@@ -1,20 +1,53 @@
 import json
 import sys
 import os
+import datetime
 
+# Aqui está certo! Os dois pontos mandam ele sair da 'src' e ir para a raiz
+CAMINHO_ESTOQUE = "../data/estoque.json"
+CAMINHO_LOG = "../data/historico_vendas.csv"
+
+# Ajuste de codificação para Windows
 if sys.platform == "win32":
     os.system('chcp 65001 > nul')
 
 def carregar_estoque():
     try:
-        with open("data/estoque.json", "r", encoding="utf-8") as f:
+        # 1. Primeiro, garantimos que a pasta existe no lugar certo (na raiz)
+        pasta_data = "../data"
+        if not os.path.exists(pasta_data): 
+            os.makedirs(pasta_data)
+        
+        # 2. AQUI ESTAVA O ERRO: Use a variável CAMINHO_ESTOQUE em vez de escrever o texto
+        with open(CAMINHO_ESTOQUE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
+def registrar_saida(codigo):
+    # Lembre-se de fazer o mesmo na função de salvar!
+    estoque = carregar_estoque()
+    if codigo in estoque:
+        # Lógica de salvar no log usando CAMINHO_LOG...
+        pass
+
 def salvar_estoque(estoque):
+    if not os.path.exists("data"): os.makedirs("data")
     with open("data/estoque.json", "w", encoding="utf-8") as f:
         json.dump(estoque, f, indent=4, ensure_ascii=False)
+
+def registrar_movimentacao_log(acao, codigo, nome, quantidade):
+    data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    arquivo_log = "data/historico_vendas.csv"
+    
+    if not os.path.exists("data"): os.makedirs("data")
+    
+    existe = os.path.exists(arquivo_log)
+    
+    with open(arquivo_log, "a", encoding="utf-8") as f:
+        if not existe:
+            f.write("Data/Hora;Ação;Código;Produto;Quantidade\n")
+        f.write(f"{data_hora};{acao};{codigo};{nome};{quantidade}\n")
 
 def registrar_saida(codigo_barras):
     estoque = carregar_estoque()
@@ -24,8 +57,10 @@ def registrar_saida(codigo_barras):
 
         if produto["quantidade"] > 0:
             produto["quantidade"] -= 1
-            # AQUI SALVAMOS A ALTERAÇÃO:
             salvar_estoque(estoque)
+            
+            # REGISTRO DE LOG (Auditoria)
+            registrar_movimentacao_log("SAÍDA", codigo_barras, produto['nome'], 1)
             
             print(f"\n✅ Saída confirmada: {produto['nome']} ({produto['estampa']})")
             print(f"📍 Localização: GAIOLA {produto['gaiola']}")
@@ -78,7 +113,6 @@ def registrar_entrada():
     codigo = input("Bipe o código do produto que chegou: ")
 
     if codigo in estoque:
-        # --- VERSÃO PREMIUM: Identifica o produto visualmente antes de pedir a quantidade ---
         produto = estoque[codigo]
         print(f"\n📦 PRODUTO IDENTIFICADO: {produto['nome']}")
         print(f"🎨 ESTAMPA: {produto['estampa']} | TAMANHO: {produto['tamanho']}")
@@ -87,20 +121,25 @@ def registrar_entrada():
             qtd_nova = int(input(f"Quanto(s) do código '{codigo}' chegaram? "))
             estoque[codigo]["quantidade"] += qtd_nova
             salvar_estoque(estoque)
+            
+            # REGISTRO DE LOG
+            registrar_movimentacao_log("ENTRADA", codigo, produto['nome'], qtd_nova)
+            
             print(f"\n✅ ESTOQUE ATUALIZADO: Agora temos {estoque[codigo]['quantidade']} unidades.")
         except ValueError:
             print("\n❌ ERRO: Digite apenas números para a quantidade!")
             
     else:
         print("\n⚠️ PRODUTO NOVO DETECTADO! Vamos cadastrar:")
-        nome = input("Nome do produto: ")
-        tamanho = input("Tamanho (King/Queen/Casal/Solteiro): ")
-        estampa = input("Nome da Estampa/Cor: ")
         try:
-            qtd = int(input("Quantidade recebida: "))
-            minimo = int(input("Alerta de estoque mínimo em quanto? "))
-            gaiola = input("Em qual gaiola vai guardar? ").upper()
-            preco = float(input("Preço de venda: R$ ").replace(',', '.'))
+            nome = input("Nome do produto: ")
+            tamanho = input("Tamanho: ")
+            estampa = input("Estampa/Cor: ")
+            qtd = int(input("Quantidade inicial: "))
+            minimo = int(input("Estoque mínimo: "))
+            gaiola = input("Gaiola: ").upper()
+            preco_v = float(input("Preço de venda: ").replace(',', '.'))
+            preco_c = float(input("Preço de custo (fábrica): ").replace(',', '.'))
 
             estoque[codigo] = {
                 "nome": nome,
@@ -109,19 +148,21 @@ def registrar_entrada():
                 "quantidade": qtd,
                 "estoque_minimo": minimo,
                 "gaiola": gaiola,
-                "preco": preco
+                "preco": preco_v,
+                "custo": preco_c
             }
             salvar_estoque(estoque)
-            print(f"\n🎉 Sucesso! '{nome}' cadastrado e disponível para venda.")
+            registrar_movimentacao_log("CADASTRO NOVO", codigo, nome, qtd)
+            print(f"\n🎉 Sucesso! '{nome}' cadastrado.")
         except ValueError:
-            print("\n❌ ERRO: Preço e Quantidade devem ser números!")
+            print("\n❌ ERRO: Verifique os valores numéricos digitados!")
 
 def menu_principal():
     print("\n--- BIPFLOW MANAGER v1.1 ---")
     print("1. Registrar Saída (Bipar)")
-    print("2. Registrar Entrada (Fábrica)") 
-    print("3. Consultar Gaiola")
-    print("4. Relatório para Fábrica")
+    print("2. Registrar Entrada") 
+    print("3. Consultar Estoque")
+    print("4. Relatório de Estoque")
     print("0. Sair")
 
 def main():

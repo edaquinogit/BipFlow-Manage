@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BipFlow - Gestão de Estoque</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white font-sans min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+        <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">BipFlow 🚀</h1>
+        
+        <div class="space-y-4">
+            <input type="text" id="codigoBip" placeholder="Bipe o código de barras..." 
+                   class="w-full p-4 rounded-lg bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xl text-center">
+            
+            <button onclick="confirmarSaida()" 
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg transition-all">
+                Confirmar Saída
+            </button>
+        </div>
+
+        <div id="resultado" class="mt-8 p-4 rounded-lg bg-slate-900 hidden border border-slate-700">
+            </div>
+    </div>
+
+    <script>
+        async function confirmarSaida() {
+            const codigo = document.getElementById('codigoBip').value;
+            const resDiv = document.getElementById('resultado');
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/saida/${codigo}`, { method: 'POST' });
+                const data = await response.json();
+                
+                resDiv.classList.remove('hidden');
+                resDiv.innerHTML = `<p class="text-green-400 text-center font-bold">✅ Saída registrada: ${codigo}</p>`;
+                document.getElementById('codigoBip').value = '';
+            } catch (err) {
+                resDiv.classList.remove('hidden');
+                resDiv.innerHTML = `<p class="text-red-400 text-center">❌ Erro ao conectar com a API</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
