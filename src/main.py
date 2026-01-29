@@ -1,188 +1,118 @@
 import json
-import sys
 import os
 import datetime
+from typing import Optional, List
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
-# Aqui está certo! Os dois pontos mandam ele sair da 'src' e ir para a raiz
-CAMINHO_ESTOQUE = "../data/estoque.json"
-CAMINHO_LOG = "../data/historico_vendas.csv"
+# --- CONFIGURAÇÕES DE SEGURANÇA ---
+SECRET_KEY = "BIPFLOW_ULTRA_SECRET" # Em produção, use variáveis de ambiente
+ALGORITHM = "HS256"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Ajuste de codificação para Windows
-if sys.platform == "win32":
-    os.system('chcp 65001 > nul')
+# --- CONFIGURAÇÕES DE CAMINHO ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+CAMINHO_ESTOQUE = os.path.join(DATA_DIR, "estoque.json")
+CAMINHO_LOG = os.path.join(DATA_DIR, "historico_movimentacao.csv")
+
+# --- MODELOS DE DADOS (PYDANTIC) ---
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class Produto(BaseModel):
+    codigo: str
+    nome: str
+    quantidade: int
+    gaiola: str
+    estoque_minimo: int
+
+# --- DATABASE LAYER (PERSISTÊNCIA) ---
+def garantir_pasta_data():
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
 
 def carregar_estoque():
+    garantir_pasta_data()
     try:
-        # 1. Primeiro, garantimos que a pasta existe no lugar certo (na raiz)
-        pasta_data = "../data"
-        if not os.path.exists(pasta_data): 
-            os.makedirs(pasta_data)
-        
-        # 2. AQUI ESTAVA O ERRO: Use a variável CAMINHO_ESTOQUE em vez de escrever o texto
         with open(CAMINHO_ESTOQUE, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-def registrar_saida(codigo):
-    # Lembre-se de fazer o mesmo na função de salvar!
-    estoque = carregar_estoque()
-    if codigo in estoque:
-        # Lógica de salvar no log usando CAMINHO_LOG...
-        pass
-
 def salvar_estoque(estoque):
-    if not os.path.exists("data"): os.makedirs("data")
-    with open("data/estoque.json", "w", encoding="utf-8") as f:
+    with open(CAMINHO_ESTOQUE, "w", encoding="utf-8") as f:
         json.dump(estoque, f, indent=4, ensure_ascii=False)
 
-def registrar_movimentacao_log(acao, codigo, nome, quantidade):
-    data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    arquivo_log = "data/historico_vendas.csv"
-    
-    if not os.path.exists("data"): os.makedirs("data")
-    
-    existe = os.path.exists(arquivo_log)
-    
-    with open(arquivo_log, "a", encoding="utf-8") as f:
+def registrar_log(acao, codigo, nome, qtd, usuario="sistema"):
+    data_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    existe = os.path.exists(CAMINHO_LOG)
+    with open(CAMINHO_LOG, "a", encoding="utf-8") as f:
         if not existe:
-            f.write("Data/Hora;Ação;Código;Produto;Quantidade\n")
-        f.write(f"{data_hora};{acao};{codigo};{nome};{quantidade}\n")
+            f.write("Data;Usuario;Acao;Codigo;Produto;Qtd\n")
+        f.write(f"{data_hora};{usuario};{acao};{codigo};{nome};{qtd}\n")
 
-def registrar_saida(codigo_barras):
+# --- AUTENTICAÇÃO ---
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None: raise HTTPException(status_code=401)
+        return email
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Sessão expirada")
+
+# --- API APP ---
+app = FastAPI(title="BipFlow API", version="2.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- ROTAS ---
+
+@app.post("/login")
+async def login(user: UserLogin):
+    # Simulação de usuário (Em prod, use um DB)
+    if user.email == "admin@bipflow.com" and user.password == "admin123":
+        token = create_access_token(data={"sub": user.email})
+        return {"access_token": token, "token_type": "bearer"}
+    raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
+
+@app.get("/estoque")
+async def listar_estoque(user: str = Depends(get_current_user)):
+    return carregar_estoque()
+
+@app.post("/produto/entrada")
+async def entrada(prod: Produto, user: str = Depends(get_current_user)):
     estoque = carregar_estoque()
-
-    if codigo_barras in estoque:
-        produto = estoque[codigo_barras]
-
-        if produto["quantidade"] > 0:
-            produto["quantidade"] -= 1
-            salvar_estoque(estoque)
-            
-            # REGISTRO DE LOG (Auditoria)
-            registrar_movimentacao_log("SAÍDA", codigo_barras, produto['nome'], 1)
-            
-            print(f"\n✅ Saída confirmada: {produto['nome']} ({produto['estampa']})")
-            print(f"📍 Localização: GAIOLA {produto['gaiola']}")
-            print(f"📦 Restam: {produto['quantidade']} unidades.")
-
-            if produto["quantidade"] <= produto["estoque_minimo"]:
-                print(f"⚠️  ALERTA: Estoque baixo! Considere repor.")
-        else:
-            print("\n❌ ERRO: Estoque zerado no sistema! Verificar urgência com a fábrica.")
-    else:
-        print("\n🚫 Código não encontrado. Cadastrar nova variação?")
-
-def consultar_gaiola(numero_gaiola):
-    estoque = carregar_estoque()
-    encontrados = []
-
-    print(f"\n--- 🔍 CONTEÚDO DA GAIOLA: {numero_gaiola} ---")
-
-    for codigo, info in estoque.items():
-        if info["gaiola"].upper() == numero_gaiola.upper():
-            encontrados.append(info)
-            status = "✅ OK" if info["quantidade"] > info["estoque_minimo"] else "⚠️  BAIXO"
-            print(f"- {info['nome']} | {info['estampa']} | Qtd: {info['quantidade']} [{status}]")
-
-    if not encontrados:
-        print("❌ Nenhuma variação encontrada para esta gaiola.")
-    print("-" * 35)
-
-def gerar_relatorio_fabrica():
-    estoque = carregar_estoque()
-    precisa_repor = False
-
-    print("\n" + "!"*40)
-    print("📋 RELATÓRIO DE REPOSIÇÃO PARA A FÁBRICA")
+    codigo = prod.codigo
     
-    for codigo, info in estoque.items():
-        if info["quantidade"] <= info["estoque_minimo"]:
-            precisa_repor = True
-            necessidade = info["estoque_minimo"] - info["quantidade"] + 5
-            print(f"🔹 {info['nome']} | {info['estampa']} ({info['tamanho']})")
-            print(f"   Status: {info['quantidade']} em estoque (Mínimo: {info['estoque_minimo']})")
-            print(f"   SUGESTÃO DE PEDIDO: +{necessidade} unidades\n")
-
-    if not precisa_repor:
-        print("✅ Tudo em dia! Nenhuma reposição urgente necessária.")
-    print("!"*40)
-
-def registrar_entrada():
-    estoque = carregar_estoque()
-    codigo = input("Bipe o código do produto que chegou: ")
-
     if codigo in estoque:
-        produto = estoque[codigo]
-        print(f"\n📦 PRODUTO IDENTIFICADO: {produto['nome']}")
-        print(f"🎨 ESTAMPA: {produto['estampa']} | TAMANHO: {produto['tamanho']}")
-        
-        try:
-            qtd_nova = int(input(f"Quanto(s) do código '{codigo}' chegaram? "))
-            estoque[codigo]["quantidade"] += qtd_nova
-            salvar_estoque(estoque)
-            
-            # REGISTRO DE LOG
-            registrar_movimentacao_log("ENTRADA", codigo, produto['nome'], qtd_nova)
-            
-            print(f"\n✅ ESTOQUE ATUALIZADO: Agora temos {estoque[codigo]['quantidade']} unidades.")
-        except ValueError:
-            print("\n❌ ERRO: Digite apenas números para a quantidade!")
-            
+        estoque[codigo]["quantidade"] += prod.quantidade
     else:
-        print("\n⚠️ PRODUTO NOVO DETECTADO! Vamos cadastrar:")
-        try:
-            nome = input("Nome do produto: ")
-            tamanho = input("Tamanho: ")
-            estampa = input("Estampa/Cor: ")
-            qtd = int(input("Quantidade inicial: "))
-            minimo = int(input("Estoque mínimo: "))
-            gaiola = input("Gaiola: ").upper()
-            preco_v = float(input("Preço de venda: ").replace(',', '.'))
-            preco_c = float(input("Preço de custo (fábrica): ").replace(',', '.'))
+        estoque[codigo] = prod.dict()
+    
+    salvar_estoque(estoque)
+    registrar_log("ENTRADA/CADASTRO", codigo, prod.nome, prod.quantidade, user)
+    return {"message": "Sucesso", "item": estoque[codigo]}
 
-            estoque[codigo] = {
-                "nome": nome,
-                "tamanho": tamanho,
-                "estampa": estampa,
-                "quantidade": qtd,
-                "estoque_minimo": minimo,
-                "gaiola": gaiola,
-                "preco": preco_v,
-                "custo": preco_c
-            }
-            salvar_estoque(estoque)
-            registrar_movimentacao_log("CADASTRO NOVO", codigo, nome, qtd)
-            print(f"\n🎉 Sucesso! '{nome}' cadastrado.")
-        except ValueError:
-            print("\n❌ ERRO: Verifique os valores numéricos digitados!")
-
-def menu_principal():
-    print("\n--- BIPFLOW MANAGER v1.1 ---")
-    print("1. Registrar Saída (Bipar)")
-    print("2. Registrar Entrada") 
-    print("3. Consultar Estoque")
-    print("4. Relatório de Estoque")
-    print("0. Sair")
-
-def main():
-    while True:
-        menu_principal()
-        opcao = input("Escolha uma opção: ")
-
-        if opcao == "1":
-            codigo = input("Bipe o código de barras: ")
-            registrar_saida(codigo)
-        elif opcao == "2":
-            registrar_entrada()
-        elif opcao == "3":
-            gaiola = input("Digite o número da gaiola: ")
-            consultar_gaiola(gaiola)
-        elif opcao == "4":
-            gerar_relatorio_fabrica()
-        elif opcao == "0":
-            print("Encerrando...")
-            break
-
-if __name__ == "__main__":
-    main()
+@app.get("/relatorio/reposicao")
+async def relatorio(user: str = Depends(get_current_user)):
+    estoque = carregar_estoque()
+    return [info for info in estoque.values() if info["quantidade"] <= info["estoque_minimo"]]

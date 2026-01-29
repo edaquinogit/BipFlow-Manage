@@ -3,43 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BipFlow - Gestão de Estoque</title>
+    <title>BipFlow | Gestão Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-white font-sans min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
-        <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">BipFlow 🚀</h1>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .soft-shadow { box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08); }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
         
-        <div class="space-y-4">
-            <input type="text" id="codigoBip" placeholder="Bipe o código de barras..." 
-                   class="w-full p-4 rounded-lg bg-slate-700 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xl text-center">
-            
-            <button onclick="confirmarSaida()" 
-                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg transition-all">
-                Confirmar Saída
+        /* Controle de visibilidade das telas */
+        .view { display: none; }
+        .view.active { display: block; }
+        .view.flex.active { display: flex; }
+    </style>
+</head>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen p-4">
+
+    <div id="toast" class="fixed top-6 right-6 hidden fade-in z-[100] px-6 py-4 rounded-2xl shadow-2xl font-bold border"></div>
+
+    <div id="view-login" class="view active min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full fade-in">
+            <div class="text-center mb-10">
+                <div class="inline-flex p-5 bg-slate-900 rounded-[2rem] mb-6 shadow-2xl">
+                    <span class="text-white text-4xl">📦</span>
+                </div>
+                <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">BipFlow</h1>
+                <p class="text-slate-500 font-medium text-sm">Gestão de Estoque Inteligente</p>
+            </div>
+
+            <div class="bg-white p-8 rounded-[2.5rem] soft-shadow border border-slate-100">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-4">E-mail</label>
+                        <input type="email" id="login-email" placeholder="seu@email.com" 
+                            class="w-full bg-slate-50 p-5 rounded-3xl outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-4">Senha</label>
+                        <input type="password" id="login-senha" placeholder="••••••••" 
+                            class="w-full bg-slate-50 p-5 rounded-3xl outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+                    </div>
+                    
+                    <button onclick="realizarLogin()" class="w-full bg-slate-900 text-white py-5 rounded-full font-bold hover:bg-blue-600 transition-all soft-shadow mt-4">
+                        Entrar no Sistema
+                    </button>
+
+                    <div class="pt-6 text-center border-t border-slate-50 mt-4">
+                        <span class="text-slate-400 text-sm">Não tem uma conta?</span>
+                        <button onclick="showView('view-cadastro')" class="text-blue-600 font-bold text-sm hover:underline ml-1 underline-offset-4">
+                            Cadastre-se aqui
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-cadastro" class="view min-h-screen flex items-center justify-center bg-slate-50">
+        <div class="max-w-md w-full fade-in">
+            <div class="bg-white p-8 rounded-[2.5rem] soft-shadow border border-slate-100">
+                <h2 class="text-2xl font-black mb-2 text-slate-900">Criar Nova Conta</h2>
+                <p class="text-slate-400 text-sm mb-6">Preencha os dados para o BipFlow</p>
+                
+                <div class="space-y-3">
+                    <input type="text" id="cad-nome-novo" placeholder="Seu Nome" class="w-full bg-slate-50 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+                    <input type="email" id="cad-email-novo" placeholder="E-mail" class="w-full bg-slate-50 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+                    <input type="password" id="cad-senha-novo" placeholder="Senha" class="w-full bg-slate-50 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-blue-500 transition-all">
+                    
+                    <button onclick="acaoCadastro()" class="w-full bg-blue-600 text-white py-5 rounded-full font-bold hover:bg-blue-700 transition-all mt-4">
+                        Criar minha conta
+                    </button>
+                    
+                    <button onclick="showView('view-login')" class="w-full text-slate-400 font-bold py-2 text-sm hover:text-slate-600 mt-2">
+                        Voltar para o Login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tela-menu" class="view max-w-2xl w-full mx-auto mt-10">
+        <header class="text-center mb-10">
+            <h2 class="text-2xl font-bold">Terminal de Operações</h2>
+            <p id="user-display" class="text-slate-400 text-xs font-bold uppercase mt-2"></p>
+        </header>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <button onclick="abrirOperacao('SAÍDA')" class="bg-white p-8 rounded-[2rem] soft-shadow flex flex-col items-center gap-4 hover:bg-slate-50 border border-slate-100 transition-all group">
+                <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-2xl group-hover:scale-110">📤</div>
+                <span class="font-bold uppercase tracking-tight text-sm">Saída de Estoque</span>
+            </button>
+            <button onclick="efetuarLogout()" class="bg-white p-8 rounded-[2rem] soft-shadow flex flex-col items-center gap-4 hover:bg-slate-50 border border-slate-100 transition-all">
+                <div class="w-16 h-16 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center text-2xl">🔒</div>
+                <span class="font-bold uppercase tracking-tight text-sm">Logout</span>
             </button>
         </div>
-
-        <div id="resultado" class="mt-8 p-4 rounded-lg bg-slate-900 hidden border border-slate-700">
-            </div>
     </div>
 
     <script>
-        async function confirmarSaida() {
-            const codigo = document.getElementById('codigoBip').value;
-            const resDiv = document.getElementById('resultado');
-            
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/saida/${codigo}`, { method: 'POST' });
-                const data = await response.json();
-                
-                resDiv.classList.remove('hidden');
-                resDiv.innerHTML = `<p class="text-green-400 text-center font-bold">✅ Saída registrada: ${codigo}</p>`;
-                document.getElementById('codigoBip').value = '';
-            } catch (err) {
-                resDiv.classList.remove('hidden');
-                resDiv.innerHTML = `<p class="text-red-400 text-center">❌ Erro ao conectar com a API</p>`;
+        const API_URL = "http://127.0.0.1:8000";
+
+        function showView(viewId) {
+            // Esconde todas as telas
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.add('hidden');
+                v.classList.remove('flex', 'active'); 
+            });
+
+            // Mostra a tela alvo
+            const target = document.getElementById(viewId);
+            if (target) {
+                target.classList.remove('hidden');
+                target.classList.add('active');
+                if (viewId === 'view-login' || viewId === 'view-cadastro') {
+                    target.classList.add('flex');
+                }
             }
+        }
+
+        async function realizarLogin() {
+            // Sua lógica de login aqui...
+            // Simulando sucesso para teste:
+            showView('tela-menu');
+        }
+
+        function efetuarLogout() {
+            localStorage.removeItem('bipflow_token');
+            showView('view-login');
+        }
+
+        function toast(msg, classes) {
+            const el = document.getElementById('toast');
+            el.innerText = msg;
+            el.className = `fixed top-6 right-6 z-[100] px-6 py-4 rounded-2xl shadow-2xl font-bold border transition-all ${classes}`;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
         }
     </script>
 </body>
