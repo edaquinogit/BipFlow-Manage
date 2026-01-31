@@ -1,0 +1,88 @@
+/* --- CONFIGURAÇÕES GERAIS --- */
+:root {
+    --primary: #0f172a; /* Slate 900 */
+    --accent: #2563eb;  /* Blue 600 */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+}
+
+/* --- ANIMAÇÕES DE TRANSIÇÃO --- */
+.fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+/* --- CUSTOMIZAÇÃO DO SCANNER (HTML5-QRCODE) --- */
+/* Isso garante que o scanner não quebre o layout e pareça profissional */
+#reader {
+    border: none !important;
+    border-radius: 1.5rem !important;
+    overflow: hidden;
+}
+
+#reader__dashboard {
+    padding: 1rem !important;
+    background: #f8fafc !important;
+}
+
+#reader__camera_selection {
+    padding: 0.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 10px;
+}
+
+#reader button {
+    background-color: var(--primary) !important;
+    color: white !important;
+    padding: 10px 20px !important;
+    border-radius: 0.75rem !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none !important;
+}
+
+#reader button:hover {
+    background-color: var(--accent) !important;
+    transform: scale(1.02);
+}
+
+/* --- ESTILIZAÇÃO DE SCROLLBAR --- */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* --- EFEITO GLASSMORPHISM PARA MODAIS --- */
+.glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
