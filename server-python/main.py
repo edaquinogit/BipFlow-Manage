@@ -114,3 +114,6 @@ async def entrada(prod: Produto):
         estoque[codigo] = prod.dict()
     salvar_json(CAMINHO_ESTOQUE, estoque)
     return {"message": "Sucesso"}
+
+if __name__ == "__main__":
+    print()
