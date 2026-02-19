@@ -1,0 +1,26 @@
+# Python e Ambientes Virtuais
+venv/
+.venv/
+*/venv/
+*/.venv/
+__pycache__/
+*.pyc
+db.sqlite3
+
+# Node.js
+node_modules/
+**/node_modules/
+dist/
+.npm/
+
+# Pastas de Legado (para não sujar o Git agora)
+archive_legacy/
+client/
+data/
+arquivos/
+server-python/
+src/
+
+# Outros
+.vscode/
+.DS_Store
