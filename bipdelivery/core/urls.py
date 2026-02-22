@@ -17,12 +17,14 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework.authtoken import views as auth_views # Usando 'as auth_views' para não confundir
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls),  # Voltamos ao padrão simples e seguro
     path('api/', include('api.urls')),
-    
-    # Agora usamos o apelido 'auth_views' que criamos acima
-    path('api-token-auth/', auth_views.obtain_auth_token, name='api-token-auth'),
 ]
+
+# Servir arquivos de mídia durante o desenvolvimento
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
