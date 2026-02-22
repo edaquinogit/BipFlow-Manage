@@ -8,6 +8,5 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'price', 'is_available')
-    list_filter = ('category', 'is_available')
-    search_fields = ('name',)
+    list_display = ('name', 'price', 'category') # Removi o is_available daqui
+    list_filter = ('category',) # Removi o is_available daqui
