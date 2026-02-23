@@ -1,170 +1,257 @@
-/* 1. VARIÁVEIS DO SISTEMA (Design Tokens) */
+/* 1. DESIGN TOKENS (Variáveis de Sistema) */
 :root {
-    /* Cores Principais */
-    --primary: #e67e22;      /* Laranja de ação */
-    --primary-dark: #d35400;
-    --accent: #670303;       /* Roxo do ícone */
+    --primary: #e67e22;      
+    --primary-hover: #d35400;
+    --secondary: #27ae60;    
+    --accent: #670303;       
     
-    /* Cores Neutras */
-    --bg-dark: #830404;      /* Fundo da página */
-    --bg-light: #f8f9fa;     /* Fundo do carrinho/cards */
-    --text-main: #333333;
+    --bg-main: #830404;      
+    --bg-card: #ffffff;
+    --bg-modal: #fcfcfc;
+    
+    --text-dark: #1a1a1a;
+    --text-muted: #666666;
     --text-white: #ffffff;
     
-    /* Espaçamentos e Bordas */
-    --radius: 12px;
-    --shadow: 0 10px 20px rgba(0,0,0,0.2);
-    --transition: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --radius-lg: 20px;
+    --radius-md: 12px;
+    --shadow-sm: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-lg: 0 20px 40px rgba(0,0,0,0.3);
+    
+    --curve: cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: 0.3s var(--curve);
 }
 
-/* 2. RESET E BASE */
+/* 2. RESET PROFISSIONAL & SCROLLBAR */
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar Moderna (Estilo macOS) */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    border: 2px solid var(--bg-main);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
 }
 
 body {
-    background-color: var(--bg-dark);
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    background-color: var(--bg-main);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: var(--text-white);
+    overflow-x: hidden;
     line-height: 1.6;
 }
 
-/* 3. LAYOUT CONTAINER */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 40px 20px;
+/* 3. HEADER & HERO */
+.main-header {
+    padding: 80px 0 50px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 100%);
+    text-align: center; /* Centralizado estilo App */
 }
 
 .main-title {
-    font-size: clamp(2rem, 5vw, 3.5rem); /* Fonte que se ajusta ao tamanho da tela */
-    font-weight: 800;
-    margin-bottom: 40px;
-    text-align: left;
+    font-size: clamp(3rem, 10vw, 5rem);
+    font-weight: 900;
+    letter-spacing: -2px;
+    text-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
-/* 4. GRID DE PRODUTOS */
+.main-title span {
+    /* 1. Fallback: Cor sólida caso o gradiente não carregue */
+    color: var(--primary); 
+    
+    /* 2. Configuração do Gradiente */
+    background-image: linear-gradient(to right, var(--primary), #f39c12);
+    
+    /* 3. Recorte do fundo no texto (Padrão de Mercado) */
+    background-clip: text;
+    -webkit-background-clip: text; /* Mantido para suporte ao Chrome/Safari/iOS */
+    
+    /* 4. Torna a cor do texto transparente para o gradiente aparecer */
+    -webkit-text-fill-color: transparent;
+    
+    /* 5. Prevenção: Garante que o fundo não se repita */
+    background-repeat: no-repeat;
+}
+
+.subtitle {
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* 4. GRID & CARDS (Refino de UI) */
+.container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
 .produtos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 32px;
+    padding: 40px 0 100px;
 }
 
-/* 5. CARDS (O Padrão Quadrado Profissional) */
 .card {
-    background: var(--bg-light);
-    border-radius: var(--radius);
-    padding: 20px;
-    color: var(--text-main);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    color: var(--text-dark);
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    transition: transform var(--transition), box-shadow var(--transition);
-    box-shadow: var(--shadow);
+    transition: all var(--transition);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(255,255,255,0.1);
+    position: relative;
 }
 
 .card:hover {
-    transform: translateY(-8px);
+    transform: translateY(-12px) scale(1.02);
+    box-shadow: var(--shadow-lg);
 }
 
 .card img {
     width: 100%;
-    height: 180px;
+    height: 220px;
     object-fit: cover;
-    border-radius: calc(var(--radius) - 4px);
+    transition: transform 0.6s var(--curve);
 }
 
-.card-content h3 { font-size: 1.3rem; margin-bottom: 5px; }
-.card-content p { color: #1d1a1a; font-size: 0.9rem; height: 40px; overflow: hidden; }
-.price { font-size: 1.25rem; font-weight: bold; color: var(--bg-dark); }
+.card:hover img {
+    transform: scale(1.1);
+}
 
-/* 6. BOTÕES */
+.card-content {
+    padding: 24px;
+    flex-grow: 1;
+}
+
+.card-content h3 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    color: #111;
+}
+
+.card-content p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin-bottom: 12px;
+
+    /* 1. Usamos o overflow oculto primeiro */
+    overflow: hidden;
+
+    /* 2. A sintaxe que silencia erros de editores modernos */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    
+    /* 3. Se o erro persistir, o editor está pedindo a versão padrão: */
+    line-clamp: 2; 
+    -webkit-line-clamp: 2;
+
+    /* 4. Altura de segurança (Fallback) */
+    max-height: 2.8rem; 
+}
+
+.price {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--bg-main);
+    margin-top: 10px;
+}
+
 .btn-adicionar {
-    background-color: var(--primary);
-    color: var(--text-white);
+    margin: 0 24px 24px;
+    background: var(--primary);
+    color: white;
     border: none;
-    padding: 14px;
-    border-radius: 8px;
-    font-weight: bold;
+    padding: 18px;
+    border-radius: var(--radius-md);
+    font-weight: 800;
     cursor: pointer;
+    transition: all 0.2s ease;
     text-transform: uppercase;
-    transition: background var(--transition);
+    box-shadow: 0 4px 12px rgba(230, 126, 34, 0.2);
 }
 
-.btn-adicionar:hover { background-color: var(--primary-dark); }
+.btn-adicionar:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(230, 126, 34, 0.4);
+}
 
-/* 7. SISTEMA DE CARRINHO (MODAL) */
+/* 5. FLOATING CART (Padrão Senior UX) */
 #cart-icon {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
-    background: var(--accent);
-    color: var(--text-white);
-    padding: 15px 25px;
-    border-radius: 50px;
+    bottom: 40px;
+    right: 40px;
+    background: var(--primary);
+    padding: 0 30px;
+    height: 65px;
+    min-width: 180px;
+    border-radius: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    border: 2px solid rgba(255,255,255,0.1);
     cursor: pointer;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
     z-index: 1000;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: bold;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+    transition: all var(--transition);
 }
 
-.modal-carrinho {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 100%;
-    max-width: 400px;
-    height: 100%;
-    background: var(--bg-light);
-    color: var(--text-main);
-    z-index: 1001;
-    transition: var(--transition);
-    display: flex;
-    flex-direction: column;
-    box-shadow: -10px 0 30px rgba(0,0,0,0.2);
+#cart-icon:hover {
+    transform: scale(1.05) translateY(-5px);
+    background: var(--primary-hover);
 }
 
-.modal-carrinho.active { right: 0; }
+#cart-icon .icon { font-size: 1.6rem; }
 
-.modal-header {
-    padding: 20px;
-    background: #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-body { flex: 1; overflow-y: auto; padding: 20px; }
-
-/* 8. ITENS DENTRO DO CARRINHO */
-.item-no-carrinho {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 0;
-    border-bottom: 1px solid #ddd;
-}
-
-.btn-remover {
-    background: #ff7675;
-    border: none;
-    padding: 5px 8px;
-    border-radius: 4px;
+#cart-icon::after {
+    content: "CONFERIR PEDIDO";
+    font-weight: 800;
     color: white;
-    cursor: pointer;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
 }
 
-/* 9. OVERLAY */
-#overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    z-index: 1000;
+.badge {
+    background: white;
+    color: var(--primary);
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
-#overlay.active { display: block; }
+
+/* Animações */
+.cart-pop { animation: cartPop 0.4s var(--curve); }
+@keyframes cartPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2) rotate(-5deg); }
+    100% { transform: scale(1); }
+}
