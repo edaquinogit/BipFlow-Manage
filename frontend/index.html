@@ -2,28 +2,60 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>BipDelivery - Menu</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="BipDelivery - O melhor sistema de pedidos de hambúrgueres e pastéis com entrega rápida.">
     
+    <title>BipDelivery | Menu Oficial</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap">
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <h1>🍔 Nosso Cardápio (Live Data)</h1>
+    <header class="main-header">
+        <div class="container">
+            <h1 class="main-title">Bip<span>Delivery</span></h1>
+            <p class="subtitle">Escolha o seu sabor favorito e peça agora!</p>
+        </div>
+    </header>
 
-    <div id="carrinho-resumo" style="background: white; padding: 20px; text-align: center; border-bottom: 2px solid #eee;">
-    <h2>🛒 Seu Pedido</h2>
-    <div id="itens-carrinho">
-        <p>O carrinho está vazio.</p>
-    </div>
-    <p><strong>Total: R$ <span id="total-valor">0.00</span></strong></p>
-    <button id="finalizar-pedido" style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">
-        Finalizar no WhatsApp
-    </button>
-</div>
-
-<main id="produtos-container" class="container">
+    <main class="container">
+        <section id="menu" aria-label="Menu de Produtos">
+            <div id="produtos-container" class="produtos-grid">
+                <div class="loading-state">Carregando delícias...</div>
+            </div>
+        </section>
     </main>
 
-<script src="script.js"></script>
+    <button id="cart-icon" onclick="toggleCarrinho()" aria-label="Abrir carrinho de compras">
+        <span class="icon">🛒</span>
+        <span id="cart-count" class="badge">0</span>
+    </button>
+
+    <aside id="carrinho-modal" class="modal-carrinho" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal-header">
+            <h2 id="modal-title">Seu Pedido</h2>
+            <button onclick="toggleCarrinho()" class="close-btn" aria-label="Fechar carrinho">&times;</button>
+        </div>
+
+        <div id="itens-carrinho" class="modal-body">
+            </div>
+
+        <footer class="modal-footer">
+            <div class="total-container">
+                <span>Total Estimado</span>
+                <span class="total-price">R$ <span id="total-valor">0.00</span></span>
+            </div>
+            <button id="finalizar-pedido" class="btn-finalizar-checkout">
+                Finalizar via WhatsApp
+            </button>
+        </footer>
+    </aside>
+
+    <div id="overlay" onclick="toggleCarrinho()"></div>
+
+    <script src="script.js"></script>
 </body>
 </html>
