@@ -154,19 +154,11 @@ body {
     font-size: 0.95rem;
     line-height: 1.4;
     margin-bottom: 12px;
-
-    /* 1. Usamos o overflow oculto primeiro */
     overflow: hidden;
-
-    /* 2. A sintaxe que silencia erros de editores modernos */
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    
-    /* 3. Se o erro persistir, o editor está pedindo a versão padrão: */
     line-clamp: 2; 
     -webkit-line-clamp: 2;
-
-    /* 4. Altura de segurança (Fallback) */
     max-height: 2.8rem; 
 }
 
@@ -197,61 +189,187 @@ body {
     box-shadow: 0 6px 15px rgba(230, 126, 34, 0.4);
 }
 
-/* 5. FLOATING CART (Padrão Senior UX) */
-#cart-icon {
+/* 1. SIDEBAR CART: ESTRUTURA PRINCIPAL */
+.modal-carrinho {
     position: fixed;
-    bottom: 40px;
-    right: 40px;
-    background: var(--primary);
-    padding: 0 30px;
-    height: 65px;
-    min-width: 180px;
-    border-radius: 100px;
+    top: 0;
+    right: -100%; /* Escondido */
+    width: 100%;
+    max-width: 420px;
+    height: 100vh;
+    background: var(--bg-modal);
+    z-index: 2000;
+    transition: right 0.6s var(--curve);
+    box-shadow: -15px 0 45px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    border-radius: 30px 0 0 30px; /* Bordas suaves à esquerda */
+}
+
+.modal-carrinho.active {
+    right: 0;
+}
+
+/* 2. BODY: LISTA DE ITENS COM SCROLL REFINADO */
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Estilização do Item no Carrinho */
+.item-no-carrinho {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 15px;
-    border: 2px solid rgba(255,255,255,0.1);
-    cursor: pointer;
-    z-index: 1000;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-    transition: all var(--transition);
-}
-
-#cart-icon:hover {
-    transform: scale(1.05) translateY(-5px);
-    background: var(--primary-hover);
-}
-
-#cart-icon .icon { font-size: 1.6rem; }
-
-#cart-icon::after {
-    content: "CONFERIR PEDIDO";
-    font-weight: 800;
-    color: white;
-    font-size: 0.85rem;
-    letter-spacing: 1px;
-}
-
-.badge {
+    justify-content: space-between;
+    padding: 16px;
     background: white;
+    border-radius: var(--radius-md);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.3s var(--curve);
+}
+
+.item-no-carrinho:hover {
+    transform: scale(1.02);
+    border-color: var(--primary);
+}
+
+.item-info strong {
+    display: block;
+    color: var(--text-dark);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.item-info small {
     color: var(--primary);
-    min-width: 24px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 12px;
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+/* 3. CONTROLES DE QUANTIDADE (+ / -) */
+.item-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f8f9fa;
+    padding: 6px 12px;
+    border-radius: 50px;
+}
+
+.btn-qty {
+    background: none;
+    border: none;
+    color: var(--text-dark);
+    cursor: pointer;
     font-size: 0.8rem;
-    font-weight: 900;
+    transition: color 0.2s;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
-/* Animações */
-.cart-pop { animation: cartPop 0.4s var(--curve); }
-@keyframes cartPop {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2) rotate(-5deg); }
-    100% { transform: scale(1); }
+.btn-qty:hover {
+    color: var(--primary);
+}
+
+/* 4. FOOTER: RESUMO DO PEDIDO */
+.modal-footer {
+    padding: 30px 24px;
+    background: white;
+    border-top: 1px solid #eee;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.03);
+}
+
+.price-summary {
+    margin-bottom: 24px;
+}
+
+.summary-line {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 2px dashed #eee;
+}
+
+.total-line span:first-child {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.total-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--bg-main); /* Seu vermelho principal */
+}
+
+/* 5. OVERLAY (O Efeito de desfoque no fundo) */
+.overlay-blur {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(8px);
+    z-index: 1500;
+    display: none;
+}
+
+.overlay-blur.active {
+    display: block;
+}
+
+.dot.pulse {
+    width: 8px;
+    height: 8px;
+    background-color: #27ae60;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7);
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+}
+
+.empty-cart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-muted);
+    gap: 15px;
+    opacity: 0.6;
+}
+
+.empty-cart i {
+    font-size: 3rem;
+}
+
+.empty-cart p {
+    font-size: 1.1rem;
+    font-weight: 500;
 }

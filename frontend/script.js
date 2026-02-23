@@ -1,23 +1,23 @@
 /**
- * BipDelivery - Core Script
- * Padrão: Clean Code & Modular JS
+ * BipDelivery - Core Script v2.0
+ * Refatorado para UX Moderna e Performance
  */
 
-// 1. CONFIGURAÇÕES GERAIS (Fácil de editar posteriormente)
+// 1. CONFIGURAÇÕES GERAIS
 const CONFIG = {
     API_URL: 'http://127.0.0.1:8000/api/produtos/',
     TELEFONE_WHATSAPP: '5511999999999',
-    MOEDA: 'R$',
-    MENSAGEM_BOAS_VINDAS: "🍔 *Novo Pedido - BipDelivery*\n\n"
+    MOEDA: 'BRL',
+    MENSAGEM_BOAS_VINDAS: "🍔 *BipDelivery - Novo Pedido*\n"
 };
 
-// 2. ESTADO DA APLICAÇÃO (Single Source of Truth)
+// 2. ESTADO DA APLICAÇÃO
 let state = {
     carrinho: [],
     produtos: []
 };
 
-// 3. SELETORES DOM (Cache de elementos para performance)
+// 3. SELETORES DOM
 const DOM = {
     container: document.getElementById('produtos-container'),
     listaCarrinho: document.getElementById('itens-carrinho'),
@@ -28,17 +28,26 @@ const DOM = {
     overlay: document.getElementById('overlay')
 };
 
-// 4. LÓGICA DE PRODUTOS (Fetching & Rendering)
+// 4. FORMATADORES (Padrão Internacional)
+const formatarMoeda = (valor) => {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: CONFIG.MOEDA });
+};
+
+// 5. LÓGICA DE PRODUTOS
 async function carregarProdutos() {
     try {
         const response = await fetch(CONFIG.API_URL);
-        if (!response.ok) throw new Error('Falha ao conectar com o servidor');
+        if (!response.ok) throw new Error('Falha na API');
         
         state.produtos = await response.json();
         renderizarProdutos();
     } catch (error) {
-        console.error('Erro crítico no carregamento:', error);
-        DOM.container.innerHTML = `<p class="error-msg">Ops! Ocorreu um erro ao carregar o menu. Tente novamente.</p>`;
+        console.error('❌ Erro:', error);
+        DOM.container.innerHTML = `
+            <div class="error-state">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <p>O cardápio está sendo atualizado. Volte em instantes!</p>
+            </div>`;
     }
 }
 
@@ -47,15 +56,19 @@ function renderizarProdutos() {
     
     DOM.container.innerHTML = state.produtos.map(prod => `
         <article class="card">
-            ${renderImagem(prod)}
-            <div class="card-content">
-                <h3>${prod.name || 'Produto'}</h3>
-                <p>${prod.description || 'Sabor inigualável BipDelivery'}</p>
-                <p class="price">${CONFIG.MOEDA} ${parseFloat(prod.price).toFixed(2)}</p>
+            <div class="card-img-wrapper">
+                ${renderImagem(prod)}
             </div>
-            <button class="btn-adicionar" onclick="adicionarAoCarrinho('${prod.name}', ${prod.price})">
-                Adicionar ao Pedido
-            </button>
+            <div class="card-content">
+                <h3>${prod.name}</h3>
+                <p>${prod.description || 'Sabor exclusivo BipDelivery.'}</p>
+                <div class="card-footer">
+                    <span class="price">${formatarMoeda(parseFloat(prod.price))}</span>
+                    <button class="btn-adicionar" onclick="adicionarAoCarrinho('${prod.name}', ${prod.price})">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
         </article>
     `).join('');
 }
@@ -63,20 +76,17 @@ function renderizarProdutos() {
 function renderImagem(prod) {
     return prod.image && prod.image !== "null" 
         ? `<img src="${prod.image}" alt="${prod.name}" loading="lazy">`
-        : `<div class="sem-foto"><i class="fa-solid fa-utensils"></i></div>`;
+        : `<div class="sem-foto"><i class="fa-solid fa-burger"></i></div>`;
 }
 
-// 5. LÓGICA DO CARRINHO (Business Logic)
+// 6. LÓGICA DO CARRINHO (Business Logic)
 
 function adicionarAoCarrinho(nome, preco) {
-    // 1. Tenta encontrar se o item já está no carrinho
     const itemExistente = state.carrinho.find(item => item.nome === nome);
 
     if (itemExistente) {
-        // Se existe, apenas aumenta a quantidade
         itemExistente.quantidade += 1;
     } else {
-        // Se é novo, adiciona o objeto completo com quantidade inicial 1
         state.carrinho.push({ 
             nome, 
             preco: parseFloat(preco), 
@@ -84,20 +94,21 @@ function adicionarAoCarrinho(nome, preco) {
         });
     }
 
-    // 2. Feedback Visual e UI (O que você já fez, que está ótimo!)
-    atualizarInterface();
-    
+    // Feedback Visual
     const cartBtn = document.getElementById('cart-icon');
-    if (cartBtn) {
-        cartBtn.classList.add('cart-pop');
-        setTimeout(() => cartBtn.classList.remove('cart-pop'), 300);
-    }
+    cartBtn.classList.add('cart-pop');
+    setTimeout(() => cartBtn.classList.remove('cart-pop'), 300);
 
-    console.log(`✅ ${itemExistente ? 'Incrementado' : 'Adicionado'}: ${nome}`);
+    atualizarInterface();
 }
 
-function removerDoCarrinho(index) {
-    state.carrinho.splice(index, 1);
+function alterarQuantidade(index, delta) {
+    state.carrinho[index].quantidade += delta;
+    
+    if (state.carrinho[index].quantidade <= 0) {
+        state.carrinho.splice(index, 1);
+    }
+    
     atualizarInterface();
 }
 
@@ -112,65 +123,109 @@ function renderizarCarrinho() {
     if (state.carrinho.length === 0) {
         DOM.listaCarrinho.innerHTML = `
             <div class="empty-cart">
-                <i class="fa-solid fa-cart-flatbed"></i>
-                <p>Seu carrinho está vazio.<br><small>Que tal um pastelzinho?</small></p>
+                <i class="fa-solid fa-basket-shopping"></i>
+                <p>Seu carrinho está vazio</p>
             </div>`;
         return;
     }
 
     DOM.listaCarrinho.innerHTML = state.carrinho.map((item, index) => `
-        <div class="item-no-carrinho">
+        <div class="item-no-carrinho anim-slide-in">
             <div class="item-info">
-                <strong>${item.nome}</strong>
-                <small>${CONFIG.MOEDA} ${item.preco.toFixed(2)}</small>
+                <strong>${item.quantidade}x ${item.nome}</strong>
+                <small>${formatarMoeda(item.preco * item.quantidade)}</small>
             </div>
-            <button class="btn-remover" onclick="removerDoCarrinho(${index})">
-                <i class="fa-solid fa-trash-can"></i>
-            </button>
+            <div class="item-controls">
+                <button onclick="alterarQuantidade(${index}, -1)" class="btn-qty"><i class="fa-solid fa-minus"></i></button>
+                <button onclick="alterarQuantidade(${index}, 1)" class="btn-qty"><i class="fa-solid fa-plus"></i></button>
+            </div>
         </div>
     `).join('');
 }
 
 function calcularTotais() {
-    const total = state.carrinho.reduce((acc, item) => acc + item.preco, 0);
+    const total = state.carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    const totalItens = state.carrinho.reduce((acc, item) => acc + item.quantidade, 0);
     
     if (DOM.total) DOM.total.innerText = total.toFixed(2);
     if (DOM.subtotal) DOM.subtotal.innerText = total.toFixed(2);
-    if (DOM.contador) DOM.contador.innerText = state.carrinho.length;
+    if (DOM.contador) DOM.contador.innerText = totalItens;
 }
 
-// 6. INTERAÇÕES DE UI
+// 7. FINALIZAÇÃO & UI (UX Refinada)
 function toggleCarrinho() {
-    const isActive = DOM.modal.classList.toggle('active');
-    DOM.overlay.classList.toggle('active');
+    const isOpening = !DOM.modal.classList.contains('active');
     
-    // Melhora acessibilidade ao abrir
-    DOM.modal.setAttribute('aria-hidden', !isActive);
+    DOM.modal.classList.toggle('active');
+    DOM.overlay.classList.toggle('active');
+
+    // Bloqueia o scroll do body ao abrir o carrinho (Padrão Apps Premium)
+    document.body.style.overflow = isOpening ? 'hidden' : 'auto';
 }
 
-function finalizarPedido() {
+async function finalizarPedido() {
+    const btnFinalizar = document.getElementById('finalizar-pedido');
+    
+    // 1. Validação de Segurança
     if (state.carrinho.length === 0) {
-        alert("Adicione pelo menos um item para finalizar!");
+        alert("Seu carrinho está vazio! Adicione algo gostoso antes de fechar o pedido. 🍔");
         return;
     }
 
-    let mensagem = CONFIG.MENSAGEM_BOAS_VINDAS;
-    state.carrinho.forEach(item => {
-        mensagem += `• ${item.nome} (${CONFIG.MOEDA} ${item.preco.toFixed(2)})\n`;
-    });
+    // 2. Feedback Visual de "Processando"
+    const originalText = btnFinalizar.innerHTML;
+    btnFinalizar.disabled = true;
+    btnFinalizar.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Preparando Pedido...`;
 
-    const total = DOM.total.innerText;
-    mensagem += `\n*Total: ${CONFIG.MOEDA} ${total}*`;
+    try {
+        // 3. Construção da Mensagem Profissional
+        let mensagem = `${CONFIG.MENSAGEM_BOAS_VINDAS}`;
+        mensagem += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+        
+        state.carrinho.forEach(item => {
+            const subtotalItem = (item.preco * item.quantidade).toFixed(2);
+            mensagem += `*${item.quantidade}x* ${item.nome.padEnd(15)} → R$ ${subtotalItem}\n`;
+        });
 
-    const url = `https://wa.me/${CONFIG.TELEFONE_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
-    window.open(url, '_blank');
+        const totalPedido = state.carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0).toFixed(2);
+        
+        mensagem += `\n━━━━━━━━━━━━━━━━━━━━`;
+        mensagem += `\n💰 *Total: R$ ${totalPedido}*`;
+        mensagem += `\n\n📍 *Por favor, informe abaixo:*`;
+        mensagem += `\n• Nome:`;
+        mensagem += `\n• Endereço de Entrega:`;
+        mensagem += `\n• Forma de Pagamento:`;
+
+        // 4. Pequeno delay para simular processamento (Melhora a percepção de valor do usuário)
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // 5. Disparo do WhatsApp
+        const url = `https://wa.me/${CONFIG.TELEFONE_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
+        window.open(url, '_blank');
+
+    } catch (error) {
+        console.error("Erro ao finalizar:", error);
+        alert("Ops! Houve um problema ao gerar seu pedido. Tente novamente.");
+    } finally {
+        // Restaura o botão
+        btnFinalizar.disabled = false;
+        btnFinalizar.innerHTML = originalText;
+    }
 }
 
-// 7. INICIALIZAÇÃO (Bootstrap)
+// 8. BOOTSTRAP (Inicialização Segura)
 window.addEventListener('DOMContentLoaded', () => {
+    // Inicializa produtos
     carregarProdutos();
     
-    // Event Listeners
+    // Configura Listeners de forma limpa (Sem onclick no HTML)
     const btnFinalizar = document.getElementById('finalizar-pedido');
-    if (btnFinalizar) btnFinalizar.addEventListener('click', finalizarPedido);
+    if (btnFinalizar) {
+        btnFinalizar.addEventListener('click', finalizarPedido);
+    }
+
+    // Fecha carrinho ao clicar no overlay
+    if (DOM.overlay) {
+        DOM.overlay.addEventListener('click', toggleCarrinho);
+    }
 });

@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="BipDelivery - Peça os melhores hambúrgueres e pastéis com entrega rápida em sua região.">
-    <meta name="theme-color" content="#e67e22">
+    <meta name="description" content="BipDelivery - Os melhores hambúrgueres e pastéis com entrega rápida.">
+    <meta name="theme-color" content="#830404">
     
-    <title>BipDelivery | O Melhor Menu de Delivery</title>
+    <title>BipDelivery | Menu de Elite</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <link rel="stylesheet" href="style.css">
@@ -19,25 +18,28 @@
 <body>
 
     <header class="main-header">
-        <div class="container header-content">
-            <div class="brand">
+        <div class="container">
+            <div class="brand-wrapper">
                 <h1 class="main-title">Bip<span>Delivery</span></h1>
-                <div class="status-badge"><span class="dot"></span> Aberto agora</div>
+                <div class="status-badge">
+                    <span class="dot pulse"></span> Aberto agora
+                </div>
             </div>
-            <p class="subtitle">A praticidade do Delivery na sua porta.</p>
+            <p class="subtitle">A experiência do verdadeiro delivery na sua porta.</p>
         </div>
     </header>
 
-    <nav class="categories-nav container">
-        <button class="cat-item active" data-category="todos">Todos</button>
-<button class="cat-item" data-category="hamburguer">Hambúrgueres</button>
-<button class="cat-item" data-category="pastel">Pastéis</button>
-<button class="cat-item" data-category="bebida">Bebidas</button>
+    <nav class="categories-nav container" aria-label="Categorias de produtos">
+        <button class="cat-item active" data-category="todos">🔥 Todos</button>
+        <button class="cat-item" data-category="hamburguer">🍔 Hambúrgueres</button>
+        <button class="cat-item" data-category="pastel">🥟 Pastéis</button>
+        <button class="cat-item" data-category="bebida">🥤 Bebidas</button>
     </nav>
 
     <main class="container">
-        <section id="menu" aria-label="Menu de Produtos">
+        <section id="menu">
             <div id="produtos-container" class="produtos-grid">
+                <div class="skeleton-card"></div>
                 <div class="skeleton-card"></div>
                 <div class="skeleton-card"></div>
                 <div class="skeleton-card"></div>
@@ -45,43 +47,44 @@
         </section>
     </main>
 
-    <button id="cart-icon" class="floating-cart" onclick="toggleCarrinho()" aria-label="Ver meu pedido">
+    <button id="cart-icon" onclick="toggleCarrinho()" aria-label="Abrir carrinho de compras">
         <div class="cart-wrapper">
             <i class="fa-solid fa-bag-shopping"></i>
             <span id="cart-count" class="badge">0</span>
         </div>
-        <span class="cart-label">Meu Carrinho</span>
+        <span class="cart-label">Ver Pedido</span>
     </button>
 
-    <aside id="carrinho-modal" class="modal-carrinho" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <aside id="carrinho-modal" class="modal-carrinho">
         <div class="modal-header">
-            <h2 id="modal-title"><i class="fa-solid fa-cart-shopping"></i> Seu Pedido</h2>
-            <button onclick="toggleCarrinho()" class="close-btn" aria-label="Fechar carrinho">
+            <h2><i class="fa-solid fa-receipt"></i> Meu Pedido</h2>
+            <button onclick="toggleCarrinho()" class="close-btn">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
 
         <div id="itens-carrinho" class="modal-body">
-            </div>
+            <div class="empty-cart-msg">Seu carrinho está vazio</div>
+        </div>
 
         <footer class="modal-footer">
             <div class="price-summary">
                 <div class="summary-line">
                     <span>Subtotal</span>
-                    <span>R$ <span id="subtotal-valor">0.00</span></span>
+                    <span class="value">R$ <span id="subtotal-valor">0,00</span></span>
                 </div>
                 <div class="summary-line">
                     <span>Taxa de Entrega</span>
-                    <span class="free-delivery">Grátis</span>
+                    <span class="value delivery-free">Grátis</span>
                 </div>
-                <div class="summary-line total">
+                <div class="total-line">
                     <span>Total</span>
-                    <span class="final-price">R$ <span id="total-valor">0.00</span></span>
+                    <span class="total-value">R$ <span id="total-valor">0,00</span></span>
                 </div>
             </div>
             
-            <button id="finalizar-pedido" class="btn-checkout">
-                <span>Finalizar Pedido</span>
+            <button id="finalizar-pedido" class="btn-checkout" onclick="enviarWhatsApp()">
+                <span>Finalizar pelo WhatsApp</span>
                 <i class="fa-brands fa-whatsapp"></i>
             </button>
         </footer>
