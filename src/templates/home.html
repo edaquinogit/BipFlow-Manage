@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/home.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="hero-section">
+    <header class="main-header container">
+        <div class="brand-wrapper">
+            <p class="subtitle">Fast &amp; Tasty Delivery</p>
+            <h1 class="main-title">Bip<span>Flow</span></h1>
+        </div>
+
+        <!-- Navegação de categorias -->
+        <nav class="categories-nav" aria-label="Filtro de categorias">
+            <!-- Conteúdo dinâmico via JS -->
+        </nav>
+    </header>
+
+    <!-- Botão hamburguer -->
+    <button class="menu-toggle" aria-label="Abrir filtros">&#9776;</button>
+
+    <!-- Menu lateral com filtros -->
+    <aside class="filters-sidebar" aria-label="Filtros de comida">
+        <h2 class="filters-sidebar__title">Filtros de Comida</h2>
+        <form class="filters-sidebar__form">
+            <label class="filters-sidebar__option">
+                <input type="checkbox" name="pizza"> Pizza
+            </label>
+            <label class="filters-sidebar__option">
+                <input type="checkbox" name="hamburguer"> Hambúrguer
+            </label>
+            <label class="filters-sidebar__option">
+                <input type="checkbox" name="salada"> Salada
+            </label>
+            <label class="filters-sidebar__option">
+                <input type="checkbox" name="sobremesa"> Sobremesa
+            </label>
+
+            <button type="submit" class="filters-sidebar__apply">Adicionar Filtro</button>
+        </form>
+    </aside>
+</section>
+
+<main class="content-wrapper container">
+    <div id="produtos-container" class="product-grid">
+        <div class="loading-state">
+            <div class="skeleton-loader"></div>
+            <p>Preparando seu cardápio...</p>
+        </div>
+    </div>
+</main>
+
+{% include "partials/_cart.html" %}
+
+<div id="overlay-cart" class="overlay-blur"></div>
+{% endblock %}

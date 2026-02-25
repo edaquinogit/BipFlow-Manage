@@ -1,26 +1,27 @@
-# Python e Ambientes Virtuais
-venv/
+# Python & Virtual Environments
 .venv/
-*/venv/
-*/.venv/
+venv/
+env/
+ENV/
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Django
 db.sqlite3
+staticfiles/
+media/
+*.log
 
-# Node.js
-node_modules/
-**/node_modules/
-dist/
-.npm/
-
-# Pastas de Legado (para não sujar o Git agora)
-archive_legacy/
-client/
-data/
-arquivos/
-server-python/
-src/
-
-# Outros
+# IDEs
 .vscode/
+.idea/
 .DS_Store
+
+# Environments
+.env
+.env.*
+
+# Frontend
+node_modules/
+dist/
+build/

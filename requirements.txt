@@ -1,0 +1,12 @@
+Django==6.0.2
+django-cors-headers==4.0.0
+# Utilities
+python-dotenv==1.0.0
+Pillow==10.0.0
+
+# Database (opcional - SQLite é padrão)
+# psycopg2-binary==2.9.6  # Descomente para PostgreSQL
+
+# Testing
+pytest==7.4.0
+pytest-django==4.5.2
