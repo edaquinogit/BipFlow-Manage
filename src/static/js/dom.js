@@ -54,16 +54,27 @@ export class Dom {
     }
 
     renderProducts(products) {
-        if (!this.produtosContainer) return;
-        this.produtosContainer.innerHTML = products.map(p => `
-            <div class="product-card">
+    // 1. Verificação de segurança (O que te diferencia de um iniciante)
+    if (!this.produtosContainer) return;
+
+    // 2. Gera o HTML de todos os produtos de uma vez
+    this.produtosContainer.innerHTML = products.map(p => `
+        <div class="product-card">
+            <div class="product-info">
                 <h3>${p.name}</h3>
-                <p>${p.description}</p>
+                <p>${p.description || ''}</p>
                 <div class="product-footer">
                     <span>R$ ${parseFloat(p.price).toFixed(2)}</span>
-                    <button class="add-btn">+</button>
+                    
+                    <button class="btn-add" 
+                            data-id="${p.id}" 
+                            data-nome="${p.name}" 
+                            data-preco="${p.price}">
+                        +
+                    </button>
                 </div>
             </div>
-        `).join('');
-    }
+        </div>
+    `).join('');
+}
 }

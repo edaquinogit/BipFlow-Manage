@@ -1,0 +1,37 @@
+<button id="cart-icon" onclick="toggleCarrinho()" aria-label="Abrir carrinho">
+    <div class="cart-wrapper">
+        <i class="fa-solid fa-bag-shopping"></i>
+        <span id="cart-count" class="badge">0</span>
+    </div>
+    <span class="cart-label">Ver Pedido</span>
+</button>
+
+<aside id="carrinho-modal" class="modal-carrinho">
+    <div class="modal-header">
+        <h2><i class="fa-solid fa-receipt"></i> Meu Pedido</h2>
+        <button onclick="toggleCarrinho()" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div id="itens-carrinho" class="modal-body">
+        <div class="empty-cart-msg">Seu carrinho está vazio</div>
+    </div>
+
+    <footer class="modal-footer">
+        <div class="price-summary">
+            <div class="summary-line">
+                <span>Subtotal</span>
+                <span class="value">R$ <span id="subtotal-valor">0,00</span></span>
+            </div>
+            <div class="total-line">
+                <span>Total</span>
+                <span class="total-value">R$ <span id="total-valor">0,00</span></span>
+            </div>
+        </div>
+        <button id="finalizar-pedido" class="btn-checkout" onclick="enviarWhatsApp()">
+            <span>Finalizar pelo WhatsApp</span>
+            <i class="fa-brands fa-whatsapp"></i>
+        </button>
+    </footer>
+</aside>
+
+<div id="overlay-cart" class="overlay-blur" onclick="toggleCarrinho()"></div>

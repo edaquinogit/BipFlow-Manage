@@ -8,11 +8,11 @@
     --transition: 0.3s ease-in-out;
 }
 
-/* Sidebar - Oculta por padrão à esquerda */
+/* Sidebar - Refatorada para não sobrepor */
 .filters-sidebar {
     position: fixed;
     top: 0;
-    left: -320px; /* Fora da tela */
+    left: -320px; 
     width: 300px;
     height: 100vh;
     background: var(--white);
@@ -20,16 +20,33 @@
     padding: 20px;
     box-shadow: 4px 0 15px rgba(0,0,0,0.2);
     transition: var(--transition);
+    
+    /* SEGURANÇA EXTRA: Impede que o menu bloqueie a tela quando fechado */
+    visibility: hidden;
+    pointer-events: none;
 }
 
-/* Isso faz a mágica acontecer quando o JS adiciona a classe */
+/* Estado Ativo: Limpo e sem !important desnecessário */
 .filters-sidebar.active {
-    left: 0 !important;
-    display: block !important;
+    left: 0;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Overlay: Garante que o fundo escuro também suma completamente */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: none; /* Mantemos o display none aqui porque ele é binário */
 }
 
 .sidebar-overlay.active {
-    display: block !important;
+    display: block;
 }
 
 /* Overlay (Fundo escuro atrás da sidebar) */

@@ -78,16 +78,24 @@ export class MenuSidebar {
   }
 
   /**
-   * Alterna visibilidade do sidebar.
-   */
-  toggleSidebar() {
-    if (!this.dom?.sidebar || !this.dom?.overlay) return;
+ * Alterna visibilidade do sidebar.
+ */
+toggleSidebar() {
+    // 1. Proteção: Se os elementos não existirem, para aqui.
+    if (!this.dom?.sidebar || !this.dom?.overlay) {
+        console.warn("⚠️ BipFlow: Elementos da sidebar não encontrados.");
+        return;
+    }
 
+    // 2. Alterna a classe 'active' (O CSS novo cuidará do resto)
     const isActive = this.dom.sidebar.classList.toggle('active');
+    
+    // 3. Sincroniza o overlay com o estado da sidebar
     this.dom.overlay.classList.toggle('active', isActive);
 
-    document.body.style.overflow = isActive ? 'hidden' : 'auto';
-  }
+    // 4. Trava o scroll da página quando o menu está aberto (UX Premium)
+    document.body.style.overflow = isActive ? 'hidden' : '';
+}
 
   /**
    * Fecha o sidebar.
