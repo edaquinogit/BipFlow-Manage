@@ -1,18 +1,16 @@
 import os
 from pathlib import Path
 
-# BASE_DIR é /BipFlow-Manage/bipdelivery
+# 1. BASE_DIR aponta para a raiz: /home/ednal/projetos/BipFlow-Manage
+# Se o settings.py está em /core/settings.py, subimos 2 níveis.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Raiz do Projeto (BipFlow-Manage) - Subindo um nível a partir de bipdelivery
-PROJECT_ROOT = BASE_DIR.parent
-
-# Configurações de Segurança
+# 2. Configurações de Segurança
 SECRET_KEY = 'django-insecure-p#994+*a+ah%p$u=i96^-ntbfax!xc3%1t62kq_1ad0yfj_ka%'
 DEBUG = True
 ALLOWED_HOSTS = ['*', '127.0.0.1', 'localhost']
 
-# Application definition
+# 3. Application definition
 INSTALLED_APPS = [
     'corsheaders',
     'django.contrib.admin',
@@ -23,8 +21,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'api',
-    'core', # Adicionado para garantir o registro das views
+    'api',    # Mantido simples para evitar o erro de Double Registration
+    'core', 
 ]
 
 MIDDLEWARE = [
@@ -40,12 +38,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
-# ==================== TEMPLATES CONFIGURATION ====================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # 🔧 Corrigido para apontar para /BipFlow-Manage/src/templates
-        'DIRS': [PROJECT_ROOT / 'src' / 'templates'],
+        'DIRS': [
+            BASE_DIR / "src" / "templates",   # prioridade: src/templates
+            BASE_DIR / "templates",           # fallback: raiz/templates
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -53,7 +52,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.static',
             ],
         },
     },
@@ -61,7 +59,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# Database
+# 5. Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -69,30 +67,27 @@ DATABASES = {
     }
 }
 
-# Internationalization
+# 6. Internationalization
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# ==================== STATIC & MEDIA FILES ====================
+# 7. STATIC & MEDIA FILES (Ajuste técnico para evitar erros de busca)
 STATIC_URL = '/static/'
 
-# 🔧 Onde o Django busca seus arquivos de desenvolvimento
 STATICFILES_DIRS = [
-    PROJECT_ROOT / 'src' / 'static',
+    BASE_DIR / 'static',
 ]
 
-# 🔧 Onde o collectstatic coloca os arquivos para produção
-STATIC_ROOT = PROJECT_ROOT / 'staticfiles'
+# Pasta onde os arquivos ficam após o collectstatic (Produção)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Armazenamento simples para desenvolvimento
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
-
-# ==================== CORS & REST FRAMEWORK ====================
+# 8. CORS & REST FRAMEWORK
+CORS_ALLOW_ALL_ORIGINS = True
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -101,6 +96,3 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
 }
-
-CORS_ALLOW_ALL_ORIGINS = True # Simplificado para desenvolvimento
-CORS_ALLOW_CREDENTIALS = True
