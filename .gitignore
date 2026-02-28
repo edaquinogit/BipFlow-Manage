@@ -1,27 +1,30 @@
-# Python & Virtual Environments
-.venv/
+# Python e Ambientes Virtuais
 venv/
-env/
-ENV/
+.venv/
+*/venv/
+*/.venv/
 __pycache__/
-*.py[cod]
-
-# Django
+*.pyc
 db.sqlite3
-staticfiles/
-media/
-*.log
 
-# IDEs
+# Node.js
+node_modules/
+**/node_modules/
+dist/
+.npm/
+
+# Pastas de Legado
+archive_legacy/
+client/
+data/
+arquivos/
+server-python/
+src/
+
+# Outros
 .vscode/
-.idea/
 .DS_Store
 
-# Environments
-.env
-.env.*
-
-# Frontend
-node_modules/
-dist/
-build/
+# Django static files
+staticfiles/
+bipdelivery/staticfiles/
