@@ -24,3 +24,7 @@ src/
 # Outros
 .vscode/
 .DS_Store
+
+# Django static files gerados por collectstatic
+staticfiles/
+bipdelivery/staticfiles/
