@@ -4,26 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}BipFlow - Delivery{% endblock %}</title>
-    
-    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
-    
+    <title>BipFlow - Delivery</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
-
-    {% block extra_head %}
-        <link rel="icon" href="data:,">
-    {% endblock %}
+    
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-
-    <main>
-        {% block content %}
-        {% endblock %}
-    </main>
-
+    {% block content %}{% endblock %}
+    
     <script type="module" src="{% static 'js/app.js' %}"></script>
-
     {% block extra_js %}{% endblock %}
-
 </body>
 </html>

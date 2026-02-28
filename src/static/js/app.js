@@ -1,55 +1,57 @@
-import { Dom } from './dom.js';
+import { ui } from './ui.js';          
+import { MenuSidebar } from './services/menuSidebar.js'; 
+import state from './state.js';
 
-const ui = new Dom();
+// Removemos o import de Utils aqui se não formos usar Utils.formatarMoeda direto no app.js
 
 const BipApp = {
     async init() {
         console.log('🚀 BipFlow App Running!');
-        ui.showLoading();
         
+        // 1. Inicializa o Menu Sidebar (Passando ui.elements como dom)
+        this.menu = new MenuSidebar(state, ui.elements, null); 
+        this.menu.init();
+
+        // 2. Carregamento Inicial
         await this.fetchProducts();
         this.setupEventListeners();
         this.atualizarInterfaceCarrinho();
     },
 
     setupEventListeners() {
-        // 1. Ouvinte para o botão de Aplicar Filtros
+        // 🔧 Corrigido para bater com a classe do seu botão no HTML
         const filterBtn = document.querySelector('.filters-sidebar__apply');
         if (filterBtn) {
             filterBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
-                const selectedCategories = ui.getActiveFilters();
-                
+                const selectedCategories = this.getActiveFilters();
                 await this.fetchProducts(selectedCategories);
-                
-                // Fecha a sidebar e remove o overlay/trava de scroll corretamente
-                ui.toggleSidebar(); 
+                this.menu.closeSidebar(); 
             });
         }
 
-        // 2. Ouvinte Global para Adicionar ao Carrinho (Event Delegation)
-        // Isso evita duplicar ouvintes e garante que funcione em produtos novos
+        // Event Delegation para Adicionar ao Carrinho
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-add');
             if (btn) {
                 const { id, nome, preco } = btn.dataset;
                 this.adicionarAoCarrinho(id, nome, parseFloat(preco));
-                console.log(`✅ Adicionado ao carrinho: ${nome}`);
             }
         });
     },
 
     async fetchProducts(filters = []) {
         try {
-            ui.showLoading();
+            ui.toggleLoading(true);
             const response = await fetch('/api/products/');
             if (!response.ok) throw new Error('Falha na API');
             
             let data = await response.json();
 
+            // Lógica de Filtro Front-end
             if (filters.length > 0) {
                 data = data.filter(product => {
-                    const category = product.category_name ? product.category_name.toLowerCase().trim() : '';
+                    const category = product.category_name?.toLowerCase().trim() || '';
                     return filters.includes(category);
                 });
             }
@@ -58,8 +60,17 @@ const BipApp = {
 
         } catch (error) {
             console.error('❌ Erro no Fetch:', error);
-            ui.produtosContainer.innerHTML = '<p>Erro ao conectar com o servidor.</p>';
+            const container = ui.elements.productGrid();
+            if (container) container.innerHTML = '<p>Erro ao conectar com o servidor.</p>';
+        } finally {
+            ui.toggleLoading(false);
         }
+    },
+
+    getActiveFilters() {
+        // 🔧 Ajustado para o nome comum de classes de checkbox
+        const checkboxes = document.querySelectorAll('.filters-sidebar__option input:checked');
+        return Array.from(checkboxes).map(cb => cb.name.toLowerCase().trim());
     },
 
     adicionarAoCarrinho(id, nome, preco) {
@@ -80,14 +91,15 @@ const BipApp = {
         const carrinho = JSON.parse(localStorage.getItem('bipflow_cart')) || [];
         const totalItens = carrinho.reduce((acc, item) => acc + item.quantidade, 0);
         
-        console.log(`📊 Total de itens no carrinho: ${totalItens}`);
+        ui.updateCartBadge(totalItens);
         
-        // Chamada para renderizar visualmente (verifique se renderCart existe no dom.js)
         if (typeof ui.renderCart === 'function') {
             ui.renderCart(carrinho);
         }
     }
 };
 
-BipApp.init();
-window.app = BipApp;
+// 🗽 O Pulo do Gato para NYC: Só inicia quando o HTML estiver pronto!
+document.addEventListener('DOMContentLoaded', () => {
+    BipApp.init();
+});

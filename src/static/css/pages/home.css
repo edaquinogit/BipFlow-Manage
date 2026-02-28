@@ -1,0 +1,115 @@
+/* 1. Variáveis de Design Ajustadas para a Referência */
+:root {
+    --bg-page: #a80000;           /* Vermelho escuro do fundo */
+    --card-bg: #ffffff;
+    --accent-color: #ff9f43;      /* Laranja do botão "+" */
+    --text-dark: #2d3436;
+    --text-light: #636e72;
+    --radius-card: 24px;          /* Bordas bem arredondadas da imagem */
+    --radius-img: 16px;
+    --shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Use apenas a classe para garantir que o CSS se aplique mais facilmente */
+.product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px;
+    padding: 16px;
+    background-color: #a80000; /* Forçando o vermelho para testar */
+}
+
+/* 3. Product Card Estilo NYC Delivery */
+.product-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-card);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease;
+    border: none;
+    position: relative;
+}
+
+.product-card:hover {
+    transform: scale(1.02);
+}
+
+/* 4. Imagem do Produto (Quadrada e Arredondada) */
+.product-card__image-wrapper {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.product-card img {
+    width: 100%;
+    aspect-ratio: 1 / 1; /* Mantém a imagem quadrada como na referência */
+    object-fit: cover;
+    border-radius: var(--radius-img);
+}
+
+/* 5. Info e Tipografia */
+.product-card__info {
+    text-align: left; /* Alinhado à esquerda como na imagem */
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.product-card__title {
+    font-size: 0.95rem;
+    color: var(--text-dark);
+    font-weight: 700;
+    margin: 4px 0;
+    line-height: 1.2;
+}
+
+.product-card__description {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin-bottom: 12px;
+}
+
+/* 6. Container de Preço e Botão */
+.price-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: auto;
+}
+
+.price-container .price {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-dark);
+}
+
+/* 7. O Botão "+" Laranja */
+.btn-add {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px; /* Quadrado arredondado */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: background 0.2s;
+}
+
+.btn-add:hover {
+    background: #e67e22;
+}
+
+/* Responsividade para Telas Maiores */
+@media (min-width: 768px) {
+    #produtos-container.product-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+}

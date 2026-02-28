@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/pages/home.css' %}">
+    <link rel="stylesheet" href="{% static 'css/pages/home.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -13,47 +13,49 @@
             <h1 class="main-title">Bip<span>Flow</span></h1>
         </div>
 
-        <!-- Navegação de categorias -->
         <nav class="categories-nav" aria-label="Filtro de categorias">
-            <!-- Conteúdo dinâmico via JS -->
+            <div id="categories-container"></div>
         </nav>
     </header>
 
-    <!-- Botão hamburguer -->
-    <button class="menu-toggle" aria-label="Abrir filtros">&#9776;</button>
+    <button class="menu-toggle" aria-label="Abrir filtros">
+        <i class="fas fa-filter"></i> <span>Filtros</span>
+    </button>
 
-    <!-- Menu lateral com filtros -->
     <aside class="filters-sidebar" aria-label="Filtros de comida">
-        <h2 class="filters-sidebar__title">Filtros de Comida</h2>
+        <div class="sidebar-header">
+            <h2 class="filters-sidebar__title">Filtrar Cardápio</h2>
+        </div>
+        
         <form class="filters-sidebar__form">
             <label class="filters-sidebar__option">
-                <input type="checkbox" name="pizza"> Pizza
+                <input type="checkbox" name="category" value="pizza" class="filter-checkbox"> Pizza
             </label>
             <label class="filters-sidebar__option">
-                <input type="checkbox" name="hamburguer"> Hambúrguer
+                <input type="checkbox" name="category" value="hamburguer" class="filter-checkbox"> Hambúrguer
             </label>
             <label class="filters-sidebar__option">
-                <input type="checkbox" name="salada"> Salada
+                <input type="checkbox" name="category" value="salada" class="filter-checkbox"> Salada
             </label>
             <label class="filters-sidebar__option">
-                <input type="checkbox" name="sobremesa"> Sobremesa
+                <input type="checkbox" name="category" value="sobremesa" class="filter-checkbox"> Sobremesa
             </label>
 
-            <button type="submit" class="filters-sidebar__apply">Adicionar Filtro</button>
+            <button type="submit" class="filters-sidebar__apply">Aplicar Filtros</button>
         </form>
     </aside>
 </section>
+
+<div id="overlay" class="overlay-blur"></div>
 
 <main class="content-wrapper container">
     <div id="produtos-container" class="product-grid">
         <div class="loading-state">
             <div class="skeleton-loader"></div>
-            <p>Preparando seu cardápio...</p>
+            <p>Buscando os melhores sabores...</p>
         </div>
     </div>
 </main>
 
 {% include "partials/_cart.html" %}
-
-<div id="overlay-cart" class="overlay-blur"></div>
 {% endblock %}
