@@ -28,3 +28,8 @@ src/
 # Django static files
 staticfiles/
 bipdelivery/staticfiles/
+
+# Media Files (Uploads de usuários/testes)
+media/
+bipdelivery/media/
+**/media/

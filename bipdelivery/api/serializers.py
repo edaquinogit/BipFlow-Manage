@@ -1,8 +1,13 @@
 from rest_framework import serializers
 from .models import Product, Category
 
+# Serializer para o Dropdown do Vue
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name']
+
 class ProductSerializer(serializers.ModelSerializer):
-    # Isso permite que o Vue envie o NOME da categoria e o Django encontre o ID sozinho
     category = serializers.SlugRelatedField(
         slug_field='name', 
         queryset=Category.objects.all()
