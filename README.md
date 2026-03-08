@@ -1,65 +1,78 @@
-BipFlow Manage | Integration Engine 🚀
+🚀 BipFlow Integration Engine
 
-Technical Assessment developed for the Jitterbit Integration Challenge. This project implements a high-performance middleware designed to bridge disparate data sources with the BipFlow internal schema.
+Professional Services Technical Assessment | Jitterbit Standard
 
-🗽 Why this matters (Business Value)
+BipFlow Engine is a high-performance middleware designed to handle complex data transformation (Mapping) and persistence. Built with a focus on Scalability and Data Integrity, it addresses the core challenges of modern enterprise integrations.
 
-In global supply chain environments, data inconsistency costs millions. BipFlow Manage solves this by providing a resilient transformation layer that ensures 100% data integrity before reaching the persistence layer.
+🌎 Vision & Business Value (PT/BR abaixo)
+
+In the global integration market (NYC/Global), data inconsistency is the primary cause of system failure. This engine implements a Data Mapper Pattern that ensures 100% sanitized data before it hits the persistence layer.
+
+Visão Executiva: No mercado global, a inconsistência de dados é a principal causa de falhas em sistemas. Este motor implementa o padrão Data Mapper, garantindo que 100% dos dados sejam sanitizados antes da persistência.
 
 🛠️ Tech Stack & Architecture
 
-Backend: Node.js v20+ with Express.js (RESTful API).
+Runtime: Node.js (v20+)
 
-Frontend: Vue.js 3 + TypeScript (Real-time monitoring).
+Framework: Express.js (RESTful Patterns)
 
-Architecture: Clean Architecture with Data Mapper Pattern for strict decoupling.
+Documentation: OpenAPI 3.0 (Swagger UI)
 
-Database: SQLite3 (Lightweight & ACID compliant).
+Database: SQLite3 (ACID Compliant)
 
-🧠 Senior Design Decisions
+Containerization: Docker & Docker Compose
 
-Fail-Fast Validation: The engine rejects malformed payloads at the edge (HTTP 400), saving compute resources.
+Architectural Decisions (Senior Insights)
 
-Data Sanitization: Implements specialized logic to strip suffixes (e.g., v100-01 → v100) as per Jitterbit's technical requirements.
+Separation of Concerns: Business logic is decoupled from the routing layer, allowing independent scaling.
 
-ISO 8601 Standardization: All date strings are normalized to UTC ISO 8601 to prevent timezone-related financial discrepancies.
+Fail-Fast Validation: The API rejects malformed payloads at the edge (HTTP 400), preserving system resources.
 
-Security-First: Optimized .gitignore and environment variable handling to prevent credential leakage.
+Idempotency: Implemented via Primary Key constraints in SQLite to prevent duplicate transaction processing.
 
-🚀 Getting Started
+🚀 Getting Started / Como Executar
 
-Prerequisites
+1. Docker (Recommended)
 
-Node.js installed (v20+ recommended).
+The fastest way to deploy the engine in a production-like environment:
 
-Git (for cloning).
+docker-compose up --build
 
-Installation & Execution
 
-# 1. Clone the repository
-git clone [https://github.com/edaquinogit/BipFlow-Manage.git](https://github.com/edaquinogit/BipFlow-Manage.git)
+2. Local Environment
 
-# 2. Install dependencies
 npm install
-
-# 3. Launch the Integration Engine
+node database/setup.js
 node index.js
 
 
-🧪 Automated Testing
+📊 API Governance (OpenAPI)
 
-Run our professional test suite to validate the mapping logic:
+Once the server is running, access the interactive documentation to test the integration flow:
+👉 http://localhost:3000/api-docs
+
+Key Endpoints:
+
+POST /api/v1/orders: The core integration gateway. Sanitizes orderId and persists items.
+
+GET /health: Real-time system monitoring.
+
+🧪 Professional Validation (Quality Assurance)
+
+We don't just hope it works; we prove it. Run the senior validation suite:
 
 chmod +x test-integration.sh
 ./test-integration.sh
 
 
-📊 Monitoring & Observability
+Expected Outcome: 1. Payload sent with dirty ID (e.g., v123-NY-01).
+2. Server cleans ID to v123.
+3. Database Audit confirms row insertion.
 
-The engine includes a Professional Logger que rastreia métodos, status codes e latência (SLA).
+👨‍💻 Engineering Profile
 
-👨‍💻 Developer Profile
+Ednaldo Aquino
+Integration Engineer focused on Distributed Systems and Global Scalability.
+Targeting: International Roles (NYC) | Senior Integration Projects.
 
-Ednaldo Aspiring Integration Engineer | Focus: Scalable Systems & Global Architectures. Targeting: International Roles (NYC) & High-Performance Engineering.
-
-This project is part of a continuous improvement roadmap for professional services excellence.
+"Building bridges between systems, one sanitized payload at a time." 🗽🚀
