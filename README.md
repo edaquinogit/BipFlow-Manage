@@ -1,31 +1,73 @@
-BipFlow Manage - Order Integration System 🚀
+BipFlow Manage | Integration Engine 🚀
 
-This repository contains the technical assessment for the Jitterbit Integration Challenge. It features a robust Node.js middleware designed to bridge external order payloads with the BipFlow internal schema.
+Technical Assessment developed for the Jitterbit Integration Challenge. This project implements a high-performance middleware designed to bridge disparate data sources with the BipFlow internal schema.
 
-🗽 Project Goal
+🗽 Why this matters (Business Value)
 
-To provide a scalable, type-safe, and resilient integration layer that sanitizes incoming data and ensures consistency across the BipFlow ecosystem.
+In global supply chain environments, data inconsistency costs millions. BipFlow Manage solves this by providing a resilient transformation layer that ensures 100% data integrity before reaching the persistence layer.
 
-🛠️ Key Technical Features
+🛠️ Tech Stack & Architecture
 
-Data Transformation Layer: Custom mapper that handles ID sanitization (stripping suffixes like -01) and currency normalization.
+Backend: Node.js v20+ with Express.js (RESTful API).
 
-RESTful Architecture: Express-based API following industry standards for status codes and error handling.
+Frontend: Vue.js 3 + TypeScript (Real-time monitoring).
 
-Environment Safety: Optimized .gitignore to ensure zero leakage of local configurations or dependencies.
+Architecture: Clean Architecture with Data Mapper Pattern for strict decoupling.
 
-Full-Stack Ready: Backend engine integrated with a Vue.js 3 frontend dashboard.
+Database: SQLite3 (Lightweight & ACID compliant).
 
-🚀 How to Run
+🧠 Senior Design Decisions
 
-Clone the repository.
+Fail-Fast Validation: The engine rejects malformed payloads at the edge (HTTP 400), saving compute resources.
 
-Install dependencies: npm install
+Data Sanitization: Implements specialized logic to strip suffixes (e.g., v100-01 → v100) as per Jitterbit's technical requirements.
 
-Start the engine: node index.js
+ISO 8601 Standardization: All date strings are normalized to UTC ISO 8601 to prevent timezone-related financial discrepancies.
 
-Run tests: ./test-integration.sh
+Security-First: Optimized .gitignore and environment variable handling to prevent credential leakage.
 
-👨‍💻 Author
+🚀 Getting Started
 
-Ednaldo - Aspiring Integration Engineer focused on High-Performance Systems.
+Prerequisites
+
+Node.js installed.
+
+Git (for cloning).
+
+Installation & Execution
+
+# 1. Clone the repository
+git clone [https://github.com/your-user/BipFlow-Manage.git](https://github.com/your-user/BipFlow-Manage.git)
+
+# 2. Install dependencies
+npm install
+
+# 3. Launch the Integration Engine
+node index.js
+
+
+🧪 Automated Testing
+
+Run our professional test suite to validate the mapping logic:
+
+chmod +x test-integration.sh
+./test-integration.sh
+
+
+📊 Monitoring & Observability
+
+The engine includes a Professional Logger that tracks:
+
+Timestamp of the request.
+
+HTTP Method & Endpoint.
+
+Response Status Code.
+
+Execution latency in milliseconds (Crucial for SLA monitoring).
+
+👨‍💻 Developer Profile
+
+Ednaldo Aspiring Integration Engineer | Focus: Scalable Systems & Global Architectures. Targeting: International Roles (NYC) & High-Performance Engineering.
+
+This project is part of a continuous improvement roadmap for professional services excellence.
