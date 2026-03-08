@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Isso diz ao Tailwind v4 para escanear seus componentes Vue */
+@source "../**/*.{vue,ts}";
+
+@theme {
+  /* Se quiser personalizar cores aqui, é o lugar certo */
+}
+
+body {
+  @apply bg-gray-900 text-white antialiased;
+}

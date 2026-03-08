@@ -1,35 +1,46 @@
-# Python e Ambientes Virtuais
-venv/
+--- Python ---
+
+**/pycache/
+*.py[cod]
+*$py.class
 .venv/
-*/venv/
-*/.venv/
-__pycache__/
-*.pyc
-db.sqlite3
-
-# Node.js
-node_modules/
-**/node_modules/
+venv/
+ENV/
+build/
 dist/
-.npm/
 
-# Pastas de Legado
-archive_legacy/
-client/
-data/
-arquivos/
-server-python/
-src/
+--- Django Specific ---
 
-# Outros
-.vscode/
-.DS_Store
-
-# Django static files
-staticfiles/
 bipdelivery/staticfiles/
-
-# Media Files (Uploads de usuários/testes)
-media/
 bipdelivery/media/
-**/media/
+db.sqlite3
+db.sqlite3-journal
+
+--- Node.js ---
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+bipflow-frontend/node_modules/
+
+--- Databases ---
+
+*.sqlite3
+*.db
+
+--- Environment / IDE ---
+
+.env
+.vscode/
+.idea/
+*.swp
+*.bak
+.DS_Store
+Thumbs.db
+
+--- Temporary Files ---
+
+.INTEGRATION.md.swp
+*.tmp
