@@ -9,11 +9,10 @@ from rest_framework_simplejwt.views import (
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Garanta que estas duas linhas existam:
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
-    # Suas outras rotas (produtos, etc)
+    # Outras rotas (produtos, etc)
     path('api/', include('api.urls')), 
 ]
 
