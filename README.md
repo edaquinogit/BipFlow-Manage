@@ -1,20 +1,31 @@
-# BipFlow Manage 🚀
+BipFlow Manage - Order Integration System 🚀
 
-Sistema de gerenciamento e integração de pedidos desenvolvido para o desafio técnico Jitterbit.
+This repository contains the technical assessment for the Jitterbit Integration Challenge. It features a robust Node.js middleware designed to bridge external order payloads with the BipFlow internal schema.
 
-## 🛠️ Stack Tecnológica
-- **Backend:** Python/Django (Gestão de Pedidos)
-- **Integration Engine:** Node.js/Express (Transformação de Dados)
-- **Frontend:** Vue.js (Dashboard - Em desenvolvimento)
-- **Database:** SQLite3
+🗽 Project Goal
 
-## 📂 Estrutura do Repositório
-- `/`: Raiz com configurações globais.
-- `/services`: Lógica de mapeamento e transformação.
-- `INTEGRATION.md`: Documentação detalhada da API de integração.
+To provide a scalable, type-safe, and resilient integration layer that sanitizes incoming data and ensures consistency across the BipFlow ecosystem.
 
-## 🚀 Como Rodar
-Veja as instruções específicas em [INTEGRATION.md](./INTEGRATION.md).
+🛠️ Key Technical Features
 
----
-*Developed by Ednaldo - Focus: High-Performance Data Integration.*
+Data Transformation Layer: Custom mapper that handles ID sanitization (stripping suffixes like -01) and currency normalization.
+
+RESTful Architecture: Express-based API following industry standards for status codes and error handling.
+
+Environment Safety: Optimized .gitignore to ensure zero leakage of local configurations or dependencies.
+
+Full-Stack Ready: Backend engine integrated with a Vue.js 3 frontend dashboard.
+
+🚀 How to Run
+
+Clone the repository.
+
+Install dependencies: npm install
+
+Start the engine: node index.js
+
+Run tests: ./test-integration.sh
+
+👨‍💻 Author
+
+Ednaldo - Aspiring Integration Engineer focused on High-Performance Systems.
