@@ -1,65 +1,73 @@
-# BipDelivery - Fast Order Management System 🗽🍔
+BipFlow Manage | Integration Engine 🚀
 
-![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
-![Django](https://img.shields.io/badge/django-%23092e20.svg?style=for-the-badge&logo=django&logoColor=white)
-![DjangoREST](https://img.shields.io/badge/DJANGO-REST-ff1709?style=for-the-badge&logo=django&logoColor=white)
-![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E)
+Technical Assessment developed for the Jitterbit Integration Challenge. This project implements a high-performance middleware designed to bridge disparate data sources with the BipFlow internal schema.
 
-BipDelivery é um ecossistema de gerenciamento de pedidos em tempo real, desenvolvido para otimizar a conexão entre estabelecimentos locais e clientes finais. O projeto foca em alta performance, escalabilidade e uma experiência de usuário fluida.
+🗽 Why this matters (Business Value)
 
-## 🚀 Status do Projeto: Em Desenvolvimento (Sprint 2 - Frontend Integration)
+In global supply chain environments, data inconsistency costs millions. BipFlow Manage solves this by providing a resilient transformation layer that ensures 100% data integrity before reaching the persistence layer.
 
-Atualmente, o sistema possui um Core Backend robusto com API REST funcional e está em fase de integração com a camada de visualização (Frontend).
+🛠️ Tech Stack & Architecture
 
-## 🛠️ Tecnologias & Arquitetura
+Backend: Node.js v20+ with Express.js (RESTful API).
 
-O projeto segue o padrão de **Separação de Preocupações (SoC)**:
+Frontend: Vue.js 3 + TypeScript (Real-time monitoring).
 
-- **Backend:** Django 5.x & Django REST Framework (DRF)
-- **Database:** SQLite (Desenvolvimento) / PostgreSQL Ready
-- **Frontend:** Vanilla Architecture (HTML5, CSS3 Moderno, JavaScript ES6+)
-- **Media Handling:** Processamento e entrega de imagens via Django Storage
+Architecture: Clean Architecture with Data Mapper Pattern for strict decoupling.
 
-## 📂 Estrutura do Repositório
+Database: SQLite3 (Lightweight & ACID compliant).
 
-```text
-├── bipdelivery/         # Core do projeto Django
-├── api/                 # App de abstração da API e Modelos
-├── frontend/            # Interface do usuário (Client-side)
-├── media/               # Armazenamento de assets de produtos
-└── manage.py            # CLI do Django
+🧠 Senior Design Decisions
 
-⚙️ Como rodar o projeto localmente
+Fail-Fast Validation: The engine rejects malformed payloads at the edge (HTTP 400), saving compute resources.
 
-1. Clonar o repositório
+Data Sanitization: Implements specialized logic to strip suffixes (e.g., v100-01 → v100) as per Jitterbit's technical requirements.
 
-git clone [https://github.com/seu-usuario/BipFlow-Manage.git](https://github.com/seu-usuario/BipFlow-Manage.git)
-cd BipFlow-Manage
+ISO 8601 Standardization: All date strings are normalized to UTC ISO 8601 to prevent timezone-related financial discrepancies.
 
-2. Configurar o Ambiente Virtual
+Security-First: Optimized .gitignore and environment variable handling to prevent credential leakage.
 
-python -m venv venv
-source venv/bin/activate  # No Windows: venv\Scripts\activate
-pip install -r requirements.txt
+🚀 Getting Started
 
-3. Executar as Migrações e Servidor
+Prerequisites
 
-python manage.py migrate
-python manage.py runserver
-A API estará disponível em http://127.0.0.1:8000/api/v1/products/
+Node.js installed.
 
-🛣️ Roadmap de Desenvolvimento
+Git (for cloning).
 
-[x] Definição da Arquitetura de Banco de Dados
+Installation & Execution
 
-[x] Implementação de API REST para Produtos
+# 1. Clone the repository
+git clone [https://github.com/your-user/BipFlow-Manage.git](https://github.com/your-user/BipFlow-Manage.git)
 
-[x] Sistema de Upload de Imagens dinâmico
+# 2. Install dependencies
+npm install
 
-[ ] Implementação de Segurança CORS (Próximo Passo)
+# 3. Launch the Integration Engine
+node index.js
 
-[ ] Desenvolvimento da Vitrine de Produtos (Frontend)
 
-[ ] Integração com Gateway de Pagamento
+🧪 Automated Testing
 
-Desenvolvido por Ednaldo – Focado em soluções escaláveis e pronto para o mercado global. 🚀
+Run our professional test suite to validate the mapping logic:
+
+chmod +x test-integration.sh
+./test-integration.sh
+
+
+📊 Monitoring & Observability
+
+The engine includes a Professional Logger that tracks:
+
+Timestamp of the request.
+
+HTTP Method & Endpoint.
+
+Response Status Code.
+
+Execution latency in milliseconds (Crucial for SLA monitoring).
+
+👨‍💻 Developer Profile
+
+Ednaldo Aspiring Integration Engineer | Focus: Scalable Systems & Global Architectures. Targeting: International Roles (NYC) & High-Performance Engineering.
+
+This project is part of a continuous improvement roadmap for professional services excellence.
