@@ -1,0 +1,27 @@
+{
+  "name": "api-order-validation",
+  "version": "1.0.0",
+  "description": "General Order Validation API for Jitterbit Assessment",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "mocha tests/*.test.js --exit",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "api",
+    "validation",
+    "jitterbit",
+    "assessment"
+  ],
+  "author": "Ednaldo Aquino",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "chai-http": "^4.3.0",
+    "mocha": "^10.2.0"
+  }
+}
