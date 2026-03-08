@@ -1,21 +1,15 @@
-from rest_framework import generics
-from .models import Category, Product
-from .serializers import CategorySerializer, ProductSerializer
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Product, Category
+from .serializers import ProductSerializer, CategorySerializer
 
-# List and Create Views
-class CategoryListCreateView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-
-class ProductListCreateView(generics.ListCreateAPIView):
+class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
 
-# Detail, Update, and Delete Views (The missing ones!)
-class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+# ESSA VIEW É A QUE O VUE VAI CHAMAR PARA MONTAR O DROPDOWN
+class CategoryViewSet(viewsets.ModelViewSet): 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-
-class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]

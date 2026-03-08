@@ -30,14 +30,14 @@ Security-First: Optimized .gitignore and environment variable handling to preven
 
 Prerequisites
 
-Node.js installed.
+Node.js installed (v20+ recommended).
 
 Git (for cloning).
 
 Installation & Execution
 
 # 1. Clone the repository
-git clone [https://github.com/your-user/BipFlow-Manage.git](https://github.com/your-user/BipFlow-Manage.git)
+git clone [https://github.com/edaquinogit/BipFlow-Manage.git](https://github.com/edaquinogit/BipFlow-Manage.git)
 
 # 2. Install dependencies
 npm install
@@ -56,15 +56,7 @@ chmod +x test-integration.sh
 
 📊 Monitoring & Observability
 
-The engine includes a Professional Logger that tracks:
-
-Timestamp of the request.
-
-HTTP Method & Endpoint.
-
-Response Status Code.
-
-Execution latency in milliseconds (Crucial for SLA monitoring).
+The engine includes a Professional Logger que rastreia métodos, status codes e latência (SLA).
 
 👨‍💻 Developer Profile
 
