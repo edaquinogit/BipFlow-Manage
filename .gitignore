@@ -1,27 +1,22 @@
-# Dependências
+# Node.js
 node_modules/
-.venv/
-env/
-venv/
-ENV/
-
-# Builds e Distribuição
-dist/
-build/
-*.pyc
-__pycache__/
-
-# Variáveis de Ambiente e Segredos
+npm-debug.log
+coverage/
 .env
-.env.local
-.env.*.local
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Banco local
+db.sqlite3
 
-# IDEs
-.vscode/
-.idea/
-.DS_Store
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Java
+target/
+*.class
+
+# Vue.js
+dist/
+.cache/
