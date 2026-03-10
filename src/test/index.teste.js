@@ -1,8 +1,8 @@
 const request = require('supertest');
-const app = require('../../index'); // ajuste o caminho conforme sua estrutura
+const app = require('../index'); // importa o app do index.js
 
 describe("BIPFLOW ENGINE API", () => {
-
+  
   test("Health check deve retornar UP", async () => {
     const res = await request(app).get('/health');
     expect(res.statusCode).toBe(200);
