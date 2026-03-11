@@ -1,7 +1,20 @@
 const request = require('supertest');
-const app = require('../../index'); // ajuste o caminho conforme sua estrutura
+const fs = require('fs');
+const path = require('path');
+const app = require('../../index');
 
 describe("BIPFLOW ENGINE API", () => {
+  beforeAll(async () => {
+    const dbPath = path.resolve(__dirname, '../../db.sqlite3');
+    // Forçar fechamento de conexões se necessário (em ambientes de teste persistentes)
+    if (fs.existsSync(dbPath)) {
+      try {
+        fs.unlinkSync(dbPath);
+      } catch (e) {
+        console.log("Aviso: Não foi possível deletar o DB, pode estar em uso.");
+      }
+    }
+  });
 
   test("Health check deve retornar UP", async () => {
     const res = await request(app).get('/health');
@@ -18,10 +31,11 @@ describe("BIPFLOW ENGINE API", () => {
   });
 
   test("Deve aceitar pedido válido", async () => {
+    const uniqueId = `TEST${Date.now()}`;
     const res = await request(app)
       .post('/api/v1/orders')
       .send({
-        numeroPedido: "123-01",
+        numeroPedido: `${uniqueId}-01`,
         valorTotal: 250.0,
         dataCriacao: "2026-03-08T18:00:00Z",
         items: [
@@ -31,6 +45,6 @@ describe("BIPFLOW ENGINE API", () => {
       });
     expect(res.statusCode).toBe(201);
     expect(res.body).toHaveProperty("status", "Success");
-    expect(res.body).toHaveProperty("orderId", "123");
+    expect(res.body).toHaveProperty("orderId", uniqueId);
   });
 });

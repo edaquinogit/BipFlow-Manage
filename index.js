@@ -15,7 +15,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- Configuração do Banco de Dados ---
-const dbPath = path.resolve(__dirname, 'db.sqlite3');
+const isTest = process.env.NODE_ENV === 'test';
+const dbPath = isTest ? ':memory:' : path.resolve(__dirname, 'db.sqlite3');
 const db = new Database(dbPath);
 
 // Criação das tabelas (Migration mínima)
