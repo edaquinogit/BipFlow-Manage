@@ -20,3 +20,10 @@ target/
 # Vue.js
 dist/
 .cache/
+
+
+coverage/
+coverage/
+node_modules/
+.venv/
+*.sqlite3
