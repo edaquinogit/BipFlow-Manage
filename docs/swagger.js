@@ -6,7 +6,7 @@ const swaggerOptions = {
         info: {
             title: 'BipFlow Manage - Integration Engine',
             version: '1.0.2',
-            description: 'API de Integração profissional desenvolvida para o desafio Jitterbit. Focada em transformação de dados (Mapping) e persistência em SQLite.',
+            description: 'API de Integração profissional focada em transformação de dados (Mapping) e persistência em SQLite.',
             contact: {
                 name: 'Ednaldo Aquino',
                 url: 'https://github.com/edaquinogit/BipFlow-Manage'
