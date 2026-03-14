@@ -1,27 +1,48 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api', // Verifique se esta é a sua URL do Django
+  baseURL: 'http://127.0.0.1:8000/api/',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
 });
 
-// INTERCEPTOR: Adiciona o token em cada requisição automaticamente
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token'); // O nome deve ser o mesmo que você usa no Login
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+/**
+ * INTERCEPTADOR DE REQUISIÇÃO (O "Crachá" de Acesso)
+ * Antes de cada chamada sair para o Django, verificamos se temos um token.
+ */
+api.interceptors.request.use(
+  (config) => {
+    // Buscamos o token que o seu auth.service salvou no login
+    const token = localStorage.getItem('token'); 
+    
+    if (token) {
+      // Adicionamos o padrão Bearer que o Django SimpleJWT exige
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+);
 
-// INTERCEPTOR DE RESPOSTA: Se der 401 (token expirado), desloga o usuário
+/**
+ * INTERCEPTADOR DE RESPOSTA
+ */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login'; // Redireciona se o token falhar
+    if (error.response?.status === 500) {
+      console.error("🏙️ NY Dev Alert: O Django teve um erro interno (500).");
+    }
+    if (error.response?.status === 401) {
+      console.warn("🚫 Acesso negado ou Token expirado.");
+      // Opcional: Se quiser deslogar o usuário automaticamente:
+      // localStorage.removeItem('token');
+      // window.location.href = '/login';
     }
     return Promise.reject(error);
   }

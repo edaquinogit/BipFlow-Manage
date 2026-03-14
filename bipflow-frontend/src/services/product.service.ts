@@ -1,56 +1,30 @@
 import api from './api';
+import { ProductSchema, type Product } from '../schemas/product.schema';
 
-// --- INTERFACES ---
-export interface Category {
-  id: number;
-  name: string;
-}
-
-export interface Product {
-  id: number;
-  name: string;
-  description?: string;
-  price: string;
-  category: string; // Nome da categoria (SlugRelatedField no Django)
-  is_available: boolean;
-  image: string | null;
-}
-
-// --- SERVIÇO ---
-export const productService = {
-  // === MÉTODOS DE PRODUTOS ===
-  
-  async getAll(): Promise<Product[]> {
-    const response = await api.get<Product[]>('/products/');
-    return response.data;
-  },
-
-  async getById(id: number): Promise<Product> {
-    const response = await api.get<Product>(`/products/${id}/`);
-    return response.data;
-  },
-
-  async create(formData: FormData): Promise<Product> {
-    const response = await api.post<Product>('/products/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-
-  async delete(id: number): Promise<void> {
-    await api.delete(`/products/${id}/`);
-  },
-
-  // === MÉTODOS DE CATEGORIAS ===
-
-  async getCategories(): Promise<Category[]> {
-    const response = await api.get<Category[]>('/categories/');
-    return response.data;
-  },
-
-  async createCategory(name: string): Promise<Category> {
-    // O Django espera um objeto { "name": "..." }
-    const response = await api.post<Category>('/categories/', { name });
-    return response.data;
-  }
-};
+export const ProductService = {
+  /**
+   * Busca todos os produtos do Django e valida com Zod
+   */
+  async getAllProducts(): Promise<Product[]> {
+    try {
+      const response = await api.get('products/');
+      
+      // Validamos se o que veio do Django bate com o nosso contrato (Schema)
+      return ProductSchema.array().parse(response.data);
+      
+    } catch (err: any) {
+      if (err.response) {
+        // O servidor respondeu com erro (ex: 401, 500)
+        console.error("❌ Erro do Servidor Django:", err.response.status);
+        console.error("Mensagem do Backend:", err.response.data);
+      } else if (err.request) {
+        // Sem resposta do servidor
+        console.error("❌ O Django não respondeu. O servidor está ligado?");
+      } else {
+        // Erro de validação do Zod ou configuração
+        console.error("❌ Erro na aplicação:", err.message);
+      }
+      throw err;
+    }
+  } // Fim da função getAllProducts
+}; // Fim do objeto ProductService
