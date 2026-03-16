@@ -1,30 +1,28 @@
-import api from './api';
-import type { LoginCredentials, LoginResponse } from '../types/auth';
+import api from "./api";
+import type { LoginCredentials, LoginResponse } from "../types/auth";
 
-// Interface para o Cadastro (Register)
 export interface RegisterCredentials extends LoginCredentials {
   name: string;
 }
 
 export const authService = {
   /**
-   * Realiza o Login e salva o "passaporte" (token)
+   * Realiza o Login e salva tokens
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      // Ajuste: enviamos o email como 'username' para o Django entender
       const payload = {
-        username: credentials.email, // Mapeia email para username
-        password: credentials.password
+        username: credentials.email,
+        password: credentials.password,
       };
 
-      const response = await api.post<LoginResponse>('token/', payload);
-      
+      const response = await api.post<LoginResponse>("token/", payload);
+
       if (response.data.access) {
-        localStorage.setItem('token', response.data.access);
-        localStorage.setItem('refresh_token', response.data.refresh);
+        localStorage.setItem("token", response.data.access);
+        localStorage.setItem("refresh_token", response.data.refresh);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error("Erro no login:", error);
@@ -33,12 +31,11 @@ export const authService = {
   },
 
   /**
-   * Cria um novo usuário no sistema
+   * Cria um novo usuário
    */
   async register(credentials: RegisterCredentials): Promise<void> {
     try {
-      // Ajuste a rota conforme o seu Django ('register/' ou 'users/')
-      await api.post('register/', credentials);
+      await api.post("register/", credentials);
     } catch (error) {
       console.error("Erro no cadastro:", error);
       throw error;
@@ -46,18 +43,29 @@ export const authService = {
   },
 
   /**
-   * Limpa as credenciais (Logout)
+   * Faz refresh manual do token
    */
-  logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
-    window.location.href = '/login';
+  async refreshToken(): Promise<void> {
+    const refresh = localStorage.getItem("refresh_token");
+    if (!refresh) throw new Error("Refresh token não encontrado");
+
+    const response = await api.post("token/refresh/", { refresh });
+    localStorage.setItem("token", response.data.access);
   },
 
   /**
-   * Verifica se o usuário está logado (para proteção de rotas)
+   * Logout
+   */
+  logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+    window.location.href = "/login";
+  },
+
+  /**
+   * Verifica se usuário está logado
    */
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('token');
-  }
+    return !!localStorage.getItem("token");
+  },
 };

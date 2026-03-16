@@ -1,49 +1,66 @@
-import axios from 'axios';
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/',
+  baseURL: "http://127.0.0.1:8000/api/",
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
 
 /**
- * INTERCEPTADOR DE REQUISIÇÃO (O "Crachá" de Acesso)
- * Antes de cada chamada sair para o Django, verificamos se temos um token.
+ * INTERCEPTADOR DE REQUISIÇÃO
+ * Adiciona o token JWT em todas as chamadas.
  */
 api.interceptors.request.use(
   (config) => {
-    // Buscamos o token que o seu auth.service salvou no login
-    const token = localStorage.getItem('token'); 
-    
+    const token = localStorage.getItem("token");
     if (token) {
-      // Adicionamos o padrão Bearer que o Django SimpleJWT exige
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 /**
  * INTERCEPTADOR DE RESPOSTA
+ * Faz refresh automático do token em caso de 401.
  */
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 500) {
-      console.error("🏙️ NY Dev Alert: O Django teve um erro interno (500).");
-    }
+  async (error) => {
     if (error.response?.status === 401) {
-      console.warn("🚫 Acesso negado ou Token expirado.");
-      // Opcional: Se quiser deslogar o usuário automaticamente:
-      // localStorage.removeItem('token');
-      // window.location.href = '/login';
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (refreshToken) {
+        try {
+          const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
+            refresh: refreshToken,
+          });
+
+          // Atualiza token
+          localStorage.setItem("token", res.data.access);
+
+          // Reenvia requisição original com novo token
+          error.config.headers.Authorization = `Bearer ${res.data.access}`;
+          return api.request(error.config);
+        } catch (refreshError) {
+          console.error("🚫 Refresh token inválido ou expirado:", refreshError);
+          localStorage.removeItem("token");
+          localStorage.removeItem("refresh_token");
+          window.location.href = "/login";
+        }
+      } else {
+        console.warn("🚫 Nenhum refresh token disponível.");
+        window.location.href = "/login";
+      }
     }
+
+    if (error.response?.status === 500) {
+      console.error("💥 Erro interno no servidor Django (500).");
+    }
+
     return Promise.reject(error);
   }
 );

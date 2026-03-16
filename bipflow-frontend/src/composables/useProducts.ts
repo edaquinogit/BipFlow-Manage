@@ -3,50 +3,68 @@ import { ProductService } from '../services/product.service';
 import type { Product } from '../schemas/product.schema';
 
 export function useProducts() {
-  // --- ESTADO (STATE) ---
+  // --- 1. ESTADO (STATE) ---
   const products = ref<Product[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const selectedCategory = ref('All');
+  const selectedCategory = ref<string | number>('All');
 
-  // --- AÇÕES (ACTIONS) ---
-  
-  // Carrega os dados da API Django
+  // --- 2. AÇÕES (ACTIONS) ---
   const fetchData = async () => {
     loading.value = true;
     error.value = null;
-    
     try {
       const data = await ProductService.getAllProducts();
-      // Garantimos que products sempre receba um array para não quebrar o .filter()
       products.value = Array.isArray(data) ? data : [];
-    } catch (err: any) {
-      error.value = "Failed to load products. Check your connection.";
-      console.error("🏙️ NY Debug - Erro no Composable:", err);
-      products.value = []; 
+    } catch (err) {
+      error.value = "Failed to load inventory. Check backend connection.";
+      products.value = [];
     } finally {
       loading.value = false;
     }
   };
 
-  // --- COMPUTADOS (GETTERS) ---
-
-  // Filtra os produtos baseado na categoria selecionada no Dashboard
+  // --- 3. FILTRAGEM (INVENTORY LOGIC) ---
   const filteredProducts = computed(() => {
-    if (selectedCategory.value === 'All') return products.value;
-    return products.value.filter(p => p.category === selectedCategory.value);
+    const categoryFilter = selectedCategory.value;
+    const list = products.value;
+
+    if (!categoryFilter || categoryFilter === 'All') {
+      return list;
+    }
+
+    return list.filter((p) => {
+      // Normalização de comparação String vs Number
+      const pCat = String(p.category);
+      const sCat = String(categoryFilter);
+      return pCat === sCat;
+    });
   });
 
-  // Cálculo de Receita Dinâmico (Sempre em Dólar!)
+  // --- 4. INTELIGÊNCIA DE NEGÓCIO (BI) ---
   const totalRevenue = computed(() => {
-    const total = filteredProducts.value.reduce((acc, p) => acc + Number(p.price), 0);
+    const rawTotal = filteredProducts.value.reduce((acc, p) => {
+      const price = Number(p.price) || 0;
+      const stock = Number(p.stock_quantity) || 0;
+      return acc + (price * stock);
+    }, 0);
+
     return new Intl.NumberFormat('en-US', { 
       style: 'currency', 
       currency: 'USD' 
-    }).format(total);
+    }).format(rawTotal);
   });
 
-  // Retornamos tudo que o DashboardView vai precisar "consumir"
+  const inventoryStats = computed(() => {
+    const list = filteredProducts.value;
+    return {
+      totalItems: list.length,
+      lowStockCount: list.filter(p => (Number(p.stock_quantity) || 0) < 5).length,
+      outOfStock: list.filter(p => (Number(p.stock_quantity) || 0) === 0).length
+    };
+  });
+
+  // --- 5. EXPOSIÇÃO ---
   return {
     products,
     loading,
@@ -54,6 +72,7 @@ export function useProducts() {
     selectedCategory,
     filteredProducts,
     totalRevenue,
+    inventoryStats,
     fetchData
   };
 }

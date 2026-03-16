@@ -1,20 +1,37 @@
 import { z } from 'zod';
 
+/**
+ * 🚀 Schema de Produto - Padrão Enterprise
+ * Refatorado para aceitar dados reais (e imperfeitos) do Django.
+ */
 export const ProductSchema = z.object({
   id: z.number().optional(),
-  name: z.string()
-    .min(3, "O nome do produto deve ter pelo menos 3 caracteres")
-    .max(50, "Nome muito longo"),
   
-  // 🚀 A MÁGICA ESTÁ AQUI:
-  // z.coerce.number() tenta transformar "150.00" em 150.00 antes de validar
-  price: z.coerce.number()
-    .positive("O preço deve ser um valor positivo"),
-    
-  category: z.string().min(1, "A categoria é obrigatória"),
+  // SKU e Slug: O Django enviou 'null', então usamos .nullable()
+  sku: z.string().nullable().optional(), 
+  slug: z.string().nullable().optional(),
   
-  // Também é bom usar coerce no stock, caso o Django mande como string
-  stock: z.coerce.number().int().nonnegative().default(0),
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  description: z.string().nullable().optional(),
+  
+  // Coerce garante que '10.50' (string) vire 10.50 (number) automaticamente
+  price: z.coerce.number().min(0, "Price cannot be negative"),
+  
+  size: z.string().nullable().optional(),
+  
+  stock_quantity: z.coerce.number().int().nonnegative().default(0),
+  is_available: z.boolean().default(true),
+
+  /**
+   * 🖼️ Tratamento de Imagem:
+   * Removemos o .url() estrito porque se a string vier vazia (""), 
+   * o Zod daria erro. O .nullable() resolve o erro de 'null' do banco.
+   */
+  image: z.string().nullable().optional(),
+
+  category: z.number(),
+  category_name: z.string().optional(),
+  created_at: z.string().optional(),
 });
 
 export type Product = z.infer<typeof ProductSchema>;
