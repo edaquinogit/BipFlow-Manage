@@ -1,71 +1,96 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { ProductSchema, type Product } from '../../schemas/product.schema';
+import FormInput from '../common/FormInput.vue';
 
 const props = defineProps<{ isOpen: boolean }>();
 const emit = defineEmits(['close', 'save']);
 
-const form = ref<Partial<Product>>({
+const initialState: Partial<Product> = {
   name: '',
   price: 0,
   stock_quantity: 0,
-  category: 1, // Default para 'Geral'
+  category: 1,
   sku: '',
-});
+  size: '',
+  image: ''
+};
 
-const errors = ref<Record<string, string>>({});
+const form = ref({ ...initialState });
+const errors = ref<Record<string, any>>({});
 
 const handleSubmit = () => {
   const result = ProductSchema.safeParse(form.value);
   
   if (!result.success) {
-    errors.value = result.error.flatten().fieldErrors as any;
+    errors.value = result.error.flatten().fieldErrors;
     return;
   }
 
   emit('save', result.data);
-  form.value = { name: '', price: 0, stock_quantity: 0, category: 1, sku: '' }; // Reset
+  form.value = { ...initialState }; // Reset
+  errors.value = {};
 };
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 overflow-hidden">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')"></div>
+  <Transition name="slide">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex justify-end">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="emit('close')" />
 
-    <div class="absolute inset-y-0 right-0 w-full max-w-md bg-zinc-900 border-l border-zinc-800 shadow-2xl p-8 flex flex-col">
-      <div class="flex justify-between items-center mb-10">
-        <h2 class="text-2xl font-black text-white italic uppercase tracking-tighter">New Product</h2>
-        <button @click="emit('close')" class="text-zinc-500 hover:text-white">✕</button>
-      </div>
-
-      <form @submit.prevent="handleSubmit" class="space-y-6 flex-1">
-        <div>
-          <label class="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Product Name</label>
-          <input v-model="form.name" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none transition-all" placeholder="e.g. Vintage Camera">
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
+      <aside class="relative w-full max-w-lg bg-zinc-900 border-l border-white/5 shadow-2xl p-8 flex flex-col">
+        <header class="flex justify-between items-center mb-10">
           <div>
-            <label class="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Price (USD)</label>
-            <input v-model.number="form.price" type="number" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none transition-all">
+            <h2 class="text-3xl font-black text-white italic tracking-tighter uppercase">New Product</h2>
+            <p class="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Inventory Expansion Hub</p>
           </div>
-          <div>
-            <label class="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Initial Stock</label>
-            <input v-model.number="form.stock_quantity" type="number" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none transition-all">
-          </div>
-        </div>
+          <button @click="emit('close')" class="h-10 w-10 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition-colors">✕</button>
+        </header>
 
-        <div>
-          <label class="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">SKU Identifier</label>
-          <input v-model="form.sku" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-400 font-mono focus:border-indigo-500 outline-none transition-all" placeholder="NYC-001">
-        </div>
+        <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto pr-4 space-y-8 custom-scrollbar">
+          
+          <section class="space-y-6">
+            <h3 class="text-xs font-black text-indigo-500 uppercase tracking-[0.3em]">Basic Info</h3>
+            <FormInput label="Product Name" v-model="form.name" placeholder="e.g. Premium Hub Gear" :error="errors.name?.[0]" />
+            <div class="grid grid-cols-2 gap-4">
+              <FormInput label="SKU" v-model="form.sku" placeholder="NYC-100" />
+              <FormInput label="Category ID" v-model="form.category" type="number" />
+            </div>
+          </section>
 
-        <div class="pt-10">
-          <button type="submit" class="w-full bg-white text-black font-black uppercase tracking-widest py-4 rounded-xl hover:bg-zinc-200 transition-all shadow-xl shadow-white/5 active:scale-95">
+          <section class="space-y-6">
+            <h3 class="text-xs font-black text-indigo-500 uppercase tracking-[0.3em]">Specifications</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <FormInput label="Price (USD)" v-model="form.price" type="number" :error="errors.price?.[0]" />
+              <FormInput label="Stock" v-model="form.stock_quantity" type="number" />
+            </div>
+            <FormInput label="Size / Version" v-model="form.size" placeholder="e.g. Large, 42, 1TB" />
+          </section>
+
+          <section class="space-y-6">
+            <h3 class="text-xs font-black text-indigo-500 uppercase tracking-[0.3em]">Media</h3>
+            <FormInput label="Image URL" v-model="form.image" placeholder="https://images.unsplash.com/..." />
+            <div v-if="form.image" class="mt-4 h-32 w-full rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950">
+               <img :src="form.image" class="w-full h-full object-cover opacity-50" />
+            </div>
+          </section>
+        </form>
+
+        <footer class="mt-10">
+          <button type="submit" @click="handleSubmit" class="w-full bg-white text-black font-black uppercase tracking-widest py-4 rounded-xl hover:bg-zinc-200 transition-all active:scale-95 shadow-xl shadow-white/5">
             Add to Inventory
           </button>
-        </div>
-      </form>
+        </footer>
+      </aside>
     </div>
-  </div>
+  </Transition>
 </template>
+
+<style scoped>
+.slide-enter-active, .slide-leave-active { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-enter-from, .slide-leave-to { transform: translateX(100%); }
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+</style>

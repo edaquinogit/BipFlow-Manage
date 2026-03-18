@@ -1,30 +1,67 @@
 import api from './api';
 import { ProductSchema, type Product } from '../schemas/product.schema';
 
-export const ProductService = {
+/**
+ * ProductService - BipFlow Engine (NYC Standard)
+ * Singleton para gerenciamento de ativos via Django REST.
+ */
+class ProductService {
+  private readonly endpoint = 'products/';
+
   /**
-   * Busca todos os produtos do Django e valida com Zod
+   * Obtém todos os produtos e valida via Zod Schema.
    */
-  async getAllProducts(): Promise<Product[]> {
+  async getAll(): Promise<Product[]> {
     try {
-      const response = await api.get('products/');
-      
-      // Validamos se o que veio do Django bate com o nosso contrato (Schema)
-      return ProductSchema.array().parse(response.data);
-      
+      const { data } = await api.get(this.endpoint);
+      // Validamos o array completo vindo do Backend
+      return ProductSchema.array().parse(data);
     } catch (err: any) {
-      if (err.response) {
-        // O servidor respondeu com erro (ex: 401, 500)
-        console.error("❌ Erro do Servidor Django:", err.response.status);
-        console.error("Mensagem do Backend:", err.response.data);
-      } else if (err.request) {
-        // Sem resposta do servidor
-        console.error("❌ O Django não respondeu. O servidor está ligado?");
-      } else {
-        // Erro de validação do Zod ou configuração
-        console.error("❌ Erro na aplicação:", err.message);
-      }
+      this.handleError(err, 'Fetch All');
       throw err;
     }
-  } // Fim da função getAllProducts
-}; // Fim do objeto ProductService
+  }
+
+  /**
+   * Provisiona um novo ativo no Hub.
+   */
+  async create(productData: Partial<Product>): Promise<Product> {
+    try {
+      const { data } = await api.post(this.endpoint, productData);
+      return ProductSchema.parse(data);
+    } catch (err: any) {
+      this.handleError(err, 'Create');
+      throw err;
+    }
+  }
+
+  /**
+   * Remove um ativo pelo ID.
+   */
+  async delete(id: number): Promise<void> {
+    try {
+      // Garantimos a barra final (padrão Django) para evitar 404/301
+      await api.delete(`${this.endpoint}${id}/`);
+    } catch (err: any) {
+      this.handleError(err, 'Delete');
+      throw err;
+    }
+  }
+
+  /**
+   * Handler de erros centralizado para Logs de Auditoria.
+   */
+  private handleError(err: any, context: string) {
+    if (err.response) {
+      console.error(`❌ [ProductService][${context}] Server Error:`, err.response.status);
+    } else if (err.request) {
+      console.error(`❌ [ProductService][${context}] Network Offline.`);
+    } else {
+      console.error(`❌ [ProductService][${context}] Schema Validation Failed:`, err.message);
+    }
+  }
+}
+
+// CRITICAL: Exportação Padrão da Instância
+const productServiceInstance = new ProductService();
+export default productServiceInstance;
