@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Component } from 'vue'; // Importação de tipo para segurança
 import StatCard from './StatCard.vue';
 import StatSkeleton from './StatSkeleton.vue';
 import RevenueCard from './RevenueCard.vue';
@@ -7,7 +8,7 @@ import {
   ExclamationTriangleIcon 
 } from '@heroicons/vue/24/outline';
 
-// Definimos uma interface para os dados (Senior Pattern)
+// Contrato de Interface (BipFlow Standard)
 interface InventoryStats {
   totalItems: number;
   lowStockCount: number;
@@ -15,7 +16,7 @@ interface InventoryStats {
 
 defineProps<{
   stats: InventoryStats | null;
-  revenue: string;
+  revenue: string | number;
   isLoading: boolean;
 }>();
 </script>
@@ -31,19 +32,19 @@ defineProps<{
       <StatCard 
         label="In Stock Units" 
         :value="stats?.totalItems ?? 0" 
-        :icon="ShoppingBagIcon"
+        :icon="(ShoppingBagIcon as any)" 
         color="indigo" 
       />
 
       <StatCard 
         label="Critical Alerts" 
         :value="stats?.lowStockCount ?? 0" 
-        :icon="ExclamationTriangleIcon" 
+        :icon="(ExclamationTriangleIcon as any)" 
         color="orange"
       />
 
       <RevenueCard :value="revenue" />
     </template>
-    
+
   </section>
 </template>

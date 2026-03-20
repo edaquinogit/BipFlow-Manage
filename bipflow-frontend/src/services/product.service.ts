@@ -14,7 +14,7 @@ class ProductService {
   async getAll(): Promise<Product[]> {
     try {
       const { data } = await api.get(this.endpoint);
-      // Validamos o array completo vindo do Backend
+      // Validamos o array completo vindo do Backend (Data Integrity)
       return ProductSchema.array().parse(data);
     } catch (err: any) {
       this.handleError(err, 'Fetch All');
@@ -36,11 +36,27 @@ class ProductService {
   }
 
   /**
+   * ATUALIZAÇÃO ESTRATÉGICA (PATCH)
+   * Sincroniza alterações parciais de um ativo existente.
+   */
+  async update(id: number, productData: Partial<Product>): Promise<Product> {
+    try {
+      // O PATCH é sênior porque não sobrescreve campos omitidos no objeto
+      const { data } = await api.patch(`${this.endpoint}${id}/`, productData);
+      
+      // Validação Zod pós-update: Garante que o retorno do Django é confiável
+      return ProductSchema.parse(data);
+    } catch (err: any) {
+      this.handleError(err, 'Update');
+      throw err;
+    }
+  }
+
+  /**
    * Remove um ativo pelo ID.
    */
   async delete(id: number): Promise<void> {
     try {
-      // Garantimos a barra final (padrão Django) para evitar 404/301
       await api.delete(`${this.endpoint}${id}/`);
     } catch (err: any) {
       this.handleError(err, 'Delete');
@@ -49,19 +65,18 @@ class ProductService {
   }
 
   /**
-   * Handler de erros centralizado para Logs de Auditoria.
+   * Handler de erros centralizado para Logs de Auditoria BipFlow.
    */
   private handleError(err: any, context: string) {
-    if (err.response) {
-      console.error(`❌ [ProductService][${context}] Server Error:`, err.response.status);
-    } else if (err.request) {
-      console.error(`❌ [ProductService][${context}] Network Offline.`);
+    if (err.name === 'ZodError') {
+      console.error(`⚠️ [ProductService][${context}] Schema Mismatch:`, err.errors);
+    } else if (err.response) {
+      console.error(`❌ [ProductService][${context}] API Error [${err.response.status}]:`, err.response.data);
     } else {
-      console.error(`❌ [ProductService][${context}] Schema Validation Failed:`, err.message);
+      console.error(`❌ [ProductService][${context}] Unexpected Failure:`, err.message);
     }
   }
 }
 
-// CRITICAL: Exportação Padrão da Instância
-const productServiceInstance = new ProductService();
-export default productServiceInstance;
+// Exportação da Instância Única (Singleton Pattern)
+export default new ProductService();

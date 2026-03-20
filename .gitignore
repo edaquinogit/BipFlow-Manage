@@ -27,3 +27,4 @@ coverage/
 node_modules/
 .venv/
 *.sqlite3
+*.sqlite3
