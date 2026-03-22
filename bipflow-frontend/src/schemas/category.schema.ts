@@ -1,59 +1,53 @@
 import { z } from 'zod';
 
 /**
- * BIPFLOW CATEGORY ARCHITECTURE
- * Este schema reflete o contrato entre o Django REST Framework e o Vue 3.
- * Incluímos suporte para campos opcionais e transformações de segurança.
+ * --- 1. CORE SCHEMA (Modelagem de Leitura) ---
+ * Reflete exatamente o que o Django envia no GET.
+ * Blindado contra valores nulos e dados inconsistentes.
  */
 export const CategorySchema = z.object({
-  // Identificador único (Opcional apenas durante a criação no front)
-  id: z.number().optional(),
-
-  // Nome da categoria com validação mínima
+  id: z.number(),
   name: z.string()
     .min(2, "Category name must have at least 2 characters")
     .max(50, "Category name is too long"),
-
-  // Descrição: Tratamos explicitamente como nulo ou opcional
   description: z.string()
     .nullable()
     .optional()
-    .default(null),
-
-  /**
-   * 🛡️ FIX: SLUG NULL-SAFETY
-   * O erro "expected string, received null" é resolvido aqui.
-   * Aceitamos nulo e transformamos em string vazia se necessário para evitar quebras no UI.
-   */
+    .default(""), // Garantimos uma string vazia para evitar erros de renderização no Vue
   slug: z.string()
     .nullable()
     .optional()
     .transform((val) => val ?? ""),
-
-  // Campo calculado (Agregação do Django)
   product_count: z.number()
     .int()
     .nonnegative()
     .optional()
     .default(0),
-
-  // Metadados de Auditoria (Opcionais para exibição em Tooltips/Logs)
-  created_at: z.string().datetime().optional(),
+  created_at: z.string().optional(), // Removido .datetime() se o Django enviar ISO formatada com timezone
 });
 
 /**
- * TYPE INFERENCE
- * Extraímos a tipagem estática diretamente do Schema do Zod.
+ * --- 2. MUTATION SCHEMA (Modelagem de Escrita) ---
+ * Omitimos os campos que são de responsabilidade exclusiva do Backend.
  */
-export type Category = z.infer<typeof CategorySchema>;
+export const CategoryCreateSchema = CategorySchema.omit({
+  id: true,
+  slug: true,
+  product_count: true,
+  created_at: true 
+});
 
 /**
- * NYC FACTORY PATTERN (Opcional)
- * Função auxiliar para gerar um estado inicial limpo para o formulário.
+ * --- TYPE INFERENCE ---
  */
-export const createEmptyCategory = (): Partial<Category> => ({
+export type Category = z.infer<typeof CategorySchema>;
+export type CategoryCreatePayload = z.infer<typeof CategoryCreateSchema>;
+
+/**
+ * --- NYC FACTORY PATTERN ---
+ * Gera um estado inicial limpo para o BipFlow Registry.
+ */
+export const createEmptyCategory = (): CategoryCreatePayload => ({
   name: '',
-  description: null,
-  slug: '',
-  product_count: 0
+  description: "", // Mantendo consistência com o default do schema
 });

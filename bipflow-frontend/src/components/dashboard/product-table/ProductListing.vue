@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProductTable from '../ProductTable.vue';
+import ProductTable from '@/components/dashboard/product-table/ProductTableRoot.vue';
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 

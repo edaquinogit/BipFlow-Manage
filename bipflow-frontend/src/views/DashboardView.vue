@@ -1,25 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useProducts } from '@/composables/useProducts';
-import { useCategories } from '@/composables/useCategories'; // Novo Import
+import { useCategories } from '@/composables/useCategories';
 import type { Product } from '@/schemas/product.schema';
 
-// Componentes de Domínio e Layout (Padrão de Herança BipFlow)
+// Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
 import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
-import ProductListing from '@/components/dashboard/table/ProductListing.vue';
-import ProductForm from '@/components/dashboard/ProductForm.vue';
+import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
+import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 /**
- * --- ENGINE STATE (Reactive Core) ---
+ * 🛰️ ENGINE STATE
  */
 const isPanelOpen = ref(false);
 const isDeleteModalOpen = ref(false);
 const assetIdToPurge = ref<number | null>(null);
 const selectedProduct = ref<Product | null>(null);
 
-// Hub de Produtos
 const {
   loading: productsLoading,
   error,      
@@ -32,76 +31,81 @@ const {
   inventoryStats
 } = useProducts();
 
-// Hub de Categorias
-const { 
-  categories, 
-  fetchCategories 
-} = useCategories();
+const { categories, fetchCategories } = useCategories();
 
 /**
- * --- BUSINESS HANDLERS (The NYC Logic) ---
+ * 🧠 BUSINESS LOGIC (NYC HUB HANDLERS)
  */
 
-// Abre o painel para um novo produto (Reset de Estado)
 const handleOpenNewPanel = () => {
   selectedProduct.value = null;
   isPanelOpen.value = true;
 };
 
-// Abre o painel populado para edição
 const handleEditRequest = (product: Product) => {
-  selectedProduct.value = product;
+  // Deep clone preventivo para evitar mutação indesejada no estado global
+  selectedProduct.value = { ...product };
   isPanelOpen.value = true;
 };
 
-// Fecha o painel e limpa rastro de memória (Clean State)
 const handleClosePanel = () => {
   isPanelOpen.value = false;
   selectedProduct.value = null;
 };
 
-// Orquestrador de Persistência (Create vs Update com Suporte a Upload)
+/**
+ * 💾 PERSISTENCE ORCHESTRATOR
+ * Gerencia o ciclo de vida do dado com validação rigorosa de mídia.
+ */
 const handleSave = async (payload: any) => {
   try {
     /**
-     * 🧹 NYC CLEAN PAYLOAD STRATEGY
-     * Removemos campos virtuais/read-only que o Django rejeita.
+     * 1. 🧹 DATA SANITIZATION
+     * Removemos campos protegidos (read-only) para não gerar erro 400 no Django.
      */
     const { 
       id, 
       created_at, 
       updated_at,
       category_name, 
-      ...cleanData 
+      ...dataToSync 
     } = payload;
 
     /**
-     * 🛡️ IMAGE UPLOAD GUARD
-     * O Django (ImageField) espera um binário (File).
-     * Se 'image' for uma string (URL vinda do banco), significa que o 
-     * usuário não trocou a foto. Logo, deletamos o campo do payload 
-     * para não sobrescrever a imagem com uma string e causar erro 400.
+     * 2. 🛡️ ASSET MEDIA GUARD
+     * Se 'image' for string, o usuário não subiu um arquivo novo.
+     * Deletamos a string do payload para que o Django mantenha a foto atual.
      */
-    if (typeof cleanData.image === 'string') {
-      delete cleanData.image;
+    if (typeof dataToSync.image === 'string') {
+      delete dataToSync.image;
     }
 
+    // 3. EXECUTION PHASE
     if (selectedProduct.value?.id) {
-      await updateProduct(selectedProduct.value.id, cleanData);
-      console.log(`🛠️ BipFlow: Asset ${selectedProduct.value.id} updated successfully.`);
+      await updateProduct(selectedProduct.value.id, dataToSync);
+      console.log(`✅ BipFlow: Asset ${selectedProduct.value.id} synchronized.`);
     } else {
-      await createProduct(cleanData);
-      console.log(`🚀 BipFlow: New asset deployed.`);
+      await createProduct(dataToSync);
+      console.log(`🚀 BipFlow: New asset deployed to registry.`);
     }
     
+    /**
+     * 4. 🔄 REGISTRY REFRESH (A SOLUÇÃO DO ERRO DE RENDERIZAÇÃO)
+     * Forçamos uma nova busca no backend. Isso garante que o Vue receba 
+     * a nova 'image_url' gerada pelo Django, reativando a exibição no Avatar.
+     */
+    await fetchData();
+    
+    // 5. UI FEEDBACK
     handleClosePanel();
+    
   } catch (err) {
-    console.error("❌ BipFlow: Save operation failed at API level.", err);
+    console.error("❌ BipFlow: Save operation aborted.", err);
   }
 };
 
 /**
- * --- DELETION PROTOCOL ---
+ * 🗑️ TERMINATION PROTOCOL
  */
 const openDeleteConfirm = (id: number) => {
   assetIdToPurge.value = id;
@@ -109,22 +113,25 @@ const openDeleteConfirm = (id: number) => {
 };
 
 const executeDelete = async () => {
-  if (assetIdToPurge.value !== null) {
-    try {
-      await deleteProduct(assetIdToPurge.value);
-      console.log(`🗑️ BipFlow: Asset purged from local registry.`);
-    } finally {
-      isDeleteModalOpen.value = false;
-      assetIdToPurge.value = null;
-    }
+  if (!assetIdToPurge.value) return;
+  
+  try {
+    await deleteProduct(assetIdToPurge.value);
+    console.log(`🗑️ BipFlow: Asset purged.`);
+    
+    // Garante integridade do grid após exclusão
+    await fetchData(); 
+  } finally {
+    isDeleteModalOpen.value = false;
+    assetIdToPurge.value = null;
   }
 };
 
 /**
- * --- SYSTEM BOOTSTRAP ---
- * Carrega Produtos e Categorias em paralelo (Performance de Alto Nível)
+ * ⚡ SYSTEM BOOTSTRAP
  */
 onMounted(async () => {
+  // Carregamento paralelo para máxima performance na montagem da tela
   await Promise.all([
     fetchData(),
     fetchCategories()
@@ -133,7 +140,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30">
+  <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30 font-sans antialiased">
     <DashboardHeader />
 
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
@@ -164,8 +171,8 @@ onMounted(async () => {
 
     <ConfirmModal 
       :show="isDeleteModalOpen"
-      title="Purge Active Asset?"
-      message="Attention: This operation is final. Removing this asset will update the global inventory valuation in real-time."
+      title="Confirm Asset Deletion"
+      message="This action is irreversible. The asset will be permanently removed from the BipFlow global registry."
       :is-loading="productsLoading"
       @close="isDeleteModalOpen = false"
       @confirm="executeDelete"

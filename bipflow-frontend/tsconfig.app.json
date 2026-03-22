@@ -3,16 +3,22 @@
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
   "exclude": ["src/**/__tests__/*"],
   "compilerOptions": {
-    // Extra safety for array and object lookups, but may have false positives.
+    // 🎯 O Fix Principal: Define a raiz para o mapeamento de paths
+    "baseUrl": ".",
+    
+    // Extra safety for array and object lookups
     "noUncheckedIndexedAccess": true,
 
-    // Path mapping for cleaner imports.
+    // Path mapping for cleaner imports (NYC Enterprise Standard)
     "paths": {
       "@/*": ["./src/*"]
     },
 
-    // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
-    // Specified here to keep it out of the root directory.
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+    // Performance & Incremental Builds
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    
+    // Suporte para as novas Macros do Vue (como o defineModel que usamos)
+    "lib": ["ESNext", "DOM"],
+    "skipLibCheck": true
   }
 }

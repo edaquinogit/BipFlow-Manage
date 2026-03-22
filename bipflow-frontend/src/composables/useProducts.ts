@@ -1,47 +1,92 @@
 import { ref, computed } from 'vue';
 import type { Product } from '../schemas/product.schema';
-import ProductService from '../services/product.service'; 
+import ProductService from '../services/product.service';
 
+/**
+ * 🛰️ BIPFLOW PRODUCT HUB (NYC ARCHITECTURE)
+ * Gerencia o estado global, cálculos e persistência de ativos.
+ */
 export function useProducts() {
+  // ==========================================
+  // 1. STATE (REACTIVE CORE)
+  // ==========================================
   const products = ref<Product[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
+  // ==========================================
+  // 2. INTERNAL UTILS (PRIVATE HELPERS)
+  // ==========================================
+
   /**
-   * --- HELPER DE EXTRAÇÃO (ESTRATÉGIA SENIOR) ---
-   * Resolve os 3 erros de 'p.stock' centralizando a lógica de fallback.
-   * Se o banco retornar 'stock' ou 'stock_quantity', ele captura corretamente.
+   * Extrai o valor de estoque lidando com inconsistências do banco.
    */
-  const getStockValue = (p: Product): number => {
-    // Acessamos via chave de string para evitar o erro de tipagem do TS
+  const _getStockValue = (p: Product): number => {
     const val = (p as any).stock_quantity ?? (p as any).stock ?? 0;
     return Number(val);
   };
 
   /**
-   * --- 1. CALCULATED HUB ---
+   * 🔄 PAYLOAD ADAPTER (Multipart/FormData Support)
+   * Centraliza a validação de arquivos e conversão para o Django.
    */
+  const _preparePayload = (data: Partial<Product>): FormData => {
+    const formData = new FormData();
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB Limit
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (value === null || value === undefined) return;
+
+      // 🛡️ SECURITY GUARD: Validação de Imagem
+      if (key === 'image') {
+        if (value instanceof File) {
+          if (value.size > MAX_FILE_SIZE) {
+            throw new Error(`The image exceeds the 2MB limit.`);
+          }
+          formData.append(key, value);
+        }
+        // Se for string (URL), omitimos para o Django não tentar sobrescrever o binário com texto
+        return;
+      }
+
+      // 🛠️ DATA FORMATTING: Price, Stock e Objects
+      if (key === 'price' || key === 'stock') {
+        formData.append(key, String(value === "" ? 0 : value));
+      } else if (typeof value === 'object' && 'id' in (value as any)) {
+        formData.append(key, String((value as any).id));
+      } else {
+        formData.append(key, String(value));
+      }
+    });
+
+    return formData;
+  };
+
+  // ==========================================
+  // 3. CALCULATED HUB (GETTERS)
+  // ==========================================
   const totalRevenue = computed(() => {
     const total = products.value.reduce((acc, p) => {
       const price = Number(p.price || 0);
-      return acc + (price * getStockValue(p));
+      return acc + (price * _getStockValue(p));
     }, 0);
 
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD', 
-      maximumFractionDigits: 0 
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
     }).format(total);
   });
 
   const inventoryStats = computed(() => ({
-    totalItems: products.value.reduce((acc, p) => acc + getStockValue(p), 0),
-    lowStockCount: products.value.filter(p => getStockValue(p) < 5).length
+    totalItems: products.value.reduce((acc, p) => acc + _getStockValue(p), 0),
+    lowStockCount: products.value.filter(p => _getStockValue(p) < 5).length
   }));
 
-  /**
-   * --- 2. ENGINE ACTIONS ---
-   */
+  // ==========================================
+  // 4. ENGINE ACTIONS (CRUD)
+  // ==========================================
+
   const fetchData = async () => {
     loading.value = true;
     error.value = null;
@@ -54,34 +99,37 @@ export function useProducts() {
     }
   };
 
-  const createProduct = async (data: Partial<Product>) => {
+  const createProduct = async (data: Partial<Product>): Promise<Product | undefined> => {
+    loading.value = true;
+    error.value = null;
     try {
-      const newProduct = await ProductService.create(data);
-      products.value = [newProduct, ...products.value];
-    } catch (err) {
-      console.error("❌ BipFlow: Provisioning failed.");
+      const payload = _preparePayload(data);
+      const newAsset = await ProductService.create(payload);
+      
+      products.value = [newAsset, ...products.value];
+      console.log(`✅ BipFlow: Asset ${newAsset.id} deployed.`);
+      return newAsset;
+    } catch (err: any) {
+      error.value = err.message || "Deployment failed.";
+      throw err;
+    } finally {
+      loading.value = false;
     }
   };
 
-  /**
-   * UPDATE ASSET (NYC HUB SYNC)
-   * Realiza o patch no service e sincroniza o estado local de forma imutável.
-   */
   const updateProduct = async (id: number, data: Partial<Product>) => {
-    loading.value = true; // Inicia feedback visual
+    loading.value = true;
+    error.value = null;
     try {
-      const updated = await ProductService.update(id, data);
+      const payload = _preparePayload(data);
+      const updatedAsset = await ProductService.update(id, payload);
       
-      // Mapeamento Imutável: Garante que a reatividade do Vue detecte a mudança
-      products.value = products.value.map(p => 
-        p.id === id ? { ...p, ...updated } : p
-      );
-      
-      console.log(`🛠️ BipFlow: Asset ${id} synchronized with global registry.`);
-    } catch (err) {
-      error.value = "Failed to synchronize update with NYC Station.";
-      console.error("❌ BipFlow: Update sequence failed.", err);
-      throw err; // Repassa o erro para o Dashboard tratar se necessário
+      products.value = products.value.map(p => p.id === id ? updatedAsset : p);
+      console.log(`🛠️ BipFlow: Asset ${id} synchronized.`);
+      return updatedAsset;
+    } catch (err: any) {
+      error.value = "Sync update failed.";
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -91,12 +139,15 @@ export function useProducts() {
     try {
       await ProductService.delete(id);
       products.value = products.value.filter(p => p.id !== id);
+      console.log(`🗑️ BipFlow: Asset ${id} purged.`);
     } catch (err) {
-      console.error("❌ BipFlow: Purge failed.", err);
+      console.error("❌ BipFlow: Purge sequence failed.", err);
     }
   };
 
-  // --- RETURN HUB (Organização e Exportação Única) ---
+  // ==========================================
+  // 5. EXPORT HUB
+  // ==========================================
   return {
     products,
     loading,
@@ -105,7 +156,7 @@ export function useProducts() {
     inventoryStats,
     fetchData,
     createProduct,
-    updateProduct, // Apenas uma vez aqui
+    updateProduct,
     deleteProduct
   };
 }

@@ -1,15 +1,22 @@
 import os
 from pathlib import Path
-from datetime import timedelta # Importante para configurar o tempo do token
+from datetime import timedelta
 
+# 🛰️ BASE DIRECTORY SETUP
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-p#994+*a+ah%p$u=i96^-ntbfax!xc3%1t62kq_1ad0yfj_ka%'
+# 🔑 SECURITY WARNING: keep the secret key used in production secret!
+# Em produção, utilize variáveis de ambiente (.env)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-p#994+*a+ah%p$u=i96^-ntbfax!xc3%1t62kq_1ad0yfj_ka%')
+
 DEBUG = True
+
 ALLOWED_HOSTS = ['*', '127.0.0.1', 'localhost']
 
+# ==============================================================================
+# 📦 APPLICATION DEFINITION
+# ==============================================================================
 INSTALLED_APPS = [
-    # 1. Apps nativas do Django (OBRIGATÓRIO vir antes)
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -17,18 +24,18 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # 2. Bibliotecas de terceiros
+    # 🛠️ THIRD PARTY PLUGINS
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
 
-    # 3. Suas Apps
-    'api',
+    # 🚀 BIPFLOW LOCAL APPS
+    'api.apps.ApiConfig',
     'core',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', 
+    'corsheaders.middleware.CorsMiddleware', # 🛡️ MUST BE FIRST
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -58,6 +65,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# ==============================================================================
+# 📊 DATABASE & LOCALIZATION
+# ==============================================================================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -70,30 +80,54 @@ TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
+# ==============================================================================
+# 🖼️ STATIC & MEDIA ASSETS (THE IMAGE FIX)
+# ==============================================================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# --- CONFIGURAÇÕES DE ELITE (NY STANDARDS) ---
+# Criar pasta media se não existir para evitar erros de IO
+if not os.path.exists(MEDIA_ROOT):
+    os.makedirs(MEDIA_ROOT)
 
-# Segurança: Permitir apenas o seu Vue.js
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+# ==============================================================================
+# 🛡️ CORS & SECURITY STANDARDS
+# ==============================================================================
+CORS_ALLOW_ALL_ORIGINS = True # 🚨 Apenas para desenvolvimento! 
+CORS_ALLOW_CREDENTIALS = True
+
+# Permitir que o Vue.js acesse os headers de autenticação
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
+# ==============================================================================
+# 🛰️ DRF & JWT CONFIGURATION
+# ==============================================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication', # MUDADO PARA JWT
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', # Mais seguro que OrReadOnly
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-# Configuração do tempo de vida do Token
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'ALGORITHM': 'HS256',
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
