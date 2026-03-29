@@ -1,109 +1,76 @@
-import {
-  createRouter,
-  createWebHistory,
-  type RouteRecordRaw,
-} from "vue-router";
+
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { authRoutes, AuthRouteNames } from './auth.routes'
+import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
+import { errorRoutes } from './error.routes'
 
 /**
- * 🛰️ REGISTRY: Definição de Rotas com Tipagem Estrita e Code-Splitting
- * Otimizado para performance de carregamento (LCP) e escalabilidade.
+ * 🔀 Route Aggregation
+ * Estrutura flat para performance máxima do matcher.
  */
 const routes: RouteRecordRaw[] = [
-  {
-    path: "/",
-    name: "dashboard",
-    // Carregamento imediato para a rota principal
-    component: () => import("@/views/DashboardView.vue"),
-    meta: {
-      requiresAuth: true,
-      title: "Inventory | BipFlow Core",
-      module: "Main Dashboard",
-    },
-  },
-  {
-    path: "/login",
-    name: "login",
-    component: () => import("@/views/LoginView.vue"),
-    meta: {
-      guestOnly: true,
-      title: "Auth | BipFlow Station",
-      module: "Access Control",
-    },
-  },
-  {
-    path: "/:pathMatch(.*)*",
-    name: "not-found",
-    component: () => import("@/views/NotFoundView.vue"),
-    meta: {
-      title: "404 - Not Found",
-      module: "System",
-    },
-  },
-];
+  ...authRoutes,
+  ...dashboardRoutes,
+  ...errorRoutes
+]
+
+/**
+ * 🔐 Auth State Helper
+ * Centraliza a verificação para facilitar migração futura (ex: Pinia/Cookies).
+ */
+const isAuthenticated = (): boolean => {
+  return !!(localStorage.getItem('access_token') || localStorage.getItem('token'))
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  // ⚡ UX: Preservação de posição de scroll entre navegações
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) return savedPosition;
-    return { top: 0, behavior: "smooth" };
-  },
-});
+  scrollBehavior(to, _from, savedPosition) {
+    // Se houver posição salva (ex: botão voltar), retorna para ela
+    if (savedPosition) return savedPosition
+    // Se a rota tiver um hash (ex: #contato), foca no elemento
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    // Caso contrário, topo da página
+    return { top: 0, behavior: 'smooth' }
+  }
+})
 
 /**
- * 🛡️ SECURITY & NAVIGATION ORCHESTRATOR
- * Implementa o protocolo de guarda de navegação com tratamento de intenção (Redirect Memory).
+ * 🛡️ Navigation Guard (Enterprise Pattern)
+ * Implementação limpa sem 'next()', seguindo o padrão moderno do Vue Router 4.
  */
-router.beforeEach((to, from, next) => {
-  // 1. DYNAMIC METADATA (SEO & Branding)
-  const baseTitle = "BipFlow";
-  document.title = to.meta.title ? `${to.meta.title}` : baseTitle;
+router.beforeEach((to) => {
+  const isLogged = isAuthenticated()
 
-  // 2. AUTHENTICATION STATE (Sincronizado com o LocalStorage do Cypress/App)
-  // Nota: access_token é o padrão usado no seu comando cy.loginViaApi()
-  const token = localStorage.getItem("access_token");
-  const isAuthenticated = !!token;
-
-  /**
-   * 🚨 INTERCEPTOR: Acesso não autorizado
-   * Redireciona para o login salvando a rota pretendida para retorno após auth.
-   */
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        `[BipFlow Guard]: Unauthorized access to ${to.fullPath}. Redirecting to Login.`,
-      );
+  // 1. Proteção de Rotas Privadas (Requires Auth)
+  if (to.meta.requiresAuth && !isLogged) {
+    return { 
+      name: AuthRouteNames.Login, 
+      query: { redirect: to.fullPath } 
     }
-    return next({
-      name: "login",
-      query: { redirect: to.fullPath },
-    });
   }
 
-  /**
-   * 🚫 INTERCEPTOR: Redirecionamento de Logado
-   * Impede que o usuário volte ao login manualmente se a sessão estiver ativa.
-   */
-  if (to.meta.guestOnly && isAuthenticated) {
-    return next({ name: "dashboard" });
+  // 2. Proteção de Rotas de Convidados (Guest Only - Login/Register)
+  if (to.meta.guestOnly && isLogged) {
+    return { name: DashboardRoutes.Root }
   }
 
-  // 3. TELEMETRY & AUDIT (Apenas em Dev)
+  // 3. Telemetria em modo Desenvolvimento
   if (import.meta.env.DEV) {
-    console.info(
-      `🚀 Navigating: ${String(to.name)} | Context: ${to.meta.module}`,
-    );
+    const moduleName = to.meta.module || 'system'
+    console.info(`[Router] Navigating to: ${String(to.name)} | Module: ${moduleName}`)
   }
 
-  next();
-});
+  // Se nenhuma condição acima for atendida, a navegação flui naturalmente
+})
 
 /**
- * 🛰️ POST-NAVIGATION HOOKS
+ * 🏁 Global After Hooks
  */
-router.afterEach((_to) => {
-  // Finalização de loadings globais ou disparos de analytics podem entrar aqui
-});
+router.afterEach((to) => {
+  // Define o título da página dinamicamente
+  const title = to.meta.title as string | undefined
+  document.title = title ? `${title} | BipFlow` : 'BipFlow - Manage'
+})
 
-export default router;
+export default router

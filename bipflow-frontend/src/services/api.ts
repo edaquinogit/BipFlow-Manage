@@ -1,19 +1,19 @@
-import axios, { type InternalAxiosRequestConfig } from "axios";
+import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 
 /**
- * 🛰️ BIPFLOW: API CONFIGURATION
- * Centralização de constantes para evitar "Magic Strings" e facilitar manutenção.
+ * 🏷️ BIPFLOW: IMMUTABLE CONFIG
  */
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
-const AUTH_KEYS = {
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
+
+const AUTH_KEYS = Object.freeze({
   ACCESS: "access_token",
   REFRESH: "refresh_token",
-};
+});
 
+// Instância principal
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 12000,
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -21,87 +21,85 @@ const api = axios.create({
 });
 
 /**
- * 🛡️ REQUEST INTERCEPTOR
- * Injeção dinâmica do Bearer Token.
+ * 🛡️ REQUEST INTERCEPTOR: DYNAMIC INJECTION
  */
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem(AUTH_KEYS.ACCESS);
-
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 );
 
 /**
- * 🔄 RESPONSE INTERCEPTOR & REFRESH LOGIC
- * Gerencia expiração de sessão e erros globais.
+ * 🔄 RESPONSE INTERCEPTOR: RESILIENCE ENGINE
  */
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // 1. Tratamento de 401 (Unauthorized) - Refresh Protocol
+    // 1. Protocolo de Expiração de Sessão (401)
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true; // Marca a requisição para não entrar em loop
+      originalRequest._retry = true;
 
       const refreshToken = localStorage.getItem(AUTH_KEYS.REFRESH);
 
       if (refreshToken) {
         try {
-          console.info(
-            "🔄 [BipFlow]: Session expired. Attempting silent refresh...",
-          );
+          console.info("🔄 [BipFlow]: Session expired. Initiating silent recovery...");
 
-          // Chamada direta via axios puro para evitar interceptores de loop
-          const res = await axios.post(`${API_BASE_URL}token/refresh/`, {
+          // Instância isolada para o refresh (NYC Clean Pattern)
+          const refreshInstance = axios.create({ baseURL: API_BASE_URL });
+          const res = await refreshInstance.post("token/refresh/", {
             refresh: refreshToken,
           });
 
-          const newAccessToken = res.data.access;
+          const { access } = res.data;
 
-          // Sincronização de Estado
-          localStorage.setItem(AUTH_KEYS.ACCESS, newAccessToken);
+          // Sincronização de Estado Atômico
+          localStorage.setItem(AUTH_KEYS.ACCESS, access);
 
-          // Atualiza o header da requisição que falhou e reenvia
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          // Re-execução da requisição original com o novo Header
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${access}`;
+          }
+          
           return api(originalRequest);
         } catch (refreshError) {
-          console.error("🚫 [BipFlow]: Refresh Token invalid or expired.");
+          console.error("🚫 [BipFlow]: Critical Auth Failure. Identity invalidated.");
           handleAuthFailure();
+          return Promise.reject(refreshError);
         }
       } else {
         handleAuthFailure();
       }
     }
 
-    // 2. Erros Críticos de Servidor
-    if (error.response?.status >= 500) {
-      console.error(
-        "💥 [BipFlow]: Critical Server Error. Registry Unavailable.",
-      );
+    // 2. Erros Críticos de Infraestrutura (500+)
+    if (error.response && error.response.status >= 500) {
+      console.error("💥 [BipFlow]: Engine Stall. Remote registry is unresponsive.");
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 /**
- * 🧹 AUTH FAILURE HANDLER
- * Limpa o rastro de autenticação e redireciona.
+ * 🧹 SECURE PURGE: IDENTITY RESET
  */
 function handleAuthFailure() {
   localStorage.removeItem(AUTH_KEYS.ACCESS);
   localStorage.removeItem(AUTH_KEYS.REFRESH);
 
-  // Evita redirecionamento se já estivermos na tela de login (previne loops no Cypress)
-  if (!window.location.pathname.includes("/login")) {
-    window.location.href = "/login";
+  const isLoginPage = window.location.pathname.includes("/login");
+  
+  if (!isLoginPage) {
+    // Adiciona um parâmetro de query para informar o motivo ao usuário
+    window.location.href = "/login?reason=session_expired";
   }
 }
 

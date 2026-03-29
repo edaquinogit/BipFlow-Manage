@@ -1,62 +1,61 @@
-// src/router/auth.routes.ts
 import type { RouteRecordRaw } from "vue-router";
 
 /**
- * Nomes de rota centralizados para evitar strings mágicas
- * e facilitar refactors e testes
+ * 🏷️ Centralized Auth Route Names
+ * Evita "Magic Strings" e garante consistência em redirects e testes.
  */
 export const AuthRouteNames = {
-  Login: "login",
-  Register: "register",
-  ForgotPassword: "forgot-password",
-  ResetPassword: "reset-password",
+  Login: "auth.login",
+  Register: "auth.register",
+  ForgotPassword: "auth.forgot-password",
+  ResetPassword: "auth.reset-password",
 } as const;
 
-// type AuthRouteName = (typeof AuthRouteNames)[keyof typeof AuthRouteNames];
-
 /**
- * Helper para criar meta padrão de rotas auth
+ * 🛡️ Guest Meta Helper
+ * Define permissões para rotas acessíveis apenas por usuários não autenticados.
  */
-const guestMeta = (title?: string) => ({
-  guestOnly: true,
+const guestMeta = (title: string) => ({
+  guestOnly: true, // Redireciona para o Dashboard se já estiver logado
   public: true,
   title,
+  module: "auth"
 });
 
 /**
- * Rotas de autenticação
- * - props: extrai token de query ou params
- * - lazy loaded components
- * - nomes centralizados
+ * 🚀 Authentication Routes
+ * Estrutura modular com Lazy Loading e caminhos normalizados para @/views/auth/
  */
 export const authRoutes: RouteRecordRaw[] = [
   {
     path: "/login",
     name: AuthRouteNames.Login,
-    component: () => import("@/views/LoginView.vue"),
-    meta: guestMeta("Login"),
+    component: () => import(/* webpackChunkName: "auth-login" */ "@/views/auth/LoginView.vue"),
+    meta: guestMeta("Entrar")
   },
   {
     path: "/register",
     name: AuthRouteNames.Register,
-    component: () => import("@/views/RegisterView.vue"),
-    meta: guestMeta("Registrar"),
+    component: () => import(/* webpackChunkName: "auth-register" */ "@/views/auth/RegisterView.vue"),
+    meta: guestMeta("Criar Conta")
   },
   {
     path: "/forgot-password",
     name: AuthRouteNames.ForgotPassword,
-    component: () => import("@/views/auth/ForgotPasswordView.vue"),
-    meta: guestMeta("Recuperar senha"),
+    component: () => import(/* webpackChunkName: "auth-forgot" */ "@/views/auth/ForgotPasswordView.vue"),
+    meta: guestMeta("Recuperar Senha")
   },
   {
-    // rota única que aceita token via query ou param
+    /**
+     * Rota híbrida para Reset de Senha
+     * Aceita o token via URL Params (/reset-password/abc) ou Query String (?token=abc)
+     */
     path: "/reset-password/:token?",
     name: AuthRouteNames.ResetPassword,
-    component: () => import("@/views/auth/ResetPasswordView.vue"),
+    component: () => import(/* webpackChunkName: "auth-reset" */ "@/views/auth/ResetPasswordView.vue"),
     props: (route) => ({
-      token:
-        (route.params?.token as string) || (route.query?.token as string) || "",
+      token: (route.params?.token as string) || (route.query?.token as string) || ""
     }),
-    meta: guestMeta("Redefinir senha"),
-  },
+    meta: guestMeta("Redefinir Senha")
+  }
 ];
