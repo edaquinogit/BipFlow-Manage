@@ -68,17 +68,31 @@ const handleClosePanel = () => {
 
 /**
  * 🧹 DATA SANITIZER (Pure Logic)
- * Prepara o payload para o Django, evitando erros 400.
+ * Prepara o payload para o Django, removendo campos calculados e protegendo mídias.
+ * @param rawPayload - O objeto vindo do formulário ou estado do Vue
+ * @returns Um objeto limpo pronto para o backend
  */
-const sanitizePayloadForDjango = (_rawPayload: Partial<Product> & Record<string, unknown>) => {
-          const { id: _id, created_at: _ca, updated_at: _ua, category_name: _cn, ..._rest } = item;
+const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, any>) => {
+  // 1. Destructuring: Removemos campos que o Django não aceita no POST/PUT (read-only)
+  // Usamos o rest operator (...) para agrupar apenas o que sobra em 'cleanData'
+  const { 
+    id: _id, 
+    created_at: _ca, 
+    updated_at: _ua, 
+    category_name: _cn, 
+    ...cleanData 
+  } = rawPayload;
 
-  // Asset Media Guard: Evita sobrescrever a imagem no BD se o usuário não enviou arquivo novo
-  if (typeof cleanData.image === 'string') {
+  // 2. Asset Media Guard: 
+  // Se 'image' for uma string (URL), significa que o usuário não selecionou um novo arquivo.
+  // Removemos do payload para não tentar sobrescrever o binário com uma string.
+  if (typeof cleanData.image === 'string' || !cleanData.image) {
     delete cleanData.image;
   }
 
-  return cleanData;
+  // 3. Normalização de tipos (Opcional, mas profissional)
+  // Garante que valores nulos ou vazios não quebrem o DRF (Django Rest Framework)
+  return JSON.parse(JSON.stringify(cleanData));
 };
 
 /**

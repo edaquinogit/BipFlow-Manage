@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { authService } from '../services/auth.service'
-import type { ApiError } from '../types/auth'
+import { authService } from '@/services/auth.service'
+import { DashboardRoutes } from '@/router/dashboard.routes'
+import type { ApiError } from '@/types/auth'
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -24,8 +25,9 @@ const handleLogin = async () => {
   
   try {
     const data = await authService.login(form)
-    localStorage.setItem('token', data.access)
-    router.push({ name: 'dashboard' })
+    localStorage.setItem('access_token', data.access)
+    // Usando o enum para evitar magic strings
+    router.push({ name: DashboardRoutes.Root })
   } catch (error) {
     const err = error as ApiError
     errorMessage.value = err.response?.data?.detail || 'Connection failed. Check your backend.'
@@ -74,7 +76,7 @@ const handleLogin = async () => {
         <button 
           type="submit"
           :disabled="isLoading"
-          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-900/20 flex justify-center items-center"
+          class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-900/20 flex justify-center items-center font-sans tracking-widest uppercase text-xs"
         >
           <span v-if="isLoading" class="animate-spin mr-2 border-2 border-white/20 border-t-white rounded-full w-4 h-4"></span>
           {{ isLoading ? 'Authenticating...' : 'Sign In' }}
