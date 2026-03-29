@@ -5,7 +5,7 @@ import ProductAvatar from './ui/ProductAvatar.vue'; // Certifique-se que o nome 
 /**
  * 🛰️ COMPONENT CONTRACT
  */
-const props = defineProps<{
+defineProps<{
   product: Product;
 }>();
 

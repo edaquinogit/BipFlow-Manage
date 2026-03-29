@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Component } from 'vue'; // Importação de tipo para segurança
 import StatCard from './StatCard.vue';
 import StatSkeleton from './StatSkeleton.vue';
 import RevenueCard from './RevenueCard.vue';

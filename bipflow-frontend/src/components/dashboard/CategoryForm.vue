@@ -11,7 +11,7 @@ interface Props {
   errors?: Record<string, string[]>;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 const emit = defineEmits(['close', 'save']);
 
 // Estado inicial reativo e estrito

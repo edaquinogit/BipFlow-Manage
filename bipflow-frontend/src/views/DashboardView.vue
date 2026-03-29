@@ -70,8 +70,8 @@ const handleClosePanel = () => {
  * 🧹 DATA SANITIZER (Pure Logic)
  * Prepara o payload para o Django, evitando erros 400.
  */
-const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, unknown>) => {
-  const { id, created_at, updated_at, category_name, ...cleanData } = rawPayload;
+const sanitizePayloadForDjango = (_rawPayload: Partial<Product> & Record<string, unknown>) => {
+          const { id: _id, created_at: _ca, updated_at: _ua, category_name: _cn, ..._rest } = item;
 
   // Asset Media Guard: Evita sobrescrever a imagem no BD se o usuário não enviou arquivo novo
   if (typeof cleanData.image === 'string') {

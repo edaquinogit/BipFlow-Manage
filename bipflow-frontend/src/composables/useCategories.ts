@@ -1,6 +1,6 @@
-import { ref, computed } from 'vue';
-import type { Category } from '../schemas/category.schema';
-import CategoryService from '../services/category.service';
+import { ref, computed } from "vue";
+import type { Category } from "../schemas/category.schema";
+import CategoryService from "../services/category.service";
 
 // Mantemos o estado FORA da função para que ele funcione como um "Store" (Singleton)
 // Isso garante que se você mudar de página e voltar, as categorias ainda estarão lá.
@@ -10,18 +10,18 @@ const error = ref<string | null>(null);
 const lastFetched = ref<number | null>(null);
 
 export function useCategories() {
-  
   /**
    * 📡 Sync: Busca todas as categorias (Com Cache de 5 minutos)
    */
   const fetchCategories = async (force = false) => {
     // Evita chamadas desnecessárias se já temos dados (TTL de 5min)
-    const isCacheValid = lastFetched.value && (Date.now() - lastFetched.value < 300000);
+    const isCacheValid =
+      lastFetched.value && Date.now() - lastFetched.value < 300000;
     if (!force && categories.value.length > 0 && isCacheValid) return;
 
     loading.value = true;
     error.value = null;
-    
+
     try {
       const data = await CategoryService.getAll();
       categories.value = data;
@@ -58,10 +58,10 @@ export function useCategories() {
    */
   const deleteCategory = async (id: number) => {
     if (!id) return;
-    
+
     const previousState = [...categories.value];
     // UI Instantânea (Optimistic Update)
-    categories.value = categories.value.filter(cat => cat.id !== id);
+    categories.value = categories.value.filter((cat) => cat.id !== id);
 
     try {
       await CategoryService.delete(id);
@@ -74,8 +74,8 @@ export function useCategories() {
   };
 
   // Helper para select/dropdowns (Ordenado alfabeticamente)
-  const sortedCategories = computed(() => 
-    [...categories.value].sort((a, b) => a.name.localeCompare(b.name))
+  const sortedCategories = computed(() =>
+    [...categories.value].sort((a, b) => a.name.localeCompare(b.name)),
   );
 
   return {
@@ -85,6 +85,6 @@ export function useCategories() {
     error,
     fetchCategories,
     addCategory,
-    deleteCategory
+    deleteCategory,
   };
 }

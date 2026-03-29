@@ -1,4 +1,8 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import {
+  createRouter,
+  createWebHistory,
+  type RouteRecordRaw,
+} from "vue-router";
 
 /**
  * 🛰️ REGISTRY: Definição de Rotas com Tipagem Estrita e Code-Splitting
@@ -6,35 +10,35 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
  */
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
-    name: 'dashboard',
+    path: "/",
+    name: "dashboard",
     // Carregamento imediato para a rota principal
-    component: () => import('@/views/DashboardView.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: 'Inventory | BipFlow Core',
-      module: 'Main Dashboard'
-    }
+    component: () => import("@/views/DashboardView.vue"),
+    meta: {
+      requiresAuth: true,
+      title: "Inventory | BipFlow Core",
+      module: "Main Dashboard",
+    },
   },
   {
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/LoginView.vue'),
-    meta: { 
-      guestOnly: true, 
-      title: 'Auth | BipFlow Station',
-      module: 'Access Control'
-    }
+    path: "/login",
+    name: "login",
+    component: () => import("@/views/LoginView.vue"),
+    meta: {
+      guestOnly: true,
+      title: "Auth | BipFlow Station",
+      module: "Access Control",
+    },
   },
   {
-    path: '/:pathMatch(.*)*',
-    name: 'not-found',
-    component: () => import('@/views/NotFoundView.vue'),
-    meta: { 
-      title: '404 - Not Found',
-      module: 'System'
-    }
-  }
+    path: "/:pathMatch(.*)*",
+    name: "not-found",
+    component: () => import("@/views/NotFoundView.vue"),
+    meta: {
+      title: "404 - Not Found",
+      module: "System",
+    },
+  },
 ];
 
 const router = createRouter({
@@ -43,8 +47,8 @@ const router = createRouter({
   // ⚡ UX: Preservação de posição de scroll entre navegações
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition;
-    return { top: 0, behavior: 'smooth' };
-  }
+    return { top: 0, behavior: "smooth" };
+  },
 });
 
 /**
@@ -53,12 +57,12 @@ const router = createRouter({
  */
 router.beforeEach((to, from, next) => {
   // 1. DYNAMIC METADATA (SEO & Branding)
-  const baseTitle = 'BipFlow';
+  const baseTitle = "BipFlow";
   document.title = to.meta.title ? `${to.meta.title}` : baseTitle;
 
   // 2. AUTHENTICATION STATE (Sincronizado com o LocalStorage do Cypress/App)
   // Nota: access_token é o padrão usado no seu comando cy.loginViaApi()
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem("access_token");
   const isAuthenticated = !!token;
 
   /**
@@ -67,11 +71,13 @@ router.beforeEach((to, from, next) => {
    */
   if (to.meta.requiresAuth && !isAuthenticated) {
     if (import.meta.env.DEV) {
-      console.warn(`[BipFlow Guard]: Unauthorized access to ${to.fullPath}. Redirecting to Login.`);
+      console.warn(
+        `[BipFlow Guard]: Unauthorized access to ${to.fullPath}. Redirecting to Login.`,
+      );
     }
-    return next({ 
-      name: 'login',
-      query: { redirect: to.fullPath } 
+    return next({
+      name: "login",
+      query: { redirect: to.fullPath },
     });
   }
 
@@ -80,12 +86,14 @@ router.beforeEach((to, from, next) => {
    * Impede que o usuário volte ao login manualmente se a sessão estiver ativa.
    */
   if (to.meta.guestOnly && isAuthenticated) {
-    return next({ name: 'dashboard' });
+    return next({ name: "dashboard" });
   }
 
   // 3. TELEMETRY & AUDIT (Apenas em Dev)
   if (import.meta.env.DEV) {
-    console.info(`🚀 Navigating: ${String(to.name)} | Context: ${to.meta.module}`);
+    console.info(
+      `🚀 Navigating: ${String(to.name)} | Context: ${to.meta.module}`,
+    );
   }
 
   next();
@@ -94,7 +102,7 @@ router.beforeEach((to, from, next) => {
 /**
  * 🛰️ POST-NAVIGATION HOOKS
  */
-router.afterEach((to) => {
+router.afterEach((_to) => {
   // Finalização de loadings globais ou disparos de analytics podem entrar aqui
 });
 
