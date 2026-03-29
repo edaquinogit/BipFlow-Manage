@@ -15,7 +15,7 @@ import './commands';
 
 // Impede que o Cypress falhe o teste caso a sua aplicação Vue lance um erro não tratado (Uncaught Exception).
 // Isso é comum em ambientes de desenvolvimento e evita que o teste quebre por bobeira do frontend.
-Cypress.on('uncaught:exception', (err, runnable) => {
+Cypress.on('uncaught:exception', (_err, _runnable) => {
   // Retornar false impede o Cypress de falhar o teste
   return false;
 });
