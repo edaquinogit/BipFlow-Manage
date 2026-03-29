@@ -1,12 +1,12 @@
-import api from './api'; // Sua instância configurada do Axios
-import { CategorySchema, type Category } from '../schemas/category.schema';
+import api from "./api"; // Sua instância configurada do Axios
+import { CategorySchema, type Category } from "../schemas/category.schema";
 
 /**
  * CategoryService
  * Responsabilidade: Abstrair chamadas HTTP e validar dados de entrada/saída.
  */
 class CategoryService {
-  private readonly endpoint = '/categories/';
+  private readonly endpoint = "/categories/";
 
   async getAll(): Promise<Category[]> {
     const { data } = await api.get(this.endpoint);

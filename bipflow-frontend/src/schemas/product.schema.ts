@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * ---------------------------------------------------------
@@ -18,28 +18,34 @@ export const CategorySchema = z.object({
  */
 
 // Trava de Segurança NYC: 2MB em Bytes
-const MAX_FILE_SIZE = 2 * 1024 * 1024; 
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
 
 const productBase = {
-  name: z.string()
+  name: z
+    .string()
     .min(3, "Name must be at least 3 characters")
     .max(100, "Name too long for registry"),
-  
+
   description: z.string().nullable().optional(),
-  
-  sku: z.string()
+
+  sku: z
+    .string()
     .min(4, "SKU is required for tracking")
     .toUpperCase()
     .nullable()
     .optional(),
 
   // Coerção Inteligente: Garante que o input do form vire número real
-  price: z.coerce.number()
-    .min(0, "Price cannot be negative")
-    .default(0),
-  
-  stock_quantity: z.coerce.number()
+  price: z.coerce.number().min(0, "Price cannot be negative").default(0),
+
+  stock_quantity: z.coerce
+    .number()
     .int("Stock must be an integer")
     .nonnegative("Stock cannot be negative")
     .default(0),
@@ -50,20 +56,21 @@ const productBase = {
     z.union([
       z.coerce.number().positive("Please select a classification"),
       CategorySchema,
-      z.undefined()
-    ])
+      z.undefined(),
+    ]),
   ),
 
   is_available: z.boolean().default(true),
   size: z.string().nullable().optional(),
-  
+
   /**
    * 🛡️ ASSET MEDIA GUARD (2MB Limit)
    * Validação multimodal para URLs existentes e Novos Uploads.
    */
-  image: z.any()
+  image: z
+    .any()
     .refine((file) => {
-      if (!file || typeof file === 'string') return true;
+      if (!file || typeof file === "string") return true;
       return file instanceof File;
     }, "Invalid file format.")
     .refine((file) => {
@@ -84,10 +91,16 @@ export const ProductSchema = z.object({
   ...productBase,
   category_name: z.string().optional(),
   slug: z.string().nullable().optional(),
-  price: z.preprocess((val) => parseFloat(val as string), z.number().nonnegative()),
-  stock_quantity: z.preprocess((val) => parseInt(val as string), z.number().nonnegative()),
+  price: z.preprocess(
+    (val) => parseFloat(val as string),
+    z.number().nonnegative(),
+  ),
+  stock_quantity: z.preprocess(
+    (val) => parseInt(val as string),
+    z.number().nonnegative(),
+  ),
   image_url: z.string().url().nullable().optional(),
-  created_at: z.string().optional(),   // mais flexível
+  created_at: z.string().optional(), // mais flexível
   updated_at: z.string().optional(),
 });
 
@@ -97,7 +110,7 @@ export const ProductFormSchema = ProductSchema.omit({
   category_name: true,
   created_at: true,
   updated_at: true,
-  slug: true
+  slug: true,
 });
 
 /**
@@ -107,18 +120,19 @@ export const ProductFormSchema = ProductSchema.omit({
  */
 
 export const OrderItemSchema = z.object({
-  idItem: z.string().min(1, 'Item ID is required'),
-  quantidadeItem: z.number().positive('Quantity must be positive'),
-  valorItem: z.number().positive('Value must be positive')
+  idItem: z.string().min(1, "Item ID is required"),
+  quantidadeItem: z.number().positive("Quantity must be positive"),
+  valorItem: z.number().positive("Value must be positive"),
 });
 
 export const CreateOrderSchema = z.object({
-  numeroPedido: z.string()
-    .min(1, 'Order number is required')
-    .regex(/^[a-zA-Z0-9\-]+$/, 'Invalid characters in order number'),
+  numeroPedido: z
+    .string()
+    .min(1, "Order number is required")
+    .regex(/^[a-zA-Z0-9\-]+$/, "Invalid characters in order number"),
   valorTotal: z.number().positive().finite(),
   dataCriacao: z.string().datetime(),
-  items: z.array(OrderItemSchema).default([])
+  items: z.array(OrderItemSchema).default([]),
 });
 
 /**
@@ -132,13 +146,13 @@ export type Category = z.infer<typeof CategorySchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
 
 export const createEmptyProduct = (): ProductFormData => ({
-  name: '',
+  name: "",
   price: 0,
   stock_quantity: 0,
   category: undefined,
   is_available: true,
-  sku: '',
-  size: '',
+  sku: "",
+  size: "",
   image: null,
-  description: ''
+  description: "",
 });
