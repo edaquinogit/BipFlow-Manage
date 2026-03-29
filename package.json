@@ -6,7 +6,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "lint": "eslint .",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "prepare": "husky"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",

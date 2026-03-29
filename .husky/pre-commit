@@ -1,0 +1,1 @@
+cd bipflow-frontend && npm run typecheck
