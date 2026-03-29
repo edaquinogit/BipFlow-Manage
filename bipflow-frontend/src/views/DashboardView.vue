@@ -12,13 +12,27 @@ import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 /**
- * 🛰️ ENGINE STATE
+ * 🛰️ UI STATE MACHINE
+ * Estados visuais e controles de modais.
  */
 const isPanelOpen = ref(false);
 const isDeleteModalOpen = ref(false);
+
+/**
+ * 💾 DATA CONTEXT
+ * Contexto de dados operacionais atuais.
+ */
 const assetIdToPurge = ref<number | null>(null);
 const selectedProduct = ref<Product | null>(null);
 
+/**
+ * ⚙️ ASYNC ACTION STATES
+ * Granularidade de loading para não travar a UI inteira durante requisições.
+ */
+const isSaving = ref(false);
+const isDeletingAction = ref(false);
+
+// Composables (Data Layer)
 const {
   loading: productsLoading,
   error,      
@@ -34,16 +48,15 @@ const {
 const { categories, fetchCategories } = useCategories();
 
 /**
- * 🧠 BUSINESS LOGIC (NYC HUB HANDLERS)
+ * 🧠 EVENT HANDLERS (View Controllers)
  */
-
 const handleOpenNewPanel = () => {
   selectedProduct.value = null;
   isPanelOpen.value = true;
 };
 
 const handleEditRequest = (product: Product) => {
-  // Deep clone preventivo para evitar mutação indesejada no estado global
+  // Deep clone preventivo para isolamento de memória
   selectedProduct.value = { ...product };
   isPanelOpen.value = true;
 };
@@ -54,53 +67,46 @@ const handleClosePanel = () => {
 };
 
 /**
- * 💾 PERSISTENCE ORCHESTRATOR
- * Gerencia o ciclo de vida do dado com validação rigorosa de mídia.
+ * 🧹 DATA SANITIZER (Pure Logic)
+ * Prepara o payload para o Django, evitando erros 400.
  */
-const handleSave = async (payload: any) => {
+const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, unknown>) => {
+  const { id, created_at, updated_at, category_name, ...cleanData } = rawPayload;
+
+  // Asset Media Guard: Evita sobrescrever a imagem no BD se o usuário não enviou arquivo novo
+  if (typeof cleanData.image === 'string') {
+    delete cleanData.image;
+  }
+
+  return cleanData;
+};
+
+/**
+ * 🚀 PERSISTENCE ORCHESTRATOR
+ */
+const handleSave = async (payload: Partial<Product>) => {
+  isSaving.value = true;
+  
   try {
-    /**
-     * 1. 🧹 DATA SANITIZATION
-     * Removemos campos protegidos (read-only) para não gerar erro 400 no Django.
-     */
-    const { 
-      id, 
-      created_at, 
-      updated_at,
-      category_name, 
-      ...dataToSync 
-    } = payload;
+    const dataToSync = sanitizePayloadForDjango(payload);
 
-    /**
-     * 2. 🛡️ ASSET MEDIA GUARD
-     * Se 'image' for string, o usuário não subiu um arquivo novo.
-     * Deletamos a string do payload para que o Django mantenha a foto atual.
-     */
-    if (typeof dataToSync.image === 'string') {
-      delete dataToSync.image;
-    }
-
-    // 3. EXECUTION PHASE
     if (selectedProduct.value?.id) {
       await updateProduct(selectedProduct.value.id, dataToSync);
-      console.log(`✅ BipFlow: Asset ${selectedProduct.value.id} synchronized.`);
+      console.info(`✅ [BipFlow Core]: Asset ${selectedProduct.value.id} synchronized.`);
     } else {
       await createProduct(dataToSync);
-      console.log(`🚀 BipFlow: New asset deployed to registry.`);
+      console.info(`🚀 [BipFlow Core]: New asset deployed to registry.`);
     }
     
-    /**
-     * 4. 🔄 REGISTRY REFRESH (A SOLUÇÃO DO ERRO DE RENDERIZAÇÃO)
-     * Forçamos uma nova busca no backend. Isso garante que o Vue receba 
-     * a nova 'image_url' gerada pelo Django, reativando a exibição no Avatar.
-     */
+    // Sincronização de Estado (Resolve o bug do Avatar)
     await fetchData();
-    
-    // 5. UI FEEDBACK
     handleClosePanel();
     
   } catch (err) {
-    console.error("❌ BipFlow: Save operation aborted.", err);
+    console.error("❌ [BipFlow Core]: Sync operation failed.", err);
+    // TODO: Disparar Toast Notification de erro aqui no futuro
+  } finally {
+    isSaving.value = false;
   }
 };
 
@@ -115,13 +121,15 @@ const openDeleteConfirm = (id: number) => {
 const executeDelete = async () => {
   if (!assetIdToPurge.value) return;
   
+  isDeletingAction.value = true;
   try {
     await deleteProduct(assetIdToPurge.value);
-    console.log(`🗑️ BipFlow: Asset purged.`);
-    
-    // Garante integridade do grid após exclusão
+    console.info(`🗑️ [BipFlow Core]: Asset ${assetIdToPurge.value} purged.`);
     await fetchData(); 
+  } catch (err) {
+    console.error("❌ [BipFlow Core]: Purge operation failed.", err);
   } finally {
+    isDeletingAction.value = false;
     isDeleteModalOpen.value = false;
     assetIdToPurge.value = null;
   }
@@ -131,8 +139,7 @@ const executeDelete = async () => {
  * ⚡ SYSTEM BOOTSTRAP
  */
 onMounted(async () => {
-  // Carregamento paralelo para máxima performance na montagem da tela
-  await Promise.all([
+  await Promise.allSettled([
     fetchData(),
     fetchCategories()
   ]);
@@ -140,7 +147,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30 font-sans antialiased">
+  <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30 font-sans antialiased" data-cy="dashboard-view">
     <DashboardHeader />
 
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
@@ -165,6 +172,7 @@ onMounted(async () => {
       :is-open="isPanelOpen" 
       :initial-data="selectedProduct"
       :categories="categories"
+      :is-saving="isSaving"
       @close="handleClosePanel" 
       @save="handleSave" 
     />
@@ -173,7 +181,7 @@ onMounted(async () => {
       :show="isDeleteModalOpen"
       title="Confirm Asset Deletion"
       message="This action is irreversible. The asset will be permanently removed from the BipFlow global registry."
-      :is-loading="productsLoading"
+      :is-loading="isDeletingAction"
       @close="isDeleteModalOpen = false"
       @confirm="executeDelete"
     />

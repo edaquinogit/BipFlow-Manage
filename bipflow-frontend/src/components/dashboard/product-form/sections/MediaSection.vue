@@ -1,65 +1,25 @@
-<template>
-  <section class="space-y-6 pb-10">
-    <h3 class="text-[10px] font-black uppercase text-indigo-500 tracking-[0.3em]">
-      Visual Asset (Max 2MB)
-    </h3>
-    
-    <div 
-      class="relative group h-32 w-full rounded-xl border-2 border-dashed border-zinc-800 
-             hover:border-indigo-500/50 transition-all flex items-center justify-center 
-             overflow-hidden bg-zinc-950 cursor-pointer focus-within:ring-2 focus-within:ring-indigo-500"
-    >
-      <img 
-        v-if="imagePreview" 
-        :src="imagePreview" 
-        class="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-20 transition-opacity duration-300" 
-        alt="Product Preview"
-      />
-      
-      <input 
-        type="file" 
-        @change="handleFileChange" 
-        accept="image/jpeg, image/png, image/webp" 
-        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        aria-label="Upload product image"
-      />
-      
-      <div class="text-center z-0 pointer-events-none flex flex-col items-center gap-2">
-        <svg v-if="!imagePreview" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-zinc-600 group-hover:text-indigo-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-        </svg>
-        <span class="text-[10px] font-black text-zinc-400 group-hover:text-indigo-400 transition-colors uppercase tracking-widest">
-          {{ imagePreview ? 'Replace Asset Media' : 'Provision File' }}
-        </span>
-      </div>
-    </div>
-
-    <Transition name="fade">
-      <p v-if="error" class="text-[9px] text-red-500 font-black uppercase tracking-wider animate-pulse">
-        {{ error }}
-      </p>
-    </Transition>
-  </section>
-</template>
-
 <script setup lang="ts">
+/**
+ * 🛰️ BIPFLOW MEDIA HUB - ASSET VISUALIZATION
+ * Padrão de Engenharia: Vue 3.4+ Atomic Synchronization
+ * Foco: Upload Binário, Preview Reativo e Memory Leak Prevention.
+ */
 import { ref, watch, onUnmounted } from 'vue';
 
-/**
- * 🛰️ NYC DATA HUB - MODULAR MEDIA
- * modelValue: Pode ser uma URL (string) ou um Arquivo (File)
- */
+// modelValue: Sincroniza o arquivo (File) ou URL (string) com o Root
 const modelValue = defineModel<string | File | null>();
 
-defineProps<{
+interface Props {
   error?: string;
-}>();
+}
+
+defineProps<Props>();
 
 const imagePreview = ref<string | null>(null);
 
 /**
  * 🧠 INTELLIGENT PREVIEW ENGINE
- * Sincroniza o estado inicial e lida com objetos de memória (Blob URLs)
+ * Resolve URLs do backend ou gera previews locais para novos uploads.
  */
 watch(modelValue, (newValue) => {
   if (!newValue) {
@@ -67,13 +27,19 @@ watch(modelValue, (newValue) => {
     return;
   }
 
+  // Caso 1: Já é uma string (URL do Cloud/Django)
   if (typeof newValue === 'string') {
-    // Se for string, é uma URL vinda do backend (ex: Django /media/)
-    imagePreview.value = newValue.startsWith('http') 
-      ? newValue 
-      : `http://localhost:8000${newValue.startsWith('/') ? '' : '/'}${newValue}`;
+    imagePreview.value = newValue;
+    return;
   }
-  // Se for File, o preview é gerado no handleFileChange
+
+  // Caso 2: É um objeto File (Novo upload via input)
+  if (newValue instanceof File) {
+    if (imagePreview.value?.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview.value);
+    }
+    imagePreview.value = URL.createObjectURL(newValue);
+  }
 }, { immediate: true });
 
 const handleFileChange = (event: Event) => {
@@ -81,21 +47,95 @@ const handleFileChange = (event: Event) => {
   const file = target.files?.[0];
 
   if (file) {
-    // Atualiza o v-model para o Root (Zod vai validar o binário)
     modelValue.value = file;
-
-    // Gera preview otimizado usando URL.createObjectURL (mais rápido que FileReader)
-    if (imagePreview.value?.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview.value); // Limpa memória anterior
-    }
-    imagePreview.value = URL.createObjectURL(file);
   }
 };
 
-// 🧹 MEMORY SAFETY (NYC Best Practice)
+/**
+ * 🧹 MEMORY SAFETY (NYC Standard)
+ * Evita memory leaks limpando as URLs temporárias do navegador ao destruir o componente.
+ */
 onUnmounted(() => {
   if (imagePreview.value?.startsWith('blob:')) {
     URL.revokeObjectURL(imagePreview.value);
   }
 });
 </script>
+
+<template>
+  <section class="space-y-6 pb-4">
+    <header>
+      <h3 class="text-[10px] font-black uppercase text-indigo-500 tracking-[0.3em] mb-1">
+        Visual Asset
+      </h3>
+      <p class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
+        Digital twin representation (Max 2MB)
+      </p>
+    </header>
+    
+    <div 
+      class="relative group h-40 w-full rounded-2xl border-2 border-dashed border-zinc-800 
+             hover:border-indigo-500/50 transition-all flex items-center justify-center 
+             overflow-hidden bg-zinc-950 cursor-pointer shadow-inner"
+      :class="{ 'border-red-500/40 bg-red-500/5': error }"
+    >
+      <Transition name="fade">
+        <img 
+          v-if="imagePreview" 
+          :src="imagePreview" 
+          class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-30 transition-opacity duration-500" 
+          data-cy="product-image-preview"
+          alt="Product Identity Preview"
+        />
+      </Transition>
+      
+      <input 
+        type="file" 
+        name="image"
+        data-cy="input-product-image"
+        @change="handleFileChange" 
+        accept="image/jpeg, image/png, image/webp" 
+        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+        aria-label="Upload product image"
+      />
+      
+      <div class="text-center z-10 pointer-events-none flex flex-col items-center gap-3">
+        <div 
+          class="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-500 group-hover:text-indigo-400 group-hover:bg-indigo-500/10 transition-all duration-300"
+          :class="{ 'text-indigo-400 bg-indigo-500/10': imagePreview }"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path v-if="!imagePreview" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </div>
+        <span class="text-[10px] font-black text-zinc-400 group-hover:text-white transition-colors uppercase tracking-[0.2em]">
+          {{ imagePreview ? 'Replace Media Asset' : 'Provision Asset File' }}
+        </span>
+      </div>
+    </div>
+
+    <Transition name="slide-up">
+      <p v-if="error" class="text-[9px] text-red-500 font-black uppercase tracking-widest text-center animate-pulse">
+        {{ error }}
+      </p>
+    </Transition>
+  </section>
+</template>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active {
+  transition: all 0.3s ease-out;
+}
+.slide-up-enter-from {
+  transform: translateY(10px);
+  opacity: 0;
+}
+</style>

@@ -1,15 +1,15 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import DashboardView from '@/views/DashboardView.vue';
 
 /**
- * 🛰️ REGISTRY: Estrutura de Rotas com Tipagem Estrita
- * Utilizamos Lazy Loading para reduzir o bundle inicial e melhorar o FCP (First Contentful Paint).
+ * 🛰️ REGISTRY: Definição de Rotas com Tipagem Estrita e Code-Splitting
+ * Otimizado para performance de carregamento (LCP) e escalabilidade.
  */
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'dashboard',
-    component: DashboardView,
+    // Carregamento imediato para a rota principal
+    component: () => import('@/views/DashboardView.vue'),
     meta: { 
       requiresAuth: true, 
       title: 'Inventory | BipFlow Core',
@@ -40,7 +40,7 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  // ⚡ Experiência de Usuário: Scroll suave entre rotas
+  // ⚡ UX: Preservação de posição de scroll entre navegações
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition;
     return { top: 0, behavior: 'smooth' };
@@ -49,25 +49,26 @@ const router = createRouter({
 
 /**
  * 🛡️ SECURITY & NAVIGATION ORCHESTRATOR
- * Implementa o protocolo de guarda de navegação com telemetria básica.
+ * Implementa o protocolo de guarda de navegação com tratamento de intenção (Redirect Memory).
  */
 router.beforeEach((to, from, next) => {
-  // 1. UPDATING SYSTEM METADATA (Document Title)
+  // 1. DYNAMIC METADATA (SEO & Branding)
   const baseTitle = 'BipFlow';
-  const pageTitle = to.meta.title ? `${to.meta.title}` : baseTitle;
-  document.title = pageTitle;
+  document.title = to.meta.title ? `${to.meta.title}` : baseTitle;
 
-  // 2. IDENTITY VERIFICATION
-  // Em projetos reais, substitua localStorage por um Store reativo (Pinia)
-  const token = localStorage.getItem('token');
+  // 2. AUTHENTICATION STATE (Sincronizado com o LocalStorage do Cypress/App)
+  // Nota: access_token é o padrão usado no seu comando cy.loginViaApi()
+  const token = localStorage.getItem('access_token');
   const isAuthenticated = !!token;
 
   /**
-   * 🚨 UNAUTHORIZED INTERCEPTION
-   * Bloqueia acesso a rotas privadas e guarda a intenção original do usuário (Redirect Memory).
+   * 🚨 INTERCEPTOR: Acesso não autorizado
+   * Redireciona para o login salvando a rota pretendida para retorno após auth.
    */
   if (to.meta.requiresAuth && !isAuthenticated) {
-    console.warn(`[BipFlow Guard]: Unauthorized attempt to ${to.fullPath}. Redirecting...`);
+    if (import.meta.env.DEV) {
+      console.warn(`[BipFlow Guard]: Unauthorized access to ${to.fullPath}. Redirecting to Login.`);
+    }
     return next({ 
       name: 'login',
       query: { redirect: to.fullPath } 
@@ -75,28 +76,26 @@ router.beforeEach((to, from, next) => {
   }
 
   /**
-   * 🚫 AUTHENTICATED REDIRECTION
-   * Impede que usuários logados retornem à tela de login via URL.
+   * 🚫 INTERCEPTOR: Redirecionamento de Logado
+   * Impede que o usuário volte ao login manualmente se a sessão estiver ativa.
    */
   if (to.meta.guestOnly && isAuthenticated) {
     return next({ name: 'dashboard' });
   }
 
-  // 3. TELEMETRY LOG (Audit)
+  // 3. TELEMETRY & AUDIT (Apenas em Dev)
   if (import.meta.env.DEV) {
-    console.info(`🚀 Navigating to: ${String(to.name)} | Module: ${to.meta.module}`);
+    console.info(`🚀 Navigating: ${String(to.name)} | Context: ${to.meta.module}`);
   }
 
   next();
 });
 
 /**
- * 🛰️ GLOBAL AFTER HOOKS
- * Ideal para encerrar barras de progresso ou disparar analytics.
+ * 🛰️ POST-NAVIGATION HOOKS
  */
 router.afterEach((to) => {
-  // Exemplo: Disparar evento de visualização de página
-  // analytics.logPageView(to.name);
+  // Finalização de loadings globais ou disparos de analytics podem entrar aqui
 });
 
 export default router;

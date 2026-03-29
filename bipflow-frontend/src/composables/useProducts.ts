@@ -87,18 +87,26 @@ export function useProducts() {
   // 4. ENGINE ACTIONS (CRUD)
   // ==========================================
 
+  /**
+   * 📡 FETCH DATA: Sincroniza a lista de ativos com a NYC Station (Django)
+   */
   const fetchData = async () => {
     loading.value = true;
     error.value = null;
     try {
       products.value = await ProductService.getAll();
-    } catch (err) {
-      error.value = "BipFlow: NYC Station Sync Failed.";
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || "Unknown Connection Error";
+      error.value = `BipFlow: NYC Station Sync Failed (${msg})`;
+      console.error("❌ BipFlow: Fetch sequence aborted.", err);
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🚀 CREATE: Faz o deploy de um novo ativo (Suporta Multi-part/Media)
+   */
   const createProduct = async (data: Partial<Product>): Promise<Product | undefined> => {
     loading.value = true;
     error.value = null;
@@ -110,13 +118,18 @@ export function useProducts() {
       console.log(`✅ BipFlow: Asset ${newAsset.id} deployed.`);
       return newAsset;
     } catch (err: any) {
-      error.value = err.message || "Deployment failed.";
+      const apiMessage = err.response?.data?.detail || err.message || "Unknown Connection Error";
+      error.value = `Deployment failed: ${apiMessage}`; // Mantém compatibilidade com o Vitest
+      console.error(`[BipFlow Station] Create Error:`, apiMessage);
       throw err;
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🛠️ UPDATE: Sincroniza alterações em um ativo existente
+   */
   const updateProduct = async (id: number, data: Partial<Product>) => {
     loading.value = true;
     error.value = null;
@@ -128,27 +141,34 @@ export function useProducts() {
       console.log(`🛠️ BipFlow: Asset ${id} synchronized.`);
       return updatedAsset;
     } catch (err: any) {
-      error.value = "Sync update failed.";
+      const apiMessage = err.response?.data?.detail || err.message || "Update Failed";
+      error.value = `Synchronization failed: ${apiMessage}`;
+      console.error(`[BipFlow Station] Update Error:`, apiMessage);
       throw err;
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🗑️ DELETE: Purga um ativo da base de dados
+   */
   const deleteProduct = async (id: number) => {
+    loading.value = true; // Adicionado loading para o delete (Boa prática)
     try {
       await ProductService.delete(id);
       products.value = products.value.filter(p => p.id !== id);
       console.log(`🗑️ BipFlow: Asset ${id} purged.`);
-    } catch (err) {
-      console.error("❌ BipFlow: Purge sequence failed.", err);
+    } catch (err: any) {
+      const apiMessage = err.response?.data?.detail || err.message || "Purge Failed";
+      error.value = `Critical: Purge sequence failed (${apiMessage})`;
+      console.error("❌ BipFlow: Security protocol - Purge failed.", err);
+    } finally {
+      loading.value = false;
     }
   };
 
-  // ==========================================
-  // 5. EXPORT HUB
-  // ==========================================
-  return {
+return {
     products,
     loading,
     error,

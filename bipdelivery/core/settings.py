@@ -2,40 +2,50 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
-# 🛰️ BASE DIRECTORY SETUP
+# ------------------------------------------------------------------------------
+# 🛰️ BASE DIRECTORY & PATHS
+# ------------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 🔑 SECURITY WARNING: keep the secret key used in production secret!
-# Em produção, utilize variáveis de ambiente (.env)
+# ------------------------------------------------------------------------------
+# 🔑 SECURITY & ENVIRONMENT
+# ------------------------------------------------------------------------------
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-p#994+*a+ah%p$u=i96^-ntbfax!xc3%1t62kq_1ad0yfj_ka%')
 
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = ['*', '127.0.0.1', 'localhost']
 
-# ==============================================================================
-# 📦 APPLICATION DEFINITION
-# ==============================================================================
-INSTALLED_APPS = [
+# ------------------------------------------------------------------------------
+# 📦 APPS CONFIGURATION (Segregated for Clarity)
+# ------------------------------------------------------------------------------
+DJANGO_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+]
 
-    # 🛠️ THIRD PARTY PLUGINS
+THIRD_PARTY_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
+]
 
-    # 🚀 BIPFLOW LOCAL APPS
+LOCAL_APPS = [
     'api.apps.ApiConfig',
     'core',
 ]
 
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
+# ------------------------------------------------------------------------------
+# 🛡️ MIDDLEWARE (Security Order is Critical)
+# ------------------------------------------------------------------------------
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # 🛡️ MUST BE FIRST
+    'corsheaders.middleware.CorsMiddleware',  # 🚀 Must be first for CORS preflight
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -46,12 +56,16 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'core.urls'
+WSGI_APPLICATION = 'core.wsgi.application'
 
+# ------------------------------------------------------------------------------
+# 🎨 TEMPLATE ENGINE (Fixes admin.E403 Error)
+# ------------------------------------------------------------------------------
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'DIRS': [BASE_DIR / 'templates'], 
+        'APP_DIRS': True,                 
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -63,11 +77,9 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'core.wsgi.application'
-
-# ==============================================================================
-# 📊 DATABASE & LOCALIZATION
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# 📊 DATABASE & AUTHENTICATION
+# ------------------------------------------------------------------------------
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -75,46 +87,40 @@ DATABASES = {
     }
 }
 
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# ------------------------------------------------------------------------------
+# 🌍 INTERNATIONALIZATION
+# ------------------------------------------------------------------------------
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# ==============================================================================
-# 🖼️ STATIC & MEDIA ASSETS (THE IMAGE FIX)
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# 🖼️ STATIC & MEDIA ASSETS (BipFlow Assets Protocol)
+# ------------------------------------------------------------------------------
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Criar pasta media se não existir para evitar erros de IO
-if not os.path.exists(MEDIA_ROOT):
-    os.makedirs(MEDIA_ROOT)
+# Automatic directory creation for assets
+for path in [STATIC_ROOT, MEDIA_ROOT]:
+    os.makedirs(path, exist_ok=True)
 
-# ==============================================================================
-# 🛡️ CORS & SECURITY STANDARDS
-# ==============================================================================
-CORS_ALLOW_ALL_ORIGINS = True # 🚨 Apenas para desenvolvimento! 
+# ------------------------------------------------------------------------------
+# 🔒 CORS & DRF SECURITY
+# ------------------------------------------------------------------------------
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Restrict in production
 CORS_ALLOW_CREDENTIALS = True
 
-# Permitir que o Vue.js acesse os headers de autenticação
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-# ==============================================================================
-# 🛰️ DRF & JWT CONFIGURATION
-# ==============================================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -124,10 +130,19 @@ REST_FRAMEWORK = {
     ],
 }
 
+# ------------------------------------------------------------------------------
+# 🛰️ JWT CONFIGURATION (Token Standards)
+# ------------------------------------------------------------------------------
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
     'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
