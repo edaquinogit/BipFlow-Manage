@@ -1,65 +1,59 @@
 /**
  * BipFlow: Asset Rendering & Sync Diagnostic
- * Nível: Produção / Debug Avançado
+ * Nível: Produção / End-to-End (E2E)
+ * Padrão: Clean Code & Hard Assertions
  */
 
 describe('BipFlow: Diagnóstico de Sincronização de Imagens', () => {
   const API_URL = Cypress.env('apiUrl') || 'http://127.0.0.1:8000';
+  
+  // ⚠️ ATENÇÃO: Altere esta variável para a rota real onde a sua tabela aparece (ex: '/', '/produtos', '/estoque')
+  const INVENTORY_ROUTE = '/'; 
 
   beforeEach(() => {
-    // Utiliza o comando otimizado para ganhar performance no debug
+    // Autenticação bypass para performance
     cy.loginViaApi();
-    cy.visit('/dashboard'); 
+    cy.visit(INVENTORY_ROUTE); 
   });
 
-  it('Inspeciona integridade das imagens e detecta falhas de protocolo', () => {
-    // 1. Aguarda a renderização da tabela de ativos
+  it('Inspeciona a integridade das imagens e valida o protocolo absoluto (CORS)', () => {
+    // 1. Sincronização de Estado: Aguarda a tabela renderizar antes de agir
     cy.contains('ACTIVE ASSETS', { timeout: 15000, matchCase: false }).should('be.visible');
 
-    // 2. Intercepta as requisições de mídia para validar o status real do servidor
-    cy.intercept('GET', '**/media/products/**').as('mediaRequest');
+    // 2. Varredura Técnica com Hard Assertions
+    cy.get('table img', { timeout: 10000 })
+      .should('have.length.at.least', 1)
+      .each(($img, index) => {
+        const src = $img.attr('src');
+        const imgName = $img.attr('alt') || `Asset_${index}`;
 
-    // 3. 🎯 VARREDURA TÉCNICA
-    cy.get('table img', { timeout: 10000 }).should('have.length.at.least', 1).each(($img, index) => {
-      const src = $img.attr('src');
-      const imgName = $img.attr('alt') || `Asset_${index}`;
+        // TESTE 1: Validação de Prefixo (O src DEVE ser uma URL absoluta)
+        expect(src, `A imagem [${imgName}] deve ter um atributo src válido`).to.not.be.undefined;
+        expect(src, `A imagem [${imgName}] deve usar URL absoluta (falha de concatenação no Vue)`).to.match(/^http/);
 
-      cy.log(`### 🔍 Analisando: ${imgName} ###`);
-
-      // TESTE 1: Validação de Prefixo (CORS/Absolute URL)
-      if (src && !src.startsWith('http')) {
-        cy.log('❌ **ERRO DE PROTOCOLO:** URL Relativa detectada. O Vue não está concatenando a API_URL.');
-        cy.log(`Path encontrado: ${src}`);
-      } else {
-        cy.log(`✅ **PROTOCOLO OK:** URL Absoluta detectada: ${src}`);
-      }
-
-      // TESTE 2: Validação de Renderização Física
-      // Verificamos se o navegador conseguiu carregar as dimensões da imagem
-      cy.wrap($img).should(($el) => {
-        const imgElement = $el[0] as HTMLImageElement;
-        
-        if (imgElement.naturalWidth === 0) {
-          cy.log(`🚨 **CRITICAL:** Imagem quebrada (404 ou Arquivo Inexistente).`);
-        } else {
-          cy.log(`🖼️ **RENDER OK:** Dimensões: ${imgElement.naturalWidth}x${imgElement.naturalHeight}px`);
-        }
+        // TESTE 2: Validação de Renderização Física (A imagem NÃO DEVE estar quebrada)
+        cy.wrap($img).should(($el) => {
+          const imgElement = $el[0] as HTMLImageElement;
+          expect(imgElement.naturalWidth, `A imagem [${imgName}] quebrou (Erro 404 ou caminho inválido)`).to.be.greaterThan(0);
+        });
       });
-    });
 
-    // 4. Captura técnica para o relatório de bugs
-    cy.screenshot('debug-renderizacao-produtos');
+    // 3. Evidência de Sucesso para o relatório
+    cy.screenshot('e2e-product-sync-success');
   });
 
-  it('Valida se o Django está servindo a pasta /media corretamente', () => {
-    // Tenta acessar um endpoint de mídia conhecido para isolar se o problema é o Django ou o Vue
+  it('Valida a disponibilidade do endpoint de mídia no Django', () => {
+    // Valida se o servidor Django está de pé e respondendo na porta configurada
     cy.request({
       url: `${API_URL}/media/`,
       failOnStatusCode: false
     }).then((response) => {
-      if (response.status === 404) {
-        cy.log('⚠️ **ALERTA BACKEND:** O Django não parece estar servindo a pasta /media. Verifique o urls.py.');
-      }
+      // Nota: No Django, acessar o diretório /media/ direto pode retornar 403 (Forbidden) ou 404, o que é seguro.
+      // O importante é garantir que o servidor respondeu à requisição.
+      expect(response.status).to.be.oneOf(
+        [200, 403, 404], 
+        'O Django deve estar ativo e configurado para lidar com rotas de mídia'
+      );
     });
   });
 });
