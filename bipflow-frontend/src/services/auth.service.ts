@@ -1,71 +1,43 @@
 import api from "./api";
 import type { LoginCredentials, LoginResponse } from "../types/auth";
 
-export interface RegisterCredentials extends LoginCredentials {
-  name: string;
-}
-
 export const authService = {
   /**
-   * Realiza o Login e salva tokens
+   * Realiza o Login e salva tokens no LocalStorage
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
+      // Ajuste estratégico: O Django (SimpleJWT) espera 'username'
       const payload = {
         username: credentials.email,
         password: credentials.password,
       };
 
-      const response = await api.post<LoginResponse>("auth/token/", payload);
+      // Certifique-se que o 'api.ts' já tem o prefixo /api/v1/
+      const { data } = await api.post<LoginResponse>("auth/token/", payload);
 
-      if (response.data.access) {
-        localStorage.setItem("token", response.data.access);
-        localStorage.setItem("refresh_token", response.data.refresh);
+      if (data.access) {
+        localStorage.setItem("token", data.access);
+        localStorage.setItem("refresh_token", data.refresh);
       }
 
-      return response.data;
+      return data;
     } catch (error) {
-      console.error("Erro no login:", error);
+      console.error("[AuthService] Erro no login:", error);
       throw error;
     }
   },
 
   /**
-   * Cria um novo usuário
+   * Logout Radical (Limpa tudo e reseta a app)
    */
-  async register(credentials: RegisterCredentials): Promise<void> {
-    try {
-      await api.post("register/", credentials);
-    } catch (error) {
-      console.error("Erro no cadastro:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Faz refresh manual do token
-   */
-  async refreshToken(): Promise<void> {
-    const refresh = localStorage.getItem("refresh_token");
-    if (!refresh) throw new Error("Refresh token não encontrado");
-
-    const response = await api.post("auth/token/refresh/", { refresh });
-    localStorage.setItem("token", response.data.access);
-  },
-
-  /**
-   * Logout
-   */
-  logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refresh_token");
+  logout(): void {
+    localStorage.clear();
+    sessionStorage.clear();
     window.location.href = "/login";
   },
 
-  /**
-   * Verifica se usuário está logado
-   */
   isAuthenticated(): boolean {
     return !!localStorage.getItem("token");
-  },
+  }
 };
