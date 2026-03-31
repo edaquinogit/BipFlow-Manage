@@ -1,5 +1,4 @@
 import api from "./api";
-import { CategorySchema } from "../schemas/category.schema";
 
 const ENDPOINT = "v1/categories/" as const;
 
