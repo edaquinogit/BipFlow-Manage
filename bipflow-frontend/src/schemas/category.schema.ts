@@ -46,3 +46,6 @@ export const createEmptyCategory = (): CategoryCreatePayload => ({
   name: "",
   description: "", // Mantendo consistência com o default do schema
 });
+
+export const CategoryPayloadSchema = CategorySchema.omit({ id: true, slug: true, product_count: true, created_at: true });
+export type CategoryPayload = z.infer<typeof CategoryPayloadSchema>;

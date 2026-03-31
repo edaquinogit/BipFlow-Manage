@@ -1,6 +1,6 @@
 import { ref, computed } from "vue";
 import type { Category } from "../schemas/category.schema";
-import CategoryService from "../services/category.service";
+import { categoryService } from "../services/category.service";
 
 // Mantemos o estado FORA da função para que ele funcione como um "Store" (Singleton)
 // Isso garante que se você mudar de página e voltar, as categorias ainda estarão lá.
@@ -23,7 +23,7 @@ export function useCategories() {
     error.value = null;
 
     try {
-      const data = await CategoryService.getAll();
+      const data = await categoryService.getAll();
       categories.value = data;
       lastFetched.value = Date.now();
       console.log("📂 BipFlow: Categories registry synchronized.");
@@ -41,7 +41,7 @@ export function useCategories() {
   const addCategory = async (payload: Partial<Category>) => {
     loading.value = true;
     try {
-      const newCategory = await CategoryService.create(payload);
+      const newCategory = await categoryService.create(payload);
       // Otimização: Em vez de fetch total, apenas adicionamos ao estado
       categories.value = [...categories.value, newCategory];
       return newCategory;
@@ -64,7 +64,7 @@ export function useCategories() {
     categories.value = categories.value.filter((cat) => cat.id !== id);
 
     try {
-      await CategoryService.delete(id);
+      await categoryService.remove(id);
     } catch (err) {
       // Rollback em caso de erro no servidor
       categories.value = previousState;

@@ -16,7 +16,7 @@ export const authService = {
         password: credentials.password,
       };
 
-      const response = await api.post<LoginResponse>("token/", payload);
+      const response = await api.post<LoginResponse>("auth/token/", payload);
 
       if (response.data.access) {
         localStorage.setItem("token", response.data.access);
@@ -49,7 +49,7 @@ export const authService = {
     const refresh = localStorage.getItem("refresh_token");
     if (!refresh) throw new Error("Refresh token não encontrado");
 
-    const response = await api.post("token/refresh/", { refresh });
+    const response = await api.post("auth/token/refresh/", { refresh });
     localStorage.setItem("token", response.data.access);
   },
 

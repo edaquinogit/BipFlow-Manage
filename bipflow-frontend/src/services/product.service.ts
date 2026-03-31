@@ -7,7 +7,7 @@ import { ProductSchema, type Product } from "../schemas/product.schema";
  * Implementa o Singleton Pattern para garantir uma única instância de conexão.
  */
 class ProductService {
-  private readonly endpoint = "products/";
+  private readonly endpoint = "v1/products/";
 
   /**
    * 🔍 FETCH ALL ASSETS

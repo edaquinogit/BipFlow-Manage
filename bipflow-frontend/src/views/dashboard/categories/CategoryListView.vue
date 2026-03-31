@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useCategories } from '@/composables/useCategories';
-import CategoryForm from '@/components/dashboard/CategoryForm.vue';
+import CategoryForm from '@/components/dashboard/category-form/CategoryForm.vue';
 import type { Category } from '@/schemas/category.schema';
 
 /**

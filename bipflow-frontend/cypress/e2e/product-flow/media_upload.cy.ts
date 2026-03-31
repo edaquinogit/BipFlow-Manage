@@ -3,9 +3,9 @@ describe('BipFlow: Gestão de Mídia e Upload', () => {
   beforeEach(() => {
     cy.clearLocalStorage();
     cy.loginViaApi().then(() => {
-      cy.intercept('GET', '**/api/products/').as('getProducts');
+      cy.intercept('GET', '**/api/v1/products/').as('getProducts');
       cy.intercept('GET', '**/api/categories/').as('getCategories');
-      cy.intercept('POST', '**/api/products/').as('postProduct'); // intercept correto
+      cy.intercept('POST', '**/api/v1/products/').as('postProduct'); // intercept correto
       cy.visit('/');
     });
   });

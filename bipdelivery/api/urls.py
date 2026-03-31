@@ -1,11 +1,20 @@
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import ProductViewSet, CategoryViewSet # <-- Adicione CategoryViewSet aqui
 
-router = DefaultRouter()
-router.register(r'products', ProductViewSet)
-router.register(r'categories', CategoryViewSet) # <-- Esta é a linha mágica!
+# 🛰️ JWT AUTHENTICATION VIEWS
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView, 
+    TokenRefreshView
+)
+
+app_name = 'api'
 
 urlpatterns = [
-    path('', include(router.urls)),
+    # 🔐 IDENTITY & ACCESS MANAGEMENT
+    # Rotas de autenticação limpas: /api/auth/token/
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # 🚀 BUSINESS DOMAIN (V1)
+    # Protege a lógica de negócio com versionamento explícito
+    path('v1/', include('api.v1_urls')),
 ]

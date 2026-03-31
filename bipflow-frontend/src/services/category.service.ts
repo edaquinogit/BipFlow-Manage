@@ -1,27 +1,37 @@
-import api from "./api"; // Sua instância configurada do Axios
-import { CategorySchema, type Category } from "../schemas/category.schema";
+import api from "./api";
+import { CategorySchema } from "../schemas/category.schema";
 
-/**
- * CategoryService
- * Responsabilidade: Abstrair chamadas HTTP e validar dados de entrada/saída.
- */
+const ENDPOINT = "v1/categories/" as const;
+
 class CategoryService {
-  private readonly endpoint = "/categories/";
-
-  async getAll(): Promise<Category[]> {
-    const { data } = await api.get(this.endpoint);
-    // Garantimos que o array que vem do Django segue o nosso Schema
-    return data.map((item: any) => CategorySchema.parse(item));
+  async getAll() {
+    try {
+      const { data } = await api.get(ENDPOINT);
+      return data;
+    } catch (error) {
+      console.error("[CategoryService] Failed to fetch categories", error);
+      throw error;
+    }
   }
 
-  async create(category: Partial<Category>): Promise<Category> {
-    const { data } = await api.post(this.endpoint, category);
-    return CategorySchema.parse(data);
+  async create(payload: any) {
+    try {
+      const { data } = await api.post(ENDPOINT, payload);
+      return data;
+    } catch (error) {
+      console.error("[CategoryService] Failed to create category", error);
+      throw error;
+    }
   }
 
-  async delete(id: number): Promise<void> {
-    await api.delete(`${this.endpoint}${id}/`);
+  async remove(id: number | string) {
+    try {
+      await api.delete(`${ENDPOINT}${id}/`);
+    } catch (error) {
+      console.error(`[CategoryService] Failed to delete category ${id}`, error);
+      throw error;
+    }
   }
 }
 
-export default new CategoryService();
+export const categoryService = new CategoryService();

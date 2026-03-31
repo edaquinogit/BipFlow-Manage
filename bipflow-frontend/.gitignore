@@ -37,3 +37,8 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Artefatos de projeto (nunca versionar)
+*.bak
+audit-report.json
+test-output.log
