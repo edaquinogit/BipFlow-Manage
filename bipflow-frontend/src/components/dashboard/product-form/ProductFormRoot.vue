@@ -124,7 +124,7 @@ const title = computed(() => props.initialData ? 'Update Asset' : 'New Product')
           />
 
           <ValuationSection 
-            v-model:price="form.price" 
+            v-model:price.number="form.price" 
             v-model:stock="form.stock_quantity"
             v-model:size="form.size"
             :errors="errors"
