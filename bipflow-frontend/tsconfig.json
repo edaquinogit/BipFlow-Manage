@@ -6,7 +6,6 @@
     "module": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
 
     /* Bundler Mode (Otimizado para Vite) */
     "moduleResolution": "bundler",
@@ -45,6 +44,5 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "exclude": ["node_modules", "dist", "cypress", "src/templates/**/*", "src/templates/**/*"],
-  "ignoreDeprecations": "6.0"
+  "exclude": ["node_modules", "dist", "cypress"]
 }

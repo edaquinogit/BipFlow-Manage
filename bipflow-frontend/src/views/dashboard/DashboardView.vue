@@ -3,8 +3,6 @@ import { ref, onMounted } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
 import type { Product } from '@/schemas/product.schema';
-import { PRODUCT_WRITABLE_API_KEYS } from '@/constants/productApiFields';
-import { productsLogger } from '@/lib/logger';
 
 // Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
@@ -74,27 +72,27 @@ const handleClosePanel = () => {
  * @param rawPayload - O objeto vindo do formulário ou estado do Vue
  * @returns Um objeto limpo pronto para o backend
  */
-const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, unknown>) => {
-  const {
-    id: _id,
-    created_at: _ca,
-    updated_at: _ua,
-    category_name: _cn,
-    ...rest
+const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, any>) => {
+  // 1. Destructuring: Removemos campos que o Django não aceita no POST/PUT (read-only)
+  // Usamos o rest operator (...) para agrupar apenas o que sobra em 'cleanData'
+  const { 
+    id: _id, 
+    created_at: _ca, 
+    updated_at: _ua, 
+    category_name: _cn, 
+    ...cleanData 
   } = rawPayload;
 
-  const cleanData: Record<string, unknown> = {};
-  for (const key of PRODUCT_WRITABLE_API_KEYS) {
-    if (key in rest && rest[key] !== undefined) {
-      cleanData[key] = rest[key];
-    }
-  }
-
+  // 2. Asset Media Guard: 
+  // Se 'image' for uma string (URL), significa que o usuário não selecionou um novo arquivo.
+  // Removemos do payload para não tentar sobrescrever o binário com uma string.
   if (typeof cleanData.image === 'string' || !cleanData.image) {
     delete cleanData.image;
   }
 
-  return JSON.parse(JSON.stringify(cleanData)) as Partial<Product>;
+  // 3. Normalização de tipos (Opcional, mas profissional)
+  // Garante que valores nulos ou vazios não quebrem o DRF (Django Rest Framework)
+  return JSON.parse(JSON.stringify(cleanData));
 };
 
 /**
@@ -108,13 +106,10 @@ const handleSave = async (payload: Partial<Product>) => {
 
     if (selectedProduct.value?.id) {
       await updateProduct(selectedProduct.value.id, dataToSync);
-      productsLogger.info(
-        { id: selectedProduct.value.id },
-        'Asset synchronized (update)',
-      );
+      console.info(`✅ [BipFlow Core]: Asset ${selectedProduct.value.id} synchronized.`);
     } else {
       await createProduct(dataToSync);
-      productsLogger.info({}, 'Asset synchronized (201 Created)');
+      console.info(`🚀 [BipFlow Core]: New asset deployed to registry.`);
     }
     
     // Sincronização de Estado (Resolve o bug do Avatar)
@@ -122,8 +117,8 @@ const handleSave = async (payload: Partial<Product>) => {
     handleClosePanel();
     
   } catch (err) {
-    productsLogger.error({ err }, 'Sync operation failed');
-    console.error('❌ [BipFlow Core]: Sync operation failed.', err);
+    console.error("❌ [BipFlow Core]: Sync operation failed.", err);
+    // TODO: Disparar Toast Notification de erro aqui no futuro
   } finally {
     isSaving.value = false;
   }

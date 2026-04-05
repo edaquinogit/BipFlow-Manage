@@ -1,94 +1,59 @@
 import { ref, computed } from "vue";
 import type { Product } from "../schemas/product.schema";
 import ProductService from "../services/product.service";
-import { productsLogger } from "@/lib/logger";
-import { PRODUCT_WRITABLE_KEY_SET } from "@/constants/productApiFields";
-import { formatDrfErrorPayload, isAxiosError } from "@/lib/drfErrors";
-
-// Singleton reactive store (shared across all useProducts() consumers).
-const products = ref<Product[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
 
 /**
- * Clears module-level catalog state. Intended for unit tests only.
- */
-export function resetProductsCatalogForTests(): void {
-  products.value = [];
-  loading.value = false;
-  error.value = null;
-}
-
-function getApiErrorDetail(err: unknown): string {
-  if (isAxiosError(err) && err.response?.data !== undefined) {
-    return formatDrfErrorPayload(err.response.data);
-  }
-  if (err instanceof Error) return err.message;
-  return "Unknown error";
-}
-
-function getStockValue(p: Product): number {
-  const withLegacy = p as Product & { stock?: number | string };
-  if (p.stock_quantity !== undefined && p.stock_quantity !== null) {
-    return Number(p.stock_quantity);
-  }
-  if (withLegacy.stock !== undefined && withLegacy.stock !== null) {
-    return Number(withLegacy.stock);
-  }
-  return 0;
-}
-
-function appendCategoryToFormData(
-  formData: FormData,
-  key: string,
-  value: unknown,
-): void {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "id" in value &&
-    typeof (value as { id: unknown }).id === "number"
-  ) {
-    formData.append(key, String((value as { id: number }).id));
-    return;
-  }
-  formData.append(key, String(value));
-}
-
-/**
- * 🛰️ BIPFLOW PRODUCT HUB — shared catalog state and persistence.
+ * 🛰️ BIPFLOW PRODUCT HUB (NYC ARCHITECTURE)
+ * Gerencia o estado global, cálculos e persistência de ativos.
  */
 export function useProducts() {
+  // ==========================================
+  // 1. STATE (REACTIVE CORE)
+  // ==========================================
+  const products = ref<Product[]>([]);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+
+  // ==========================================
+  // 2. INTERNAL UTILS (PRIVATE HELPERS)
+  // ==========================================
+
+  /**
+   * Extrai o valor de estoque lidando com inconsistências do banco.
+   */
+  const _getStockValue = (p: Product): number => {
+    const val = (p as any).stock_quantity ?? (p as any).stock ?? 0;
+    return Number(val);
+  };
+
+  /**
+   * 🔄 PAYLOAD ADAPTER (Multipart/FormData Support)
+   * Centraliza a validação de arquivos e conversão para o Django.
+   */
   const _preparePayload = (data: Partial<Product>): FormData => {
     const formData = new FormData();
-    const MAX_FILE_SIZE = 2 * 1024 * 1024;
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB Limit
 
     Object.entries(data).forEach(([key, value]) => {
-      if (!PRODUCT_WRITABLE_KEY_SET.has(key)) return;
       if (value === null || value === undefined) return;
 
-      if (
-        (key === "sku" || key === "size") &&
-        typeof value === "string" &&
-        value.trim() === ""
-      ) {
-        return;
-      }
-
+      // 🛡️ SECURITY GUARD: Validação de Imagem
       if (key === "image") {
         if (value instanceof File) {
           if (value.size > MAX_FILE_SIZE) {
-            throw new Error("The image exceeds the 2MB limit.");
+            throw new Error(`The image exceeds the 2MB limit.`);
           }
           formData.append(key, value);
         }
+        // Se for string (URL), omitimos para o Django não tentar sobrescrever o binário com texto
         return;
       }
 
-      if (key === "price" || key === "stock" || key === "stock_quantity") {
+      // 🛠️ DATA FORMATTING: Price, Stock e Objects
+      if (key === "price" || key === "stock") {
         formData.append(key, String(value === "" ? 0 : value));
-      } else if (typeof value === "object") {
-        appendCategoryToFormData(formData, key, value);
+      } else if (typeof value === "object" && "id" in (value as any)) {
+        formData.append(key, String((value as any).id));
       } else {
         formData.append(key, String(value));
       }
@@ -97,10 +62,13 @@ export function useProducts() {
     return formData;
   };
 
+  // ==========================================
+  // 3. CALCULATED HUB (GETTERS)
+  // ==========================================
   const totalRevenue = computed(() => {
     const total = products.value.reduce((acc, p) => {
       const price = Number(p.price || 0);
-      return acc + price * getStockValue(p);
+      return acc + price * _getStockValue(p);
     }, 0);
 
     return new Intl.NumberFormat("en-US", {
@@ -111,25 +79,35 @@ export function useProducts() {
   });
 
   const inventoryStats = computed(() => ({
-    totalItems: products.value.reduce((acc, p) => acc + getStockValue(p), 0),
-    lowStockCount: products.value.filter((p) => getStockValue(p) < 5).length,
+    totalItems: products.value.reduce((acc, p) => acc + _getStockValue(p), 0),
+    lowStockCount: products.value.filter((p) => _getStockValue(p) < 5).length,
   }));
 
+  // ==========================================
+  // 4. ENGINE ACTIONS (CRUD)
+  // ==========================================
+
+  /**
+   * 📡 FETCH DATA: Sincroniza a lista de ativos com a NYC Station (Django)
+   */
   const fetchData = async () => {
     loading.value = true;
     error.value = null;
     try {
       products.value = await ProductService.getAll();
-      productsLogger.info({ count: products.value.length }, "Catalog synced");
-    } catch (err: unknown) {
-      const msg = getApiErrorDetail(err);
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.detail || err.message || "Unknown Connection Error";
       error.value = `BipFlow: NYC Station Sync Failed (${msg})`;
-      productsLogger.error({ err }, "Fetch catalog failed");
+      console.error("❌ BipFlow: Fetch sequence aborted.", err);
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🚀 CREATE: Faz o deploy de um novo ativo (Suporta Multi-part/Media)
+   */
   const createProduct = async (
     data: Partial<Product>,
   ): Promise<Product | undefined> => {
@@ -140,18 +118,22 @@ export function useProducts() {
       const newAsset = await ProductService.create(payload);
 
       products.value = [newAsset, ...products.value];
-      productsLogger.info({ id: newAsset.id }, "Product created");
+      console.log(`✅ BipFlow: Asset ${newAsset.id} deployed.`);
       return newAsset;
-    } catch (err: unknown) {
-      const apiMessage = getApiErrorDetail(err);
-      error.value = `Deployment failed: ${apiMessage}`;
-      productsLogger.error({ err, apiMessage }, "Create product failed");
+    } catch (err: any) {
+      const apiMessage =
+        err.response?.data?.detail || err.message || "Unknown Connection Error";
+      error.value = `Deployment failed: ${apiMessage}`; // Mantém compatibilidade com o Vitest
+      console.error(`[BipFlow Station] Create Error:`, apiMessage);
       throw err;
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🛠️ UPDATE: Sincroniza alterações em um ativo existente
+   */
   const updateProduct = async (id: number, data: Partial<Product>) => {
     loading.value = true;
     error.value = null;
@@ -159,36 +141,36 @@ export function useProducts() {
       const payload = _preparePayload(data);
       const updatedAsset = await ProductService.update(id, payload);
 
-      const idx = products.value.findIndex((p) => p.id === id);
-      if (idx !== -1) {
-        Object.assign(products.value[idx], updatedAsset);
-      } else {
-        products.value = [updatedAsset, ...products.value];
-        productsLogger.warn({ id }, "Updated product missing locally; prepended");
-      }
-
-      productsLogger.info({ id }, "Product updated in catalog");
+      products.value = products.value.map((p) =>
+        p.id === id ? updatedAsset : p,
+      );
+      console.log(`🛠️ BipFlow: Asset ${id} synchronized.`);
       return updatedAsset;
-    } catch (err: unknown) {
-      const apiMessage = getApiErrorDetail(err);
+    } catch (err: any) {
+      const apiMessage =
+        err.response?.data?.detail || err.message || "Update Failed";
       error.value = `Synchronization failed: ${apiMessage}`;
-      productsLogger.error({ err, id, apiMessage }, "Update product failed");
+      console.error(`[BipFlow Station] Update Error:`, apiMessage);
       throw err;
     } finally {
       loading.value = false;
     }
   };
 
+  /**
+   * 🗑️ DELETE: Purga um ativo da base de dados
+   */
   const deleteProduct = async (id: number) => {
-    loading.value = true;
+    loading.value = true; // Adicionado loading para o delete (Boa prática)
     try {
       await ProductService.delete(id);
       products.value = products.value.filter((p) => p.id !== id);
-      productsLogger.info({ id }, "Product deleted");
-    } catch (err: unknown) {
-      const apiMessage = getApiErrorDetail(err);
+      console.log(`🗑️ BipFlow: Asset ${id} purged.`);
+    } catch (err: any) {
+      const apiMessage =
+        err.response?.data?.detail || err.message || "Purge Failed";
       error.value = `Critical: Purge sequence failed (${apiMessage})`;
-      productsLogger.error({ err, id }, "Delete product failed");
+      console.error("❌ BipFlow: Security protocol - Purge failed.", err);
     } finally {
       loading.value = false;
     }

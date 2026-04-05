@@ -1,10 +1,9 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
-import { getApiBaseUrl } from "@/lib/apiBase";
 
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
  */
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
 
 const AUTH_KEYS = Object.freeze({
   ACCESS: "access_token",

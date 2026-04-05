@@ -34,16 +34,12 @@ const productBase = {
 
   description: z.string().nullable().optional(),
 
-  /** Matches Django `CharField(max_length=50, blank=True, null=True, unique=True)`. */
   sku: z
-    .union([z.string(), z.null()])
-    .optional()
-    .transform((val) => {
-      if (val == null || val === "") return null;
-      const u = String(val).trim().toUpperCase();
-      return u === "" ? null : u;
-    })
-    .refine((s) => s === null || s.length <= 50, "SKU exceeds 50 characters"),
+    .string()
+    .min(4, "SKU is required for tracking")
+    .toUpperCase()
+    .nullable()
+    .optional(),
 
   // Coerção Inteligente: Garante que o input do form vire número real
   price: z.coerce.number().min(0, "Price cannot be negative").default(0),
@@ -72,7 +68,7 @@ const productBase = {
    * Validação multimodal para URLs existentes e Novos Uploads.
    */
   image: z
-    .union([z.instanceof(File), z.string(), z.null(), z.undefined()])
+    .any()
     .refine((file) => {
       if (!file || typeof file === "string") return true;
       return file instanceof File;
