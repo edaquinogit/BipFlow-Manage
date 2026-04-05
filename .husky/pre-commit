@@ -1,1 +1,37 @@
-cd bipflow-frontend && npm run typecheck
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Root-level pre-commit hook for BipFlow monorepo
+# This hook runs checks across both frontend and backend
+# Individual subdirectories have their own hooks
+
+echo "[pre-commit] Running root validation checks..."
+
+# 1. Frontend TypeScript checks
+echo "[pre-commit] Checking frontend TypeScript..."
+cd bipflow-frontend && npm run typecheck --no-git
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] ❌ Frontend TypeScript check failed"
+  exit 1
+fi
+cd ..
+
+# 2. Python linting (if black/flake8 available)
+echo "[pre-commit] Checking Python syntax..."
+python -m py_compile bipdelivery/api/models.py bipdelivery/api/serializers.py bipdelivery/api/views.py 2>/dev/null
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] ❌ Python syntax check failed"
+  exit 1
+fi
+
+# 3. Markdown validation (optional - if markdownlint available)
+if command -v markdownlint &> /dev/null; then
+  echo "[pre-commit] Checking Markdown formatting..."
+  markdownlint -f "docs/**/*.md" "README.md" 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "[pre-commit] ⚠️  Markdown formatting issues (warnings only)"
+  fi
+fi
+
+echo "[pre-commit] ✅ All checks passed"
+exit 0
