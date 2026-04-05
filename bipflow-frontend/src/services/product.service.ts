@@ -1,63 +1,88 @@
 import api from "./api";
+import { Logger } from "./logger";
 import { ProductSchema, type Product } from "../schemas/product.schema";
+import {
+  isAxiosError,
+  isZodError,
+  buildErrorContext,
+  type ApplicationError,
+} from "../types/errors";
 
 /**
- * 🛰️ PRODUCT SERVICE (BIPFLOW ENGINE - NYC STANDARD)
- * Camada de persistência e validação atômica para ativos do inventário.
- * Implementa o Singleton Pattern para garantir uma única instância de conexão.
+ * Product Service - Business Logic Layer
+ *
+ * Handles all product-related API operations with strict type safety.
+ * Implements singleton pattern for consistent state management.
+ * Provides comprehensive error handling and schema validation via Zod.
  */
 class ProductService {
   private readonly endpoint = "v1/products/";
 
   /**
-   * 🔍 FETCH ALL ASSETS
-   * Recupera a coleção completa e garante a integridade dos dados via Zod.
+   * Fetch all products from the backend.
+   *
+   * Performs schema validation to ensure data integrity. If validation fails,
+   * logs warning but returns raw data to prevent UI lockup.
+   *
+   * @returns Array of validated Product objects
+   * @throws Error if API request fails completely
    */
   async getAll(): Promise<Product[]> {
     try {
-      const { data } = await api.get(this.endpoint);
+      const { data } = await api.get<unknown>(this.endpoint);
 
-      // O safeParse evita que o dashboard quebre se um único campo vier errado do banco
       const validation = ProductSchema.array().safeParse(data);
 
       if (!validation.success) {
-        console.error(
-          "❌ BipFlow: Registry Data Corruption Detected.",
-          validation.error.format(),
+        Logger.warn(
+          'Product schema validation failed - returning unvalidated data',
+          buildErrorContext(validation.error, { endpoint: this.endpoint })
         );
-        return data as Product[]; // Fallback para não travar a UI, mas loga o erro
+        return data as Product[];
       }
 
       return validation.data;
-    } catch (err: any) {
-      this.handleError(err, "Fetch All Assets");
-      throw err;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Fetch All Products");
+      throw error;
     }
   }
 
   /**
-   * 🚀 CREATE ASSET (MULTIPART DEPLOYMENT)
-   * Despacha o payload (FormData) para suportar upload de imagens.
+   * Create a new product with optional image upload.
+   *
+   * Accepts FormData payload to support multipart file uploads.
+   * Performs strict validation on response to ensure data consistency.
+   *
+   * @param payload FormData containing product data and optional image
+   * @returns Created Product object with server-assigned ID and image URL
+   * @throws Error if validation or API request fails
    */
   async create(payload: FormData): Promise<Product> {
     try {
-      const { data } = await api.post(this.endpoint, payload, {
+      const { data } = await api.post<unknown>(this.endpoint, payload, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      // Validação rigorosa no Create para garantir que o objeto novo está correto
       return ProductSchema.parse(data);
-    } catch (err: any) {
-      this.handleError(err, "Asset Provisioning");
-      throw err;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Create Product");
+      throw error;
     }
   }
 
   /**
-   * 🛰️ STRATEGIC UPDATE (PATCH / MULTIPART)
-   * Sincroniza alterações parciais no registro.
+   * Update an existing product.
+   *
+   * Supports both JSON and FormData payloads.
+   * Uses PATCH to allow partial updates without requiring all fields.
+   *
+   * @param id Product ID to update
+   * @param productData Partial product data or FormData
+   * @returns Updated Product object
+   * @throws Error if validation or API request fails
    */
   async update(
     id: number,
@@ -66,71 +91,86 @@ class ProductService {
     try {
       const isFormData = productData instanceof FormData;
 
-      const { data } = await api.patch(`${this.endpoint}${id}/`, productData, {
-        headers: {
-          // Deixamos o Axios gerenciar o boundary se for FormData
-          "Content-Type": isFormData
-            ? "multipart/form-data"
-            : "application/json",
-        },
-      });
+      const { data } = await api.patch<unknown>(
+        `${this.endpoint}${id}/`,
+        productData,
+        {
+          headers: {
+            "Content-Type": isFormData
+              ? "multipart/form-data"
+              : "application/json",
+          },
+        }
+      );
 
       const validation = ProductSchema.safeParse(data);
 
       if (!validation.success) {
-        console.warn(
-          `⚠️ BipFlow: Schema mismatch on Asset ${id}.`,
-          validation.error.format(),
+        Logger.warn(
+          `Product schema mismatch after update [ID: ${id}]`,
+          buildErrorContext(validation.error, { productId: id })
         );
         return data as Product;
       }
 
       return validation.data;
-    } catch (err: any) {
-      this.handleError(err, "Update Sequence");
-      throw err;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Update Product");
+      throw error;
     }
   }
 
   /**
-   * 🗑️ PURGE ASSET
-   * Remove permanentemente um ativo do registro.
+   * Delete a product by ID.
+   *
+   * Performs hard delete - operation cannot be undone.
+   *
+   * @param id Product ID to delete
+   * @throws Error if product not found or API request fails
    */
   async delete(id: number): Promise<void> {
     try {
       await api.delete(`${this.endpoint}${id}/`);
-      console.log(`🗑️ BipFlow: Asset ${id} purged from registry.`);
-    } catch (err: any) {
-      this.handleError(err, "Delete Sequence");
-      throw err;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Delete Product");
+      throw error;
     }
   }
 
   /**
-   * 🛡️ INTERNAL ERROR HANDLER (AUDIT LOG PROTOCOL)
-   * Centraliza a telemetria de erros para debug profissional.
+   * Centralized error handling and logging.
+   *
+   * Distinguishes between validation errors (Zod), API errors (Axios),
+   * and unexpected runtime errors. Logs structured context for debugging.
+   *
+   * @param error Application error instance
+   * @param context Operation context for logging
    */
-  private handleError(err: any, context: string) {
-    if (err.name === "ZodError") {
-      console.error(
-        `⚠️ [ProductService][${context}] Schema Mismatch:`,
-        err.errors,
+  private handleError(error: ApplicationError, context: string): void {
+    if (isZodError(error)) {
+      Logger.error(
+        `[ProductService][${context}] Schema validation failed`,
+        buildErrorContext(error)
       );
-    } else if (err.response) {
-      // Erro vindo do Servidor (Django/Node)
-      console.error(
-        `❌ [ProductService][${context}] API Error [${err.response.status}]:`,
-        err.response.data,
+    } else if (isAxiosError(error)) {
+      Logger.error(
+        `[ProductService][${context}] API request failed [HTTP ${error.response?.status}]`,
+        buildErrorContext(error, {
+          data: error.response?.data,
+        })
+      );
+    } else if (error instanceof Error) {
+      Logger.error(
+        `[ProductService][${context}] Unexpected error: ${error.message}`,
+        buildErrorContext(error)
       );
     } else {
-      // Erro de Rede ou Inesperado
-      console.error(
-        `❌ [ProductService][${context}] Unexpected Failure:`,
-        err.message,
+      Logger.error(
+        `[ProductService][${context}] Unknown error occurred`,
+        { error }
       );
     }
   }
 }
 
-// Exportação da Instância Única (Singleton)
 export default new ProductService();
