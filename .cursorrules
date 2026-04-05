@@ -1,0 +1,949 @@
+# 🛰️ BipFlow AI Agent Rules & Standards
+
+**Role**: You are a Senior Full Stack Architect and Engineer. Maintain BipFlow with DX automation, consistency, and best practices.
+
+**Last Updated**: April 5, 2026 | **Version**: 2.0
+
+---
+
+## 📋 Quick Links
+
+📄 **Full Standards**: See `AI_CONTEXT.md` in project root  
+🎨 **Page Template**: See `bipflow-frontend/src/templates/PERFECT_PAGE.TEMPLATE.vue`  
+⚙️ **Composable Template**: See `bipflow-frontend/src/templates/useEntity.TEMPLATE.ts`  
+📚 **API Docs**: Visit `http://127.0.0.1:8000/api/docs/` (auto-generated)
+
+---
+
+## 1. Core Stack Context
+
+- **Backend:** Django 6.0+ / Django REST Framework / Python 3.11+
+- **Frontend:** Vue 3.4+ / Vite / TypeScript
+- **Authentication:** JWT (djangorestframework-simplejwt)
+- **API Documentation:** OpenAPI 3.0 (drf-spectacular)
+- **Validation (Frontend):** Zod
+- **Styling:** Tailwind CSS
+- **Database:** SQLite (dev) / PostgreSQL (prod)
+
+---
+
+## 2. Absolute Rules (No Exceptions)
+
+### 2.1 Image URLs MUST Be Absolute
+
+❌ **WRONG:**
+```json
+{ "image": "/media/products/photo.jpg" }
+```
+
+✅ **CORRECT:**
+```json
+{ "image": "http://127.0.0.1:8000/media/products/photo.jpg" }
+```
+
+**Backend**: Implement in `to_representation()` of serializers.  
+**Frontend**: Always use `resolveMediaSrc()` helper.
+
+### 2.2 Frontend Components MUST Use `<script setup lang="ts">`
+
+✅ **CORRECT:**
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+</script>
+<template><div /></template>
+```
+
+❌ **WRONG:**
+- Options API (`export default { data() {} }`)
+- Class components
+- Any component without TypeScript
+
+### 2.3 HTTP Verb Rules (Strict)
+
+| Action | Method | Rule |
+|--------|--------|------|
+| Create | POST | Expect 201 |
+| Read | GET | Request/Response only |
+| Update | **PATCH** | **Never PUT** |
+| Delete | DELETE | Expect 204 |
+
+**Why PATCH not PUT?**: PATCH only validates provided fields. PUT validates entire resource (causes SKU duplicates).
+
+### 2.4 List Rendering MUST Include `updated_at` in Key
+
+✅ **CORRECT:**
+```vue
+<div v-for="item in items" :key="`${item.id}-${item.updated_at}`" />
+```
+
+❌ **WRONG:**
+```vue
+<div v-for="(item, idx) in items" :key="idx" />
+<div v-for="item in items" :key="item.id" />
+```
+
+### 2.5 Error Handling MUST Use DRF Formatter
+
+✅ **CORRECT:**
+```typescript
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';
+
+try {
+  await api.post('/products/', data);
+} catch (err) {
+  if (isAxiosError(err) && err.response?.data) {
+    error.value = formatDrfErrorPayload(err.response.data);
+  }
+}
+```
+
+### 2.6 State Management MUST Be Singleton Pattern
+
+✅ **CORRECT** (Module-level shared state):
+```typescript
+const items = ref<Entity[]>([]);  // ← Module level
+
+export function useEntity() {
+  const fetchData = async () => {
+    items.value = await service.getAll();  // ← Mutates shared store
+  };
+  return { items, fetchData };
+}
+```
+
+❌ **WRONG** (Instance-based):
+```typescript
+export function useEntity() {
+  const items = ref<Entity[]>([]);  // ← New per call!
+}
+```
+
+---
+
+## 3. Backend Architecture Standards
+
+### 3.1 Models (Always Include Timestamps)
+
+```python
+class Entity(models.Model):
+    name = models.CharField(max_length=255)
+    
+    # MANDATORY
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+```
+
+### 3.2 Serializers (Absolute URLs)
+
+```python
+class EntitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Entity
+        fields = ['id', 'name', 'image', 'created_at', 'updated_at']
+        read_only_fields = ('created_at', 'updated_at')
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.image:
+            path = instance.image.url
+            request = self.context.get('request')
+            if request:
+                data['image'] = request.build_absolute_uri(path)
+            else:
+                base = getattr(settings, 'PUBLIC_BASE_URL', '')
+                data['image'] = f'{base}{path}' if base else path
+        return data
+```
+
+### 3.3 ViewSets (Explicit Permissions)
+
+```python
+class EntityViewSet(viewsets.ModelViewSet):
+    queryset = Entity.objects.all()
+    serializer_class = EntitySerializer
+    permission_classes = [IsAuthenticated]  # REQUIRED
+```
+
+### 3.4 Settings Configuration
+
+```python
+# ✅ Required for absolute URLs
+PUBLIC_BASE_URL = os.environ.get(
+    'DJANGO_PUBLIC_BASE_URL',
+    'http://127.0.0.1:8000' if DEBUG else ''
+).strip().rstrip('/')
+
+# ✅ CORS configuration
+CORS_ALLOWED_ORIGINS = [
+    'http://127.0.0.1:5173',   # Vite dev
+    'http://localhost:5173',
+    'http://127.0.0.1:8000',   # Django dev
+    'http://localhost:8000',
+]
+
+# ✅ Media & static serving
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# ✅ Auto-docs
+INSTALLED_APPS += ['drf_spectacular']
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+```
+
+### 3.5 URL Routing (Auto-docs)
+
+```python
+from drf_spectacular.views import SpectacularSwaggerView, SpectacularAPIView
+
+urlpatterns = [
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/', include('api.urls')),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+---
+
+## 4. Frontend Architecture Standards
+
+### 4.1 Required Imports (All Pages)
+
+```typescript
+import { resolveMediaSrc } from '@/lib/apiBase';  // ✅ Images
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';  // ✅ Errors
+import { pageLogger } from '@/lib/logger';  // ✅ Logging
+```
+
+### 4.2 Required Imports (All Composables)
+
+```typescript
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';  // ✅ Errors
+import { entityLogger } from '@/lib/logger';  // ✅ Logging
+```
+
+### 4.3 Page Component Structure
+
+Use template at: `bipflow-frontend/src/templates/PERFECT_PAGE.TEMPLATE.vue`
+
+Key sections:
+1. State machine (forms, modals)
+2. Data layer (composables)
+3. Async operation states
+4. Computed properties
+5. Event handlers (CRUD)
+6. Lifecycle
+
+### 4.4 Composable Structure
+
+Use template at: `bipflow-frontend/src/templates/useEntity.TEMPLATE.ts`
+
+Key sections:
+1. Module-level singleton store
+2. Error handling helpers
+3. CRUD operations (fetch, create, update, delete)
+4. Payload preparation
+5. Public API (return object)
+
+### 4.5 Image Rendering
+
+```vue
+<script setup lang="ts">
+import { resolveMediaSrc } from '@/lib/apiBase';
+
+const imageUrl = computed(() =>
+  product.value.image ? resolveMediaSrc(product.value.image) : null
+);
+</script>
+
+<template>
+  <!-- ✅ Images always use resolveMediaSrc -->
+  <img :src="imageUrl" alt="Product" />
+</template>
+```
+
+### 4.6 List Rendering
+
+```vue
+<template>
+  <!-- ✅ MUST include updated_at in key for cache invalidation -->
+  <div
+    v-for="item in items"
+    :key="`${item.id}-${item.updated_at}`"
+    class="item-card"
+  >
+    <!-- Content -->
+  </div>
+</template>
+```
+
+---
+
+## 5. CRUD Routing Logic
+
+### Frontend Decision Tree
+
+```typescript
+const handleSave = async (formData: Partial<Entity>) => {
+  try {
+    if (selectedEntity.value?.id) {
+      // ✅ Has ID → Update (PATCH)
+      await updateEntity(selectedEntity.value.id, formData);
+    } else {
+      // ✅ No ID → Create (POST)
+      await createEntity(formData);
+    }
+    await fetchData();  // Refresh to sync
+  } catch (err) {
+    error.value = getApiErrorDetail(err);
+  }
+};
+```
+
+---
+
+## 6. Environment Variables
+
+### Backend (`bipdelivery/.env`)
+
+```
+DJANGO_SECRET_KEY=secret-key-here
+DJANGO_DEBUG=True
+DJANGO_PUBLIC_BASE_URL=http://127.0.0.1:8000
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+```
+
+### Frontend (`bipflow-frontend/.env.local`)
+
+```
+VITE_API_URL=http://127.0.0.1:8000/api/
+VITE_BACKEND_ORIGIN=http://127.0.0.1:8000
+```
+
+---
+
+## 7. Code Quality Checklist
+
+When you generate or review code, verify:
+
+- [ ] Vue components use `<script setup lang="ts">` only
+- [ ] Images use `resolveMediaSrc()` helper
+- [ ] Errors use `formatDrfErrorPayload()`
+- [ ] List items have `:key="{id}-{updated_at}"`
+- [ ] Updates use PATCH (never PUT)
+- [ ] Creates use POST
+- [ ] Composables are singletons (module-level state)
+- [ ] Models include `created_at` and `updated_at`
+- [ ] Serializers export timestamps as read-only
+- [ ] ViewSets have `permission_classes`
+- [ ] All required imports present
+- [ ] Error states properly handled
+
+---
+
+## 8. Templates to Copy & Use
+
+### New Backend Endpoint
+
+```python
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
+class EntityViewSet(viewsets.ModelViewSet):
+    """Entity API — CRUD operations"""
+    queryset = Entity.objects.all()
+    serializer_class = EntitySerializer
+    permission_classes = [IsAuthenticated]
+```
+
+### New Frontend Page
+
+**Copy from**: `bipflow-frontend/src/templates/PERFECT_PAGE.TEMPLATE.vue`
+
+Includes all standards:
+- State machine
+- Composables
+- CRUD handlers
+- Error handling
+- Image rendering
+- List cache keys
+
+### New Frontend Composable
+
+**Copy from**: `bipflow-frontend/src/templates/useEntity.TEMPLATE.ts`
+
+Includes all standards:
+- Singleton pattern
+- DRF error handling
+- CRUD operations
+- Payload preparation
+
+---
+
+## 9. Documentation Auto-Generation
+
+**NO manual endpoint docs needed!**
+
+Access auto-generated docs at:
+```
+http://127.0.0.1:8000/api/docs/          (Swagger UI)
+http://127.0.0.1:8000/api/redoc/         (ReDoc)
+http://127.0.0.1:8000/api/schema/        (OpenAPI JSON)
+```
+
+Documentation auto-generates from:
+- ViewSet docstrings
+- Serializer fields
+- Django model help_text
+
+---
+
+## 10. How to Implement a New Feature (Checklist)
+
+1. **Backend Model**
+   - [ ] Add `created_at` and `updated_at`
+   - [ ] Create serializer with absolute URLs (if images)
+   - [ ] Create ViewSet with `permission_classes = [IsAuthenticated]`
+   - [ ] Add to router in `v1_urls.py`
+
+2. **Frontend**
+   - [ ] Copy `PERFECT_PAGE.TEMPLATE.vue` → rename to page name
+   - [ ] Copy `useEntity.TEMPLATE.ts` → rename to composable
+   - [ ] Replace "Entity" with your domain object
+   - [ ] Update API endpoints
+   - [ ] Test list rendering with `:key` pattern
+
+3. **Documentation**
+   - [ ] Verify Swagger UI auto-generates at `/api/docs/`
+   - [ ] Check all endpoints are discoverable
+
+4. **Validation**
+   - [ ] All imports present
+   - [ ] Images use `resolveMediaSrc()`
+   - [ ] Errors use `formatDrfErrorPayload()`
+   - [ ] Lists have `updated_at` in key
+   - [ ] Updates use PATCH
+
+---
+
+## 11. Common Patterns
+
+### Handling 400 SKU Conflict
+
+```typescript
+// This happens when:
+// ❌ Using PUT (re-validates all fields)
+// ✅ Use PATCH instead (validates only provided fields)
+
+if (selectedProduct.value?.id) {
+  await api.patch(`/api/v1/products/${id}/`, data);  // ✅ PATCH
+}
+```
+
+### Image Cache Busting
+
+```typescript
+// Backend returns updated_at with every response
+// Frontend uses it in :key to force re-render
+
+<img
+  :key="`${product.image}-${product.updated_at}`"  // ✅ Cache busts when updated_at changes
+  :src="imageUrl"
+/>
+```
+
+### Error Message Translation
+
+```typescript
+// DRF returns: { "sku": ["This field may not be blank."] }
+// formatDrfErrorPayload converts to: "sku: This field may not be blank."
+
+const message = formatDrfErrorPayload(error.response.data);
+```
+
+---
+
+## 12. Performance & Best Practices
+
+- ✅ Use PATCH (not PUT) for updates → faster, fewer validation errors
+- ✅ Use `resolveMediaSrc()` with cache busting → prevents stale images
+- ✅ Use module-level singleton stores → efficient, no duplication
+- ✅ Use auto-generated docs → always accurate, zero maintenance
+
+---
+
+**For full details, see**: `AI_CONTEXT.md` in project root
+
+**Questions?** This file is your source of truth.
+
+
+❌ **WRONG:**
+```json
+{ "image": "/media/products/photo.jpg" }
+```
+
+✅ **CORRECT:**
+```json
+{ "image": "http://127.0.0.1:8000/media/products/photo.jpg" }
+```
+
+**Backend**: Implement in `to_representation()` of serializers.  
+**Frontend**: Always use `resolveMediaSrc()` helper.
+
+### 2.2 Frontend Components MUST Use `<script setup lang="ts">`
+
+✅ **CORRECT:**
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+</script>
+<template><div /></template>
+```
+
+❌ **WRONG:**
+- Options API (`export default { data() {} }`)
+- Class components
+- Any component without TypeScript
+
+### 2.3 HTTP Verb Rules (Strict)
+
+| Action | Method | Rule |
+|--------|--------|------|
+| Create | POST | Expect 201 |
+| Read | GET | Request/Response only |
+| Update | **PATCH** | **Never PUT** |
+| Delete | DELETE | Expect 204 |
+
+**Why PATCH not PUT?**: PATCH only validates provided fields. PUT validates entire resource (causes SKU duplicates).
+
+### 2.4 List Rendering MUST Include `updated_at` in Key
+
+✅ **CORRECT:**
+```vue
+<div v-for="item in items" :key="`${item.id}-${item.updated_at}`" />
+```
+
+❌ **WRONG:**
+```vue
+<div v-for="(item, idx) in items" :key="idx" />
+<div v-for="item in items" :key="item.id" />
+```
+
+### 2.5 Error Handling MUST Use DRF Formatter
+
+✅ **CORRECT:**
+```typescript
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';
+
+try {
+  await api.post('/products/', data);
+} catch (err) {
+  if (isAxiosError(err) && err.response?.data) {
+    error.value = formatDrfErrorPayload(err.response.data);
+  }
+}
+```
+
+### 2.6 State Management MUST Be Singleton Pattern
+
+✅ **CORRECT** (Module-level shared state):
+```typescript
+const items = ref<Entity[]>([]);  // ← Module level
+
+export function useEntity() {
+  const fetchData = async () => {
+    items.value = await service.getAll();  // ← Mutates shared store
+  };
+  return { items, fetchData };
+}
+```
+
+❌ **WRONG** (Instance-based):
+```typescript
+export function useEntity() {
+  const items = ref<Entity[]>([]);  // ← New per call!
+}
+```
+
+---
+
+## 3. Backend Architecture Standards
+
+### 3.1 Models (Always Include Timestamps)
+
+```python
+class Entity(models.Model):
+    name = models.CharField(max_length=255)
+    
+    # MANDATORY
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+```
+
+### 3.2 Serializers (Absolute URLs)
+
+```python
+class EntitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Entity
+        fields = ['id', 'name', 'image', 'created_at', 'updated_at']
+        read_only_fields = ('created_at', 'updated_at')
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.image:
+            path = instance.image.url
+            request = self.context.get('request')
+            if request:
+                data['image'] = request.build_absolute_uri(path)
+            else:
+                base = getattr(settings, 'PUBLIC_BASE_URL', '')
+                data['image'] = f'{base}{path}' if base else path
+        return data
+```
+
+### 3.3 ViewSets (Explicit Permissions)
+
+```python
+class EntityViewSet(viewsets.ModelViewSet):
+    queryset = Entity.objects.all()
+    serializer_class = EntitySerializer
+    permission_classes = [IsAuthenticated]  # REQUIRED
+```
+
+### 3.4 Settings Configuration
+
+```python
+# ✅ Required for absolute URLs
+PUBLIC_BASE_URL = os.environ.get(
+    'DJANGO_PUBLIC_BASE_URL',
+    'http://127.0.0.1:8000' if DEBUG else ''
+).strip().rstrip('/')
+
+# ✅ CORS configuration
+CORS_ALLOWED_ORIGINS = [
+    'http://127.0.0.1:5173',   # Vite dev
+    'http://localhost:5173',
+    'http://127.0.0.1:8000',   # Django dev
+    'http://localhost:8000',
+]
+
+# ✅ Media & static serving
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# ✅ Auto-docs
+INSTALLED_APPS += ['drf_spectacular']
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+```
+
+### 3.5 URL Routing (Auto-docs)
+
+```python
+from drf_spectacular.views import SpectacularSwaggerView, SpectacularAPIView
+
+urlpatterns = [
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/', include('api.urls')),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+---
+
+## 4. Frontend Architecture Standards
+
+### 4.1 Required Imports (All Pages)
+
+```typescript
+import { resolveMediaSrc } from '@/lib/apiBase';  // ✅ Images
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';  // ✅ Errors
+import { pageLogger } from '@/lib/logger';  // ✅ Logging
+```
+
+### 4.2 Required Imports (All Composables)
+
+```typescript
+import { formatDrfErrorPayload, isAxiosError } from '@/lib/drfErrors';  // ✅ Errors
+import { entityLogger } from '@/lib/logger';  // ✅ Logging
+```
+
+### 4.3 Page Component Structure
+
+Use template at: `bipflow-frontend/src/templates/PERFECT_PAGE.TEMPLATE.vue`
+
+Key sections:
+1. State machine (forms, modals)
+2. Data layer (composables)
+3. Async operation states
+4. Computed properties
+5. Event handlers (CRUD)
+6. Lifecycle
+
+### 4.4 Composable Structure
+
+Use template at: `bipflow-frontend/src/templates/useEntity.TEMPLATE.ts`
+
+Key sections:
+1. Module-level singleton store
+2. Error handling helpers
+3. CRUD operations (fetch, create, update, delete)
+4. Payload preparation
+5. Public API (return object)
+
+### 4.5 Image Rendering
+
+```vue
+<script setup lang="ts">
+import { resolveMediaSrc } from '@/lib/apiBase';
+
+const imageUrl = computed(() =>
+  product.value.image ? resolveMediaSrc(product.value.image) : null
+);
+</script>
+
+<template>
+  <!-- ✅ Images always use resolveMediaSrc -->
+  <img :src="imageUrl" alt="Product" />
+</template>
+```
+
+### 4.6 List Rendering
+
+```vue
+<template>
+  <!-- ✅ MUST include updated_at in key for cache invalidation -->
+  <div
+    v-for="item in items"
+    :key="`${item.id}-${item.updated_at}`"
+    class="item-card"
+  >
+    <!-- Content -->
+  </div>
+</template>
+```
+
+---
+
+## 5. CRUD Routing Logic
+
+### Frontend Decision Tree
+
+```typescript
+const handleSave = async (formData: Partial<Entity>) => {
+  try {
+    if (selectedEntity.value?.id) {
+      // ✅ Has ID → Update (PATCH)
+      await updateEntity(selectedEntity.value.id, formData);
+    } else {
+      // ✅ No ID → Create (POST)
+      await createEntity(formData);
+    }
+    await fetchData();  // Refresh to sync
+  } catch (err) {
+    error.value = getApiErrorDetail(err);
+  }
+};
+```
+
+---
+
+## 6. Environment Variables
+
+### Backend (`bipdelivery/.env`)
+
+```
+DJANGO_SECRET_KEY=secret-key-here
+DJANGO_DEBUG=True
+DJANGO_PUBLIC_BASE_URL=http://127.0.0.1:8000
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+```
+
+### Frontend (`bipflow-frontend/.env.local`)
+
+```
+VITE_API_URL=http://127.0.0.1:8000/api/
+VITE_BACKEND_ORIGIN=http://127.0.0.1:8000
+```
+
+---
+
+## 7. Code Quality Checklist
+
+When you generate or review code, verify:
+
+- [ ] Vue components use `<script setup lang="ts">` only
+- [ ] Images use `resolveMediaSrc()` helper
+- [ ] Errors use `formatDrfErrorPayload()`
+- [ ] List items have `:key="{id}-{updated_at}"`
+- [ ] Updates use PATCH (never PUT)
+- [ ] Creates use POST
+- [ ] Composables are singletons (module-level state)
+- [ ] Models include `created_at` and `updated_at`
+- [ ] Serializers export timestamps as read-only
+- [ ] ViewSets have `permission_classes`
+- [ ] All required imports present
+- [ ] Error states properly handled
+
+---
+
+## 8. Templates to Copy & Use
+
+### New Backend Endpoint
+
+```python
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
+class EntityViewSet(viewsets.ModelViewSet):
+    """Entity API — CRUD operations"""
+    queryset = Entity.objects.all()
+    serializer_class = EntitySerializer
+    permission_classes = [IsAuthenticated]
+```
+
+### New Frontend Page
+
+**Copy from**: `bipflow-frontend/src/templates/PERFECT_PAGE.TEMPLATE.vue`
+
+Includes all standards:
+- State machine
+- Composables
+- CRUD handlers
+- Error handling
+- Image rendering
+- List cache keys
+
+### New Frontend Composable
+
+**Copy from**: `bipflow-frontend/src/templates/useEntity.TEMPLATE.ts`
+
+Includes all standards:
+- Singleton pattern
+- DRF error handling
+- CRUD operations
+- Payload preparation
+
+---
+
+## 9. Documentation Auto-Generation
+
+**NO manual endpoint docs needed!**
+
+Access auto-generated docs at:
+```
+http://127.0.0.1:8000/api/docs/          (Swagger UI)
+http://127.0.0.1:8000/api/redoc/         (ReDoc)
+http://127.0.0.1:8000/api/schema/        (OpenAPI JSON)
+```
+
+Documentation auto-generates from:
+- ViewSet docstrings
+- Serializer fields
+- Django model help_text
+
+---
+
+## 10. How to Implement a New Feature (Checklist)
+
+1. **Backend Model**
+   - [ ] Add `created_at` and `updated_at`
+   - [ ] Create serializer with absolute URLs (if images)
+   - [ ] Create ViewSet with `permission_classes = [IsAuthenticated]`
+   - [ ] Add to router in `v1_urls.py`
+
+2. **Frontend**
+   - [ ] Copy `PERFECT_PAGE.TEMPLATE.vue` → rename to page name
+   - [ ] Copy `useEntity.TEMPLATE.ts` → rename to composable
+   - [ ] Replace "Entity" with your domain object
+   - [ ] Update API endpoints
+   - [ ] Test list rendering with `:key` pattern
+
+3. **Documentation**
+   - [ ] Verify Swagger UI auto-generates at `/api/docs/`
+   - [ ] Check all endpoints are discoverable
+
+4. **Validation**
+   - [ ] All imports present
+   - [ ] Images use `resolveMediaSrc()`
+   - [ ] Errors use `formatDrfErrorPayload()`
+   - [ ] Lists have `updated_at` in key
+   - [ ] Updates use PATCH
+
+---
+
+## 11. Common Patterns
+
+### Handling 400 SKU Conflict
+
+```typescript
+// This happens when:
+// ❌ Using PUT (re-validates all fields)
+// ✅ Use PATCH instead (validates only provided fields)
+
+if (selectedProduct.value?.id) {
+  await api.patch(`/api/v1/products/${id}/`, data);  // ✅ PATCH
+}
+```
+
+### Image Cache Busting
+
+```typescript
+// Backend returns updated_at with every response
+// Frontend uses it in :key to force re-render
+
+<img
+  :key="`${product.image}-${product.updated_at}`"  // ✅ Cache busts when updated_at changes
+  :src="imageUrl"
+/>
+```
+
+### Error Message Translation
+
+```typescript
+// DRF returns: { "sku": ["This field may not be blank."] }
+// formatDrfErrorPayload converts to: "sku: This field may not be blank."
+
+const message = formatDrfErrorPayload(error.response.data);
+```
+
+---
+
+## 12. Performance & Best Practices
+
+- ✅ Use PATCH (not PUT) for updates → faster, fewer validation errors
+- ✅ Use `resolveMediaSrc()` with cache busting → prevents stale images
+- ✅ Use module-level singleton stores → efficient, no duplication
+- ✅ Use auto-generated docs → always accurate, zero maintenance
+
+---
+
+**For full details, see**: `AI_CONTEXT.md` in project root
+
+**Questions?** This file is your source of truth.
+
+
+## 3. Communication Protocol
+- Be concise and technical.
+- When proposing a change, explain the "Why" behind the architectural choice.
+- Always check `@Codebase` before suggesting a new utility to avoid duplication.
