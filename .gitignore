@@ -31,3 +31,15 @@ node_modules/
 bipdelivery/db.sqlite3
 cypress/screenshots/
 cypress/videos/
+
+# --- Enterprise Clean Sweep ---
+**/staticfiles/
+**/static_root/
+**/*.sqlite3
+**/*.log
+.env
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
