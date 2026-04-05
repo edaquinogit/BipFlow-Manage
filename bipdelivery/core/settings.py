@@ -32,6 +32,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
+    'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -111,6 +112,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Absolute URLs for serializers when request context is missing (tasks, shell).
+# Example: https://api.bipflow.example — no trailing slash.
+# Defaults to localhost:8000 in development (DEBUG=True) and requires env var in production
+PUBLIC_BASE_URL = os.environ.get(
+    'DJANGO_PUBLIC_BASE_URL',
+    'http://127.0.0.1:8000' if DEBUG else ''
+).strip().rstrip('/')
+
 # Automatic directory creation for assets
 for path in [STATIC_ROOT, MEDIA_ROOT]:
     os.makedirs(path, exist_ok=True)
@@ -118,7 +127,23 @@ for path in [STATIC_ROOT, MEDIA_ROOT]:
 # ------------------------------------------------------------------------------
 # 🔒 CORS & DRF SECURITY
 # ------------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Restrict in production
+# In DEBUG mode, allow local Vite development server. In production, set explicitly.
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # ⚠️ Restrict in production!
+if not DEBUG:
+    # Production: Explicitly allow your frontend domain
+    CORS_ALLOWED_ORIGINS = os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'https://example.com'
+    ).split(',')
+else:
+    # Development: Allow localhost origins for Vite (port 5173) and any localhost variant
+    CORS_ALLOWED_ORIGINS = [
+        'http://127.0.0.1:5173',
+        'http://localhost:5173',
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+    ]
+
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
@@ -128,6 +153,32 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # 📡 AUTO-GENERATED DOCUMENTATION (drf-spectacular)
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# 📚 DRF-SPECTACULAR CONFIGURATION (Auto-generate OpenAPI/Swagger docs)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'BipFlow API',
+    'DESCRIPTION': 'Full-stack asset management system API • Vue 3 + Vite / Django REST Framework',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+    'AUTHENTICATION_WHITELIST': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    # Server definitions for Swagger UI
+    'SERVERS': [
+        {'url': 'http://127.0.0.1:8000', 'description': 'Local Development'},
+        {'url': 'https://api.bipflow.example.com', 'description': 'Production'},
+    ],
+    # Improve readability: group endpoints by tags
+    'TITLE_COMPONENT': 'drf_spectacular.openapi.AutoSchema',
+    # Enable request/response examples from docstrings
+    'EXAMPLES_USE_INSTANCE': True,
+    # Use explicit type hints from ViewSets docstrings
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': True,
+    'ENUM_NAME_CASE': 'upper',
 }
 
 # ------------------------------------------------------------------------------
