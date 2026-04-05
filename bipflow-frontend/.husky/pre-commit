@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Git runs hooks with the repository root as cwd; run checks in this package.
+cd bipflow-frontend && npm run typecheck

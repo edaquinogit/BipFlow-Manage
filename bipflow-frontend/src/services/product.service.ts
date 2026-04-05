@@ -1,5 +1,8 @@
 import api from "./api";
 import { ProductSchema, type Product } from "../schemas/product.schema";
+import { formatDrfErrorPayload } from "@/lib/drfErrors";
+import { productServiceLogger } from "@/lib/logger";
+import type { AxiosError } from "axios";
 
 /**
  * 🛰️ PRODUCT SERVICE (BIPFLOW ENGINE - NYC STANDARD)
@@ -29,7 +32,7 @@ class ProductService {
       }
 
       return validation.data;
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.handleError(err, "Fetch All Assets");
       throw err;
     }
@@ -37,27 +40,31 @@ class ProductService {
 
   /**
    * 🚀 CREATE ASSET (MULTIPART DEPLOYMENT)
-   * Despacha o payload (FormData) para suportar upload de imagens.
+   * Do not set Content-Type manually: axios must add the multipart boundary.
    */
   async create(payload: FormData): Promise<Product> {
     try {
-      const { data } = await api.post(this.endpoint, payload, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const { data, status } = await api.post(this.endpoint, payload);
 
-      // Validação rigorosa no Create para garantir que o objeto novo está correto
+      if (status !== 201) {
+        productServiceLogger.error(
+          { status, data },
+          "Create rejected: expected 201 Created",
+        );
+        throw new Error(`Expected 201 Created, received HTTP ${status}`);
+      }
+
       return ProductSchema.parse(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.handleError(err, "Asset Provisioning");
       throw err;
     }
   }
 
   /**
-   * 🛰️ STRATEGIC UPDATE (PATCH / MULTIPART)
-   * Sincroniza alterações parciais no registro.
+   * 🛰️ STRATEGIC UPDATE (PATCH / MULTIPART or JSON)
+   * Uses FormData only if image is included. Otherwise sends JSON for better SKU handling.
+   * This prevents duplicate SKU constraint violations during partial updates.
    */
   async update(
     id: number,
@@ -65,15 +72,18 @@ class ProductService {
   ): Promise<Product> {
     try {
       const isFormData = productData instanceof FormData;
+      const endpoint = `${this.endpoint}${id}/`;
 
-      const { data } = await api.patch(`${this.endpoint}${id}/`, productData, {
-        headers: {
-          // Deixamos o Axios gerenciar o boundary se for FormData
-          "Content-Type": isFormData
-            ? "multipart/form-data"
-            : "application/json",
-        },
-      });
+      interface AxiosConfig {
+        headers?: Record<string, string>;
+      }
+
+      const config: AxiosConfig = {};
+      if (!isFormData) {
+        config.headers = { "Content-Type": "application/json" };
+      }
+
+      const { data } = await api.patch(endpoint, productData, config);
 
       const validation = ProductSchema.safeParse(data);
 
@@ -86,7 +96,23 @@ class ProductService {
       }
 
       return validation.data;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // Enhanced error logging for SKU conflicts
+      const axiosError = err as AxiosError<Record<string, unknown>>;
+      if (
+        axiosError &&
+        typeof axiosError === "object" &&
+        "response" in axiosError &&
+        axiosError.response?.status === 400
+      ) {
+        const responseData = axiosError.response?.data;
+        if (responseData?.sku) {
+          productServiceLogger.error(
+            { id, error: responseData.sku },
+            "SKU conflict: Product with this SKU already exists",
+          );
+        }
+      }
       this.handleError(err, "Update Sequence");
       throw err;
     }
@@ -94,13 +120,13 @@ class ProductService {
 
   /**
    * 🗑️ PURGE ASSET
-   * Remove permanentemente um ativo do registro.
+   * Remove permanentemente um registro do inventário.
    */
   async delete(id: number): Promise<void> {
     try {
       await api.delete(`${this.endpoint}${id}/`);
       console.log(`🗑️ BipFlow: Asset ${id} purged from registry.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.handleError(err, "Delete Sequence");
       throw err;
     }
@@ -108,27 +134,46 @@ class ProductService {
 
   /**
    * 🛡️ INTERNAL ERROR HANDLER (AUDIT LOG PROTOCOL)
-   * Centraliza a telemetria de erros para debug profissional.
    */
-  private handleError(err: any, context: string) {
-    if (err.name === "ZodError") {
+  private handleError(err: unknown, context: string) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "name" in err &&
+      (err as Error).name === "ZodError"
+    ) {
       console.error(
         `⚠️ [ProductService][${context}] Schema Mismatch:`,
-        err.errors,
+        (err as { errors?: unknown }).errors ?? err,
       );
-    } else if (err.response) {
-      // Erro vindo do Servidor (Django/Node)
-      console.error(
-        `❌ [ProductService][${context}] API Error [${err.response.status}]:`,
-        err.response.data,
-      );
-    } else {
-      // Erro de Rede ou Inesperado
-      console.error(
-        `❌ [ProductService][${context}] Unexpected Failure:`,
-        err.message,
-      );
+      return;
     }
+
+    const ax = err as AxiosError<unknown>;
+    if (ax.response) {
+      const body = ax.response.data;
+      const summary = formatDrfErrorPayload(body);
+      productServiceLogger.error(
+        {
+          context,
+          status: ax.response.status,
+          drf: body,
+          summary,
+        },
+        "DRF request failed",
+      );
+      console.error(
+        `❌ [ProductService][${context}] API Error [${ax.response.status}]`,
+        summary,
+        body,
+      );
+      return;
+    }
+
+    console.error(
+      `❌ [ProductService][${context}] Unexpected Failure:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 

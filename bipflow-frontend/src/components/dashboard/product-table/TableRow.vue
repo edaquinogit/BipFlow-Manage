@@ -36,7 +36,11 @@ const getCategoryName = (category: any): string => {
     
     <td class="px-6 py-4">
       <div class="flex items-center gap-4">
-        <ProductAvatar :image="product.image" :name="product.name" />
+        <ProductAvatar 
+          :key="`${product.id}-${product.updated_at || product.name}`"
+          :image="product.image" 
+          :name="product.name" 
+        />
         
         <div class="flex flex-col">
           <span class="text-sm font-bold text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">

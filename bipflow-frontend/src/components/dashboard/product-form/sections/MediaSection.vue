@@ -5,6 +5,7 @@
  * Foco: Upload Binário, Preview Reativo e Memory Leak Prevention.
  */
 import { ref, watch, onUnmounted } from 'vue';
+import { resolveMediaSrc } from '@/lib/apiBase';
 
 // modelValue: Sincroniza o arquivo (File) ou URL (string) com o Root
 const modelValue = defineModel<string | File | null>();
@@ -27,9 +28,9 @@ watch(modelValue, (newValue) => {
     return;
   }
 
-  // Caso 1: Já é uma string (URL do Cloud/Django)
+  // Caso 1: string da API — resolver origem do backend (evita /media no host do Vite)
   if (typeof newValue === 'string') {
-    imagePreview.value = newValue;
+    imagePreview.value = newValue ? resolveMediaSrc(newValue) : null;
     return;
   }
 

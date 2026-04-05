@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
+import { resolveMediaSrc } from '@/lib/apiBase';
 
 /**
  * 🛰️ BipFlow Registry Interface
@@ -14,12 +15,6 @@ const props = withDefaults(defineProps<AvatarProps>(), {
   image: null,
   size: 'md'
 });
-
-// ==========================================
-// 1. INFRASTRUCTURE & CONSTANTS
-// ==========================================
-// Fallback inteligente para garantir que nunca fiquemos sem a URL do Backend
-const BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 // ==========================================
 // 2. REACTIVE STATE (TELEMETRY)
@@ -52,21 +47,9 @@ const resolvedUrl = computed<string | null>(() => {
   }
 
   // 🌍 CASO B: Asset Remoto (String do Banco de Dados)
+  // Append cache nonce to force browser refresh on updates
   if (typeof props.image === 'string') {
-    // Se a string já for uma URL completa, não mexemos nela
-    if (props.image.startsWith('http') || props.image.startsWith('blob:')) {
-      return props.image;
-    }
-
-    // Garante que o path comece com / mas não duplique
-    const cleanPath = props.image.startsWith('/') ? props.image : `/${props.image}`;
-    
-    // Concatenação robusta: evita http://localhost:8000//media
-    const fullUrl = `${BASE_URL}${cleanPath}`;
-    
-    // Cache Busting: Importante para refletir trocas de imagem no Dashboard
-    const separator = fullUrl.includes('?') ? '&' : '?';
-    return `${fullUrl}${separator}v=${cacheNonce.value}`;
+    return resolveMediaSrc(props.image, cacheNonce.value);
   }
 
   return null;
@@ -112,7 +95,7 @@ const onImageError = (e: Event): void => {
     <transition name="fade" mode="out-in">
       <img 
         v-if="resolvedUrl" 
-        :key="resolvedUrl"
+        :key="`${resolvedUrl}-${cacheNonce}`"
         :src="resolvedUrl" 
         @error="onImageError"
         class="absolute inset-0 h-full w-full object-cover z-10 transition-transform duration-500 group-hover:scale-110" 

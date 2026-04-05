@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, computed, toRef } from 'vue';
 import { ProductSchema, type Product } from '@/schemas/product.schema';
+import { useProductState } from '@/composables/useProductState';
 
 // Sections
 import IdentitySection from '@/components/dashboard/product-form/sections/IdentitySection.vue';
@@ -23,45 +24,24 @@ const emit = defineEmits<{
   (e: 'save', data: Product): void;
 }>();
 
-// --- 🛠️ STATE MANAGEMENT ---
 const isSubmitting = ref(false);
 const errors = ref<Record<string, string[]>>({});
 
-// Factory para estado limpo
-const createEmptyForm = (): Partial<Product> => ({
-  name: '',
-  price: 0,
-  stock_quantity: 0,
-  category: undefined,
-  sku: '',
-  size: '',
-  image: null
-});
-
-const form = ref<any>(createEmptyForm());
-
-/**
- * 🛰️ ENGINE SYNC
- */
-watch(() => props.isOpen, (isVisible) => {
-  if (isVisible) {
-    // Spread para evitar mutação direta e problemas de referência
-    form.value = props.initialData ? { ...props.initialData } : createEmptyForm();
+const { form } = useProductState(
+  toRef(props, 'isOpen'),
+  () => props.initialData ?? null,
+  () => {
     errors.value = {};
-  }
-}, { immediate: true });
+  },
+);
 
-/**
- * 🧠 VALIDATION DISPATCHER
- */
 const handleSubmit = async () => {
   isSubmitting.value = true;
   errors.value = {};
 
-  // Pequeno delay para estabilidade do DOM
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
-  const result = ProductSchema.safeParse(form.value);
+  const result = ProductSchema.safeParse(form);
 
   if (!result.success) {
     errors.value = result.error.flatten().fieldErrors;
@@ -156,7 +136,6 @@ const title = computed(() => props.initialData ? 'Update Asset' : 'New Product')
 </template>
 
 <style scoped>
-/* Transições puras para evitar conflitos de linter */
 .slide-enter-active, 
 .slide-leave-active { 
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); 

@@ -31,7 +31,7 @@
     "test:e2e:run": "start-server-and-test dev http://127.0.0.1:5173 cypress:run",
 
     "// --- INFRA ---": "",
-    "prepare": "husky install"
+    "prepare": "cd .. && husky install bipflow-frontend/.husky"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
