@@ -3,6 +3,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import productService from '@/services/product.service'
 import { categoryService } from '@/services/category.service'
+import { Logger } from '@/services/logger'
+import { isAxiosError, buildErrorContext, type ApplicationError } from '@/types/errors'
 import type { Category } from '@/schemas/category.schema'
 
 const router = useRouter()
@@ -12,37 +14,52 @@ const categories = ref<Category[]>([])
 
 const form = reactive({
   name: '',
-  sku: `BIP-${Math.floor(1000 + Math.random() * 9000)}`, // Gera SKU único inicial
+  sku: `BIP-${Math.floor(1000 + Math.random() * 9000)}`,
   description: '',
   price: 0,
   stock_quantity: 0,
-  category: ''
+  category: '',
 })
 
-onMounted(async () => {
+onMounted(async (): Promise<void> => {
   try {
     const data = await categoryService.getAll()
     categories.value = data
-  } catch (err) {
-    console.error('Falha ao carregar categorias', err)
+  } catch (error: unknown) {
+    Logger.warn(
+      'Failed to load categories for product form',
+      buildErrorContext(error as ApplicationError)
+    )
   }
 })
 
-const handleSubmit = async () => {
+const handleSubmit = async (): Promise<void> => {
   isLoading.value = true
   errorMessage.value = ''
-  
+
   try {
-    const formData = new FormData(); Object.entries(form).forEach(([key, val]) => formData.append(key, String(val))); await productService.create(formData)
-    // Redireciona de volta para a lista após o sucesso
+    const formData = new FormData()
+    Object.entries(form).forEach(([key, val]) => {
+      formData.append(key, String(val))
+    })
+
+    await productService.create(formData)
+    Logger.info('Product created successfully from form')
     router.push({ name: 'dashboard.products' })
-  } catch (error: any) {
-    // Captura o erro específico do SKU ou outros do Django
-    const apiError = error.response?.data
-    if (apiError?.sku) {
-      errorMessage.value = `SKU Error: ${apiError.sku[0]}`
+  } catch (error: unknown) {
+    Logger.error('Product form submission failed', buildErrorContext(error as ApplicationError))
+
+    if (isAxiosError(error)) {
+      const apiError = error.response?.data as Record<string, unknown> | undefined
+      if (apiError?.sku) {
+        errorMessage.value = `SKU Error: ${String(apiError.sku)}`
+      } else if (apiError?.detail) {
+        errorMessage.value = `Error: ${String(apiError.detail)}`
+      } else {
+        errorMessage.value = 'Failed to create product. Please check your data and try again.'
+      }
     } else {
-      errorMessage.value = 'Falha ao salvar produto. Verifique os dados.'
+      errorMessage.value = 'An unexpected error occurred. Please try again.'
     }
   } finally {
     isLoading.value = false
@@ -63,7 +80,7 @@ const handleSubmit = async () => {
     </div>
 
     <form @submit.prevent="handleSubmit" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-900 p-8 rounded-2xl border border-gray-800 shadow-2xl">
-      
+
       <div v-if="errorMessage" class="col-span-full p-4 bg-red-500/10 border border-red-500/50 text-red-500 rounded-xl text-sm mb-4">
         {{ errorMessage }}
       </div>

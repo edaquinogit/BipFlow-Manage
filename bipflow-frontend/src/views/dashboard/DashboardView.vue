@@ -2,7 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
+import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
+import { Logger } from '@/services/logger';
 
 // Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
@@ -13,21 +15,21 @@ import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 /**
  * 🛰️ UI STATE MACHINE
- * Estados visuais e controles de modais.
+ * Visual states and modal controls.
  */
 const isPanelOpen = ref(false);
 const isDeleteModalOpen = ref(false);
 
 /**
  * 💾 DATA CONTEXT
- * Contexto de dados operacionais atuais.
+ * Current operational data context.
  */
 const assetIdToPurge = ref<number | null>(null);
 const selectedProduct = ref<Product | null>(null);
 
 /**
  * ⚙️ ASYNC ACTION STATES
- * Granularidade de loading para não travar a UI inteira durante requisições.
+ * Loading granularity to prevent blocking the entire UI during requests.
  */
 const isSaving = ref(false);
 const isDeletingAction = ref(false);
@@ -35,17 +37,18 @@ const isDeletingAction = ref(false);
 // Composables (Data Layer)
 const {
   loading: productsLoading,
-  error,      
+  error,
   products,
   fetchData,
   createProduct,
-  updateProduct, 
+  updateProduct,
   deleteProduct,
   totalRevenue,
   inventoryStats
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
+const { success, error: toastError } = useToast();
 
 /**
  * 🧠 EVENT HANDLERS (View Controllers)
@@ -56,7 +59,7 @@ const handleOpenNewPanel = () => {
 };
 
 const handleEditRequest = (product: Product) => {
-  // Deep clone preventivo para isolamento de memória
+  // Deep clone to prevent memory reference issues
   selectedProduct.value = { ...product };
   isPanelOpen.value = true;
 };
@@ -68,31 +71,27 @@ const handleClosePanel = () => {
 
 /**
  * 🧹 DATA SANITIZER (Pure Logic)
- * Prepara o payload para o Django, removendo campos calculados e protegendo mídias.
- * @param rawPayload - O objeto vindo do formulário ou estado do Vue
- * @returns Um objeto limpo pronto para o backend
+ * Prepares the payload for Django, removing computed fields and protecting media.
+ * @param rawPayload - The object from form or Vue state
+ * @returns A clean object ready for the backend
  */
-const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, any>) => {
-  // 1. Destructuring: Removemos campos que o Django não aceita no POST/PUT (read-only)
-  // Usamos o rest operator (...) para agrupar apenas o que sobra em 'cleanData'
-  const { 
-    id: _id, 
-    created_at: _ca, 
-    updated_at: _ua, 
-    category_name: _cn, 
-    ...cleanData 
-  } = rawPayload;
+const sanitizePayloadForDjango = (
+  rawPayload: Partial<Product>
+): Partial<Product> => {
+  const {
+    id: _id,
+    created_at: _created_at,
+    updated_at: _updated_at,
+    category_name: _category_name,
+    is_available: _is_available,
+    ...cleanData
+  } = rawPayload as Record<string, unknown>;
 
-  // 2. Asset Media Guard: 
-  // Se 'image' for uma string (URL), significa que o usuário não selecionou um novo arquivo.
-  // Removemos do payload para não tentar sobrescrever o binário com uma string.
   if (typeof cleanData.image === 'string' || !cleanData.image) {
     delete cleanData.image;
   }
 
-  // 3. Normalização de tipos (Opcional, mas profissional)
-  // Garante que valores nulos ou vazios não quebrem o DRF (Django Rest Framework)
-  return JSON.parse(JSON.stringify(cleanData));
+  return JSON.parse(JSON.stringify(cleanData)) as Partial<Product>;
 };
 
 /**
@@ -100,25 +99,24 @@ const sanitizePayloadForDjango = (rawPayload: Partial<Product> & Record<string, 
  */
 const handleSave = async (payload: Partial<Product>) => {
   isSaving.value = true;
-  
+
   try {
     const dataToSync = sanitizePayloadForDjango(payload);
 
     if (selectedProduct.value?.id) {
       await updateProduct(selectedProduct.value.id, dataToSync);
-      console.info(`✅ [BipFlow Core]: Asset ${selectedProduct.value.id} synchronized.`);
+      success('Product updated successfully');
     } else {
       await createProduct(dataToSync);
-      console.info(`🚀 [BipFlow Core]: New asset deployed to registry.`);
+      success('Product created successfully');
     }
-    
+
     // Sincronização de Estado (Resolve o bug do Avatar)
     await fetchData();
     handleClosePanel();
-    
+
   } catch (err) {
-    console.error("❌ [BipFlow Core]: Sync operation failed.", err);
-    // TODO: Disparar Toast Notification de erro aqui no futuro
+    toastError('Failed to save product. Please try again.');
   } finally {
     isSaving.value = false;
   }
@@ -132,16 +130,17 @@ const openDeleteConfirm = (id: number) => {
   isDeleteModalOpen.value = true;
 };
 
-const executeDelete = async () => {
+const executeDelete = async (): Promise<void> => {
   if (!assetIdToPurge.value) return;
-  
+
   isDeletingAction.value = true;
   try {
     await deleteProduct(assetIdToPurge.value);
-    console.info(`🗑️ [BipFlow Core]: Asset ${assetIdToPurge.value} purged.`);
-    await fetchData(); 
-  } catch (err) {
-    console.error("❌ [BipFlow Core]: Purge operation failed.", err);
+    success('Product deleted successfully.');
+    await fetchData();
+  } catch (error: unknown) {
+    Logger.error('Product deletion failed', { error });
+    toastError('Failed to delete product. Please try again.');
   } finally {
     isDeletingAction.value = false;
     isDeleteModalOpen.value = false;
@@ -165,13 +164,13 @@ onMounted(async () => {
     <DashboardHeader />
 
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
-      <StatsGrid 
-        :stats="inventoryStats" 
-        :revenue="totalRevenue" 
+      <StatsGrid
+        :stats="inventoryStats"
+        :revenue="totalRevenue"
         :is-loading="productsLoading"
       />
 
-      <ProductListing 
+      <ProductListing
         :products="products"
         :is-loading="productsLoading"
         :error="error"
@@ -182,16 +181,16 @@ onMounted(async () => {
       />
     </main>
 
-    <ProductForm 
-      :is-open="isPanelOpen" 
+    <ProductForm
+      :is-open="isPanelOpen"
       :initial-data="selectedProduct"
       :categories="categories"
       :is-saving="isSaving"
-      @close="handleClosePanel" 
-      @save="handleSave" 
+      @close="handleClosePanel"
+      @save="handleSave"
     />
 
-    <ConfirmModal 
+    <ConfirmModal
       :show="isDeleteModalOpen"
       title="Confirm Asset Deletion"
       message="This action is irreversible. The asset will be permanently removed from the BipFlow global registry."
