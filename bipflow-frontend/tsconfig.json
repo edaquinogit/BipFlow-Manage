@@ -1,46 +1,51 @@
 {
   "compilerOptions": {
-    /* Base & Target */
+    /* Target & Module Output */
     "target": "ESNext",
-    "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
 
-    /* Bundler Mode (Otimizado para Vite) */
+    /* Module Resolution (Bundler Mode for Vite) */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "preserve",
+    "useDefineForClassFields": true,
 
-    /* Strict Mode & Clean Code */
+    /* Type Checking (Strict Mode - Senior Standard) */
     "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Interoperability & Output Control */
     "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
     "sourceMap": true,
 
-    /* Path Aliases (O coração do BipFlow) */
+    /* JSX & Vue */
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+
+    /* Path Aliases (Project-Wide) */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
 
-    /* Tipagem do Ecossistema */
-    "types": [
-      "vite/client", 
-      "vitest/globals", 
-      "node"
-    ]
+    /* Type Definitions */
+    "types": ["vite/client", "vitest/globals", "node"]
   },
   "include": [
-    "src/**/*.ts", 
-    "src/**/*.d.ts", 
-    "src/**/*.tsx", 
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
     "src/**/*.vue",
+    "env.d.ts",
     "vite.config.ts",
     "vitest.config.ts"
   ],

@@ -89,13 +89,15 @@ describe("useProducts Composable", () => {
       expect(mockLogger.info).toHaveBeenCalled();
 
       // Assertion: The payload sent to service must be FormData
-      const sentPayload = serviceSpy.mock.calls[0][0];
+      const sentPayload = serviceSpy.mock.calls[0]?.[0];
       expect(sentPayload).toBeInstanceOf(FormData);
 
       // Assertion: Verify image file is present in FormData
       const imageInPayload = (sentPayload as FormData).get("image");
       expect(imageInPayload).toBeInstanceOf(File);
-      expect((imageInPayload as File).name).toBe("test-product.png");
+      if (imageInPayload instanceof File) {
+        expect(imageInPayload.name).toBe("test-product.png");
+      }
 
       // Assertion: Verify response includes absolute media URL
       expect(result!.image).toMatch(/^http.*media/);
