@@ -16,20 +16,20 @@ const { CreateOrderSchema } = require('./src/schemas');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Configuração do Banco de Dados ---
+// --- Database Configuration ---
 const isTest = process.env.NODE_ENV === 'test';
 const dbPath = isTest ? ':memory:' : path.resolve(__dirname, 'db.sqlite3');
 let db;
 
 try {
   db = new Database(dbPath);
-  logger.info({ dbPath: isTest ? 'memory' : dbPath }, 'Banco de dados conectado');
+  logger.info({ dbPath: isTest ? 'memory' : dbPath }, 'Database connected');
 } catch (err) {
-  logger.error({ error: err.message }, 'Falha ao conectar ao banco de dados');
+  logger.error({ error: err.message }, 'Failed to connect to database');
   process.exit(1);
 }
 
-// Criação das tabelas (Migration mínima)
+// Table creation (Minimal migration)
 try {
   db.prepare(`
     CREATE TABLE IF NOT EXISTS Orders (
@@ -50,9 +50,9 @@ try {
     )
   `).run();
 
-  logger.debug('Tabelas criadas/verificadas com sucesso');
+  logger.debug('Tables created/verified successfully');
 } catch (err) {
-  logger.error({ error: err.message }, 'Falha ao criar tabelas');
+  logger.error({ error: err.message }, 'Failed to create tables');
   process.exit(1);
 }
 

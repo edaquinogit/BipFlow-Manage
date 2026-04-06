@@ -4,7 +4,7 @@ const path = require('path');
 const dbPath = path.resolve(__dirname, 'database.sqlite');
 const db = new Database(dbPath);
 
-// Criação da tabela
+// Table creation
 db.prepare(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,7 +13,7 @@ db.prepare(`
     )
 `).run();
 
-console.log("Tabela 'users' criada com sucesso usando better-sqlite3!");
+console.log("'users' table created successfully using better-sqlite3!");
 
 // Exemplo de inserção
 const insertUser = db.prepare("INSERT INTO users (name, email) VALUES (?, ?)");

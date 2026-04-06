@@ -1,5 +1,5 @@
 // --- src/config/database.js ---
-// Usando o padrão Singleton para garantir uma única conexão
+// Using the Singleton pattern to ensure a single connection
 import 'dotenv/config';
 
 export const dbConfig = {
@@ -10,13 +10,13 @@ export const dbConfig = {
 };
 
 // --- src/services/mapper.js ---
-// O Mapper é crucial para transformar dados da DB em objetos de domínio (Domain Objects)
-// Isso evita que seu front-end fique acoplado à estrutura da sua tabela SQL.
+// The Mapper is crucial for transforming database data into domain objects
+// This prevents your frontend from being tightly coupled to your SQL table structure.
 export class DataMapper {
   static toDomain(raw) {
     return {
       id: raw.id,
-      flowName: raw.flow_name, // Exemplo de conversão de snake_case para camelCase
+      flowName: raw.flow_name, // Example of snake_case to camelCase conversion
       createdAt: new Date(raw.created_at),
     };
   }
