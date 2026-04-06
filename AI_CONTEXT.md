@@ -116,7 +116,8 @@ Delivery companies need real-time visibility into orders, automatic inventory up
 ## 3. Folder Structure Map
 
 ### Backend (`bipdelivery/`)
-```
+
+```bash
 bipdelivery/
 ├── api/                      # ⭐ Main app: All business logic
 │   ├── models.py             # Database schema (Category, Product)
@@ -141,12 +142,13 @@ bipdelivery/
 ├── db.sqlite3                # Development database (git-ignored)
 ├── requirements.txt          # Python dependencies (pinned versions)
 └── venv/                     # Virtual environment (git-ignored)
-```
+```bash
 
 **Key Insight:** Logic lives in `api/`. Models define the schema, serializers handle JSON conversion and validation, views handle HTTP routing and permissions.
 
 ### Frontend (`bipflow-frontend/`)
-```
+
+```bash
 bipflow-frontend/
 ├── src/
 │   ├── components/           # Reusable Vue components
@@ -204,23 +206,25 @@ bipflow-frontend/
 ├── vitest.config.ts          # Unit test runner config
 ├── package.json              # Node dependencies
 └── tailwind.config.js        # Utility CSS framework config
-```
+```bash
 
 **Key Insight:** Composables are the "brains" (state + logic). Services are the "connectors" (API calls). Components are the "faces" (UI rendering).
 
 ### VS Code Workspace (`.vscode/`)
-```
+
+```bash
 .vscode/
 ├── settings.json             # Python interpreter path, linting rules, testing config
 ├── launch.json               # Debug configurations (Django runserver, pytest, etc.)
 ├── tasks.json                # Development tasks (runserver, migrate, lint, test)
 └── extensions.json           # Recommended extensions (Ruff, Volar, Pylance, etc.)
-```
+```bash
 
 **Key Insight:** Settings auto-select the venv Python interpreter. No manual configuration needed for developers.
 
 ### Root-Level Configuration
-```
+
+```bash
 BipFlow-Oficial/
 ├── README.md                 # **UPDATED** Professional documentation (source of truth)
 ├── AI_CONTEXT.md             # **THIS FILE** AI grounding document
@@ -231,7 +235,7 @@ BipFlow-Oficial/
 ├── docker-compose.yml        # **Optional** Containerization setup
 ├── Dockerfile                # **Optional** Production image
 └── INTEGRATION.md            # Integration & deployment guide
-```
+```bash
 
 ---
 
@@ -243,6 +247,7 @@ BipFlow-Oficial/
 **All functions must have return type annotations.**
 
 ```python
+
 # ✅ GOOD: Explicit types
 def get_image(self, obj: Product) -> Optional[str]:
     """Convert image to absolute URI."""
@@ -261,10 +266,12 @@ def save(self, *args, **kwargs) -> None:
 def save(self, *args, **kwargs):
     self.slug = slugify(self.name)
     super().save(*args, **kwargs)
-```
-
-#### ✅ Docstrings (Google Style)
 ```python
+
+## ✅ Docstrings (Google Style)
+
+```python
+
 # ✅ GOOD
 def create_product(data: Partial[Product]) -> Product:
     """
@@ -281,16 +288,19 @@ def create_product(data: Partial[Product]) -> Product:
     Raises:
         ValidationError: If SKU already exists or required fields missing.
     """
-    # Implementation
-```
 
-#### ✅ Linting Rules
+    # Implementation
+```python
+
+## ✅ Linting Rules
 - **Ruff:** `--select=E,W,F,I,UP,ANN,RUF --ignore=E501,ANN101,ANN102 --line-length=100`
 - **Black:** Line length 100 characters
 - **No:** `any` types, `print()` statements, unused imports, bare except
 
-#### ❌ Forbidden Patterns
+### ❌ Forbidden Patterns
+
 ```python
+
 # ❌ NO: print() for logging
 print("Product created:", product_id)  # Use structured logging instead
 
@@ -305,15 +315,18 @@ except:  # FORBIDDEN - must specify exception type
     pass
 
 # ❌ NO: TODO comments without tracking
+
 # TODO: Add pagination to products endpoint  # FORBIDDEN
 
 # ❌ NO: Portuguese comments mixed with code
+
 # ESSA VIEW É A QUE O VUE VAI CHAMAR  # FORBIDDEN - English only
-```
+```typescript
 
-### Vue 3 / TypeScript Standards
+## Vue 3 / TypeScript Standards
 
-#### ✅ Strict TypeScript
+### ✅ Strict TypeScript
+
 ```typescript
 // ✅ GOOD: Explicit types everywhere
 interface Props {
@@ -336,9 +349,10 @@ const emit = defineEmits<{
 const props = defineProps({
   products: Array as PropType<any>,  // FORBIDDEN
 });
-```
+```bash
 
 #### ✅ Error Handling (No alerts, use Toast)
+
 ```typescript
 // ✅ GOOD: Professional logging + Toast
 import { Logger } from '@/services/logger';
@@ -356,9 +370,10 @@ try {
 // ❌ BAD: alert() and console.log()
 alert("Failed to save");  // FORBIDDEN
 console.log("Error:", err);  // FORBIDDEN
-```
+```python
 
 #### ✅ Composables Pattern
+
 ```typescript
 // ✅ GOOD: Reactive composition
 import { ref, computed } from 'vue';
@@ -385,9 +400,10 @@ export function useProducts() {
 
   return { products, loading, totalRevenue, fetchData };
 }
-```
+```bash
 
-#### ❌ Forbidden Patterns
+#### ❌ Forbidden Patterns (Implementation Examples)
+
 ```typescript
 // ❌ NO: @ts-ignore
 const data: any = response.data;  // @ts-ignore  # FORBIDDEN
@@ -400,42 +416,47 @@ console.log('🚀 Product loaded');  // FORBIDDEN
 
 // ❌ NO: Inline styles
 <div style="color: red;">Error</div>  <!-- FORBIDDEN, use classes -->
-```
+```bash
 
 ### Shared Standards (Python + TypeScript)
 
 #### ✅ Logging (Structured, Professional)
+
 ```python
+
 # Python
 from logger import Logger
 Logger.error('Product fetch failed', {'product_id': 123, 'status': 404})
 Logger.info('Product created', {'sku': 'ABC-123'})
-```
+```bash
 
 ```typescript
 // TypeScript
 import { Logger } from '@/services/logger';
 Logger.error('Product fetch failed', { productId: 123, status: 404 });
 Logger.info('Product created', { sku: 'ABC-123' });
-```
+```python
 
 Output: `[ERROR] Product fetch failed {"productId": 123, "status": 404}`
 
-#### ✅ Error Handling
+## ✅ Error Handling
 - **Backend:** Return DRF Response with proper status codes (400, 401, 403, 500)
 - **Frontend:** Catch errors, log them, show Toast to user
 - **Never crash:** Always have try/finally or .catch() handlers
 
-#### ✅ Comments (English Only, No Emojis)
+### ✅ Comments (English Only, No Emojis)
+
 ```python
-# ✅ GOOD
+
+# ✅ GOOD (Examples)
 def calculate_availability(self) -> bool:
     """Determine if product is available for purchase."""
     return self.stock_quantity > 0
 
 # ❌ BAD
+
 # 🔥 🎯 THIS IS THE CRITICAL FUNCTION  ← NO EMOJI
-```
+```bash
 
 ---
 
@@ -454,7 +475,7 @@ def calculate_availability(self) -> bool:
 ### Commit Message Format
 **Semantic Commits:** `<type>: <description>`
 
-```
+```plaintext
 ✅ GOOD:
 feat: add product image upload with validation
 fix: correct stock availability calculation
@@ -466,13 +487,14 @@ Updated stuff
 Fixed bug
 WIP: working on things
 URGENT: fix this now!!!
-```
+```bash
 
 ### Pre-Commit Checklist
 Before pushing, run:
+
 ```powershell
 .\check-integrity.ps1
-```
+```bash
 
 This validates:
 - ✅ Ruff (Python lint)
@@ -487,7 +509,9 @@ This validates:
 ## 6. Development Workflow (Daily Routine)
 
 ### Starting Work
+
 ```powershell
+
 # 1. Navigate to project
 cd BipFlow-Oficial
 
@@ -499,17 +523,22 @@ git pull origin main
 
 # 4. Create feature branch
 git checkout -b feat/your-feature
-```
-
-### Making Changes
-
-#### Backend Change
 ```bash
+
+## Making Changes
+
+### Backend Change
+
+```bash
+
 # 1. Edit files (models.py, serializers.py, views.py)
+
 # 2. Add type hints & docstrings
+
 # 3. Test locally:
 cd bipdelivery
 python manage.py runserver
+
 # Test endpoints in browser or Postman
 
 # 4. Run linting:
@@ -518,27 +547,34 @@ black . --line-length=100
 
 # 5. Run tests:
 pytest -v --tb=short
-```
-
-#### Frontend Change
 ```bash
+
+## Frontend Change
+
+```bash
+
 # 1. Edit Vue files (components, composables, services)
+
 # 2. Ensure all props/types are explicit
-# 3. Test locally:
+
+# 3. Test locally: (Pre-commit)
 cd bipflow-frontend
 npm run dev
+
 # Test in browser at http://localhost:5173
 
-# 4. Run linting:
+# 4. Run linting: (Pre-commit)
 npm run lint
 
-# 5. Run tests:
+# 5. Run tests: (Pre-commit)
 npm run test
 npm run test:e2e  # If E2E modifications needed
-```
-
-### Committing
 ```bash
+
+## Committing
+
+```bash
+
 # 1. Stage changes
 git add .
 
@@ -550,9 +586,9 @@ git commit -m "feat: add product image upload"
 
 # 4. Push
 git push origin feat/your-feature
-```
+```bash
 
-### Opening PR
+## Opening PR
 1. Push to feature branch
 2. Open PR on GitHub with descriptive title
 3. Link to related issues (if any)
@@ -565,7 +601,9 @@ git push origin feat/your-feature
 ## 7. Common Tasks & Commands
 
 ### Database
+
 ```bash
+
 # Migrations
 python manage.py makemigrations
 python manage.py migrate
@@ -575,10 +613,12 @@ python manage.py shell >>> from api.models import Product >>> Product.objects.al
 
 # Create superuser
 python manage.py createsuperuser
-```
-
-### API Testing
 ```bash
+
+## API Testing
+
+```bash
+
 # Get JWT token
 curl -X POST http://127.0.0.1:8000/api/token/ \
   -H "Content-Type: application/json" \
@@ -587,10 +627,12 @@ curl -X POST http://127.0.0.1:8000/api/token/ \
 # Use token in request
 curl http://127.0.0.1:8000/api/products/ \
   -H "Authorization: Bearer <access_token>"
-```
-
-### Frontend Debugging
 ```bash
+
+## Frontend Debugging
+
+```bash
+
 # Check TypeScript errors
 npx tsc --noEmit
 
@@ -598,11 +640,13 @@ npx tsc --noEmit
 npm run lint
 
 # Debug in browser
+
 # Open DevTools (F12) → Sources tab → Set breakpoints
 
 # Check network requests
+
 # DevTools → Network tab → Filter by XHR
-```
+```bash
 
 ---
 
@@ -611,34 +655,39 @@ npm run lint
 ### ⚠️ Common Mistakes (Don't Do These)
 
 1. **Forgetting to activate venv**
-   ```
+
+```python
    Error: ModuleNotFoundError: No module named 'django'
    Fix: Run bootstrap-env.ps1 first
-   ```
+```bash
 
 2. **Mismatched Python versions**
-   ```
+
+```bash
    Error: syntax errors or import failures
    Fix: Ensure Python 3.11+ (check: python --version)
-   ```
+```bash
 
 3. **Missing .env.local in frontend**
-   ```
+
+```env
    Error: 404 errors calling API
    Fix: Create bipflow-frontend/.env.local with VITE_API_URL
-   ```
+```bash
 
 4. **Stale npm/pip caches**
-   ```
+
+```bash
    Error: Old versions installed despite updates
    Fix: npm ci --clean && pip install --upgrade --force-reinstall -r requirements.txt
-   ```
+```bash
 
 5. **DB migrations not run before API calls**
-   ```
+
+```bash
    Error: Table doesn't exist errors
    Fix: python manage.py migrate before runserver
-   ```
+```bash
 
 ### ⚠️ Performance Notes
 - **Avoid N+1 queries:** Use `select_related()` / `prefetch_related()` in ViewSets
