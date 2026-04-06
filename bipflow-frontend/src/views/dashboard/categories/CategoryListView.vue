@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useCategories } from '@/composables/useCategories';
+import { useToast } from '@/composables/useToast';
 import CategoryForm from '@/components/dashboard/category-form/CategoryForm.vue';
 import type { Category } from '@/schemas/category.schema';
 
 /**
  * --- 1. CORE ENGINE (Infrastructure) ---
  */
-const { 
-  categories, 
-  loading: isFetching, 
+const {
+  categories,
+  loading: isFetching,
   fetchCategories,
   addCategory,
-  deleteCategory 
+  deleteCategory
 } = useCategories();
+
+const { success, error: toastError } = useToast();
 
 /**
  * --- 2. UI STATE MANAGEMENT ---
@@ -38,14 +41,14 @@ const handleSaveCategory = async (categoryData: Partial<Category>) => {
   try {
     isSaving.value = true;
     activeError.value = null;
-    
+
     await addCategory(categoryData);
-    
+
     togglePanel(false);
-    // TODO: Implementar um Toast de sucesso aqui
+    success('Category created successfully');
   } catch (err) {
     activeError.value = "Failed to sync with BipFlow Engine. Please verify your data.";
-    console.error("[BipFlow Exception]:", err);
+    toastError('Failed to save category');
   } finally {
     isSaving.value = false;
   }
@@ -75,7 +78,7 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen bg-zinc-950 text-zinc-200 font-sans selection:bg-indigo-500/30">
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-12">
-      
+
       <header class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
         <div class="space-y-1">
           <h2 class="text-5xl font-black text-white tracking-tighter italic uppercase leading-none">
@@ -89,8 +92,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <button 
-          @click="togglePanel(true)" 
+        <button
+          @click="togglePanel(true)"
           class="group relative bg-white text-black px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all active:scale-95 overflow-hidden"
         >
           <span class="relative z-10">+ New Category</span>
@@ -98,7 +101,7 @@ onMounted(async () => {
       </header>
 
       <section class="relative bg-zinc-900/40 border border-white/5 rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
-        
+
         <div v-if="isFetching" class="absolute inset-0 z-20 bg-zinc-950/60 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
           <div class="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           <p class="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em] animate-pulse">Syncing NYC Hub...</p>
@@ -113,11 +116,11 @@ onMounted(async () => {
                 <th class="px-8 py-5 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
-            
+
             <tbody class="divide-y divide-white/5">
-              <tr 
-                v-for="cat in categories" 
-                :key="cat.id" 
+              <tr
+                v-for="cat in categories"
+                :key="cat.id"
                 class="hover:bg-indigo-500/5 transition-colors group"
               >
                 <td class="px-8 py-6">
@@ -130,7 +133,7 @@ onMounted(async () => {
                     </p>
                   </div>
                 </td>
-                
+
                 <td class="px-8 py-6 text-zinc-400 text-sm max-w-md font-medium">
                   <span v-if="cat.description" class="line-clamp-2 leading-relaxed italic">
                     "{{ cat.description }}"
@@ -145,7 +148,7 @@ onMounted(async () => {
                     <button class="text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest">
                       Edit
                     </button>
-                    <button 
+                    <button
                       @click="confirmDeletion(cat.id)"
                       class="text-zinc-700 hover:text-red-500 text-[10px] font-black uppercase tracking-widest"
                     >
@@ -171,8 +174,8 @@ onMounted(async () => {
       </section>
     </main>
 
-    <CategoryForm 
-      :is-open="isPanelOpen" 
+    <CategoryForm
+      :is-open="isPanelOpen"
       :is-saving="isSaving"
       :error-message="activeError"
       @close="togglePanel(false)"

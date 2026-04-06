@@ -26,10 +26,9 @@ export function useCategories() {
       const data = await categoryService.getAll();
       categories.value = data;
       lastFetched.value = Date.now();
-      console.log("📂 BipFlow: Categories registry synchronized.");
+
     } catch (err) {
       error.value = "Registry connection failed.";
-      console.error("[Category Sync Error]:", err);
     } finally {
       loading.value = false;
     }
@@ -69,7 +68,6 @@ export function useCategories() {
       // Rollback em caso de erro no servidor
       categories.value = previousState;
       error.value = "Decommission failed. Rollback executed.";
-      console.error(err);
     }
   };
 

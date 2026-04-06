@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 /**
- * --- 1. CORE SCHEMA (Modelagem de Leitura) ---
- * Reflete exatamente o que o Django envia no GET.
- * Blindado contra valores nulos e dados inconsistentes.
+ * --- 1. CORE SCHEMA (Read Modeling) ---
+ * Reflects exactly what Django sends in GET.
+ * Protected against null values and inconsistent data.
  */
 export const CategorySchema = z.object({
   id: z.number(),
@@ -11,19 +11,19 @@ export const CategorySchema = z.object({
     .string()
     .min(2, "Category name must have at least 2 characters")
     .max(50, "Category name is too long"),
-  description: z.string().nullable().optional().default(""), // Garantimos uma string vazia para evitar erros de renderização no Vue
+  description: z.string().nullable().optional().default(""), // Ensure empty string to prevent rendering errors in Vue
   slug: z
     .string()
     .nullable()
     .optional()
     .transform((val) => val ?? ""),
   product_count: z.number().int().nonnegative().optional().default(0),
-  created_at: z.string().optional(), // Removido .datetime() se o Django enviar ISO formatada com timezone
+  created_at: z.string().optional(), // Removed .datetime() in case Django sends ISO formatted with timezone
 });
 
 /**
- * --- 2. MUTATION SCHEMA (Modelagem de Escrita) ---
- * Omitimos os campos que são de responsabilidade exclusiva do Backend.
+ * --- 2. MUTATION SCHEMA (Write Modeling) ---
+ * Omit fields that are exclusively the Backend's responsibility.
  */
 export const CategoryCreateSchema = CategorySchema.omit({
   id: true,
