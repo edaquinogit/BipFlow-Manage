@@ -4,19 +4,19 @@ export default defineConfig({
   e2e: {
     // 🌐 NETWORK & HOSTS
     baseUrl: "http://127.0.0.1:5173",
-    
-    // 📂 ESTRUTURA DE ARQUIVOS (Maturidade de Projeto)
+
+    // 📂 FILE STRUCTURE (Project Maturity)
     specPattern: "bipflow-frontend/cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
-    
-    // 🎯 O AJUSTE QUE FALTAVA: Mapeia a pasta de assets para o upload
+
+    // 🎯 CRITICAL ADJUSTMENT: Maps assets folder for upload
     fixturesFolder: "bipflow-frontend/cypress/fixtures",
-    
-    // 🔌 CONFIGURAÇÃO DE SUPORTE
+
+    // 🔌 SUPPORT CONFIGURATION
     supportFile: "bipflow-frontend/cypress/support/e2e.ts",
 
     // 🛡️ SECURITY & ASSETS PROTOCOL
-    chromeWebSecurity: false, 
-    
+    chromeWebSecurity: false,
+
     // 📹 OUTPUT & DEBUG
     video: false,
     screenshotOnRunFailure: true,

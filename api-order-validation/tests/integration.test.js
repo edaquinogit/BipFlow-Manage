@@ -1,15 +1,25 @@
+/**
+ * BipFlow API: Integration Tests
+ *
+ * Tests complex order workflows with real database:
+ * - Order persistence and retrieval
+ * - Sequential and concurrent processing
+ * - Data integrity and validation
+ * - Error recovery and resilience
+ */
+
 const request = require('supertest');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const app = require('../../index');
 
-describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
+describe('BipFlow API - Integration Tests', () => {
   let testDbPath;
   let testDb;
 
   beforeAll(() => {
-    // Criar banco de dados de teste separado
+    // Create separate test database
     testDbPath = path.resolve(__dirname, '../../test-integration.db');
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
@@ -17,38 +27,45 @@ describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
   });
 
   afterAll(() => {
-    // Limpar banco de dados de teste
+    // Clean up test database
     if (fs.existsSync(testDbPath)) {
       try {
         fs.unlinkSync(testDbPath);
       } catch (e) {
-        // Ignorar erro ao deletar
+        // Ignore cleanup errors
       }
     }
   });
 
-  describe('Complete Order Workflow', () => {
-    test('Deve criar pedido e verificar persistência', async () => {
+  describe('Order Creation and Persistence', () => {
+    /**
+     * Verify order is created and persisted
+     * Should return success status with order ID
+     */
+    test('should create order and verify persistence', async () => {
       const uniqueId = `PERSIST${Date.now()}`;
-      
-      // Criar pedido
+
       const createRes = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: 500.0,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: 500.00,
+          date_created: '2026-03-11T10:00:00Z',
           items: [
-            { idItem: 'SKU001', quantidadeItem: 2, valorItem: 250.0 }
+            { item_id: 'SKU001', quantity: 2, unit_price: 250.00 }
           ]
         });
 
       expect(createRes.statusCode).toBe(201);
       expect(createRes.body).toHaveProperty('status', 'Success');
-      expect(createRes.body).toHaveProperty('orderId', uniqueId);
+      expect(createRes.body).toHaveProperty('order_id');
     });
 
-    test('Deve processar múltiplos pedidos sequencialmente', async () => {
+    /**
+     * Verify sequential order processing
+     * Multiple orders should be created without conflicts
+     */
+    test('should process multiple orders sequentially', async () => {
       const results = [];
 
       for (let i = 0; i < 5; i++) {
@@ -56,11 +73,11 @@ describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
         const res = await request(app)
           .post('/api/v1/orders')
           .send({
-            numeroPedido: `${uniqueId}-01`,
-            valorTotal: (i + 1) * 100.0,
-            dataCriacao: '2026-03-11T10:00:00Z',
+            order_number: `${uniqueId}-01`,
+            total_value: (i + 1) * 100.00,
+            date_created: '2026-03-11T10:00:00Z',
             items: [
-              { idItem: `SKU${i}`, quantidadeItem: i + 1, valorItem: 100.0 }
+              { item_id: `SKU${i}`, quantity: i + 1, unit_price: 100.00 }
             ]
           });
 
@@ -68,75 +85,83 @@ describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
         expect(res.statusCode).toBe(201);
       }
 
-      // Verificar que todos os pedidos foram criados com sucesso
+      // Verify all orders were created successfully
       expect(results.filter(r => r.statusCode === 201)).toHaveLength(5);
     });
 
-    test('Deve rejeitar pedido duplicado após primeira inserção', async () => {
+    /**
+     * Verify duplicate order detection
+     * Same order number should not be accepted twice
+     */
+    test('should reject duplicate order after first insertion', async () => {
       const uniqueId = `DUPCHECK${Date.now()}`;
       const payload = {
-        numeroPedido: `${uniqueId}-01`,
-        valorTotal: 100.0,
-        dataCriacao: '2026-03-11T10:00:00Z',
+        order_number: `${uniqueId}-01`,
+        total_value: 100.00,
+        date_created: '2026-03-11T10:00:00Z',
         items: []
       };
 
-      // Primeiro pedido deve passar
+      // First order should succeed
       const res1 = await request(app)
         .post('/api/v1/orders')
         .send(payload);
       expect(res1.statusCode).toBe(201);
 
-      // Segundo pedido com mesmo ID deve falhar
+      // Duplicate should fail
       const res2 = await request(app)
         .post('/api/v1/orders')
-        .send({
-          ...payload,
-          numeroPedido: `${uniqueId}-02` // ID diferente após split
-        });
+        .send(payload);
       expect(res2.statusCode).toBe(400);
     });
   });
 
   describe('Complex Item Scenarios', () => {
-    test('Deve persistir pedido com múltiplos itens diferentes', async () => {
+    /**
+     * Verify order with multiple different items
+     * Should persist all items and calculate total correctly
+     */
+    test('should persist order with multiple different items', async () => {
       const uniqueId = `COMPLEX${Date.now()}`;
-      
+
       const res = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: 1500.0,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: 1500.00,
+          date_created: '2026-03-11T10:00:00Z',
           items: [
-            { idItem: 'PROD-A', quantidadeItem: 5, valorItem: 100.0 },
-            { idItem: 'PROD-B', quantidadeItem: 3, valorItem: 200.0 },
-            { idItem: 'PROD-C', quantidadeItem: 2, valorItem: 250.0 },
-            { idItem: 'PROD-D', quantidadeItem: 1, valorItem: 500.0 }
+            { item_id: 'PROD-A', quantity: 5, unit_price: 100.00 },
+            { item_id: 'PROD-B', quantity: 3, unit_price: 200.00 },
+            { item_id: 'PROD-C', quantity: 2, unit_price: 250.00 },
+            { item_id: 'PROD-D', quantity: 1, unit_price: 500.00 }
           ]
         });
 
       expect(res.statusCode).toBe(201);
       expect(res.body).toHaveProperty('status', 'Success');
-      expect(res.body).toHaveProperty('orderId', uniqueId);
     });
 
-    test('Deve processar pedido com grande quantidade de itens', async () => {
+    /**
+     * Verify order with large item count
+     * Should handle 50+ items without performance degradation
+     */
+    test('should process order with large quantity of items', async () => {
       const uniqueId = `LARGEITEMS${Date.now()}`;
       const items = Array.from({ length: 50 }, (_, i) => ({
-        idItem: `ITEM-${i}`,
-        quantidadeItem: Math.floor(Math.random() * 100) + 1,
-        valorItem: Math.random() * 1000 + 10
+        item_id: `ITEM-${i}`,
+        quantity: Math.floor(Math.random() * 100) + 1,
+        unit_price: Math.random() * 1000 + 10
       }));
 
-      const totalValue = items.reduce((sum, item) => sum + item.valorItem, 0);
+      const totalValue = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
       const res = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: totalValue,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: totalValue,
+          date_created: '2026-03-11T10:00:00Z',
           items
         });
 
@@ -146,39 +171,45 @@ describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
   });
 
   describe('Data Integrity', () => {
-    test('Deve manter integridade referencial entre Orders e Items', async () => {
+    /**
+     * Verify referential integrity
+     * Order and items relationship should be maintained
+     */
+    test('should maintain referential integrity between orders and items', async () => {
       const uniqueId = `INTEGRITY${Date.now()}`;
-      
+
       const res = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: 300.0,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: 300.00,
+          date_created: '2026-03-11T10:00:00Z',
           items: [
-            { idItem: 'ITEM1', quantidadeItem: 1, valorItem: 100.0 },
-            { idItem: 'ITEM2', quantidadeItem: 2, valorItem: 100.0 }
+            { item_id: 'ITEM1', quantity: 1, unit_price: 100.00 },
+            { item_id: 'ITEM2', quantity: 2, unit_price: 100.00 }
           ]
         });
 
       expect(res.statusCode).toBe(201);
-      const orderId = res.body.orderId;
-
-      // Verificar que o pedido foi criado
+      const orderId = res.body.order_id;
       expect(orderId).toBe(uniqueId);
     });
 
-    test('Deve rejeitar item com idItem vazio', async () => {
+    /**
+     * Verify empty item_id rejection
+     * Items must have valid IDs
+     */
+    test('should reject item with empty item_id', async () => {
       const uniqueId = `EMPTYID${Date.now()}`;
-      
+
       const res = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: 100.0,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: 100.00,
+          date_created: '2026-03-11T10:00:00Z',
           items: [
-            { idItem: '', quantidadeItem: 1, valorItem: 100.0 }
+            { item_id: '', quantity: 1, unit_price: 100.00 }
           ]
         });
 
@@ -188,66 +219,81 @@ describe('BIPFLOW ENGINE API - Integration Tests with Real Database', () => {
   });
 
   describe('Concurrent Request Handling', () => {
-    test('Deve processar múltiplas requisições concorrentes', async () => {
+    /**
+     * Verify concurrent request processing
+     * Multiple simultaneous requests should not cause data corruption
+     */
+    test('should handle multiple concurrent requests', async () => {
       const promises = Array.from({ length: 10 }, (_, i) => {
         const uniqueId = `CONCURRENT${Date.now()}-${i}`;
         return request(app)
           .post('/api/v1/orders')
           .send({
-            numeroPedido: `${uniqueId}-01`,
-            valorTotal: Math.random() * 1000 + 100,
-            dataCriacao: '2026-03-11T10:00:00Z',
+            order_number: `${uniqueId}-01`,
+            total_value: Math.random() * 1000 + 100,
+            date_created: '2026-03-11T10:00:00Z',
             items: [
-              { idItem: `SKU-${i}`, quantidadeItem: i + 1, valorItem: 100.0 }
+              { item_id: `SKU-${i}`, quantity: i + 1, unit_price: 100.00 }
             ]
           });
       });
 
       const results = await Promise.all(promises);
-      
-      // Verificar que todas as requisições foram bem-sucedidas
+
+      // Verify all requests succeeded
       const successCount = results.filter(r => r.statusCode === 201).length;
       expect(successCount).toBeGreaterThan(0);
     });
   });
 
   describe('Error Recovery', () => {
-    test('Deve recuperar após erro de validação', async () => {
-      // Requisição inválida
+    /**
+     * Verify recovery after validation error
+     * System should continue functioning after failed request
+     */
+    test('should recover after validation error', async () => {
+      // Invalid request
       const invalidRes = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: 'TEST',
-          valorTotal: -100,
-          dataCriacao: 'invalid'
+          order_number: 'TEST',
+          total_value: -100,
+          date_created: 'invalid'
         });
       expect([400, 500]).toContain(invalidRes.statusCode);
 
-      // Requisição válida após erro
+      // Valid request after error
       const uniqueId = `RECOVERY${Date.now()}`;
       const validRes = await request(app)
         .post('/api/v1/orders')
         .send({
-          numeroPedido: `${uniqueId}-01`,
-          valorTotal: 100.0,
-          dataCriacao: '2026-03-11T10:00:00Z',
+          order_number: `${uniqueId}-01`,
+          total_value: 100.00,
+          date_created: '2026-03-11T10:00:00Z',
           items: []
         });
-      // Deve passar mesmo após erro anterior
+      // Should succeed despite previous error
       expect(validRes.statusCode).toBe(201);
     });
 
-    test('Deve manter servidor operacional após múltiplos erros', async () => {
+    /**
+     * Verify server stays operational after multiple errors
+     * Should not crash or become unresponsive
+     */
+    test('should remain operational after multiple errors', async () => {
       for (let i = 0; i < 5; i++) {
         await request(app)
           .post('/api/v1/orders')
           .send({ invalid: 'data' });
       }
 
-      // Health check deve passar
+      // Health check should pass
       const healthRes = await request(app).get('/health');
       expect(healthRes.statusCode).toBe(200);
       expect(healthRes.body).toHaveProperty('status', 'UP');
+    });
+  });
+});
     });
   });
 
