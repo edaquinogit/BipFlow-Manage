@@ -6,7 +6,7 @@ export default {
   ],
   theme: {
     extend: {
-      // O BipFlow usa a paleta Zinc e Indigo por padrão
+      // BipFlow uses Zinc and Indigo palette by default
     },
   },
   plugins: [],

@@ -11,24 +11,24 @@ module.exports = {
   ],
   parserOptions: {
     ecmaVersion: 'latest',
-    // 🎯 O Fix Principal: O parser do Vue deve envolver o do TypeScript
+    // 🎯 CRITICAL FIX: Vue parser must wrap TypeScript parser
     parser: '@typescript-eslint/parser',
     sourceType: 'module'
   },
   rules: {
-    // Silencia variáveis não usadas que começam com "_"
+    // Silence unused variables starting with "_"
     '@typescript-eslint/no-unused-vars': ['error', { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
-    
-    // Permite console.log em desenvolvimento
+
+    // Allow console.log in development
     'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
-    
-    // Resolve o erro de escape no seu schema de produtos
+
+    // Resolve escape sequencing issues in product schema
     'no-useless-escape': 'off',
-    
-    // Resolve o erro do empty object "{}" no shims-vue.d.ts
+
+    // Resolve empty object "{}" error in shims-vue.d.ts
     '@typescript-eslint/no-empty-object-type': 'off',
 
-    // Desativa a regra que exige nomes de componentes com múltiplas palavras (opcional)
+    // Disable rule requiring multi-word component names (optional)
     'vue/multi-word-component-names': 'off'
   }
 }
