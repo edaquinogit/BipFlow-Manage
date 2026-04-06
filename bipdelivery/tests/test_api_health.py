@@ -16,6 +16,7 @@ Run tests with:
 """
 
 from decimal import Decimal
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -27,6 +28,10 @@ from api.models import Category, Product
 
 class CategoryAPIHealthTest(TestCase):
     """Test Category endpoints are functioning."""
+
+    client: APIClient
+    user: User
+    category: Category
 
     def setUp(self) -> None:
         """Initialize test client and create test data."""
@@ -40,20 +45,20 @@ class CategoryAPIHealthTest(TestCase):
 
     def test_category_list_requires_auth(self) -> None:
         """Categories endpoint should require authentication."""
-        response = self.client.get('/api/v1/categories/')
+        response: Any = self.client.get('/api/v1/categories/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_category_list_returns_200_authenticated(self) -> None:
         """Categories list should return 200 when authenticated."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get('/api/v1/categories/')
+        response: Any = self.client.get('/api/v1/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.data, list)
 
     def test_category_list_contains_data(self) -> None:
         """Categories list should contain created category."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get('/api/v1/categories/')
+        response: Any = self.client.get('/api/v1/categories/')
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['name'], 'Electronics')
 
@@ -61,14 +66,14 @@ class CategoryAPIHealthTest(TestCase):
         """Should create category via POST endpoint."""
         self.client.force_authenticate(user=self.user)
         payload = {'name': 'Books', 'slug': 'books'}
-        response = self.client.post('/api/v1/categories/', payload, format='json')
+        response: Any = self.client.post('/api/v1/categories/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'Books')
 
     def test_category_retrieve(self) -> None:
         """Should retrieve category by ID."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/api/v1/categories/{self.category.id}/')
+        response: Any = self.client.get(f'/api/v1/categories/{self.category.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Electronics')
 
@@ -76,8 +81,8 @@ class CategoryAPIHealthTest(TestCase):
         """Should update category via PUT endpoint."""
         self.client.force_authenticate(user=self.user)
         payload = {'name': 'Updated Electronics'}
-        response = self.client.put(
-            f'/api/v1/categories/{self.category.id}/',
+        response: Any = self.client.put(
+            f'/api/v1/categories/{self.category.id}/',  # type: ignore
             payload,
             format='json'
         )
@@ -87,13 +92,18 @@ class CategoryAPIHealthTest(TestCase):
     def test_category_delete(self) -> None:
         """Should delete category via DELETE endpoint."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.delete(f'/api/v1/categories/{self.category.id}/')
+        response: Any = self.client.delete(f'/api/v1/categories/{self.category.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Category.objects.filter(id=self.category.id).exists())
+        self.assertFalse(Category.objects.filter(id=self.category.id).exists())  # type: ignore
 
 
 class ProductAPIHealthTest(TestCase):
     """Test Product endpoints are functioning."""
+
+    client: APIClient
+    user: User
+    category: Category
+    product: Product
 
     def setUp(self) -> None:
         """Initialize test client and create test data."""
@@ -114,34 +124,34 @@ class ProductAPIHealthTest(TestCase):
 
     def test_product_list_requires_auth(self) -> None:
         """Products endpoint should require authentication."""
-        response = self.client.get('/api/v1/products/')
+        response: Any = self.client.get('/api/v1/products/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_product_list_returns_200_authenticated(self) -> None:
         """Products list should return 200 when authenticated."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get('/api/v1/products/')
+        response: Any = self.client.get('/api/v1/products/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.data, list)
 
     def test_product_list_contains_data(self) -> None:
         """Products list should contain created product."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get('/api/v1/products/')
+        response: Any = self.client.get('/api/v1/products/')
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['name'], 'Laptop')
 
     def test_product_includes_category_name(self) -> None:
         """Product response should include denormalized category_name."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/api/v1/products/{self.product.id}/')
+        response: Any = self.client.get(f'/api/v1/products/{self.product.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['category_name'], 'Electronics')
 
     def test_product_availability_calculated(self) -> None:
         """Product should have is_available=True when stock > 0."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/api/v1/products/{self.product.id}/')
+        response: Any = self.client.get(f'/api/v1/products/{self.product.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['is_available'])
 
@@ -150,7 +160,7 @@ class ProductAPIHealthTest(TestCase):
         self.product.stock_quantity = 0
         self.product.save()
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/api/v1/products/{self.product.id}/')
+        response: Any = self.client.get(f'/api/v1/products/{self.product.id}/')  # type: ignore
         self.assertFalse(response.data['is_available'])
 
     def test_product_create(self) -> None:
@@ -161,12 +171,12 @@ class ProductAPIHealthTest(TestCase):
             'sku': 'DES-001',
             'price': '1299.99',
             'stock_quantity': 3,
-            'category': self.category.id,
+            'category': self.category.id,  # type: ignore
         }
-        response = self.client.post('/api/v1/products/', payload, format='json')
+        response: Any = self.client.post('/api/v1/products/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'Desktop')
-        self.assertIsNotNone(response.data['slug'])  # Auto-generated
+        self.assertIsNotNone(response.data['slug'])
 
     def test_product_create_auto_generates_slug(self) -> None:
         """Product slug should be auto-generated if not provided."""
@@ -176,16 +186,16 @@ class ProductAPIHealthTest(TestCase):
             'sku': 'PHN-001',
             'price': '599.99',
             'stock_quantity': 10,
-            'category': self.category.id,
+            'category': self.category.id,  # type: ignore
         }
-        response = self.client.post('/api/v1/products/', payload, format='json')
-        self.assertIn('phone', response.data['slug'])  # Should contain name
-        self.assertRegex(response.data['slug'], r'^phone-[a-f0-9]{8}$')  # With UUID
+        response: Any = self.client.post('/api/v1/products/', payload, format='json')
+        self.assertIn('phone', response.data['slug'])
+        self.assertRegex(response.data['slug'], r'^phone-[a-f0-9]{8}$')
 
     def test_product_retrieve(self) -> None:
         """Should retrieve product by ID."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(f'/api/v1/products/{self.product.id}/')
+        response: Any = self.client.get(f'/api/v1/products/{self.product.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Laptop')
 
@@ -193,8 +203,8 @@ class ProductAPIHealthTest(TestCase):
         """Should update product via PUT endpoint."""
         self.client.force_authenticate(user=self.user)
         payload = {'name': 'Updated Laptop', 'stock_quantity': 8}
-        response = self.client.put(
-            f'/api/v1/products/{self.product.id}/',
+        response: Any = self.client.put(
+            f'/api/v1/products/{self.product.id}/',  # type: ignore
             payload,
             format='json'
         )
@@ -205,17 +215,16 @@ class ProductAPIHealthTest(TestCase):
     def test_product_delete(self) -> None:
         """Should delete product via DELETE endpoint."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.delete(f'/api/v1/products/{self.product.id}/')
+        response: Any = self.client.delete(f'/api/v1/products/{self.product.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Product.objects.filter(id=self.product.id).exists())
+        self.assertFalse(Product.objects.filter(id=self.product.id).exists())  # type: ignore
 
     def test_product_delete_with_category_protect(self) -> None:
         """Deleting category with products should fail (PROTECT)."""
         self.client.force_authenticate(user=self.user)
-        response = self.client.delete(f'/api/v1/categories/{self.category.id}/')
-        # Should fail because Product has ForeignKey with on_delete=PROTECT
+        response: Any = self.client.delete(f'/api/v1/categories/{self.category.id}/')  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Category.objects.filter(id=self.category.id).exists())
+        self.assertTrue(Category.objects.filter(id=self.category.id).exists())  # type: ignore
 
 
 class DjangoHealthTest(TestCase):
@@ -226,7 +235,7 @@ class DjangoHealthTest(TestCase):
         # Creating and retrieving from DB proves connection
         user = User.objects.create_user(username='dbtest', password='pass')
         retrieved = User.objects.get(username='dbtest')
-        self.assertEqual(user.id, retrieved.id)
+        self.assertEqual(user.id, retrieved.id)  # type: ignore
 
     def test_django_migrations_applied(self) -> None:
         """All migrations should be applied (tables exist)."""
