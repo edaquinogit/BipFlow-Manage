@@ -15,15 +15,24 @@ Run tests with:
     pytest tests/test_api_health.py -v (if using pytest)
 """
 
+import os
 from decimal import Decimal
 from typing import Any
 
+import django
+import pytest
 from django.contrib.auth.models import User
 from django.test import TestCase
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
+
+# Set environment variable for standalone execution
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django.setup()
 
 from api.models import Category, Product
+
+pytestmark = pytest.mark.django_db
 
 
 class CategoryAPIHealthTest(TestCase):

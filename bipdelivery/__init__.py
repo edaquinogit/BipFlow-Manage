@@ -1,0 +1,1 @@
+"""BipFlow delivery Django project."""
