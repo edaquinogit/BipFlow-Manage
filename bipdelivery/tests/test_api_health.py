@@ -26,11 +26,11 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-# Set environment variable for standalone execution
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+# Configure Django before importing models (required for app initialization)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bipdelivery.core.settings')
 django.setup()
 
-from api.models import Category, Product
+from bipdelivery.api.models import Category, Product  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
@@ -256,7 +256,7 @@ class DjangoHealthTest(TestCase):
         """Django settings should be properly loaded."""
         from django.conf import settings
         self.assertIsNotNone(settings.INSTALLED_APPS)
-        self.assertIn('api', settings.INSTALLED_APPS)
+        self.assertIn('bipdelivery.api.apps.ApiConfig', settings.INSTALLED_APPS)
         self.assertIn('rest_framework', settings.INSTALLED_APPS)
 
     def test_drf_authentication_configured(self) -> None:

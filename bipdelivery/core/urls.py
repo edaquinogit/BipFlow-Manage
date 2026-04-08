@@ -1,7 +1,7 @@
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
 
 urlpatterns = [
     # 🔐 ADMINISTRATIVE INTERFACE
@@ -9,7 +9,7 @@ urlpatterns = [
 
     # 🚀 API GATEWAY (Versioned)
     # Centraliza todas as rotas de negócio e autenticação
-    path('api/', include('api.urls')),
+    path('api/', include('bipdelivery.api.urls')),
 ]
 
 # 🖼️ STATIC & MEDIA ASSETS

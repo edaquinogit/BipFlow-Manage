@@ -8,6 +8,7 @@ python-dotenv==1.0.0
 pytest==7.4.0
 pytest-django==4.5.2
 pytest-cov==4.1.0
+Pillow
 
 # Code Quality
 ruff==0.1.5

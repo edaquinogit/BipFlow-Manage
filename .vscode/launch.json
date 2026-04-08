@@ -1,0 +1,72 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚀 Django: runserver",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/bipdelivery/manage.py",
+      "args": [
+        "runserver",
+        "0.0.0.0:8000"
+      ],
+      "django": true,
+      "justMyCode": true,
+      "console": "integratedTerminal",
+      "stopOnEntry": false,
+      "env": {
+        "DJANGO_SETTINGS_MODULE": "core.settings"
+      }
+    },
+    {
+      "name": "🧪 pytest: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/bipdelivery/../venv/Scripts/pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "-s"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "🧪 pytest: All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/bipdelivery/../venv/Scripts/pytest",
+      "args": [
+        "bipdelivery",
+        "-v",
+        "--tb=short",
+        "--cov=bipdelivery"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "🔧 Django: Shell",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/bipdelivery/manage.py",
+      "args": [
+        "shell"
+      ],
+      "django": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🗄️ Django: Migrations",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/bipdelivery/manage.py",
+      "args": [
+        "migrate"
+      ],
+      "django": true,
+      "console": "integratedTerminal",
+      "stopOnEntry": true
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/bipdelivery/venv/Scripts/python.exe",
+  "python.terminal.executeInFileDir": false,
+  "python.terminal.focusAfterLaunch": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.lint.run": "onSave",
+  "ruff.lint.args": [
+    "--select=E,W,F,I,UP,ANN,RUF",
+    "--ignore=E501,ANN101,ANN102",
+    "--line-length=100"
+  ],
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [
+    "bipdelivery",
+    "-v",
+    "--tb=short",
+    "--strict-markers"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": true,
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
+    "reportUndefinedVariable": "error",
+    "reportGeneralTypeIssues": "error",
+    "reportOptionalMemberAccess": "warning"
+  },
+  "python.debugging.debugJustMyCode": true,
+  "python.debugging.showReturnValue": true,
+
+  "editor.rulers": [88, 100],
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+  "editor.trimAutoWhitespace": true,
+  "editor.wordWrap": "on",
+  "editor.semanticHighlighting.enabled": true,
+
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true,
+    "**/venv": false
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/node_modules": true,
+    "**/venv": false,
+    "**/.venv": true,
+    "**/dist": true
+  },
+
+  "git.autofetch": true,
+  "git.autorefresh": true,
+
+  "gitlens.advanced.messages": {
+    "suppressShowKeyBindingsNotice": true
+  },
+
+  "extensions.recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-python.black-formatter",
+    "eamodio.gitlens",
+    "ms-vscode.makefile-tools",
+    "GitKraken.gitkraken-for-github"
+  ]
+}

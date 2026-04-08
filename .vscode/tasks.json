@@ -1,0 +1,101 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🔧 Bootstrap Environment",
+      "type": "shell",
+      "command": ".\\bootstrap-env.ps1",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "🚀 Django: Start Server",
+      "type": "shell",
+      "command": "cd bipdelivery; python manage.py runserver",
+      "problemMatcher": ["$python"],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🗄️ Django: Run Migrations",
+      "type": "shell",
+      "command": "cd bipdelivery; python manage.py migrate",
+      "problemMatcher": ["$python"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🧑‍💻 Django: Create Superuser",
+      "type": "shell",
+      "command": "cd bipdelivery; python manage.py createsuperuser",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🧪 Run All Tests",
+      "type": "shell",
+      "command": "cd bipdelivery; python -m pytest -v --tb=short",
+      "problemMatcher": ["$python"],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "✨ Lint & Format Code",
+      "type": "shell",
+      "command": "cd bipdelivery; python -m ruff check . --fix && python -m black . --line-length=100",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "📊 Check Code Quality",
+      "type": "shell",
+      "command": "cd bipdelivery; python -m ruff check . --statistics",
+      "problemMatcher": ["$python"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🧹 Clean Python Cache",
+      "type": "shell",
+      "command": "Get-ChildItem -Recurse -Include __pycache__,.pytest_cache,.ruff_cache,*.pyc | Remove-Item -Recurse -Force",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "new"
+      }
+    }
+  ]
+}

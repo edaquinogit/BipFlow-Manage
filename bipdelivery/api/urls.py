@@ -1,10 +1,7 @@
-from django.urls import path, include
+from django.urls import include, path
 
 # 🛰️ JWT AUTHENTICATION VIEWS
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView, 
-    TokenRefreshView
-)
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 app_name = 'api'
 
@@ -16,5 +13,5 @@ urlpatterns = [
 
     # 🚀 BUSINESS DOMAIN (V1)
     # Protege a lógica de negócio com versionamento explícito
-    path('v1/', include('api.v1_urls')),
+    path('v1/', include('bipdelivery.api.v1_urls')),
 ]

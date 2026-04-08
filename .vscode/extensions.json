@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-python.black-formatter",
+    "eamodio.gitlens",
+    "ms-vscode.makefile-tools",
+    "GitKraken.gitkraken-for-github",
+    "ms-python.debugpy",
+    "ms-vscode-remote.remote-containers",
+    "ms-vscode-remote.remote-wsl",
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "esbenp.prettier-vscode",
+    "bierner.markdown-preview-github-styles"
+  ]
+}

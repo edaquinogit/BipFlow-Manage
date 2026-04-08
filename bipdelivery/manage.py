@@ -2,11 +2,18 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
 
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+    # Add parent directory to Python path so 'bipdelivery' module can be imported
+    current_dir = Path(__file__).resolve().parent
+    parent_dir = current_dir.parent
+    if str(parent_dir) not in sys.path:
+        sys.path.insert(0, str(parent_dir))
+
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bipdelivery.core.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

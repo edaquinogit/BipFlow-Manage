@@ -1,6 +1,7 @@
+
 from rest_framework import serializers
-from typing import Optional
-from .models import Product, Category
+
+from .models import Category, Product
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -20,7 +21,6 @@ class ProductSerializer(serializers.ModelSerializer):
     """
 
     category_name = serializers.ReadOnlyField(source='category.name')
-    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -29,21 +29,18 @@ class ProductSerializer(serializers.ModelSerializer):
             'price', 'size', 'stock_quantity', 'is_available',
             'image', 'category', 'category_name', 'created_at'
         ]
+        read_only_fields = ['id', 'slug', 'created_at', 'category_name']
 
-    def get_image(self, obj: Product) -> Optional[str]:
+    def to_representation(self, instance):
         """
-        Convert relative image URL to absolute URI for API response.
+        Override to_representation to return absolute URL for image field.
 
-        Args:
-            obj: Product instance being serialized.
-
-        Returns:
-            Absolute image URI if image exists and request context available,
-            relative image URL as fallback, or None if no image.
+        Converts the relative image path to an absolute URL for API responses.
         """
-        if obj.image:
-            request = self.context.get('request')
-            if request is not None:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
-        return None
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+
+        if instance.image and request is not None:
+            data['image'] = request.build_absolute_uri(instance.image.url)
+
+        return data

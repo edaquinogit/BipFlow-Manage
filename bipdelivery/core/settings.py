@@ -35,8 +35,8 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'api.apps.ApiConfig',
-    'core',
+    'bipdelivery.api.apps.ApiConfig',
+    'bipdelivery.core',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -55,8 +55,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'core.urls'
-WSGI_APPLICATION = 'core.wsgi.application'
+ROOT_URLCONF = 'bipdelivery.core.urls'
+WSGI_APPLICATION = 'bipdelivery.core.wsgi.application'
 
 # ------------------------------------------------------------------------------
 # 🎨 TEMPLATE ENGINE (Fixes admin.E403 Error)
