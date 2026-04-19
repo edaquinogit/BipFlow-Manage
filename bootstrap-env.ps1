@@ -116,8 +116,8 @@ Write-Info "Active Python: $ActivePython"
 # Step 4: Upgrade pip
 Write-Header "Step 4: Upgrading pip, setuptools, and wheel"
 
-Write-Info "Running: python -m pip install --upgrade pip setuptools wheel"
-& python -m pip install --upgrade pip setuptools wheel --quiet
+Write-Info "Running: python -m pip install --upgrade pip setuptools==78.0.1 wheel"
+& python -m pip install --upgrade pip setuptools==78.0.1 wheel --quiet
 
 if ($LASTEXITCODE -eq 0) {
     Write-Success "pip and build tools upgraded"

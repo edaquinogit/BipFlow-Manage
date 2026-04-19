@@ -18,5 +18,5 @@ if str(bipdelivery_path.parent) not in sys.path:
     sys.path.insert(0, str(bipdelivery_path.parent))
 
 # Set up Django settings module
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bipdelivery.core.settings')
 django.setup()

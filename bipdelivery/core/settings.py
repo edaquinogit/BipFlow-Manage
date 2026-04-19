@@ -1,20 +1,68 @@
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 # ------------------------------------------------------------------------------
 # 🛰️ BASE DIRECTORY & PATHS
 # ------------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env values into environment variables
+load_dotenv(BASE_DIR / '.env')
+
 # ------------------------------------------------------------------------------
 # 🔑 SECURITY & ENVIRONMENT
 # ------------------------------------------------------------------------------
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-p#994+*a+ah%p$u=i96^-ntbfax!xc3%1t62kq_1ad0yfj_ka%')
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+def get_bool_env(key: str, default: bool = False) -> bool:
+    value = os.environ.get(key)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
-ALLOWED_HOSTS = ['*', '127.0.0.1', 'localhost']
+
+def is_test_mode() -> bool:
+    return bool(
+        os.environ.get('PYTEST_CURRENT_TEST')
+        or any('pytest' in arg for arg in sys.argv)
+    )
+
+
+ENVIRONMENT = os.environ.get('DJANGO_ENV', 'development').strip().lower()
+IS_PRODUCTION = ENVIRONMENT == 'production'
+IS_TEST = is_test_mode()
+
+
+def get_env_or_raise(key: str) -> str:
+    value = os.environ.get(key)
+    if value:
+        return value
+
+    if not IS_PRODUCTION:
+        return 'django-insecure-local-key'
+
+    raise ImproperlyConfigured(f'{key} must be set as an environment variable.')
+
+
+DEBUG = get_bool_env('DJANGO_DEBUG', not IS_PRODUCTION)
+
+if IS_PRODUCTION and DEBUG:
+    raise ImproperlyConfigured('DJANGO_DEBUG must be False in production.')
+
+SECRET_KEY = get_env_or_raise('DJANGO_SECRET_KEY')
+
+allowed_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
+
+if not ALLOWED_HOSTS:
+    if not IS_PRODUCTION:
+        ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+    else:
+        raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS must be defined in production.')
 
 # ------------------------------------------------------------------------------
 # 📦 APPS CONFIGURATION (Segregated for Clarity)
@@ -46,7 +94,9 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # 🚀 Must be first for CORS preflight
+    'bipdelivery.core.middleware.CORSMediaMiddleware',  # 🖼️ CORS for media files
     'django.middleware.security.SecurityMiddleware',
+    'bipdelivery.core.middleware.GlobalExceptionMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
