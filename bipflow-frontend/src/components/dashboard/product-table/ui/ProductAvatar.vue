@@ -46,6 +46,8 @@ onUnmounted(releaseMemory);
 const resolvedUrl = computed<string | null>(() => {
   if (hasError.value || !props.image) return null;
 
+  console.log(`[ProductAvatar] Received image prop: ${props.image}`); // Debug log
+
   // 🚀 CASO A: Preview Local (Upload de Arquivo)
   if (props.image instanceof File) {
     return objectUrl.value;
@@ -55,15 +57,18 @@ const resolvedUrl = computed<string | null>(() => {
   if (typeof props.image === 'string') {
     // Se a string já for uma URL completa, não mexemos nela
     if (props.image.startsWith('http') || props.image.startsWith('blob:')) {
+      console.log(`[ProductAvatar] Using absolute URL: ${props.image}`); // Debug log
       return props.image;
     }
 
     // Garante que o path comece com / mas não duplique
     const cleanPath = props.image.startsWith('/') ? props.image : `/${props.image}`;
-    
+
     // Concatenação robusta: evita http://localhost:8000//media
     const fullUrl = `${BASE_URL}${cleanPath}`;
-    
+
+    console.log(`[ProductAvatar] Constructed URL: ${fullUrl}`); // Debug log
+
     // Cache Busting: Importante para refletir trocas de imagem no Dashboard
     const separator = fullUrl.includes('?') ? '&' : '?';
     return `${fullUrl}${separator}v=${cacheNonce.value}`;
@@ -84,7 +89,7 @@ watch(() => props.image, (newImage) => {
   hasError.value = false;
   // Só atualizamos o Nonce se for String (URL), para evitar flickering em Files
   if (typeof newImage === 'string') cacheNonce.value = Date.now();
-  
+
   if (newImage instanceof File) {
     releaseMemory();
     objectUrl.value = URL.createObjectURL(newImage);
@@ -101,7 +106,7 @@ const onImageError = (e: Event): void => {
 </script>
 
 <template>
-  <div 
+  <div
     class="relative flex-none overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-inner group transition-all duration-300"
     :class="{
       'h-8 w-8': size === 'sm',
@@ -110,17 +115,17 @@ const onImageError = (e: Event): void => {
     }"
   >
     <transition name="fade" mode="out-in">
-      <img 
-        v-if="resolvedUrl" 
+      <img
+        v-if="resolvedUrl"
         :key="resolvedUrl"
-        :src="resolvedUrl" 
+        :src="resolvedUrl"
         @error="onImageError"
-        class="absolute inset-0 h-full w-full object-cover z-10 transition-transform duration-500 group-hover:scale-110" 
-        loading="eager" 
+        class="absolute inset-0 h-full w-full object-cover z-10 transition-transform duration-500 group-hover:scale-110"
+        loading="eager"
         fetchpriority="high"
       />
 
-      <div 
+      <div
         v-else
         class="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-500 font-black uppercase italic select-none"
         :class="size === 'lg' ? 'text-lg' : 'text-[10px]'"

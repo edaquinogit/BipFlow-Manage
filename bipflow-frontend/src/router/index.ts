@@ -38,15 +38,35 @@ const router = createRouter({
 /**
  * 🛡️ Navigation Guard (Enterprise Pattern)
  * Implementação limpa sem 'next()', seguindo o padrão moderno do Vue Router 4.
+ * Added deadlock prevention and loading state bypass for resilience.
  */
 router.beforeEach((to) => {
   const isLogged = isAuthenticated()
 
+  // 🚨 DEADLOCK PREVENTION: Prevent infinite redirect loops
+  const isRedirectingToLogin = to.name === AuthRouteNames.Login
+
+  // Allow login page to always mount, even during API failures
+  if (isRedirectingToLogin) {
+    if (import.meta.env.DEV) {
+      console.info(`[Router] Allowing login page mount (reason: ${String(to.query.reason || 'direct_access')})`)
+    }
+    return true // Explicitly allow navigation to login
+  }
+
   // 1. Proteção de Rotas Privadas (Requires Auth)
   if (to.meta.requiresAuth && !isLogged) {
-    return { 
-      name: AuthRouteNames.Login, 
-      query: { redirect: to.fullPath } 
+    if (import.meta.env.DEV) {
+      console.group('🔐 Auth Flow Debug')
+      console.log('Route requires auth:', to.fullPath)
+      console.log('User authenticated:', isLogged)
+      console.log('Redirecting to login...')
+      console.groupEnd()
+    }
+
+    return {
+      name: AuthRouteNames.Login,
+      query: { redirect: to.fullPath, reason: 'auth_required' }
     }
   }
 
@@ -62,6 +82,7 @@ router.beforeEach((to) => {
   }
 
   // Se nenhuma condição acima for atendida, a navegação flui naturalmente
+  return true
 })
 
 /**

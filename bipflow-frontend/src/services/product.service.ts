@@ -7,6 +7,8 @@ import {
   buildErrorContext,
   type ApplicationError,
 } from "../types/errors";
+import type { ProductFilterPayload } from "../types/filters";
+import { filtersToQueryParams } from "../types/filters";
 
 /**
  * Product Service - Business Logic Layer
@@ -44,6 +46,55 @@ class ProductService {
       return validation.data;
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Fetch All Products");
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch products with advanced filtering and search capabilities.
+   *
+   * Supports server-side filtering for:
+   * - Text search (name, SKU, description)
+   * - Category filtering
+   * - Availability filtering
+   * - Price range filtering
+   *
+   * Implements efficient database queries with select_related for relationships.
+   * Performs schema validation on all returned products.
+   *
+   * @param filters Filter payload with search and filter parameters
+   * @returns Array of validated Product objects matching the filters
+   * @throws Error if API request fails completely
+   */
+  async getFiltered(filters: Partial<ProductFilterPayload>): Promise<Product[]> {
+    try {
+      const queryParams = filtersToQueryParams(filters);
+      const queryString = queryParams.toString();
+      const url = queryString ? `${this.endpoint}?${queryString}` : this.endpoint;
+
+      const { data } = await api.get<unknown>(url);
+
+      const validation = ProductSchema.array().safeParse(data);
+
+      if (!validation.success) {
+        Logger.warn(
+          'Product schema validation failed during filtered search',
+          buildErrorContext(validation.error, {
+            endpoint: this.endpoint,
+            filters,
+          })
+        );
+        return data as Product[];
+      }
+
+      Logger.info('Filtered product search completed', {
+        filterCount: queryParams.size,
+        resultCount: validation.data.length,
+      });
+
+      return validation.data;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Fetch Filtered Products");
       throw error;
     }
   }

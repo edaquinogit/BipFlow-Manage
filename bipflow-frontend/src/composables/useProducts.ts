@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import type { Product } from "../schemas/product.schema";
 import ProductService from "../services/product.service";
 import { Logger } from "../services/logger";
@@ -9,12 +9,27 @@ import {
   buildErrorContext,
   type ApplicationError,
 } from "../types/errors";
+import {
+  type ProductFilterPayload,
+  type FilterState,
+  createDefaultFilterState,
+  hasActiveFilters,
+  DEFAULT_DEBOUNCE_CONFIG,
+} from "../types/filters";
+import { debounce } from "../utils/debounce";
 
 /**
  * Product Management Composable
  *
- * Manages product state, CRUD operations, and business logic calculations.
- * Provides reactive access to products, inventory statistics, and revenue metrics.
+ * Manages product state, CRUD operations, business logic calculations,
+ * and advanced filtering with debounced search.
+ *
+ * Features:
+ * - Full CRUD operations for products
+ * - Server-side filtering with debouncing
+ * - Real-time search across name, SKU, and description
+ * - Category, availability, and price range filtering
+ * - Automatic filter state persistence
  */
 export function useProducts() {
   // ==========================================
@@ -24,6 +39,13 @@ export function useProducts() {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const toast = useToast();
+
+  // 🔍 FILTER STATE
+  const filters = ref<FilterState>(createDefaultFilterState());
+  const isSearching = ref(false);
+
+  // Debounced search function (will be initialized below)
+  let debouncedSearch: ReturnType<typeof debounce> | null = null;
 
   // ==========================================
   // HELPERS
@@ -56,7 +78,7 @@ export function useProducts() {
     const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
     Object.entries(data).forEach(([key, value]) => {
-      if (value === null || value === undefined) return;
+      if (value === null || value === undefined || value === "") return;
 
       // Handle image file validation
       if (key === "image") {
@@ -94,13 +116,29 @@ export function useProducts() {
   /**
    * Extract error message from API response.
    *
-   * Handles various error response formats from backend.
+   * Handles various error response formats from backend, including
+   * Django REST framework field validation errors.
    */
   const _extractErrorMessage = (error: unknown): string => {
     if (isAxiosError(error)) {
+      const data = error.response?.data;
+
+      // Handle Django REST framework field validation errors
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const fieldErrors = Object.entries(data)
+          .filter(([, value]) => Array.isArray(value) && value.length > 0)
+          .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+          .join('; ');
+
+        if (fieldErrors) {
+          return fieldErrors;
+        }
+      }
+
+      // Fallback to standard error formats
       return (
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
+        data?.detail ||
+        data?.message ||
         error.message ||
         "Unknown connection error"
       );
@@ -139,6 +177,27 @@ export function useProducts() {
   const inventoryStats = computed(() => ({
     totalItems: products.value.reduce((acc, p) => acc + _getStockValue(p), 0),
     lowStockCount: products.value.filter((p) => _getStockValue(p) < 5).length,
+  }));
+
+  /**
+   * Check if any filters are currently active.
+   */
+  const hasFilters = computed(() => hasActiveFilters(filters.value));
+
+  /**
+   * Check if search is currently processing.
+   */
+  const isFilteringActive = computed(() => isSearching.value);
+
+  /**
+   * Get filter payload for API requests.
+   */
+  const filterPayload = computed((): Partial<ProductFilterPayload> => ({
+    search: filters.value.search || undefined,
+    category: filters.value.categoryId || undefined,
+    in_stock: filters.value.inStock ?? undefined,
+    min_price: filters.value.minPrice ?? undefined,
+    max_price: filters.value.maxPrice ?? undefined,
   }));
 
   // ==========================================
@@ -283,15 +342,193 @@ export function useProducts() {
     }
   };
 
+  /**
+   * Perform filtered search on products.
+   *
+   * Fetches products matching the current filter state from the backend.
+   * Handles debouncing to prevent excessive API calls.
+   *
+   * @throws Error if search fails
+   */
+  const performSearch = async (): Promise<void> => {
+    isSearching.value = true;
+    error.value = null;
+
+    try {
+      if (hasFilters.value) {
+        products.value = await ProductService.getFiltered(filterPayload.value);
+        Logger.info("Filtered search completed", {
+          filterCount: Object.values(filterPayload.value).filter(v => v !== undefined).length,
+          resultCount: products.value.length,
+        });
+      } else {
+        // If no filters, fetch all products
+        products.value = await ProductService.getAll();
+      }
+    } catch (err: unknown) {
+      const errorMessage = _extractErrorMessage(err);
+      error.value = `Search failed: ${errorMessage}`;
+      Logger.error(
+        "Product search failed",
+        buildErrorContext(err as ApplicationError, {
+          errorMessage,
+          filters: filterPayload.value,
+        })
+      );
+      toast.error("Search failed. Please try again.");
+    } finally {
+      isSearching.value = false;
+    }
+  };
+
+  /**
+   * Initialize debounced search function.
+   *
+   * This is called once to set up the debounced version of performSearch.
+   */
+  const initializeDebouncedSearch = (): void => {
+    if (!debouncedSearch) {
+      debouncedSearch = debounce(performSearch, {
+        delay: DEFAULT_DEBOUNCE_CONFIG.delay,
+        maxWait: DEFAULT_DEBOUNCE_CONFIG.maxWait,
+        trailing: true,
+      });
+    }
+  };
+
+  /**
+   * Update filter state and trigger debounced search.
+   *
+   * @param updates Partial filter state updates
+   */
+  const updateFilters = (updates: Partial<FilterState>): void => {
+    filters.value = {
+      ...filters.value,
+      ...updates,
+      page: 1, // Reset to first page on filter change
+    };
+
+    // Initialize debounced search on first use
+    if (!debouncedSearch) {
+      initializeDebouncedSearch();
+    }
+
+    // Trigger debounced search
+    if (debouncedSearch) {
+      (debouncedSearch as unknown as (...args: unknown[]) => void)();
+    }
+  };
+
+  /**
+   * Update search term with debouncing.
+   *
+   * @param searchTerm New search term
+   */
+  const updateSearchTerm = (searchTerm: string): void => {
+    updateFilters({ search: searchTerm });
+  };
+
+  /**
+   * Update category filter.
+   *
+   * @param categoryId Category ID or null to clear
+   */
+  const updateCategory = (categoryId: string | number | null): void => {
+    updateFilters({ categoryId });
+  };
+
+  /**
+   * Update availability filter.
+   *
+   * @param inStock true for in stock, false for out of stock, null for all
+   */
+  const updateAvailability = (inStock: boolean | null): void => {
+    updateFilters({ inStock });
+  };
+
+  /**
+   * Update price range filters.
+   *
+   * @param minPrice Minimum price (null for no minimum)
+   * @param maxPrice Maximum price (null for no maximum)
+   */
+  const updatePriceRange = (minPrice: number | null, maxPrice: number | null): void => {
+    updateFilters({ minPrice, maxPrice });
+  };
+
+  /**
+   * Clear all filters and reset to initial state.
+   */
+  const clearFilters = async (): Promise<void> => {
+    filters.value = createDefaultFilterState();
+    error.value = null;
+
+    // Cancel any pending search
+    if (debouncedSearch) {
+      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
+    }
+
+    // Fetch all products without filters
+    await fetchData();
+    Logger.info("All filters cleared");
+    toast.info("Filters cleared.");
+  };
+
+  /**
+   * Set up watchers for automatic search on filter changes.
+   * This is called during component lifecycle.
+   */
+  const setupFilterWatchers = (): void => {
+    watch(
+      () => filters.value,
+      () => {
+        initializeDebouncedSearch();
+        if (debouncedSearch) {
+          (debouncedSearch as unknown as (...args: unknown[]) => void)();
+        }
+      },
+      { deep: true }
+    );
+  };
+
+  /**
+   * Clean up debounced functions on unmount.
+   */
+  onBeforeUnmount(() => {
+    if (debouncedSearch && typeof debouncedSearch === 'object' && 'cancel' in debouncedSearch) {
+      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
+    }
+  });
+
   return {
+    // State
     products,
     loading,
     error,
+    filters,
+    isSearching,
+
+    // Computed
     totalRevenue,
     inventoryStats,
+    hasFilters,
+    isFilteringActive,
+    filterPayload,
+
+    // Actions
     fetchData,
     createProduct,
     updateProduct,
     deleteProduct,
+
+    // Search & Filter Actions
+    updateFilters,
+    updateSearchTerm,
+    updateCategory,
+    updateAvailability,
+    updatePriceRange,
+    clearFilters,
+    performSearch,
+    setupFilterWatchers,
   };
 }

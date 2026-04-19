@@ -4,6 +4,7 @@ import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
 import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
+import type { FilterState } from '@/types/filters';
 import { Logger } from '@/services/logger';
 
 // Layout & UI Components
@@ -39,12 +40,17 @@ const {
   loading: productsLoading,
   error,
   products,
+  filters,
+  isSearching,
   fetchData,
   createProduct,
   updateProduct,
   deleteProduct,
   totalRevenue,
-  inventoryStats
+  inventoryStats,
+  updateFilters,
+  clearFilters,
+  setupFilterWatchers,
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
@@ -149,6 +155,17 @@ const executeDelete = async (): Promise<void> => {
 };
 
 /**
+ * 🔍 FILTER EVENT HANDLERS
+ */
+const handleFiltersUpdate = (newFilters: FilterState): void => {
+  updateFilters(newFilters);
+};
+
+const handleClearFilters = async (): Promise<void> => {
+  await clearFilters();
+};
+
+/**
  * ⚡ SYSTEM BOOTSTRAP
  */
 onMounted(async () => {
@@ -156,6 +173,9 @@ onMounted(async () => {
     fetchData(),
     fetchCategories()
   ]);
+
+  // Initialize filter watchers
+  setupFilterWatchers();
 });
 </script>
 
@@ -174,10 +194,15 @@ onMounted(async () => {
         :products="products"
         :is-loading="productsLoading"
         :error="error"
+        :filters="filters"
+        :is-searching="isSearching"
+        :categories="categories"
         @open-panel="handleOpenNewPanel"
         @edit="handleEditRequest"
         @delete="openDeleteConfirm"
         @retry="fetchData"
+        @updateFilters="handleFiltersUpdate"
+        @clear-filters="handleClearFilters"
       />
     </main>
 

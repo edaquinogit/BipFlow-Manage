@@ -36,10 +36,12 @@ const productBase = {
 
   sku: z
     .string()
-    .min(4, "SKU is required for tracking")
-    .toUpperCase()
-    .nullable()
-    .optional(),
+    .optional()
+    .refine((val) => !val || val.length >= 4, {
+      message: "SKU must be at least 4 characters if provided",
+    })
+    .transform((val) => val?.toUpperCase() || undefined)
+    .nullable(),
 
   // Coerção Inteligente: Garante que o input do form vire número real
   price: z.coerce.number().min(0, "Price cannot be negative").default(0),

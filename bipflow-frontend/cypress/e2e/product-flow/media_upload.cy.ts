@@ -230,22 +230,11 @@ describe('Product Image Upload Flow', () => {
 
     // Form should remain open so user can correct
     cy.get(SELECTORS.formPanel)
-      .should('be.visible
-    previewImg: '[data-cy="product-image-preview"] img',
-    submitBtn: '[data-cy="btn-save-product"]',
-    closeFormBtn: '[data-cy="btn-close-form"]',
+      .should('be.visible')
+      .and('contain.class', 'open');
+  });
 
-    // Table
-    productTable: '[data-cy="product-table"]',
-    tableRow: '[data-cy="product-table-row"]',
-
-    // Notifications
-    toastContainer: '[data-cy="toast-container"]',
-    toastSuccess: '[data-cy="toast-success"]',
-    toastError: '[data-cy="toast-error"]',
-  };
-
-  beforeEach(() => {
+  it('should handle image upload errors gracefully', () => {
     // 1. Authenticate user (bypass login flow)
     cy.loginViaApi();
 
