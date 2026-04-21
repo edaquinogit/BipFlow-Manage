@@ -44,7 +44,8 @@ def get_env_or_raise(key: str) -> str:
         return value
 
     if not IS_PRODUCTION:
-        return 'django-insecure-local-key'
+        # Keep local/test fallback long enough for HS256 recommendations.
+        return 'django-insecure-local-key-for-bipflow-tests-2026'
 
     raise ImproperlyConfigured(f'{key} must be set as an environment variable.')
 
