@@ -1,218 +1,44 @@
-# BipFlow
+# BipFlow Manage
 
-Plataforma de delivery e gestão operacional com backend Django/DRF, frontend Vue 3 e um conjunto adicional de serviços Node mantidos na raiz do repositório.
+Plataforma de gestao de catalogo e pedidos com backend Django REST, frontend Vue 3 e um servico Node isolado para validacao de pedidos.
 
-## Estado Atual
+## Visao Geral
 
-O projeto está funcional e com a base principal validada:
+O repositorio esta organizado em tres frentes principais:
 
-- Backend Django: testes `pytest` verdes
-- Frontend Vue: testes unitários críticos verdes
-- API de produtos/categorias: contrato paginado alinhado entre backend, frontend e testes
-- Ambiente Node: padronizado com a raiz como orquestradora e `bipflow-frontend` como fonte de verdade do stack web
+- `bipdelivery/`: backend Django + Django REST Framework responsavel por produtos, categorias, autenticacao JWT e checkout via WhatsApp.
+- `bipflow-frontend/`: aplicacao Vue 3 + TypeScript para dashboard autenticado e catalogo publico.
+- `api-order-validation/`: servico Node independente, mantido como projeto paralelo de validacao de pedidos.
 
-Ainda assim, este README evita prometer "zero dívida técnica". O objetivo aqui é documentar o estado real do projeto e o fluxo recomendado de desenvolvimento.
+O fluxo principal do produto hoje acontece entre `bipflow-frontend` e `bipdelivery`. O servico `api-order-validation` nao faz parte do runtime padrao da aplicacao web.
 
-## Arquitetura
+## Fontes De Verdade
 
-- `bipdelivery/`: backend Django + Django REST Framework
-- `bipflow-frontend/`: aplicação Vue 3 + TypeScript + Vite
-- `api-order-validation/`: serviço Node isolado com testes próprios
-- `package.json` na raiz: scripts de orquestração e tooling do repositório
-- `bipflow-frontend/package.json`: dependências e scripts do frontend
+Para reduzir divergencia entre documentacao e codigo, estes arquivos devem ser tratados como referencia principal:
 
-## Fontes de Verdade
+- Arquitetura geral: [docs/architecture/system-overview.md](docs/architecture/system-overview.md)
+- Guia de desenvolvimento: [docs/development-guide.md](docs/development-guide.md)
+- Contrato da API: [docs/api/reference.md](docs/api/reference.md)
+- Frontend: [bipflow-frontend/README.md](bipflow-frontend/README.md)
+- Backend: `requirements.txt`, `bipdelivery/core/settings.py`, `bipdelivery/api/`
 
-- Backend Python: `requirements.txt`
-- Frontend web: `bipflow-frontend/package.json`
-- Scripts de orquestração do repositório: `package.json` na raiz
-- Configuração frontend: `bipflow-frontend/.env.example`
-- Configuração backend: `.env.example`
+Arquivos de resumo antigos na raiz, como relatarios de entrega, auditorias e checklists, devem ser lidos como contexto historico, nao como documentacao operacional atual.
 
-## Pré-requisitos
+## Stack Atual
 
 - Python 3.11+
+- Django 6
+- Django REST Framework
+- Simple JWT
 - Node.js 18+
-- npm 9+
-- Git
+- Vue 3
+- TypeScript
+- Vite
+- Vitest
+- Cypress
+- SQLite para desenvolvimento local
 
-## Setup Recomendado
-
-### Windows / PowerShell
-
-Use o bootstrap da raiz:
-
-```powershell
-.\bootstrap-env.ps1
-```
-
-Esse script agora:
-
-1. cria ou reutiliza a virtualenv Python
-2. instala dependências backend
-3. instala dependências Node da raiz
-4. instala dependências do frontend com `--ignore-scripts`
-5. cria `bipflow-frontend/.env.local` a partir de `.env.example`, se necessário
-
-### WSL / Linux
-
-Use instalação manual para evitar conflitos entre binários Windows e Linux dentro de `node_modules`.
-
-Backend:
-
-```bash
-python3 -m venv .venv_linux
-source .venv_linux/bin/activate
-pip install -r requirements.txt
-```
-
-Frontend:
-
-```bash
-cd bipflow-frontend
-rm -rf node_modules package-lock.json
-npm install --ignore-scripts
-```
-
-Raiz do repositório:
-
-```bash
-cd ..
-rm -rf node_modules package-lock.json
-npm install --ignore-scripts
-```
-
-### Observação Importante Sobre Ambiente
-
-Não compartilhe o mesmo `node_modules` entre PowerShell/Windows e WSL/Linux. Os bindings nativos de ferramentas como Vite, Rolldown e Lightning CSS podem quebrar quando o diretório é reaproveitado entre ambientes.
-
-## Configuração de Ambiente
-
-### Backend
-
-Copie `.env.example` para `.env` na raiz, se precisar sobrescrever os padrões.
-
-### Frontend
-
-O frontend usa `bipflow-frontend/.env.local`:
-
-```env
-VITE_API_URL=http://127.0.0.1:8000/api/
-VITE_DEBUG=true
-```
-
-## Rodando Localmente
-
-### Backend Django
-
-```bash
-cd bipdelivery
-python manage.py migrate
-python manage.py runserver
-```
-
-API local:
-
-```text
-http://127.0.0.1:8000/api/
-```
-
-### Frontend Vue
-
-```bash
-cd bipflow-frontend
-npm run dev
-```
-
-Frontend local:
-
-```text
-http://127.0.0.1:5173/
-```
-
-### Scripts da Raiz
-
-A raiz não é mais fonte de dependências do frontend. Ela apenas orquestra:
-
-```bash
-npm run frontend:dev
-npm run frontend:build
-npm run frontend:typecheck
-npm run frontend:lint
-npm run frontend:test:unit
-npm run frontend:test:e2e
-```
-
-## Testes
-
-### Backend
-
-```bash
-cd bipdelivery
-pytest
-```
-
-### Frontend Unitário
-
-```bash
-cd bipflow-frontend
-npm run test:unit:run
-```
-
-Para rodar arquivos específicos:
-
-```bash
-npm run test:unit:run -- src/services/__tests__/product.service.spec.ts
-npm run test:unit:run -- src/composables/__tests__/useProducts.spec.ts
-```
-
-### Frontend E2E
-
-```bash
-cd bipflow-frontend
-npm run test:e2e:run
-```
-
-## Qualidade de Código
-
-### Backend
-
-```bash
-cd bipdelivery
-ruff check .
-black . --line-length 100
-```
-
-### Frontend
-
-```bash
-cd bipflow-frontend
-npm run lint
-npm run typecheck
-```
-
-## Padrões do Projeto
-
-### Logging
-
-- Backend: não usar `print()`
-- Frontend: não usar `console.log()` como telemetria de aplicação
-- Use os serviços de logging do projeto
-
-### Contratos de API
-
-- Listagens principais de produtos e categorias usam payload paginado
-- O frontend deve consumir serviços, não acessar diretamente formatos crus da API
-- Schemas e services devem ser atualizados em conjunto quando o contrato mudar
-
-### Clean Code
-
-- nomes explícitos e orientados ao domínio
-- funções pequenas e com responsabilidade clara
-- testes cobrindo contrato e comportamento, não detalhes acidentais
-- documentação alinhada ao estado real do código
-
-## Estrutura do Repositório
+## Estrutura Do Repositorio
 
 ```text
 BipFlow-Manage/
@@ -223,46 +49,92 @@ BipFlow-Manage/
 |-- bipflow-frontend/
 |   |-- src/
 |   |-- cypress/
-|   |-- package.json
-|   `-- vitest.config.ts
+|   `-- package.json
 |-- api-order-validation/
-|-- bootstrap-env.ps1
+|-- docs/
 |-- package.json
 |-- requirements.txt
-`-- README.md
+`-- .env.example
 ```
 
-## Troubleshooting
+## Setup Rapido
 
-### `ModuleNotFoundError: No module named 'django'`
+### 1. Backend
 
-Ative a virtualenv correta antes de rodar o backend.
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+cd bipdelivery
+python manage.py migrate
+python manage.py runserver
+```
 
-### `Missing script` ao rodar testes frontend na raiz
+API local: `http://127.0.0.1:8000/api/`
 
-Rode no diretório `bipflow-frontend` ou use os wrappers da raiz:
+### 2. Frontend
 
-```bash
+```powershell
+cd bipflow-frontend
+npm install --ignore-scripts
+Copy-Item .env.example .env.local
+npm run dev
+```
+
+Aplicacao local: `http://127.0.0.1:5173/`
+
+### 3. Scripts De Orquestracao Na Raiz
+
+A raiz do repositorio nao substitui o ambiente do frontend. Ela oferece atalhos para o time:
+
+```powershell
+npm run frontend:dev
+npm run frontend:build
+npm run frontend:typecheck
+npm run frontend:lint
 npm run frontend:test:unit
+npm run frontend:test:e2e
 ```
 
-### `Cannot find native binding` / erros de `rolldown` no WSL
+## Comandos Principais
 
-Reinstale `node_modules` dentro do próprio WSL e não reaproveite instalação feita no Windows.
+### Backend
 
-### `husky - .git can't be found`
+```powershell
+cd bipdelivery
+pytest
+ruff check .
+black . --line-length 100
+```
 
-Husky fica na raiz do repositório. Não rode instalação de hooks a partir de `bipflow-frontend`.
+### Frontend
 
-## Próximas Evoluções Técnicas
+```powershell
+cd bipflow-frontend
+npm run test:unit:run
+npm run test:e2e:run
+npm run lint
+npm run typecheck
+```
 
-Os próximos focos recomendados de evolução são:
+## Convencoes Do Projeto
 
-- consolidar documentação operacional complementar em `docs/`
-- revisar dependências deprecated do frontend
-- ampliar testes contratuais para endpoints paginados
-- reduzir tempo de inicialização do runner de testes frontend
+- Leitura publica e escrita autenticada nos endpoints principais de produtos e categorias.
+- O frontend deve consumir a API via `services/`, nao espalhar chamadas HTTP direto nas views.
+- Contratos de resposta devem ser validados por schemas quando o modulo ja segue esse padrao.
+- Documentacao deve descrever comportamento real do codigo, nao roadmap, suposicoes ou arquitetura aspiracional.
 
-## Licença
+## Problemas Comuns
 
-Consulte [LICENSE](LICENSE).
+### Backend sem dependencias
+
+Se aparecer `ModuleNotFoundError: No module named 'django'`, ative a virtualenv correta antes de executar o servidor ou os testes.
+
+### Frontend com bindings nativos quebrados
+
+Nao compartilhe `node_modules` entre Windows e WSL. Ao trocar de ambiente, reinstale as dependencias no ambiente atual.
+
+### Scripts ausentes na raiz
+
+Os scripts web completos vivem em `bipflow-frontend/package.json`. Use a raiz apenas como atalho de orquestracao.

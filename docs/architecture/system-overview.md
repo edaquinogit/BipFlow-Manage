@@ -1,100 +1,114 @@
-# System Architecture Overview
+# Visao Geral Da Arquitetura
 
-> High-level system design and component interactions for BipFlow delivery ecosystem
+Resumo da arquitetura real mantida no repositorio, com foco no fluxo principal em producao do projeto.
 
----
+## Contexto
 
-## Architecture Diagram
+O BipFlow hoje opera com duas aplicacoes centrais acopladas por HTTP:
 
-```plaintext
-┌─────────────────────────────────────────────────────────────┐
-│                    BipFlow Delivery System                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                ┌─────────────┼─────────────┐
-                │             │             │
-         ┌──────▼──────┐ ┌────▼────┐ ┌─────▼─────┐
-         │   Frontend   │ │ Backend │ │ Database  │
-         │  (Vue 3/TS)  │ │(Django) │ │(SQLite)   │
-         └──────┬──────┘ └────┬────┘ └─────┬─────┘
-                │             │            │
-          REST API ◄──────────►  ORM ◄────►│
-                │            │             │
-         ┌──────▼──────────────────────────▼────┐
-         │      Authentication (JWT Token)      │
-         └───────────────────────────────────────┘
+- `bipdelivery`: backend Django REST
+- `bipflow-frontend`: frontend Vue 3
+
+Ha tambem um servico paralelo em `api-order-validation`, mas ele nao compoe o fluxo principal do catalogo e do dashboard web.
+
+## Mapa De Componentes
+
+```text
+Usuario
+  |
+  | navega / interage
+  v
+Frontend Vue 3 (bipflow-frontend)
+  |
+  | HTTP JSON / multipart
+  v
+Backend Django REST (bipdelivery)
+  |
+  | ORM
+  v
+SQLite em desenvolvimento
 ```
 
----
+Recursos complementares:
 
-## Core Components
+- JWT para autenticacao de escrita
+- arquivos de imagem em `MEDIA_ROOT`
+- checkout publico com geracao de mensagem para WhatsApp
 
-### 1. Vue 3 Frontend (TypeScript)
-- **Framework**: Vue 3 Composition API
-- **TypeScript**: Strict mode (`strict: true`)
-- **Key Features**:
-  - Real-time product listing and inventory
-  - Order management dashboard
-  - Image upload with preview
-  - Responsive design with TailwindCSS
+## Responsabilidades Por Aplicacao
 
-### 2. Django REST API Backend
-- **Framework**: Django 6.0 + Django REST Framework
-- **Authentication**: JWT (Simple JWT)
-- **Key Features**:
-  - Product CRUD operations
-  - Category management
-  - Inventory calculation
-  - CORS support for frontend requests
+### Frontend Vue
 
-### 3. Data Layer
-- **Database**: SQLite (development) / PostgreSQL (production)
-- **ORM**: Django ORM
-- **Migrations**: Django migrations system
+Responsavel por:
 
----
+- dashboard autenticado para gestao de produtos e categorias
+- catalogo publico em `/produtos`
+- filtros, busca, ordenacao e paginacao no catalogo
+- carrinho local e coleta de dados do cliente
+- chamada ao endpoint de checkout para montar a mensagem final do pedido
 
-## Data Flow
+Estrutura funcional relevante:
 
-### Order Creation Flow
-1. User fills form in Vue dashboard
-2. Frontend validates via Zod schema
-3. Sends POST to `/api/products/` with JWT token
-4. Django ViewSet receives and validates
-5. Model saved to database
-6. Response returned with product ID
-7. Frontend shows success toast
+- `src/services/`: integracao HTTP e regras de consumo da API
+- `src/composables/`: estado reutilizavel de busca, carrinho e listagens
+- `src/views/dashboard/`: area autenticada
+- `src/views/products/`: experiencia publica de catalogo e checkout
 
----
+### Backend Django
 
-## Deployment & CI/CD
+Responsavel por:
 
-### Local Development
-- `npm run dev` — Frontend development server
-- `python manage.py runserver` — Django development server
-- SQLite database auto-created on first migration
+- CRUD de produtos
+- CRUD de categorias
+- autenticacao JWT
+- regras de permissao publica para leitura e autenticada para escrita
+- upload e serializacao de imagens
+- validacao server-side do checkout via WhatsApp
 
-### Testing
-- **Frontend**: Vitest + Cypress
-- **Backend**: pytest + pytest-django
-- **Linting**: ESLint + Ruff
-- **Type Checking**: TypeScript strict mode
+Estrutura funcional relevante:
 
-### Production
-- Frontend: Build with Vite → static files
-- Backend: Gunicorn + PostgreSQL
-- Docker containerization ready
+- `bipdelivery/api/models.py`
+- `bipdelivery/api/serializers.py`
+- `bipdelivery/api/views.py`
+- `bipdelivery/api/pagination.py`
+- `bipdelivery/core/settings.py`
 
----
+## Contratos Principais
 
-## Security Considerations
+### Produtos
 
-- JWT tokens for API authentication
-- CORS headers restricted to frontend domain
-- CSRF protection on POST/PUT/DELETE
-- Input validation via Zod (frontend) + DRF serializers (backend)
-- Environment variables for sensitive data
+- Endpoint base: `/api/v1/products/`
+- Leitura publica
+- Escrita autenticada
+- Resposta paginada
+- `category` retorna id
+- `category_name` retorna o nome denormalizado
 
----
+### Categorias
 
-Last Updated: April 2026
+- Endpoint base: `/api/v1/categories/`
+- Leitura publica
+- Escrita autenticada
+- Exclusao protegida quando ha produtos relacionados
+
+### Checkout
+
+- Endpoint: `/api/v1/checkout/whatsapp/`
+- Publico
+- Recalcula totais no backend
+- Gera mensagem e URL de redirecionamento para WhatsApp
+
+## Decisoes Arquiteturais Importantes
+
+- O frontend nao deve conhecer detalhes brutos do backend fora da camada de `services`.
+- O backend centraliza validacoes criticas de estoque, disponibilidade e taxa de entrega.
+- O catalogo publico e o dashboard compartilham a mesma API versionada.
+- A documentacao deve priorizar o fluxo Django + Vue, porque este e o caminho implementado e testado no repositorio.
+
+## Fora Do Escopo Deste Documento
+
+Este documento nao descreve:
+
+- arquitetura aspiracional futura
+- integracoes que nao aparecem no codigo principal atual
+- relatorios historicos de entrega ou auditoria mantidos na raiz
