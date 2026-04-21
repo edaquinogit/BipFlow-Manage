@@ -8,6 +8,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    pool: "threads",
+    fileParallelism: false,
+    maxWorkers: 1,
     setupFiles: "src/tests/setupTests.ts",
     coverage: { provider: "v8" },
     include: ["src/**/*.spec.ts", "src/**/*.spec.tsx", "src/**/*.spec.vue"],

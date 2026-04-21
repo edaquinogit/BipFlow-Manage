@@ -7,6 +7,8 @@
  * Provides consistent formatting for prices, dates, and other data.
  */
 
+import { Logger } from '@/services/logger'
+
 /**
  * Format price to Brazilian Real (BRL) currency
  *
@@ -17,7 +19,7 @@ export const formatBRL = (price: string | number): string => {
   const numericPrice = typeof price === 'string' ? parseFloat(price) : price
 
   if (isNaN(numericPrice)) {
-    console.warn('[formatBRL] Invalid price value:', price)
+    Logger.warn('Invalid price value received by formatBRL', { price })
     return 'R$ 0,00'
   }
 
@@ -38,13 +40,16 @@ export const formatBRL = (price: string | number): string => {
 export const formatDateBR = (dateString: string): string => {
   try {
     const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('Invalid date')
+    }
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     }).format(date)
-  } catch (error) {
-    console.warn('[formatDateBR] Invalid date string:', dateString)
+  } catch (_error) {
+    Logger.warn('Invalid date string received by formatDateBR', { dateString })
     return 'Data inválida'
   }
 }
@@ -58,6 +63,9 @@ export const formatDateBR = (dateString: string): string => {
 export const formatRelativeTime = (dateString: string): string => {
   try {
     const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('Invalid date')
+    }
     const now = new Date()
     const diffInMs = now.getTime() - date.getTime()
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
@@ -68,8 +76,8 @@ export const formatRelativeTime = (dateString: string): string => {
     if (diffInDays < 30) return `há ${Math.floor(diffInDays / 7)} semanas`
 
     return formatDateBR(dateString)
-  } catch (error) {
-    console.warn('[formatRelativeTime] Invalid date string:', dateString)
+  } catch (_error) {
+    Logger.warn('Invalid date string received by formatRelativeTime', { dateString })
     return 'data inválida'
   }
 }

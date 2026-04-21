@@ -1,42 +1,101 @@
-# BipFlow Frontend - Vue 3 Dashboard
+# BipFlow Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Aplicação Vue 3 + TypeScript do ecossistema BipFlow.
 
-## Recommended IDE Setup
+## Responsabilidade
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Este diretório é a fonte de verdade do stack frontend:
 
-## Recommended Browser Setup
+- Vue 3
+- Vite
+- Vitest
+- Cypress
+- ESLint / Prettier
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+As dependências web devem ser instaladas e executadas a partir daqui. A raiz do repositório oferece apenas scripts de orquestração.
 
-## Type Support for `.vue` Imports in TS
+## Pré-requisitos
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- Node.js 18+
+- npm 9+
 
-## Customize configuration
+## Instalação
 
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
 ```bash
+npm install --ignore-scripts
+```
 
-### Compile and Hot-Reload for Development
+`--ignore-scripts` é recomendado para evitar efeitos colaterais de ambiente durante setup local, especialmente em WSL.
 
-```sh
+## Ambiente
+
+Copie `.env.example` para `.env.local` se o arquivo ainda não existir:
+
+```bash
+cp .env.example .env.local
+```
+
+Exemplo:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000/api/
+VITE_DEBUG=true
+```
+
+## Desenvolvimento
+
+```bash
 npm run dev
-```bash
+```
 
-### Type-Check, Compile and Minify for Production
+Aplicação local:
 
-```sh
-npm run build
 ```text
+http://127.0.0.1:5173/
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Testes
+
+Todos os testes unitários:
+
+```bash
+npm run test:unit:run
+```
+
+Arquivos específicos:
+
+```bash
+npm run test:unit:run -- src/services/__tests__/product.service.spec.ts
+npm run test:unit:run -- src/composables/__tests__/useProducts.spec.ts
+```
+
+E2E:
+
+```bash
+npm run test:e2e:run
+```
+
+## Qualidade
+
+```bash
+npm run lint
+npm run typecheck
+npm run format
+```
+
+## Padrões
+
+- use `Logger` para telemetria de aplicação
+- não introduza `console.log()` como debug permanente
+- use composables e services para encapsular contratos de API
+- mantenha schemas e serviços alinhados quando houver mudança de payload
+
+## Observação de Ambiente
+
+Não compartilhe `node_modules` entre Windows e WSL. Se alternar de ambiente, reinstale as dependências no ambiente atual.

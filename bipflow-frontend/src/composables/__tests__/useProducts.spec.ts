@@ -8,7 +8,7 @@
  * - Integration with services
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useProducts } from "../useProducts";
 import ProductService from "../../services/product.service";
 import { useToast } from "../../composables/useToast";
@@ -31,10 +31,12 @@ vi.mock("../../services/logger", () => ({
 describe("useProducts Composable", () => {
   let mockToast: any;
   let mockLogger: any;
+  let dispose: (() => void) | undefined;
 
   beforeEach(() => {
     // Clear all mocks before each test to prevent state pollution
     vi.clearAllMocks();
+    dispose = undefined;
 
     // Get reference to mocked Logger
     mockLogger = vi.mocked(Logger);
@@ -50,6 +52,12 @@ describe("useProducts Composable", () => {
     vi.mocked(useToast).mockReturnValue(mockToast);
   });
 
+  const createComposable = () => {
+    const composable = useProducts();
+    dispose = composable.dispose;
+    return composable;
+  };
+
   describe("Product Creation with Image Upload", () => {
     /**
      * Verify FormData transformation for multipart uploads
@@ -59,7 +67,7 @@ describe("useProducts Composable", () => {
      */
     it("should transform product data into valid FormData for media upload", async () => {
       // Setup: Create a mock image file (simulates user upload)
-      const { createProduct } = useProducts();
+      const { createProduct } = createComposable();
       const mockFile = new File(["image-content"], "test-product.png", {
         type: "image/png",
       });
@@ -113,7 +121,7 @@ describe("useProducts Composable", () => {
      * - Not crash
      */
     it("should handle creation errors gracefully", async () => {
-      const { createProduct } = useProducts();
+      const { createProduct } = createComposable();
 
       const apiError = new Error("Product with this SKU already exists");
       vi.spyOn(ProductService, "create").mockRejectedValue(apiError);
@@ -139,7 +147,7 @@ describe("useProducts Composable", () => {
      * Handle mixed price types (string vs number) in revenue totals.
      */
     it("should calculate total revenue correctly with mixed price types", () => {
-      const { products, totalRevenue } = useProducts();
+      const { products, totalRevenue } = createComposable();
 
       // Setup: Products with mixed price types
       products.value = [
@@ -158,7 +166,7 @@ describe("useProducts Composable", () => {
      * When no products exist, revenue should be zero.
      */
     it("should return zero revenue when no products exist", () => {
-      const { products, totalRevenue } = useProducts();
+      const { products, totalRevenue } = createComposable();
 
       products.value = [];
 
@@ -173,7 +181,7 @@ describe("useProducts Composable", () => {
      * While product creation is in progress, loading should be true.
      */
     it("should set loading state during product creation", async () => {
-      const { createProduct, loading } = useProducts();
+      const { createProduct, loading } = createComposable();
 
       const slowPromise = new Promise((resolve) =>
         setTimeout(() => resolve({ id: 1 }), 100)
@@ -196,7 +204,7 @@ describe("useProducts Composable", () => {
      * After a failed API call, attempting again should reset error state.
      */
     it("should clear error state on successful retry", async () => {
-      const { createProduct, error } = useProducts();
+      const { createProduct, error } = createComposable();
 
       // First call fails
       vi.spyOn(ProductService, "create")
@@ -226,7 +234,7 @@ describe("useProducts Composable", () => {
      * When server returns relative image path, it should be converted to absolute URL.
      */
     it("should handle image URL transformation from server response", async () => {
-      const { createProduct } = useProducts();
+      const { createProduct } = createComposable();
 
       const mockFile = new File(["content"], "product.jpg", {
         type: "image/jpeg",
@@ -255,7 +263,7 @@ describe("useProducts Composable", () => {
      * Products without images should not cause errors or display broken image icons.
      */
     it("should handle products without images gracefully", async () => {
-      const { createProduct } = useProducts();
+      const { createProduct } = createComposable();
 
       vi.spyOn(ProductService, "create").mockResolvedValue({
         id: 1,
@@ -271,5 +279,9 @@ describe("useProducts Composable", () => {
       expect(result!.image).toBeNull();
       expect(mockToast.success).toHaveBeenCalled();
     });
+  });
+
+  afterEach(() => {
+    dispose?.();
   });
 });

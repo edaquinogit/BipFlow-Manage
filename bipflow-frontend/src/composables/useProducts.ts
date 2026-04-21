@@ -1,4 +1,11 @@
-import { ref, computed, watch, onBeforeUnmount } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onBeforeUnmount,
+  getCurrentInstance,
+  type WatchStopHandle,
+} from "vue";
 import type { Product } from "../schemas/product.schema";
 import ProductService from "../services/product.service";
 import { Logger } from "../services/logger";
@@ -44,8 +51,12 @@ export function useProducts() {
   const filters = ref<FilterState>(createDefaultFilterState());
   const isSearching = ref(false);
 
+  // 🔄 BULK SELECTION STATE
+  const selectedAssetIds = ref<Set<number>>(new Set());
+
   // Debounced search function (will be initialized below)
   let debouncedSearch: ReturnType<typeof debounce> | null = null;
+  let stopFilterWatcher: WatchStopHandle | null = null;
 
   // ==========================================
   // HELPERS
@@ -199,6 +210,36 @@ export function useProducts() {
     min_price: filters.value.minPrice ?? undefined,
     max_price: filters.value.maxPrice ?? undefined,
   }));
+
+  // ==========================================
+  // BULK SELECTION COMPUTED
+  // ==========================================
+
+  /**
+   * Check if any assets are currently selected.
+   */
+  const hasSelectedAssets = computed(() => selectedAssetIds.value.size > 0);
+
+  /**
+   * Get the count of selected assets.
+   */
+  const selectedAssetsCount = computed(() => selectedAssetIds.value.size);
+
+  /**
+   * Check if all visible products are selected.
+   */
+  const isAllSelected = computed(() => {
+    if (products.value.length === 0) return false;
+    return products.value.every(product => product.id && selectedAssetIds.value.has(product.id));
+  });
+
+  /**
+   * Check if some (but not all) products are selected.
+   */
+  const isIndeterminate = computed(() => {
+    const selectedCount = selectedAssetIds.value.size;
+    return selectedCount > 0 && selectedCount < products.value.length;
+  });
 
   // ==========================================
   // ACTIONS
@@ -397,6 +438,21 @@ export function useProducts() {
   };
 
   /**
+   * Release debounced callbacks and watchers.
+   *
+   * Keeps the composable safe when used both inside Vue components
+   * and directly inside unit tests or standalone scripts.
+   */
+  const dispose = (): void => {
+    if (debouncedSearch && typeof debouncedSearch === "object" && "cancel" in debouncedSearch) {
+      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
+    }
+
+    stopFilterWatcher?.();
+    stopFilterWatcher = null;
+  };
+
+  /**
    * Update filter state and trigger debounced search.
    *
    * @param updates Partial filter state updates
@@ -464,7 +520,7 @@ export function useProducts() {
     error.value = null;
 
     // Cancel any pending search
-    if (debouncedSearch) {
+    if (debouncedSearch && typeof debouncedSearch === "object" && "cancel" in debouncedSearch) {
       (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
     }
 
@@ -474,12 +530,97 @@ export function useProducts() {
     toast.info("Filters cleared.");
   };
 
+  // ==========================================
+  // BULK SELECTION ACTIONS
+  // ==========================================
+
+  /**
+   * Toggle selection of a specific asset.
+   *
+   * @param assetId Product ID to toggle
+   */
+  const toggleSelection = (assetId: number): void => {
+    if (selectedAssetIds.value.has(assetId)) {
+      selectedAssetIds.value.delete(assetId);
+    } else {
+      selectedAssetIds.value.add(assetId);
+    }
+    Logger.info(`Asset selection toggled [ID: ${assetId}]`);
+  };
+
+  /**
+   * Select all visible assets.
+   */
+  const selectAll = (): void => {
+    const allIds = products.value
+      .map(p => p.id)
+      .filter((id): id is number => id !== undefined);
+
+    selectedAssetIds.value = new Set(allIds);
+    Logger.info(`All assets selected [Count: ${allIds.length}]`);
+  };
+
+  /**
+   * Clear all asset selections.
+   */
+  const clearSelection = (): void => {
+    selectedAssetIds.value.clear();
+    Logger.info("Asset selection cleared");
+  };
+
+  /**
+   * Bulk update category for selected assets.
+   *
+   * @param productIds Array of product IDs to update
+   * @param categoryId New category ID
+   * @returns Promise that resolves when update is complete
+   */
+  const bulkUpdateCategory = async (productIds: number[], categoryId: number): Promise<void> => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await ProductService.bulkUpdateCategory(productIds, categoryId);
+
+      // Update local state immediately for UI reactivity
+      products.value = products.value.map(product => {
+        if (result.updated_products.includes(product.id!)) {
+          return { ...product, category: result.new_category };
+        }
+        return product;
+      });
+
+      // Clear selection after successful update
+      clearSelection();
+
+      Logger.info(`Bulk category update completed [Products: ${productIds.length}, Category: ${categoryId}]`);
+      toast.success(`Successfully updated ${productIds.length} asset${productIds.length === 1 ? '' : 's'}`);
+    } catch (err: unknown) {
+      const errorMessage = _extractErrorMessage(err);
+      error.value = `Bulk update failed: ${errorMessage}`;
+      Logger.error(
+        "Bulk category update failed",
+        buildErrorContext(err as ApplicationError, {
+          productIds,
+          categoryId,
+          errorMessage,
+        })
+      );
+      toast.error("Bulk update failed. Please try again.");
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   /**
    * Set up watchers for automatic search on filter changes.
    * This is called during component lifecycle.
    */
   const setupFilterWatchers = (): void => {
-    watch(
+    stopFilterWatcher?.();
+
+    stopFilterWatcher = watch(
       () => filters.value,
       () => {
         initializeDebouncedSearch();
@@ -494,11 +635,11 @@ export function useProducts() {
   /**
    * Clean up debounced functions on unmount.
    */
-  onBeforeUnmount(() => {
-    if (debouncedSearch && typeof debouncedSearch === 'object' && 'cancel' in debouncedSearch) {
-      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
-    }
-  });
+  if (getCurrentInstance()) {
+    onBeforeUnmount(() => {
+      dispose();
+    });
+  }
 
   return {
     // State
@@ -507,6 +648,7 @@ export function useProducts() {
     error,
     filters,
     isSearching,
+    selectedAssetIds,
 
     // Computed
     totalRevenue,
@@ -514,6 +656,10 @@ export function useProducts() {
     hasFilters,
     isFilteringActive,
     filterPayload,
+    hasSelectedAssets,
+    selectedAssetsCount,
+    isAllSelected,
+    isIndeterminate,
 
     // Actions
     fetchData,
@@ -530,5 +676,12 @@ export function useProducts() {
     clearFilters,
     performSearch,
     setupFilterWatchers,
+    dispose,
+
+    // Bulk Selection Actions
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    bulkUpdateCategory,
   };
 }

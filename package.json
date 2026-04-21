@@ -2,15 +2,19 @@
   "name": "bipflow-manage",
   "version": "1.0.0",
   "main": "index.js",
+  "private": true,
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "lint": "eslint .",
-    "test": "jest --coverage",
-    "prepare": "husky"
+    "frontend:dev": "npm --prefix bipflow-frontend run dev",
+    "frontend:build": "npm --prefix bipflow-frontend run build",
+    "frontend:typecheck": "npm --prefix bipflow-frontend run typecheck",
+    "frontend:lint": "npm --prefix bipflow-frontend run lint",
+    "frontend:test:unit": "npm --prefix bipflow-frontend run test:unit:run",
+    "frontend:test:e2e": "npm --prefix bipflow-frontend run test:e2e:run",
+    "prepare": "husky install"
   },
   "dependencies": {
-    "@heroicons/vue": "^2.2.0",
     "better-sqlite3": "^9.0.0",
     "body-parser": "^2.2.2",
     "cors": "^2.8.6",
@@ -23,18 +27,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/vue": "^8.1.0",
-    "@vitest/coverage-v8": "^4.1.0",
-    "@vue/test-utils": "^2.4.6",
-    "cypress": "^15.12.0",
-    "eslint": "^9.0.0",
-    "jest": "^29.7.0",
-    "jest-mock-extended": "^4.0.0",
-    "jsdom": "^29.0.1",
-    "msw": "^2.12.14",
+    "husky": "^8.0.3",
     "nodemon": "^3.1.0",
-    "supertest": "^7.2.2",
-    "vitest": "^4.1.2"
+    "supertest": "^7.2.2"
   }
 }

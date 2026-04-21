@@ -5,7 +5,7 @@ Comprehensive test suite validating Django REST Framework endpoints respond corr
 including database connectivity, authentication requirements, and full CRUD operations.
 
 Documentation:
-- Ensures all API endpoints require proper JWT authentication
+- Ensures public read endpoints and authenticated write endpoints behave correctly
 - Validates data serialization and deserialization
 - Tests error conditions (404, 400, protections)
 - Confirms database transactional integrity
@@ -53,23 +53,25 @@ class CategoryAPIHealthTest(TestCase):
         )
 
     def test_category_list_requires_auth(self) -> None:
-        """Categories endpoint should require authentication."""
+        """Categories list should be publicly accessible."""
         response: Any = self.client.get('/api/v1/categories/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_category_list_returns_200_authenticated(self) -> None:
-        """Categories list should return 200 when authenticated."""
+        """Categories list should return paginated results when authenticated."""
         self.client.force_authenticate(user=self.user)
         response: Any = self.client.get('/api/v1/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
+        self.assertIn('results', response.data)
+        self.assertIsInstance(response.data['results'], list)
 
     def test_category_list_contains_data(self) -> None:
         """Categories list should contain created category."""
         self.client.force_authenticate(user=self.user)
         response: Any = self.client.get('/api/v1/categories/')
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['name'], 'Electronics')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Electronics')
 
     def test_category_create(self) -> None:
         """Should create category via POST endpoint."""
@@ -132,23 +134,25 @@ class ProductAPIHealthTest(TestCase):
         )
 
     def test_product_list_requires_auth(self) -> None:
-        """Products endpoint should require authentication."""
+        """Products list should be publicly accessible."""
         response: Any = self.client.get('/api/v1/products/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_product_list_returns_200_authenticated(self) -> None:
-        """Products list should return 200 when authenticated."""
+        """Products list should return paginated results when authenticated."""
         self.client.force_authenticate(user=self.user)
         response: Any = self.client.get('/api/v1/products/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
+        self.assertIn('results', response.data)
+        self.assertIsInstance(response.data['results'], list)
 
     def test_product_list_contains_data(self) -> None:
         """Products list should contain created product."""
         self.client.force_authenticate(user=self.user)
         response: Any = self.client.get('/api/v1/products/')
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['name'], 'Laptop')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Laptop')
 
     def test_product_includes_category_name(self) -> None:
         """Product response should include denormalized category_name."""

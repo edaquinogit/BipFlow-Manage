@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue';
+import { Logger } from '@/services/logger';
 
 /**
  * 🛰️ BipFlow Registry Interface
@@ -46,8 +47,6 @@ onUnmounted(releaseMemory);
 const resolvedUrl = computed<string | null>(() => {
   if (hasError.value || !props.image) return null;
 
-  console.log(`[ProductAvatar] Received image prop: ${props.image}`); // Debug log
-
   // 🚀 CASO A: Preview Local (Upload de Arquivo)
   if (props.image instanceof File) {
     return objectUrl.value;
@@ -57,7 +56,6 @@ const resolvedUrl = computed<string | null>(() => {
   if (typeof props.image === 'string') {
     // Se a string já for uma URL completa, não mexemos nela
     if (props.image.startsWith('http') || props.image.startsWith('blob:')) {
-      console.log(`[ProductAvatar] Using absolute URL: ${props.image}`); // Debug log
       return props.image;
     }
 
@@ -66,8 +64,6 @@ const resolvedUrl = computed<string | null>(() => {
 
     // Concatenação robusta: evita http://localhost:8000//media
     const fullUrl = `${BASE_URL}${cleanPath}`;
-
-    console.log(`[ProductAvatar] Constructed URL: ${fullUrl}`); // Debug log
 
     // Cache Busting: Importante para refletir trocas de imagem no Dashboard
     const separator = fullUrl.includes('?') ? '&' : '?';
@@ -100,7 +96,10 @@ watch(() => props.image, (newImage) => {
 
 const onImageError = (e: Event): void => {
   const target = e.target as HTMLImageElement;
-  console.warn(`[BipFlow] Asset broken at: ${target.src}. Switching to initials.`);
+  Logger.warn('Product avatar failed to load, falling back to initials', {
+    src: target.src,
+    name: props.name,
+  });
   hasError.value = true;
 };
 </script>

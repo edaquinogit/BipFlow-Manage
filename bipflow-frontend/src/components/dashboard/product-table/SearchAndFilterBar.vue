@@ -3,6 +3,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { MagnifyingGlassIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 import type { FilterState } from '@/types/filters';
 import { useDebounceFn } from '@/utils/debounce';
+import { Logger } from '@/services/logger';
 
 /**
  * Search and Filter Bar Component
@@ -218,7 +219,10 @@ const createNewCategory = async (): Promise<void> => {
     emit('updateFilters', { ...localFilters.value });
 
   } catch (error: any) {
-    console.error('Failed to create category:', error);
+    Logger.error('Failed to create category from filter bar', {
+      error,
+      categoryName: newCategoryName.value.trim(),
+    });
 
     // Import toast composable for error notification
     const { useToast } = await import('@/composables/useToast');

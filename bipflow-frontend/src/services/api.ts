@@ -1,4 +1,5 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
+import { Logger } from "./logger";
 
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
@@ -16,7 +17,9 @@ const AUTH_KEYS = Object.freeze({
  * Skip validation in test environments where VITE_API_URL might not be set
  */
 if (!import.meta.env.VITE_API_URL && import.meta.env.MODE !== 'test') {
-  console.error("❌ CRITICAL: VITE_API_URL is not defined. Please check your environment variables.");
+  Logger.error("VITE_API_URL is not defined", {
+    mode: import.meta.env.MODE,
+  });
   throw new Error("VITE_API_URL environment variable is required but not set.");
 }
 
@@ -102,8 +105,7 @@ api.interceptors.response.use(
       if (refreshToken && !isAuthFailureInProgress) {
         try {
           if (import.meta.env.DEV) {
-            console.group('🔄 Token Refresh Attempt');
-            console.log('Attempting to refresh access token...');
+            Logger.info("Attempting to refresh access token");
           }
 
           // Isolated instance for refresh (Clean Architecture Pattern)
@@ -123,15 +125,13 @@ api.interceptors.response.use(
           }
 
           if (import.meta.env.DEV) {
-            console.log('✅ Token refreshed successfully, retrying original request');
-            console.groupEnd();
+            Logger.info("Token refreshed successfully, retrying original request");
           }
 
           return api(originalRequest);
         } catch (refreshError) {
           if (import.meta.env.DEV) {
-            console.log('❌ Token refresh failed, initiating logout');
-            console.groupEnd();
+            Logger.warn("Token refresh failed, initiating logout");
           }
           handleAuthFailure();
           return Promise.reject(refreshError);
@@ -144,7 +144,10 @@ api.interceptors.response.use(
     // 2. Critical Infrastructure Errors (500+)
     if (error.response && error.response.status >= 500) {
       if (import.meta.env.DEV) {
-        console.warn(`🚨 Server Error (${error.response.status}):`, error.response.data);
+        Logger.warn("Server error returned by API", {
+          status: error.response.status,
+          data: error.response.data,
+        });
       }
       // Server error will be handled by calling code
     }
@@ -160,7 +163,7 @@ function handleAuthFailure() {
   // 🚨 Prevent multiple simultaneous auth failure handling
   if (isAuthFailureInProgress) {
     if (import.meta.env.DEV) {
-      console.warn('⚠️ Auth failure already in progress, skipping duplicate handling');
+      Logger.warn("Auth failure already in progress, skipping duplicate handling");
     }
     return;
   }
@@ -168,15 +171,15 @@ function handleAuthFailure() {
   isAuthFailureInProgress = true;
 
   if (import.meta.env.DEV) {
-    console.group('🚨 Auth Failure Protocol');
-    console.log('Clearing authentication state...');
-    console.log(`Cancelling ${pendingRequests.size} pending requests...`);
+    Logger.warn("Handling authentication failure", {
+      pendingRequestCount: pendingRequests.size,
+    });
   }
 
   // 🛑 Cancel all pending requests to prevent "Pending" waterfall
   pendingRequests.forEach((controller, requestId) => {
     if (import.meta.env.DEV) {
-      console.log(`Cancelling request: ${requestId}`);
+      Logger.debug("Cancelling pending request", { requestId });
     }
     controller.abort();
   });
@@ -192,8 +195,7 @@ function handleAuthFailure() {
 
   if (!isAlreadyOnLogin) {
     if (import.meta.env.DEV) {
-      console.log('Redirecting to login page...');
-      console.groupEnd();
+      Logger.info("Redirecting to login page");
     }
 
     // Use Vue Router for SPA navigation instead of window.location.href
@@ -201,8 +203,7 @@ function handleAuthFailure() {
     window.location.href = "/login?reason=session_expired";
   } else {
     if (import.meta.env.DEV) {
-      console.log('Already on login page, no redirect needed');
-      console.groupEnd();
+      Logger.debug("Already on login page, no redirect needed");
     }
   }
 

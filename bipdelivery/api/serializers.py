@@ -9,7 +9,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug']
+        fields = ['id', 'name', 'slug', 'description']
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -43,7 +43,6 @@ class ProductSerializer(serializers.ModelSerializer):
         if instance.image:
             if request is not None:
                 data['image'] = request.build_absolute_uri(instance.image.url)
-                print(f"[SERIALIZER] Built absolute URL: {data['image']}")  # Debug log
             else:
                 # Fallback: build URL manually if no request context
                 import urllib.parse
@@ -51,9 +50,7 @@ class ProductSerializer(serializers.ModelSerializer):
                 from django.conf import settings
                 base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
                 data['image'] = urllib.parse.urljoin(base_url, instance.image.url)
-                print(f"[SERIALIZER] Fallback URL (no request context): {data['image']}")  # Debug log
         else:
             data['image'] = None
-            print("[SERIALIZER] No image for product")  # Debug log
 
         return data

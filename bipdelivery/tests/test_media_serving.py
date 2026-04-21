@@ -156,8 +156,11 @@ def test_multiple_products_image_urls(api_client, authenticated_user, test_categ
     list_response = api_client.get(list_url)
     assert list_response.status_code == status.HTTP_200_OK
 
-    products = list_response.data
-    assert len(products) == 3, f"Expected 3 products, got {len(products)}"
+    payload = list_response.data
+    assert payload['count'] == 3, f"Expected 3 products, got {payload['count']}"
+
+    products = payload['results']
+    assert len(products) == 3, f"Expected 3 products on page, got {len(products)}"
 
     for idx, product in enumerate(products):
         image_url = product['image']

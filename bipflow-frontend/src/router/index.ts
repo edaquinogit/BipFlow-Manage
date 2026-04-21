@@ -3,6 +3,8 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { authRoutes, AuthRouteNames } from './auth.routes'
 import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
 import { errorRoutes } from './error.routes'
+import { publicRoutes } from './public.routes'
+import { Logger } from '@/services/logger'
 
 /**
  * 🔀 Route Aggregation
@@ -11,7 +13,8 @@ import { errorRoutes } from './error.routes'
 const routes: RouteRecordRaw[] = [
   ...authRoutes,
   ...dashboardRoutes,
-  ...errorRoutes
+  ...errorRoutes,
+  ...publicRoutes
 ]
 
 /**
@@ -49,7 +52,9 @@ router.beforeEach((to) => {
   // Allow login page to always mount, even during API failures
   if (isRedirectingToLogin) {
     if (import.meta.env.DEV) {
-      console.info(`[Router] Allowing login page mount (reason: ${String(to.query.reason || 'direct_access')})`)
+      Logger.info("Allowing login page mount", {
+        reason: String(to.query.reason || 'direct_access'),
+      })
     }
     return true // Explicitly allow navigation to login
   }
@@ -57,11 +62,10 @@ router.beforeEach((to) => {
   // 1. Proteção de Rotas Privadas (Requires Auth)
   if (to.meta.requiresAuth && !isLogged) {
     if (import.meta.env.DEV) {
-      console.group('🔐 Auth Flow Debug')
-      console.log('Route requires auth:', to.fullPath)
-      console.log('User authenticated:', isLogged)
-      console.log('Redirecting to login...')
-      console.groupEnd()
+      Logger.info("Redirecting unauthenticated user to login", {
+        path: to.fullPath,
+        isAuthenticated: isLogged,
+      })
     }
 
     return {
@@ -78,7 +82,10 @@ router.beforeEach((to) => {
   // 3. Telemetria em modo Desenvolvimento
   if (import.meta.env.DEV) {
     const moduleName = to.meta.module || 'system'
-    console.info(`[Router] Navigating to: ${String(to.name)} | Module: ${moduleName}`)
+    Logger.info("Navigating to route", {
+      routeName: String(to.name),
+      module: moduleName,
+    })
   }
 
   // Se nenhuma condição acima for atendida, a navegação flui naturalmente

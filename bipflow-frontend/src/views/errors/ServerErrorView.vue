@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useToast } from '@/composables/useToast';
+import { Logger } from '@/services/logger';
 
 /**
  * --- 1. INFRAESTRUTURA ---
  */
 const router = useRouter();
+const toast = useToast();
 
 // Função centralizada para teletransporte do usuário (Clean Navigation)
 const navigateToDashboard = () => router.push({ name: 'dashboard-overview' });
@@ -14,8 +17,8 @@ const navigateToDashboard = () => router.push({ name: 'dashboard-overview' });
  * Em produção, aqui você poderia disparar um log para o Sentry ou DataDog
  */
 const reportIssue = () => {
-  console.info("🚀 BipFlow: Issue reported to the engineering hub.");
-  alert("Report sent! Our team in NYC has been notified.");
+  Logger.info('Server error issue reported by user');
+  toast.info('Report sent. Our team has been notified.');
 };
 </script>
 
