@@ -34,6 +34,7 @@ const selectedProduct = ref<Product | null>(null);
  */
 const isSaving = ref(false);
 const isDeletingAction = ref(false);
+const isBulkUpdating = ref(false);
 
 // Composables (Data Layer)
 const {
@@ -42,6 +43,9 @@ const {
   products,
   filters,
   isSearching,
+  selectedAssetIds,
+  isAllSelected,
+  isIndeterminate,
   fetchData,
   createProduct,
   updateProduct,
@@ -50,7 +54,10 @@ const {
   inventoryStats,
   updateFilters,
   clearFilters,
-  setupFilterWatchers,
+  toggleSelection,
+  selectAll,
+  clearSelection,
+  bulkUpdateCategory,
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
@@ -157,12 +164,41 @@ const executeDelete = async (): Promise<void> => {
 /**
  * 🔍 FILTER EVENT HANDLERS
  */
-const handleFiltersUpdate = (newFilters: FilterState): void => {
+const handleFiltersUpdate = (newFilters: Partial<FilterState>): void => {
   updateFilters(newFilters);
 };
 
 const handleClearFilters = async (): Promise<void> => {
   await clearFilters();
+};
+
+const handleToggleSelection = (productId: number): void => {
+  toggleSelection(productId);
+};
+
+const handleSelectAll = (): void => {
+  selectAll();
+};
+
+const handleClearSelection = (): void => {
+  clearSelection();
+};
+
+const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
+  if (selectedAssetIds.value.size === 0) {
+    toastError('Select at least one asset before changing category.');
+    return;
+  }
+
+  isBulkUpdating.value = true;
+  try {
+    await bulkUpdateCategory(Array.from(selectedAssetIds.value), categoryId);
+  } catch (error: unknown) {
+    Logger.error('Bulk category update failed', { error, categoryId });
+    toastError('Failed to update selected assets.');
+  } finally {
+    isBulkUpdating.value = false;
+  }
 };
 
 /**
@@ -173,9 +209,6 @@ onMounted(async () => {
     fetchData(),
     fetchCategories()
   ]);
-
-  // Initialize filter watchers
-  setupFilterWatchers();
 });
 </script>
 
@@ -197,12 +230,20 @@ onMounted(async () => {
         :filters="filters"
         :is-searching="isSearching"
         :categories="categories"
+        :selected-asset-ids="selectedAssetIds"
+        :is-all-selected="isAllSelected"
+        :is-indeterminate="isIndeterminate"
+        :is-bulk-updating="isBulkUpdating"
         @open-panel="handleOpenNewPanel"
         @edit="handleEditRequest"
         @delete="openDeleteConfirm"
         @retry="fetchData"
         @updateFilters="handleFiltersUpdate"
         @clear-filters="handleClearFilters"
+        @toggle-selection="handleToggleSelection"
+        @select-all="handleSelectAll"
+        @clear-selection="handleClearSelection"
+        @bulk-update-category="handleBulkUpdateCategory"
       />
     </main>
 

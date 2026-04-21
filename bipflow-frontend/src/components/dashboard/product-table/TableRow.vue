@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { Product } from '@/schemas/product.schema';
 import ProductAvatar from './ui/ProductAvatar.vue';
 import CategoryBadge from './ui/CategoryBadge.vue';
@@ -6,14 +7,24 @@ import CategoryBadge from './ui/CategoryBadge.vue';
 /**
  * 🛰️ COMPONENT CONTRACT
  */
-defineProps<{
+const props = defineProps<{
   product: Product;
+  isSelected?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
+  (e: 'toggle-selection', productId: number): void;
 }>();
+
+const resolvedCategory = computed(() => {
+  if (!props.product.category || typeof props.product.category !== 'object') {
+    return null;
+  }
+
+  return props.product.category;
+});
 
 // ==========================================
 // 1. FORMATTERS (NYC FINANCIAL DISTRICT STYLE)
@@ -28,6 +39,30 @@ const formatCurrency = (value: number) => {
 
 <template>
   <tr class="group hover:bg-zinc-800/40 transition-all duration-200 border-b border-zinc-800/50 last:border-0">
+
+    <!-- Custom Themed Checkbox -->
+    <td class="px-6 py-4">
+      <button
+        @click="emit('toggle-selection', product.id!)"
+        class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+        :class="[
+          isSelected
+            ? 'bg-indigo-500 border-indigo-500 shadow-lg shadow-indigo-500/25'
+            : 'border-zinc-600 hover:border-indigo-400 bg-zinc-800/50'
+        ]"
+        title="Select Asset"
+      >
+        <svg
+          v-if="isSelected"
+          class="w-3 h-3 text-white"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+        </svg>
+      </button>
+    </td>
 
     <td class="px-6 py-4">
       <div class="flex items-center gap-4">
@@ -45,7 +80,7 @@ const formatCurrency = (value: number) => {
     </td>
 
     <td class="px-6 py-4 text-center">
-      <CategoryBadge :category="product.category" />
+      <CategoryBadge :category="resolvedCategory" />
     </td>
 
     <td class="px-6 py-4 text-center">

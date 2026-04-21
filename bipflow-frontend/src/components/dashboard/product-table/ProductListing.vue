@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import ProductTable from '@/components/dashboard/product-table/ProductTableRoot.vue';
 import SearchAndFilterBar from '@/components/dashboard/product-table/SearchAndFilterBar.vue';
+import BulkActionBar from '@/components/dashboard/product-table/ui/BulkActionBar.vue';
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
+import type { Category } from '@/schemas/category.schema';
 import type { FilterState } from '@/types/filters';
 
 /**
@@ -15,7 +17,11 @@ defineProps<{
   error: string | null;
   filters: FilterState;
   isSearching?: boolean;
-  categories?: Array<{ id: number | string; name: string }>;
+  categories?: Category[];
+  selectedAssetIds?: Set<number>;
+  isAllSelected?: boolean;
+  isIndeterminate?: boolean;
+  isBulkUpdating?: boolean;
 }>();
 
 /**
@@ -28,13 +34,17 @@ defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'retry'): void;
-  (e: 'updateFilters', filters: FilterState): void;
+  (e: 'updateFilters', filters: Partial<FilterState>): void;
   (e: 'clear-filters'): void;
+  (e: 'toggle-selection', productId: number): void;
+  (e: 'select-all'): void;
+  (e: 'clear-selection'): void;
+  (e: 'bulk-update-category', categoryId: number): void;
 }>();
 </script>
 
 <template>
-  <section class="space-y-8" data-cy="product-listing-section">
+  <section class="relative isolate space-y-8 overflow-visible" data-cy="product-listing-section">
 
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-indigo-500 pl-6">
       <div>
@@ -81,8 +91,22 @@ defineEmits<{
     <ProductTable
       v-else
       :products="products"
+      :selected-asset-ids="selectedAssetIds"
+      :is-all-selected="isAllSelected"
+      :is-indeterminate="isIndeterminate"
       @delete="(id) => $emit('delete', id)"
       @edit="(product) => $emit('edit', product)"
+      @toggle-selection="(productId) => $emit('toggle-selection', productId)"
+      @select-all="$emit('select-all')"
     />
   </section>
+
+  <!-- Bulk Action Bar -->
+  <BulkActionBar
+    :selected-count="selectedAssetIds?.size || 0"
+    :categories="categories || []"
+    :is-updating="isBulkUpdating"
+    @cancel="$emit('clear-selection')"
+    @confirm-bulk-update="(categoryId) => $emit('bulk-update-category', categoryId)"
+  />
 </template>

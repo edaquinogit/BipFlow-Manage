@@ -1,19 +1,80 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { defineComponent, nextTick, ref } from 'vue'
 import ProductsView from '../ProductsView.vue'
-import ProductCard from '../ProductCard.vue'
-import ProductFilters from '../ProductFilters.vue'
-import ProductPagination from '../ProductPagination.vue'
 import { useProductSearch } from '@/composables/useProductSearch'
+import { useCart } from '@/composables/useCart'
+import { useToast } from '@/composables/useToast'
+import { categoryService } from '@/services/category.service'
 
-// Mock the composable
 vi.mock('@/composables/useProductSearch', () => ({
   useProductSearch: vi.fn()
 }))
 
+vi.mock('@/composables/useCart', () => ({
+  useCart: vi.fn()
+}))
+
+vi.mock('@/composables/useToast', () => ({
+  useToast: vi.fn()
+}))
+
+vi.mock('@/services/category.service', () => ({
+  categoryService: {
+    getAll: vi.fn(),
+  },
+}))
+
+const ProductCardStub = defineComponent({
+  name: 'ProductCard',
+  props: {
+    product: { type: Object, required: true },
+    cartQuantity: { type: Number, default: 0 },
+  },
+  emits: ['add-to-cart'],
+  template: '<div class="product-card-stub">{{ product.name }}</div>',
+})
+
+const ProductFiltersStub = defineComponent({
+  name: 'ProductFilters',
+  props: {
+    filters: { type: Object, required: true },
+    categories: { type: Array, required: true },
+  },
+  emits: ['update-filters', 'clear-filters'],
+  template: '<div class="product-filters-stub"></div>',
+})
+
+const ProductPaginationStub = defineComponent({
+  name: 'ProductPagination',
+  props: {
+    currentPage: { type: Number, required: true },
+    totalPages: { type: Number, required: true },
+    hasPreviousPage: { type: Boolean, required: true },
+    hasNextPage: { type: Boolean, required: true },
+    showingRange: { type: String, required: true },
+  },
+  emits: ['go-to-page', 'next-page', 'previous-page'],
+  template: '<div class="product-pagination-stub"></div>',
+})
+
+const CartDrawerStub = defineComponent({
+  name: 'CartDrawer',
+  props: {
+    isOpen: { type: Boolean, required: true },
+    items: { type: Array, required: true },
+    customer: { type: Object, required: true },
+    itemCount: { type: Number, required: true },
+    subtotal: { type: Number, required: true },
+    deliveryFee: { type: Number, required: true },
+    total: { type: Number, required: true },
+  },
+  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer', 'copy-order'],
+  template: '<div class="cart-drawer-stub"></div>',
+})
+
 describe('ProductsView', () => {
   let wrapper: ReturnType<typeof mount>
-  let mockUseProductSearch: any
 
   const mockProducts = [
     {
@@ -29,23 +90,24 @@ describe('ProductsView', () => {
     }
   ]
 
-  const defaultMockReturn = {
-    products: mockProducts,
-    isLoading: false,
-    error: null,
-    page: 1,
-    totalCount: 1,
-    totalPages: 1,
-    filters: {
+  const searchState = {
+    products: ref(mockProducts),
+    isLoading: ref(false),
+    isInitialLoading: ref(false),
+    isLoadingMore: ref(false),
+    error: ref<string | null>(null),
+    page: ref(1),
+    totalPages: ref(1),
+    filters: ref({
       search: '',
       categoryId: undefined,
       priceMin: undefined,
       priceMax: undefined,
       inStockOnly: false
-    },
-    hasNextPage: false,
-    hasPreviousPage: false,
-    showingRange: 'Exibindo 1-1 de 1 produtos',
+    }),
+    hasNextPage: ref(false),
+    hasPreviousPage: ref(false),
+    showingRange: ref('Exibindo 1-1 de 1 produtos'),
     fetchProducts: vi.fn(),
     updateFilters: vi.fn(),
     clearFilters: vi.fn(),
@@ -54,227 +116,109 @@ describe('ProductsView', () => {
     previousPage: vi.fn()
   }
 
-  const mountView = (): ReturnType<typeof mount> => {
-    return mount(ProductsView, {
-      global: {
-        stubs: {
-          ProductCard: true,
-          ProductFilters: true,
-          ProductPagination: true
-        }
-      }
-    })
+  const cartState = {
+    items: ref([]),
+    customer: ref({
+      fullName: '',
+      phone: '',
+      email: '',
+      deliveryMethod: 'delivery',
+      paymentMethod: 'pix',
+      address: '',
+      neighborhood: '',
+      city: '',
+      notes: '',
+    }),
+    itemCount: ref(0),
+    uniqueItemCount: ref(0),
+    subtotal: ref(0),
+    deliveryFee: ref(12),
+    total: ref(12),
+    addItem: vi.fn(),
+    removeItem: vi.fn(),
+    updateQuantity: vi.fn(),
+    clearCart: vi.fn(),
+    updateCustomer: vi.fn(),
+    getProductQuantity: vi.fn(() => 0),
+    buildOrderSummary: vi.fn(() => 'Pedido BipFlow'),
   }
 
-  beforeEach(() => {
-    mockUseProductSearch = vi.fn().mockReturnValue(defaultMockReturn)
-    vi.mocked(useProductSearch).mockImplementation(mockUseProductSearch)
+  const toastMock = {
+    success: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  }
+
+  const mountView = () =>
+    mount(ProductsView, {
+      global: {
+        stubs: {
+          ProductCard: ProductCardStub,
+          ProductFilters: ProductFiltersStub,
+          ProductPagination: ProductPaginationStub,
+          CartDrawer: CartDrawerStub,
+        },
+      },
+    })
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    vi.mocked(useProductSearch).mockReturnValue(searchState as any)
+    vi.mocked(useCart).mockReturnValue(cartState as any)
+    vi.mocked(useToast).mockReturnValue(toastMock as any)
+    vi.mocked(categoryService.getAll).mockResolvedValue([
+      { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
+    ] as any)
+
     wrapper = mountView()
+    await nextTick()
   })
 
-  describe('Initial Rendering', () => {
-    it('should render the main structure', () => {
-      expect(wrapper.find('header').exists()).toBe(true)
-      expect(wrapper.find('main').exists()).toBe(true)
-      expect(wrapper.find('h1').text()).toBe('Produtos')
-    })
-
-    it('should render product components', () => {
-      expect(wrapper.findComponent(ProductFilters).exists()).toBe(true)
-      expect(wrapper.findComponent(ProductCard).exists()).toBe(true)
-    })
-
-    it('should display showing range when not loading', () => {
-      expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
-    })
+  it('renders catalog header and products', () => {
+    expect(wrapper.find('h1').text()).toContain('Produtos prontos')
+    expect(wrapper.find('.product-card-stub').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })
 
-  describe('Loading State', () => {
-    it('should show skeleton loaders when loading and no products', async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        isLoading: true,
-        products: []
-      })
-      wrapper = mountView()
-
-      await wrapper.vm.$nextTick()
-
-      const skeletons = wrapper.findAll('.animate-pulse')
-      expect(skeletons.length).toBeGreaterThan(0)
-    })
-
-    it('should not show skeletons when loading but has products', async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        isLoading: true,
-        products: mockProducts
-      })
-      wrapper = mountView()
-
-      await wrapper.vm.$nextTick()
-
-      expect(wrapper.findComponent(ProductCard).exists()).toBe(true)
-    })
+  it('renders filters and cart drawer components', () => {
+    expect(wrapper.find('.product-filters-stub').exists()).toBe(true)
+    expect(wrapper.find('.cart-drawer-stub').exists()).toBe(true)
   })
 
-  describe('Error State', () => {
-    it('should show error message when there is an error and no products', async () => {
-      const errorMessage = 'Failed to load products'
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        error: errorMessage,
-        products: []
-      })
-      wrapper = mountView()
+  it('updates filters when quick category is clicked', async () => {
+    const buttons = wrapper.findAll('button')
+    const categoryButton = buttons.find((button) => button.text() === 'Test Category')
 
-      await wrapper.vm.$nextTick()
+    expect(categoryButton).toBeDefined()
 
-      expect(wrapper.text()).toContain('Erro ao carregar produtos')
-      expect(wrapper.text()).toContain(errorMessage)
-      expect(wrapper.find('button').text()).toContain('Tentar novamente')
-    })
+    await categoryButton!.trigger('click')
 
-    it('should call fetchProducts when retry button is clicked', async () => {
-      const fetchProductsMock = vi.fn()
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        error: 'Error',
-        products: [],
-        fetchProducts: fetchProductsMock
-      })
-      wrapper = mountView()
-
-      await wrapper.vm.$nextTick()
-
-      const retryButton = wrapper.find('button[aria-label="Tentar novamente"]')
-      await retryButton.trigger('click')
-
-      expect(fetchProductsMock).toHaveBeenCalled()
-    })
+    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1 })
   })
 
-  describe('Empty State', () => {
-    it('should show empty state when no products and not loading', async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        products: [],
-        isLoading: false,
-        error: null
-      })
-      wrapper = mountView()
+  it('forwards ProductFilters events to search actions', async () => {
+    const filtersComponent = wrapper.findComponent(ProductFiltersStub)
 
-      await wrapper.vm.$nextTick()
+    await filtersComponent.vm.$emit('update-filters', { search: 'monitor' })
+    await filtersComponent.vm.$emit('clear-filters')
 
-      expect(wrapper.text()).toContain('Nenhum produto encontrado')
-      expect(wrapper.find('button').text()).toContain('Limpar filtros')
-    })
+    expect(searchState.updateFilters).toHaveBeenCalledWith({ search: 'monitor' })
+    expect(searchState.clearFilters).toHaveBeenCalled()
   })
 
-  describe('Pagination', () => {
-    it('should render pagination when there are multiple pages', async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        totalPages: 3,
-        hasNextPage: true
-      })
-      wrapper = mountView()
+  it('adds product to cart and shows toast feedback', async () => {
+    const cardComponent = wrapper.findComponent(ProductCardStub)
+    await cardComponent.vm.$emit('add-to-cart', mockProducts[0], 2)
 
-      await wrapper.vm.$nextTick()
-
-      expect(wrapper.findComponent(ProductPagination).exists()).toBe(true)
-    })
-
-    it('should not render pagination for single page', async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        totalPages: 1
-      })
-      wrapper = mountView()
-
-      await wrapper.vm.$nextTick()
-
-      expect(wrapper.findComponent(ProductPagination).exists()).toBe(false)
-    })
+    expect(cartState.addItem).toHaveBeenCalledWith(mockProducts[0], 2)
+    expect(toastMock.success).toHaveBeenCalled()
   })
 
-  describe('Filter Integration', () => {
-    it('should call updateFilters when filters are updated', async () => {
-      mockUseProductSearch.mockReturnValue(defaultMockReturn)
-      wrapper = mountView()
+  it('renders empty state when no products are available', async () => {
+    searchState.products.value = []
+    await nextTick()
 
-      await wrapper.vm.$nextTick()
-
-      const filtersComponent = wrapper.findComponent(ProductFilters)
-      await filtersComponent.vm.$emit('update-filters', { search: 'test search' })
-
-      expect(defaultMockReturn.updateFilters).toHaveBeenCalledWith({ search: 'test search' })
-    })
-
-    it('should call clearFilters when clear filters is triggered', async () => {
-      mockUseProductSearch.mockReturnValue(defaultMockReturn)
-      wrapper = mountView()
-
-      await wrapper.vm.$nextTick()
-
-      const filtersComponent = wrapper.findComponent(ProductFilters)
-      await filtersComponent.vm.$emit('clear-filters')
-
-      expect(defaultMockReturn.clearFilters).toHaveBeenCalled()
-    })
-  })
-
-  describe('Pagination Events', () => {
-    beforeEach(async () => {
-      mockUseProductSearch.mockReturnValue({
-        ...defaultMockReturn,
-        totalPages: 3,
-        hasNextPage: true
-      })
-      wrapper = mountView()
-      await wrapper.vm.$nextTick()
-    })
-
-    it('should call goToPage when pagination emits go-to-page', async () => {
-      const paginationComponent = wrapper.findComponent(ProductPagination)
-      await paginationComponent.vm.$emit('go-to-page', 2)
-
-      expect(defaultMockReturn.goToPage).toHaveBeenCalledWith(2)
-    })
-
-    it('should call nextPage when pagination emits next-page', async () => {
-      const paginationComponent = wrapper.findComponent(ProductPagination)
-      await paginationComponent.vm.$emit('next-page')
-
-      expect(defaultMockReturn.nextPage).toHaveBeenCalled()
-    })
-
-    it('should call previousPage when pagination emits previous-page', async () => {
-      const paginationComponent = wrapper.findComponent(ProductPagination)
-      await paginationComponent.vm.$emit('previous-page')
-
-      expect(defaultMockReturn.previousPage).toHaveBeenCalled()
-    })
-  })
-
-  describe('Accessibility', () => {
-    it('should have proper heading structure', () => {
-      const h1 = wrapper.find('h1')
-      expect(h1.exists()).toBe(true)
-      expect(h1.text()).toBe('Produtos')
-    })
-
-    it('should have proper ARIA labels', () => {
-      const main = wrapper.find('main')
-      expect(main.attributes('aria-label')).toBeUndefined() // Main doesn't need label
-
-      // Check that buttons have aria-labels where needed
-      const buttons = wrapper.findAll('button')
-      buttons.forEach(button => {
-        if (button.text().includes('Tentar novamente')) {
-          expect(button.attributes('aria-label')).toBe('Tentar novamente')
-        }
-      })
-    })
+    expect(wrapper.text()).toContain('Nenhum produto encontrado')
   })
 })

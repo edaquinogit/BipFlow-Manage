@@ -8,7 +8,7 @@ import { z } from "zod";
 export const CategorySchema = z.object({
   id: z.number(),
   name: z.string().min(1, "Category name is required"),
-  slug: z.string().optional(),
+  slug: z.string().nullable().optional(),
 });
 
 /**

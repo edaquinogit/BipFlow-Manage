@@ -270,3 +270,91 @@ class DjangoHealthTest(TestCase):
         self.assertIn('DEFAULT_AUTHENTICATION_CLASSES', rest_framework_config)
         auth_classes = rest_framework_config['DEFAULT_AUTHENTICATION_CLASSES']
         self.assertTrue(any('JWT' in cls for cls in auth_classes))
+
+
+class CheckoutWhatsAppAPITest(TestCase):
+    """Test the public checkout preparation endpoint."""
+
+    client: APIClient
+    category: Category
+    product: Product
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.category = Category.objects.create(
+            name='Lanches',
+            slug='lanches'
+        )
+        self.product = Product.objects.create(
+            name='Combo Executivo',
+            sku='CMB-001',
+            price=Decimal('42.50'),
+            stock_quantity=8,
+            category=self.category,
+        )
+
+    def test_checkout_builds_whatsapp_payload(self) -> None:
+        """Checkout should return totals, note text and WhatsApp URL."""
+        with self.settings(WHATSAPP_ORDER_PHONE='5571999999999'):
+            payload = {
+                'items': [
+                    {
+                        'product_id': self.product.id,  # type: ignore[arg-type]
+                        'quantity': 2,
+                    }
+                ],
+                'customer': {
+                    'full_name': 'Cliente Teste',
+                    'phone': '(71) 99999-0000',
+                    'email': 'cliente@teste.com',
+                    'delivery_method': 'delivery',
+                    'payment_method': 'pix',
+                    'address': 'Rua A, 123',
+                    'neighborhood': 'Centro',
+                    'city': 'Salvador',
+                    'notes': 'Sem cebola',
+                }
+            }
+            response: Any = self.client.post(
+                '/api/v1/checkout/whatsapp/',
+                payload,
+                format='json'
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['subtotal'], '85.00')
+        self.assertEqual(response.data['delivery_fee'], '12.00')
+        self.assertEqual(response.data['total'], '97.00')
+        self.assertTrue(response.data['whatsapp_url'].startswith('https://wa.me/5571999999999?text='))
+        self.assertIn('Pedido BipFlow', response.data['message'])
+        self.assertEqual(response.data['items'][0]['product_name'], 'Combo Executivo')
+
+    def test_checkout_requires_delivery_address_for_delivery_orders(self) -> None:
+        """Delivery orders should require address fields."""
+        payload = {
+            'items': [
+                {
+                    'product_id': self.product.id,  # type: ignore[arg-type]
+                    'quantity': 1,
+                }
+            ],
+            'customer': {
+                'full_name': 'Cliente Teste',
+                'phone': '(71) 99999-0000',
+                'email': '',
+                'delivery_method': 'delivery',
+                'payment_method': 'pix',
+                'address': '',
+                'neighborhood': '',
+                'city': '',
+                'notes': '',
+            }
+        }
+        response: Any = self.client.post(
+            '/api/v1/checkout/whatsapp/',
+            payload,
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('address', response.data)

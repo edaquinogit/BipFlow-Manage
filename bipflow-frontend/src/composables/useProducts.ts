@@ -1,10 +1,8 @@
 import {
   ref,
   computed,
-  watch,
   onBeforeUnmount,
   getCurrentInstance,
-  type WatchStopHandle,
 } from "vue";
 import type { Product } from "../schemas/product.schema";
 import ProductService from "../services/product.service";
@@ -56,7 +54,6 @@ export function useProducts() {
 
   // Debounced search function (will be initialized below)
   let debouncedSearch: ReturnType<typeof debounce> | null = null;
-  let stopFilterWatcher: WatchStopHandle | null = null;
 
   // ==========================================
   // HELPERS
@@ -448,8 +445,6 @@ export function useProducts() {
       (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
     }
 
-    stopFilterWatcher?.();
-    stopFilterWatcher = null;
   };
 
   /**
@@ -458,6 +453,7 @@ export function useProducts() {
    * @param updates Partial filter state updates
    */
   const updateFilters = (updates: Partial<FilterState>): void => {
+    const hasSearchUpdate = Object.prototype.hasOwnProperty.call(updates, "search");
     filters.value = {
       ...filters.value,
       ...updates,
@@ -469,9 +465,30 @@ export function useProducts() {
       initializeDebouncedSearch();
     }
 
-    // Trigger debounced search
-    if (debouncedSearch) {
-      (debouncedSearch as unknown as (...args: unknown[]) => void)();
+    if (!debouncedSearch) {
+      return;
+    }
+
+    const debouncedController = debouncedSearch as DebouncedFunctionLike;
+
+    // Free-text search stays debounced; structured filters apply immediately.
+    if (hasSearchUpdate) {
+      debouncedController();
+      return;
+    }
+
+    debouncedController.cancel?.();
+    void performSearch();
+  };
+
+  interface DebouncedFunctionLike {
+    (): void;
+    cancel?: () => void;
+  }
+
+  const cancelPendingSearch = (): void => {
+    if (debouncedSearch && typeof debouncedSearch === "object" && "cancel" in debouncedSearch) {
+      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
     }
   };
 
@@ -519,10 +536,7 @@ export function useProducts() {
     filters.value = createDefaultFilterState();
     error.value = null;
 
-    // Cancel any pending search
-    if (debouncedSearch && typeof debouncedSearch === "object" && "cancel" in debouncedSearch) {
-      (debouncedSearch as unknown as { cancel: () => void }).cancel?.();
-    }
+    cancelPendingSearch();
 
     // Fetch all products without filters
     await fetchData();
@@ -614,25 +628,6 @@ export function useProducts() {
   };
 
   /**
-   * Set up watchers for automatic search on filter changes.
-   * This is called during component lifecycle.
-   */
-  const setupFilterWatchers = (): void => {
-    stopFilterWatcher?.();
-
-    stopFilterWatcher = watch(
-      () => filters.value,
-      () => {
-        initializeDebouncedSearch();
-        if (debouncedSearch) {
-          (debouncedSearch as unknown as (...args: unknown[]) => void)();
-        }
-      },
-      { deep: true }
-    );
-  };
-
-  /**
    * Clean up debounced functions on unmount.
    */
   if (getCurrentInstance()) {
@@ -675,7 +670,6 @@ export function useProducts() {
     updatePriceRange,
     clearFilters,
     performSearch,
-    setupFilterWatchers,
     dispose,
 
     // Bulk Selection Actions

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { Category } from '@/schemas/category.schema';
+import type { Category as ProductCategory } from '@/schemas/product.schema';
+import type { Category as CategorySchema } from '@/schemas/category.schema';
 
 /**
  * 🏷️ COMPONENT CONTRACT
  */
 defineProps<{
-  category: Category | null;
+  category: CategorySchema | ProductCategory | null;
 }>();
 
 /**
@@ -23,7 +24,8 @@ const getCategoryGlowColor = (categoryId: number): string => {
     'rgba(6, 182, 212, 0.3)',    // cyan
     'rgba(245, 158, 11, 0.3)',   // yellow
   ];
-  return colors[categoryId % colors.length];
+  const index = ((categoryId % colors.length) + colors.length) % colors.length;
+  return colors[index] as string;
 };
 
 const getCategoryBorderColor = (categoryId: number): string => {
@@ -37,7 +39,8 @@ const getCategoryBorderColor = (categoryId: number): string => {
     'rgba(6, 182, 212, 0.6)',    // cyan
     'rgba(245, 158, 11, 0.6)',   // yellow
   ];
-  return colors[categoryId % colors.length];
+  const index = ((categoryId % colors.length) + colors.length) % colors.length;
+  return colors[index] as string;
 };
 </script>
 

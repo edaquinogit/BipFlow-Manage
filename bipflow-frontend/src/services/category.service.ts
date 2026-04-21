@@ -1,4 +1,5 @@
 import type { AxiosError } from "axios";
+import { z } from "zod";
 import api from "./api";
 import {
   CategorySchema,
@@ -7,6 +8,14 @@ import {
 } from "../schemas/category.schema";
 
 const ENDPOINT = "v1/categories/" as const;
+const CategoryListEnvelopeSchema = z.object({
+  count: z.number(),
+  next: z.string().nullable(),
+  previous: z.string().nullable(),
+  page_size: z.number().optional(),
+  total_pages: z.number().optional(),
+  results: z.array(z.unknown()),
+});
 
 export class CategoryServiceError extends Error {
   constructor(
@@ -45,8 +54,18 @@ function resolveAxiosError(error: unknown, fallback: string): never {
 class CategoryService {
   async getAll(): Promise<Category[]> {
     try {
-      const { data } = await api.get<unknown[]>(ENDPOINT);
-      return data.map((item, index) => parseOrThrow(item, `getAll[${index}]`));
+      const { data } = await api.get<unknown>(ENDPOINT);
+      const envelopeValidation = CategoryListEnvelopeSchema.safeParse(data);
+      const categoryList = envelopeValidation.success ? envelopeValidation.data.results : data;
+
+      if (!Array.isArray(categoryList)) {
+        throw new CategoryServiceError(
+          '[CategoryService] Invalid categories payload received',
+          data,
+        );
+      }
+
+      return categoryList.map((item, index) => parseOrThrow(item, `getAll[${index}]`));
     } catch (error) {
       if (error instanceof CategoryServiceError) throw error;
       resolveAxiosError(error, "[CategoryService] Failed to fetch categories");

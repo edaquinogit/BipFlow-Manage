@@ -11,14 +11,22 @@ import TableRow from '@/components/dashboard/product-table/TableRow.vue';
 const props = withDefaults(defineProps<{
   products: Product[];
   isLoading?: boolean;
+  selectedAssetIds?: Set<number>;
+  isAllSelected?: boolean;
+  isIndeterminate?: boolean;
 }>(), {
   products: () => [],
-  isLoading: false
+  isLoading: false,
+  selectedAssetIds: () => new Set(),
+  isAllSelected: false,
+  isIndeterminate: false
 });
 
 const emit = defineEmits<{
   (e: 'delete', id: number): void;
   (e: 'edit', product: Product): void;
+  (e: 'toggle-selection', productId: number): void;
+  (e: 'select-all'): void;
 }>();
 
 /**
@@ -35,8 +43,8 @@ const onDelete = (id: number) => {
 </script>
 
 <template>
-  <div class="relative w-full min-h-96 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-    
+  <div class="relative z-0 w-full min-h-96 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+
     <Transition name="fade">
       <div
   v-if="props.isLoading && hasProducts"
@@ -53,6 +61,37 @@ const onDelete = (id: number) => {
       <table class="w-full text-left border-collapse table-auto">
         <thead>
           <tr class="bg-zinc-800/50 text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black border-b border-zinc-800">
+            <th class="px-6 py-5">
+              <button
+                @click="emit('select-all')"
+                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500/50 hover:border-indigo-400"
+                :class="[
+                  props.isAllSelected || props.isIndeterminate
+                    ? 'bg-indigo-500 border-indigo-500'
+                    : 'border-zinc-600 bg-zinc-800/50'
+                ]"
+                title="Select All Assets"
+              >
+                <svg
+                  v-if="isAllSelected"
+                  class="w-3 h-3 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                </svg>
+                <svg
+                  v-else-if="isIndeterminate"
+                  class="w-3 h-3 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4" />
+                </svg>
+              </button>
+            </th>
             <th class="px-6 py-5">Asset Details</th>
             <th class="px-6 py-5 text-center">Category</th>
             <th class="px-6 py-5 text-center">Stock</th>
@@ -64,7 +103,7 @@ const onDelete = (id: number) => {
         <tbody class="divide-y divide-zinc-800 relative">
           <TableEmptyState
             v-if="!hasProducts && !props.isLoading"
-            :colspan="5"
+            :colspan="6"
           />
 
           <template v-if="props.isLoading && !hasProducts">
@@ -77,8 +116,10 @@ const onDelete = (id: number) => {
             v-for="product in props.products"
             :key="product.id || Math.random()"
             :product="product"
+            :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"
             @edit="onEdit"
             @delete="onDelete"
+            @toggle-selection="(productId) => emit('toggle-selection', productId)"
           />
         </tbody>
       </table>

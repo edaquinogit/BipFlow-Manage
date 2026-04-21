@@ -38,6 +38,28 @@ const createEmptyForm = (): Partial<Product> => ({
   image: null
 });
 
+const normalizeInitialFormData = (
+  product: Product | null | undefined
+): Partial<Product> => {
+  if (!product) {
+    return createEmptyForm();
+  }
+
+  const nextForm = { ...product } as Partial<Product> & {
+    category?: Product['category'];
+  };
+
+  if (
+    nextForm.category &&
+    typeof nextForm.category === 'object' &&
+    'id' in nextForm.category
+  ) {
+    nextForm.category = nextForm.category.id;
+  }
+
+  return nextForm;
+};
+
 const form = ref<any>(createEmptyForm());
 
 /**
@@ -45,8 +67,8 @@ const form = ref<any>(createEmptyForm());
  */
 watch(() => props.isOpen, (isVisible) => {
   if (isVisible) {
-    // Spread para evitar mutação direta e problemas de referência
-    form.value = props.initialData ? { ...props.initialData } : createEmptyForm();
+    // Normaliza relações para o formato esperado pelos inputs do formulário
+    form.value = normalizeInitialFormData(props.initialData);
     errors.value = {};
   }
 }, { immediate: true });

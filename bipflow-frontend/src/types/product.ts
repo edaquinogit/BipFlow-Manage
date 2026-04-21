@@ -45,6 +45,72 @@ export interface ProductFilters {
   inStockOnly?: boolean
 }
 
+export type ProductSortOption =
+  | 'featured'
+  | 'price-asc'
+  | 'price-desc'
+  | 'name-asc'
+  | 'newest'
+
+export interface CartItem {
+  product: Product
+  quantity: number
+}
+
+export interface CartCustomer {
+  fullName: string
+  phone: string
+  email: string
+  deliveryMethod: 'delivery' | 'pickup'
+  paymentMethod: 'pix' | 'card' | 'cash'
+  address: string
+  neighborhood: string
+  city: string
+  notes: string
+}
+
+export interface CheckoutPayloadItem {
+  product_id: number
+  quantity: number
+}
+
+export interface CheckoutPayloadCustomer {
+  full_name: string
+  phone: string
+  email: string
+  delivery_method: 'delivery' | 'pickup'
+  payment_method: 'pix' | 'card' | 'cash'
+  address: string
+  neighborhood: string
+  city: string
+  notes: string
+}
+
+export interface CheckoutPayload {
+  items: CheckoutPayloadItem[]
+  customer: CheckoutPayloadCustomer
+}
+
+export interface CheckoutResponseItem {
+  product_id: number
+  product_name: string
+  sku: string
+  quantity: number
+  unit_price: string
+  line_total: string
+}
+
+export interface CheckoutResponse {
+  order_reference: string
+  items: CheckoutResponseItem[]
+  customer: CheckoutPayloadCustomer
+  subtotal: string
+  delivery_fee: string
+  total: string
+  message: string
+  whatsapp_url: string
+}
+
 export type ProductFilterCategory = Pick<Category, 'id' | 'name'>
 
 /**

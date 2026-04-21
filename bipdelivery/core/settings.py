@@ -1,6 +1,7 @@
 ﻿import os
 import sys
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -218,6 +219,12 @@ SIMPLE_JWT = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ------------------------------------------------------------------------------
+# ORDER CHECKOUT / WHATSAPP
+# ------------------------------------------------------------------------------
+WHATSAPP_ORDER_PHONE = os.environ.get('WHATSAPP_ORDER_PHONE', '').strip()
+ORDER_DELIVERY_FEE = Decimal(os.environ.get('ORDER_DELIVERY_FEE', '12.00'))
 
 # ------------------------------------------------------------------------------
 
