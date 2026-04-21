@@ -14,3 +14,4 @@ Pillow
 # Code Quality
 ruff==0.1.5
 black==23.9.1
+django-filter==24.1

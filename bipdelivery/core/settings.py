@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -7,7 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # ------------------------------------------------------------------------------
-# 🛰️ BASE DIRECTORY & PATHS
+# ðŸ›°ï¸ BASE DIRECTORY & PATHS
 # ------------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 # ------------------------------------------------------------------------------
-# 🔑 SECURITY & ENVIRONMENT
+# ðŸ”‘ SECURITY & ENVIRONMENT
 # ------------------------------------------------------------------------------
 
 def get_bool_env(key: str, default: bool = False) -> bool:
@@ -65,7 +65,7 @@ if not ALLOWED_HOSTS:
         raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS must be defined in production.')
 
 # ------------------------------------------------------------------------------
-# 📦 APPS CONFIGURATION (Segregated for Clarity)
+# ðŸ“¦ APPS CONFIGURATION (Segregated for Clarity)
 # ------------------------------------------------------------------------------
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -79,6 +79,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     'rest_framework',
     'corsheaders',
+    'django_filters',
     # 'rest_framework_simplejwt',  # JWT auth is configured in REST_FRAMEWORK settings, not as installed app
 ]
 
@@ -90,11 +91,11 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 # ------------------------------------------------------------------------------
-# 🛡️ MIDDLEWARE (Security Order is Critical)
+# ðŸ›¡ï¸ MIDDLEWARE (Security Order is Critical)
 # ------------------------------------------------------------------------------
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # 🚀 Must be first for CORS preflight
-    'bipdelivery.core.middleware.CORSMediaMiddleware',  # 🖼️ CORS for media files
+    'corsheaders.middleware.CorsMiddleware',  # ðŸš€ Must be first for CORS preflight
+    'bipdelivery.core.middleware.CORSMediaMiddleware',  # ðŸ–¼ï¸ CORS for media files
     'django.middleware.security.SecurityMiddleware',
     'bipdelivery.core.middleware.GlobalExceptionMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -109,7 +110,7 @@ ROOT_URLCONF = 'bipdelivery.core.urls'
 WSGI_APPLICATION = 'bipdelivery.core.wsgi.application'
 
 # ------------------------------------------------------------------------------
-# 🎨 TEMPLATE ENGINE (Fixes admin.E403 Error)
+# ðŸŽ¨ TEMPLATE ENGINE (Fixes admin.E403 Error)
 # ------------------------------------------------------------------------------
 TEMPLATES = [
     {
@@ -128,7 +129,7 @@ TEMPLATES = [
 ]
 
 # ------------------------------------------------------------------------------
-# 📊 DATABASE & AUTHENTICATION
+# ðŸ“Š DATABASE & AUTHENTICATION
 # ------------------------------------------------------------------------------
 DATABASES = {
     'default': {
@@ -145,7 +146,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # ------------------------------------------------------------------------------
-# 🌍 INTERNATIONALIZATION
+# ðŸŒ INTERNATIONALIZATION
 # ------------------------------------------------------------------------------
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
@@ -153,7 +154,7 @@ USE_I18N = True
 USE_TZ = True
 
 # ------------------------------------------------------------------------------
-# 🖼️ STATIC & MEDIA ASSETS (BipFlow Assets Protocol)
+# ðŸ–¼ï¸ STATIC & MEDIA ASSETS (BipFlow Assets Protocol)
 # ------------------------------------------------------------------------------
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -166,9 +167,31 @@ for path in [STATIC_ROOT, MEDIA_ROOT]:
     os.makedirs(path, exist_ok=True)
 
 # ------------------------------------------------------------------------------
-# 🔒 CORS & DRF SECURITY
+# ðŸ”’ CORS & DRF SECURITY
 # ------------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Restrict in production
+# Parse CORS allowed origins from environment or use sensible defaults
+cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+if DEBUG:
+    # In development, allow localhost and common dev ports
+    CORS_ALLOWED_ORIGINS = [
+        'http://localhost:5173',  # Vite dev server
+        'http://localhost:3000',  # Alternative dev port
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:3000',
+        'http://localhost:8000',  # Django dev server
+        'http://127.0.0.1:8000',
+    ]
+elif cors_origins:
+    # In production, use environment variable (comma-separated)
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in cors_origins.split(',')
+        if origin.strip()
+    ]
+else:
+    # Fallback for production without env var - no CORS
+    CORS_ALLOWED_ORIGINS = []
+
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
@@ -176,12 +199,11 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-}
+        'rest_framework.permissions.AllowAny',  # ðŸ"' Allow public read access by default
+    ],    'DEFAULT_PAGINATION_CLASS': 'bipdelivery.api.pagination.StandardPagination',
+    'PAGE_SIZE': 12,}
 
-# ------------------------------------------------------------------------------
-# 🛰️ JWT CONFIGURATION (Token Standards)
+# ðŸ›°ï¸ JWT CONFIGURATION (Token Standards)
 # ------------------------------------------------------------------------------
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
@@ -196,3 +218,22 @@ SIMPLE_JWT = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ------------------------------------------------------------------------------
+
+# ─────────────────────────────────────────────────────────────────────────
+# 🕐 CACHE CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'bipflow-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,
+        }
+    }
+}
+
+
+

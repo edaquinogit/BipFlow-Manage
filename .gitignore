@@ -43,3 +43,35 @@ node_modules/
 dist/
 __pycache__/
 *.py[cod]
+
+# Virtual environments
+.venv
+.venv_linux/
+venv/
+
+# Test coverage
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Media files (local uploads)
+bipdelivery/media/
+bipdelivery/staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Backup files
+*.bak
+*.backup
