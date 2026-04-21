@@ -83,12 +83,15 @@ Services principais:
 - `src/services/category.service.ts`
 - `src/services/order.service.ts`
 - `src/services/auth.service.ts`
+- `src/services/token-store.ts`
 
 Padroes atuais:
 
 - produtos e categorias sao consumidos via camada de service
 - respostas podem ser validadas com Zod quando o modulo ja adota esse padrao
 - o checkout e concluido via endpoint de WhatsApp, nao por persistencia local no frontend
+- autenticacao JWT usa `tokenStore` como unica fonte de verdade para `access_token` e `refresh_token`
+- guards de rota e interceptors nao devem ler ou gravar tokens diretamente fora da camada de servico
 
 ## Qualidade
 

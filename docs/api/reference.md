@@ -19,6 +19,8 @@ Versionamento de negocio:
 ## Autenticacao
 
 O backend usa JWT com Simple JWT.
+No frontend, a persistencia de sessao deve usar o par `access_token` + `refresh_token`
+armazenado pela camada centralizada de autenticacao.
 
 ### Obter token
 
@@ -48,6 +50,12 @@ Payload esperado:
   "refresh": "refresh-token"
 }
 ```
+
+Notas operacionais:
+
+- o frontend deve chamar `auth/token/refresh/` relativo ao `VITE_API_URL`
+- o frontend nao deve usar chaves legadas como `token` para controle de sessao
+- guards de rota e interceptors devem consultar a mesma fonte de verdade de autenticacao
 
 ## Politica De Permissao
 

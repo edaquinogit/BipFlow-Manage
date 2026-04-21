@@ -22,6 +22,7 @@ Este guia descreve o fluxo local recomendado para trabalhar no BipFlow sem depen
 - Local: `bipflow-frontend/`
 - Stack: Vue 3 + TypeScript + Vite
 - Responsabilidades: dashboard autenticado, catalogo publico, carrinho local, integracao com API Django
+- Contrato de auth: tokens JWT persistidos exclusivamente via `bipflow-frontend/src/services/token-store.ts`
 
 ### Servico paralelo
 
@@ -129,6 +130,7 @@ Cobertura atual do frontend inclui:
 - Prefira nomes orientados ao dominio.
 - Mantenha componentes, services e composables com responsabilidade unica.
 - Centralize acesso HTTP em `src/services/`.
+- Em frontend, trate `token-store.ts` como unica fonte de verdade para persistencia de tokens.
 - Sempre que o modulo ja usar schema validation, atualize schema e service juntos.
 - Em backend, preserve regras de permissao publica para leitura e autenticada para escrita quando alterar produtos e categorias.
 

@@ -4,6 +4,7 @@ import { authRoutes, AuthRouteNames } from './auth.routes'
 import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
 import { errorRoutes } from './error.routes'
 import { publicRoutes } from './public.routes'
+import { authService } from '@/services/auth.service'
 import { Logger } from '@/services/logger'
 
 /**
@@ -16,14 +17,6 @@ const routes: RouteRecordRaw[] = [
   ...errorRoutes,
   ...publicRoutes
 ]
-
-/**
- * 🔐 Auth State Helper
- * Centraliza a verificação para facilitar migração futura (ex: Pinia/Cookies).
- */
-const isAuthenticated = (): boolean => {
-  return !!(localStorage.getItem('access_token') || localStorage.getItem('token'))
-}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,7 +37,7 @@ const router = createRouter({
  * Added deadlock prevention and loading state bypass for resilience.
  */
 router.beforeEach((to) => {
-  const isLogged = isAuthenticated()
+  const isLogged = authService.isAuthenticated()
 
   // 🚨 DEADLOCK PREVENTION: Prevent infinite redirect loops
   const isRedirectingToLogin = to.name === AuthRouteNames.Login

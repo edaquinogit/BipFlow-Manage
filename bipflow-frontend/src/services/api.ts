@@ -1,15 +1,11 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { Logger } from "./logger";
+import { tokenStore } from "./token-store";
 
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
  */
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
-
-const AUTH_KEYS = Object.freeze({
-  ACCESS: "access_token",
-  REFRESH: "refresh_token",
-});
 
 /**
  * 🚨 Environment Validation
@@ -47,7 +43,7 @@ const api = axios.create({
  */
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem(AUTH_KEYS.ACCESS);
+    const token = tokenStore.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -100,7 +96,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const refreshToken = localStorage.getItem(AUTH_KEYS.REFRESH);
+      const refreshToken = tokenStore.getRefreshToken();
 
       if (refreshToken && !isAuthFailureInProgress) {
         try {
@@ -110,14 +106,14 @@ api.interceptors.response.use(
 
           // Isolated instance for refresh (Clean Architecture Pattern)
           const refreshInstance = axios.create({ baseURL: API_BASE_URL });
-          const res = await refreshInstance.post("token/refresh/", {
+          const res = await refreshInstance.post("auth/token/refresh/", {
             refresh: refreshToken,
           });
 
           const { access } = res.data;
 
           // Atomic state synchronization
-          localStorage.setItem(AUTH_KEYS.ACCESS, access);
+          tokenStore.updateAccessToken(access);
 
           // Re-execute original request with new Authorization header
           if (originalRequest.headers) {
@@ -185,9 +181,8 @@ function handleAuthFailure() {
   });
   pendingRequests.clear();
 
-  // Clear authentication state
-  localStorage.removeItem(AUTH_KEYS.ACCESS);
-  localStorage.removeItem(AUTH_KEYS.REFRESH);
+  // Clear authentication state through the centralized contract
+  tokenStore.clearTokens();
 
   // Prevent redirect loops - check current location
   const currentPath = window.location.pathname;

@@ -201,13 +201,13 @@ class ProductService {
         queryParams.set('category', String(filters.categoryId))
       }
       if (filters.priceMin !== undefined && filters.priceMin >= 0) {
-        queryParams.set('price__gte', String(filters.priceMin))
+        queryParams.set('min_price', String(filters.priceMin))
       }
       if (filters.priceMax !== undefined && filters.priceMax > 0) {
-        queryParams.set('price__lte', String(filters.priceMax))
+        queryParams.set('max_price', String(filters.priceMax))
       }
       if (filters.inStockOnly) {
-        queryParams.set('is_available', 'true')
+        queryParams.set('in_stock', 'true')
       }
 
       // Add pagination

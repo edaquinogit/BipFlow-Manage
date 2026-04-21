@@ -357,4 +357,4 @@ class CheckoutWhatsAppAPITest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('address', response.data)
+        self.assertIn('address', response.data.get('customer', {}))

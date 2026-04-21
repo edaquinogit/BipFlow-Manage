@@ -1,5 +1,6 @@
 import api from "./api";
 import { Logger } from "./logger";
+import { tokenStore } from "./token-store";
 import type { LoginCredentials, LoginResponse } from "../types/auth";
 import {
   isAxiosError,
@@ -33,9 +34,8 @@ export const authService = {
 
       const { data } = await api.post<LoginResponse>("auth/token/", payload);
 
-      if (data.access) {
-        localStorage.setItem("token", data.access);
-        localStorage.setItem("refresh_token", data.refresh);
+      if (data.access && data.refresh) {
+        tokenStore.saveTokens({ access: data.access, refresh: data.refresh });
       }
 
       Logger.info("User authenticated successfully", {
@@ -62,11 +62,10 @@ export const authService = {
   /**
    * Log out the current user.
    *
-   * Clears both localStorage and sessionStorage to remove all traces
-   * of the session and redirects to login page.
+   * Clears authentication tokens and redirects to login page.
    */
   logout(): void {
-    localStorage.clear();
+    tokenStore.clearTokens();
     sessionStorage.clear();
     Logger.info("User logged out");
     window.location.href = "/login";
@@ -75,9 +74,9 @@ export const authService = {
   /**
    * Check if user is currently authenticated.
    *
-   * @returns True if access token exists in storage
+   * @returns True if both access and refresh tokens exist in storage
    */
   isAuthenticated(): boolean {
-    return !!localStorage.getItem("token");
+    return tokenStore.hasTokens();
   },
 };
