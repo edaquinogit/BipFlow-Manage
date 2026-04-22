@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, Callable
+from typing import Callable
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -36,6 +36,19 @@ class CORSMediaMiddleware:
 
 
 class GlobalExceptionMiddleware:
+    """
+    Standardized Error Response Middleware
+
+    Provides consistent error responses across all API endpoints.
+    All errors follow the format:
+    {
+        "error": "ErrorType",
+        "message": "Human readable message",
+        "request_id": "uuid-for-tracking",
+        "details": {...} // Optional additional context
+    }
+    """
+
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
@@ -45,8 +58,14 @@ class GlobalExceptionMiddleware:
 
         try:
             response = self.get_response(request)
-        except (ValidationError, APIException, PermissionDenied, Http404) as error:
-            return self._handle_known_exception(error, request_id)
+        except ValidationError as error:
+            return self._handle_known_exception(error, request, request_id)
+        except APIException as error:
+            return self._handle_known_exception(error, request, request_id)
+        except PermissionDenied as error:
+            return self._handle_known_exception(error, request, request_id)
+        except Http404 as error:
+            return self._handle_known_exception(error, request, request_id)
         except Exception as error:  # pragma: no cover
             return self._handle_server_error(error, request, request_id)
 
@@ -63,49 +82,100 @@ class GlobalExceptionMiddleware:
         request.META['HTTP_X_REQUEST_ID'] = new_request_id
         return new_request_id
 
-    def _handle_known_exception(self, exception: Exception, request_id: str) -> JsonResponse:
+    def _handle_known_exception(self, exception: Exception, request: HttpRequest, request_id: str) -> JsonResponse:
+        """
+        Handle known exception types with standardized error responses.
+        """
         if isinstance(exception, ValidationError):
             status_code = 400
-            error = 'Bad Request'
-            message: Any = exception.message_dict if hasattr(exception, 'message_dict') else str(exception)
+            error_type = 'VALIDATION_ERROR'
+            message = self._extract_validation_message(exception)
+            details = {'fields': exception.message_dict} if hasattr(exception, 'message_dict') else None
         elif isinstance(exception, Http404):
             status_code = 404
-            error = 'Not Found'
-            message = 'The requested resource was not found.'
+            error_type = 'NOT_FOUND'
+            message = 'O recurso solicitado não foi encontrado.'
+            details = None
         elif isinstance(exception, PermissionDenied):
             status_code = 403
-            error = 'Permission Denied'
-            message = str(exception) or 'You do not have permission to perform this action.'
+            error_type = 'PERMISSION_DENIED'
+            message = str(exception) or 'Você não tem permissão para executar esta ação.'
+            details = None
         elif isinstance(exception, APIException):
             status_code = exception.status_code
-            error = exception.default_code.replace('_', ' ').title()
+            error_type = self._get_api_exception_type(exception)
             message = exception.detail
+            details = getattr(exception, 'details', None)
         else:
             status_code = 400
-            error = 'Bad Request'
+            error_type = 'BAD_REQUEST'
             message = str(exception)
+            details = None
 
         logger.warning(
             'Handled exception in GlobalExceptionMiddleware',
             extra={
                 'request_id': request_id,
                 'status_code': status_code,
-                'error': error,
+                'error_type': error_type,
                 'path': request.path,
             },
             exc_info=isinstance(exception, Exception),
         )
 
-        response = JsonResponse(
-            {
-                'error': error,
-                'message': message,
-                'request_id': request_id,
-            },
-            status=status_code,
-        )
+        response_data = {
+            'error': error_type,
+            'message': message,
+            'request_id': request_id,
+        }
+
+        if details:
+            response_data['details'] = details
+
+        response = JsonResponse(response_data, status=status_code)
         response.setdefault('X-Request-ID', request_id)
         return response
+
+    @staticmethod
+    def _extract_validation_message(exception: ValidationError) -> str:
+        """Extract human-readable message from ValidationError."""
+        if hasattr(exception, 'message_dict') and exception.message_dict:
+            # Get first error message from first field
+            first_field = next(iter(exception.message_dict.keys()))
+            first_errors = exception.message_dict[first_field]
+            if isinstance(first_errors, list) and first_errors:
+                return str(first_errors[0])
+        return str(exception) or 'Dados inválidos fornecidos.'
+
+    @staticmethod
+    def _get_api_exception_type(exception: APIException) -> str:
+        """Map APIException to standardized error type."""
+        # Check by status code first for more reliable mapping
+        status_mapping = {
+            401: 'NOT_AUTHENTICATED',
+            403: 'PERMISSION_DENIED',
+            404: 'NOT_FOUND',
+            405: 'METHOD_NOT_ALLOWED',
+            406: 'NOT_ACCEPTABLE',
+            415: 'UNSUPPORTED_MEDIA_TYPE',
+            429: 'THROTTLED',
+        }
+
+        if exception.status_code in status_mapping:
+            return status_mapping[exception.status_code]
+
+        # Fallback to default_code mapping
+        error_mapping = {
+            'authentication_failed': 'AUTHENTICATION_FAILED',
+            'not_authenticated': 'NOT_AUTHENTICATED',
+            'permission_denied': 'PERMISSION_DENIED',
+            'not_found': 'NOT_FOUND',
+            'method_not_allowed': 'METHOD_NOT_ALLOWED',
+            'not_acceptable': 'NOT_ACCEPTABLE',
+            'unsupported_media_type': 'UNSUPPORTED_MEDIA_TYPE',
+            'throttled': 'THROTTLED',
+        }
+        return error_mapping.get(exception.default_code, 'API_EXCEPTION')
 
     def _handle_server_error(self, exception: Exception, request: HttpRequest, request_id: str) -> JsonResponse:
         logger.error(
@@ -119,8 +189,8 @@ class GlobalExceptionMiddleware:
 
         response = JsonResponse(
             {
-                'error': 'Internal Server Error',
-                'message': 'Unexpected error occurred. Please contact support with the request_id.',
+                'error': 'INTERNAL_SERVER_ERROR',
+                'message': 'Erro interno do servidor. Entre em contato com o suporte informando o request_id.',
                 'request_id': request_id,
             },
             status=500,

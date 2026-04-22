@@ -13,6 +13,7 @@ import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
+import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productPayload';
 
 /**
  * 🛰️ UI STATE MACHINE
@@ -83,38 +84,13 @@ const handleClosePanel = () => {
 };
 
 /**
- * 🧹 DATA SANITIZER (Pure Logic)
- * Prepares the payload for Django, removing computed fields and protecting media.
- * @param rawPayload - The object from form or Vue state
- * @returns A clean object ready for the backend
- */
-const sanitizePayloadForDjango = (
-  rawPayload: Partial<Product>
-): Partial<Product> => {
-  const {
-    id: _id,
-    created_at: _created_at,
-    updated_at: _updated_at,
-    category_name: _category_name,
-    is_available: _is_available,
-    ...cleanData
-  } = rawPayload as Record<string, unknown>;
-
-  if (typeof cleanData.image === 'string' || !cleanData.image) {
-    delete cleanData.image;
-  }
-
-  return JSON.parse(JSON.stringify(cleanData)) as Partial<Product>;
-};
-
-/**
  * 🚀 PERSISTENCE ORCHESTRATOR
  */
 const handleSave = async (payload: Partial<Product>) => {
   isSaving.value = true;
 
   try {
-    const dataToSync = sanitizePayloadForDjango(payload);
+    const dataToSync = sanitizeDashboardPayload(payload);
 
     if (selectedProduct.value?.id) {
       await updateProduct(selectedProduct.value.id, dataToSync);

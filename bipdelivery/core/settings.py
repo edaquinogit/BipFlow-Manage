@@ -163,9 +163,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+LOGS_ROOT = BASE_DIR / 'logs'
 
-# Automatic directory creation for assets
-for path in [STATIC_ROOT, MEDIA_ROOT]:
+# Automatic directory creation for assets and runtime logs
+for path in [STATIC_ROOT, MEDIA_ROOT, LOGS_ROOT]:
     os.makedirs(path, exist_ok=True)
 
 # ------------------------------------------------------------------------------
@@ -241,6 +242,55 @@ CACHES = {
             'MAX_ENTRIES': 10000,
         }
     }
+}
+
+# ------------------------------------------------------------------------------
+# 📝 LOGGING CONFIGURATION
+# ------------------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_ROOT / 'django.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'bipdelivery': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if not IS_PRODUCTION else 'INFO',
+            'propagate': False,
+        },
+    },
 }
 
 

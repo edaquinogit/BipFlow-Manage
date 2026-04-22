@@ -47,7 +47,7 @@
                 v-if="items.length > 0"
                 type="button"
                 class="text-sm font-medium text-rose-600 transition hover:text-rose-700"
-                @click="$emit('clear-cart')"
+              @click="$emit('clearCart')"
               >
                 Limpar carrinho
               </button>
@@ -93,7 +93,7 @@
                         type="button"
                         class="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-rose-600"
                         :aria-label="`Remover ${item.product.name} do carrinho`"
-                        @click="$emit('remove-item', item.product.id)"
+                        @click="$emit('removeItem', item.product.id)"
                       >
                         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                           <path fill-rule="evenodd" d="M8.257 3.099c.366-.446.911-.724 1.5-.724h.486c.589 0 1.134.278 1.5.724l.97 1.183h2.287a.75.75 0 010 1.5h-.614l-.64 8.316A2.25 2.25 0 0111.504 16H8.496a2.25 2.25 0 01-2.242-1.902l-.64-8.316H5a.75.75 0 010-1.5h2.287l.97-1.183zM8.717 4.282h2.566l-.39-.475a.438.438 0 00-.339-.157h-.108a.438.438 0 00-.339.157l-.39.475z" clip-rule="evenodd" />
@@ -107,7 +107,7 @@
                           type="button"
                           class="h-9 w-9 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white"
                           :aria-label="`Diminuir quantidade de ${item.product.name}`"
-                          @click="$emit('update-quantity', item.product.id, item.quantity - 1)"
+                          @click="$emit('updateQuantity', item.product.id, item.quantity - 1)"
                         >
                           -
                         </button>
@@ -118,7 +118,7 @@
                           type="button"
                           class="h-9 w-9 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white"
                           :aria-label="`Aumentar quantidade de ${item.product.name}`"
-                          @click="$emit('update-quantity', item.product.id, item.quantity + 1)"
+                          @click="$emit('updateQuantity', item.product.id, item.quantity + 1)"
                         >
                           +
                         </button>
@@ -274,7 +274,7 @@
                 type="button"
                 class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="items.length === 0 || isSubmitting"
-                @click="$emit('copy-order')"
+                @click="$emit('copyOrder')"
               >
                 Copiar resumo
               </button>
@@ -283,7 +283,7 @@
                 type="button"
                 class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
                 :disabled="items.length === 0 || isSubmitting"
-                @click="$emit('submit-order')"
+                @click="$emit('submitOrder')"
               >
                 {{ isSubmitting ? 'Emitindo nota...' : 'Finalizar pedido no WhatsApp' }}
               </button>

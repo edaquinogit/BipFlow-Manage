@@ -42,12 +42,14 @@ describe('ProductCard', () => {
     const decreaseButton = buttons[0]
     const increaseButton = buttons[1]
 
+    expect(decreaseButton).toBeDefined()
+    expect(increaseButton).toBeDefined()
     expect(wrapper.text()).toContain('1')
 
-    await increaseButton.trigger('click')
+    await increaseButton!.trigger('click')
     expect(wrapper.text()).toContain('2')
 
-    await decreaseButton.trigger('click')
+    await decreaseButton!.trigger('click')
     expect(wrapper.text()).toContain('1')
   })
 
@@ -56,8 +58,11 @@ describe('ProductCard', () => {
     const increaseButton = buttons[1]
     const addButton = buttons[2]
 
-    await increaseButton.trigger('click')
-    await addButton.trigger('click')
+    expect(increaseButton).toBeDefined()
+    expect(addButton).toBeDefined()
+
+    await increaseButton!.trigger('click')
+    await addButton!.trigger('click')
 
     expect(wrapper.emitted('addToCart')).toHaveLength(1)
     expect(wrapper.emitted('addToCart')?.[0]).toEqual([mockProduct, 2])
@@ -69,7 +74,8 @@ describe('ProductCard', () => {
     })
 
     const addButton = wrapper.findAll('button')[2]
-    expect(addButton.attributes('disabled')).toBeDefined()
+    expect(addButton).toBeDefined()
+    expect(addButton!.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('Fora de estoque')
   })
 

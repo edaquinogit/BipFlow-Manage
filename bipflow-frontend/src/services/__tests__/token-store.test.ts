@@ -13,7 +13,7 @@
  *   vitest run auth-contract.test.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { tokenStore, TOKEN_KEYS } from '@/services/token-store'
 
 describe('Token Store - Centralized Auth Contract', () => {

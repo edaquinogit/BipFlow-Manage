@@ -9,8 +9,19 @@ import type { AxiosError } from 'axios';
 import type { ZodError } from 'zod';
 
 /**
- * API Error Response Structure
- * Matches Django REST Framework error response format
+ * API Error Response Structure - Standardized BipFlow Format
+ * All backend errors follow this format after standardization
+ */
+export interface StandardizedApiErrorResponse {
+  error: string; // Error type identifier (e.g., 'VALIDATION_ERROR', 'NOT_FOUND')
+  message: string; // Human-readable error message
+  request_id: string; // Request tracking ID
+  details?: Record<string, unknown>; // Optional additional context
+}
+
+/**
+ * Legacy API Error Response Structure
+ * Some endpoints may still return this format during transition
  */
 export interface ApiErrorResponse {
   detail?: string;
@@ -53,22 +64,51 @@ export function isZodError(error: unknown): error is ZodError {
 
 /**
  * Extract human-readable error message from any error type
+ * Now supports both standardized and legacy error formats
  */
-export function getErrorMessage(error: unknown, fallback = 'An unexpected error occurred'): string {
+export function getErrorMessage(error: unknown, fallback = 'Ocorreu um erro inesperado'): string {
   if (error instanceof Error) {
     return error.message;
   }
 
   if (typeof error === 'object' && error !== null) {
+    // Check for standardized error format first
     if ('message' in error && typeof error.message === 'string') {
       return error.message;
     }
+    // Fallback to legacy format
     if ('detail' in error && typeof error.detail === 'string') {
       return error.detail;
     }
   }
 
   return fallback;
+}
+
+/**
+ * Extract error type from standardized error response
+ */
+export function getErrorType(error: unknown): string | undefined {
+  if (typeof error === 'object' && error !== null && 'error' in error) {
+    return String(error.error);
+  }
+  return undefined;
+}
+
+/**
+ * Check if error is a standardized BipFlow error response
+ */
+export function isStandardizedError(error: unknown): error is StandardizedApiErrorResponse {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'error' in error &&
+    'message' in error &&
+    'request_id' in error &&
+    typeof (error as any).error === 'string' &&
+    typeof (error as any).message === 'string' &&
+    typeof (error as any).request_id === 'string'
+  );
 }
 
 /**

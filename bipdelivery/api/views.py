@@ -12,6 +12,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .errors import business_logic_error, not_found_error, validation_error
 from .models import Category, Product
 from .pagination import ProductListPagination, StandardPagination
 from .serializers import (
@@ -165,42 +166,27 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         # Input validation
         if not product_ids or not isinstance(product_ids, list):
-            return Response(
-                {"detail": "product_ids must be a non-empty list"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return validation_error('product_ids deve ser uma lista não vazia.')
 
         if not new_category_id:
-            return Response(
-                {"detail": "new_category_id is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return validation_error('new_category_id é obrigatório.')
 
         try:
             new_category_id = int(new_category_id)
         except (ValueError, TypeError):
-            return Response(
-                {"detail": "new_category_id must be a valid integer"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return validation_error('new_category_id deve ser um número inteiro válido.')
 
         # Validate category exists
         try:
             new_category = Category.objects.get(id=new_category_id)
         except Category.DoesNotExist:
-            return Response(
-                {"detail": f"Category with id {new_category_id} does not exist"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return not_found_error(f'Categoria com id {new_category_id} não existe.')
 
         # Convert product_ids to integers and validate
         try:
             product_ids = [int(pid) for pid in product_ids]
         except (ValueError, TypeError):
-            return Response(
-                {"detail": "All product_ids must be valid integers"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return validation_error('Todos os product_ids devem ser números inteiros válidos.')
 
         # Use atomic transaction for data integrity
         with transaction.atomic():
@@ -213,9 +199,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             missing_ids = set(product_ids) - found_ids
 
             if missing_ids:
-                return Response(
-                    {"detail": f"Products with ids {list(missing_ids)} do not exist"},
-                    status=status.HTTP_400_BAD_REQUEST
+                return business_logic_error(
+                    f'Produtos não encontrados: {", ".join(str(pid) for pid in missing_ids)}'
                 )
 
             # Perform bulk update using QuerySet.update() for efficiency
@@ -271,16 +256,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
         """
         Delete category with protection for referenced products.
 
-        Returns 400 Bad Request if category has related products (on_delete=PROTECT).
+        Returns standardized error response if category has related products.
         """
         instance = self.get_object()
         try:
             instance.delete()
         except ProtectedError:
-            return Response(
-                {"detail": "Cannot delete category because it has related products."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return business_logic_error('Não é possível excluir categoria porque ela possui produtos relacionados.')
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

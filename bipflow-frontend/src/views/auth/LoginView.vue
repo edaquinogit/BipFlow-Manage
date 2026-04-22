@@ -24,7 +24,7 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    const data = await authService.login(form)
+    await authService.login(form)
     // authService now handles all token persistence through centralized tokenStore
     router.push({ name: DashboardRoutes.Root })
   } catch (error) {
