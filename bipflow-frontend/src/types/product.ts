@@ -26,12 +26,22 @@ export interface Product {
   id: number
   name: string
   slug: string | null
+  sku?: string | null
+  description?: string | null
   price: string
+  size?: string | null
   category: ProductCategory
   image: string | null
+  images?: string[]
   stock_quantity: number
   is_available: boolean
   created_at: string
+}
+
+export interface ProductDetail extends Product {
+  sku: string | null
+  description: string | null
+  size: string | null
 }
 
 /**
@@ -138,12 +148,23 @@ export const ProductSchema = z.object({
   id: z.number(),
   name: z.string(),
   slug: z.string().nullable(),
+  sku: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
   price: z.union([z.string(), z.number()]).transform((value) => String(value)),
+  size: z.string().nullable().optional(),
   category: ProductCategorySchema,
   image: z.string().url().nullable(),
+  images: z.array(z.string().url()).optional().default([]),
   stock_quantity: z.number(),
   is_available: z.boolean(),
   created_at: z.string(),
+})
+
+export const ProductDetailSchema = ProductSchema.extend({
+  sku: z.string().nullable(),
+  description: z.string().nullable(),
+  size: z.string().nullable(),
+  images: z.array(z.string().url()).default([]),
 })
 
 export const PaginatedProductsResponseSchema = z.object({

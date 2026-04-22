@@ -12,7 +12,7 @@
         <header class="border-b border-slate-200 px-6 py-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-600">
+              <p class="text-sm font-semibold uppercase tracking-[0.24em] text-rose-600">
                 Carrinho
               </p>
               <h2 class="mt-2 text-2xl font-semibold text-slate-900">
@@ -150,7 +150,7 @@
                 <input
                   :value="customer.fullName"
                   type="text"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   placeholder="Digite o nome do cliente"
                   @input="handleTextInput('fullName', $event)"
                 />
@@ -161,7 +161,7 @@
                 <input
                   :value="customer.phone"
                   type="tel"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   placeholder="(71) 99999-9999"
                   @input="handleTextInput('phone', $event)"
                 />
@@ -172,7 +172,7 @@
                 <input
                   :value="customer.email"
                   type="email"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   placeholder="cliente@empresa.com"
                   @input="handleTextInput('email', $event)"
                 />
@@ -182,7 +182,7 @@
                 <span class="mb-2 block text-sm font-medium text-slate-700">Entrega</span>
                 <select
                   :value="customer.deliveryMethod"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   @change="handleDeliveryMethodChange"
                 >
                   <option value="delivery">Delivery</option>
@@ -194,7 +194,7 @@
                 <span class="mb-2 block text-sm font-medium text-slate-700">Pagamento</span>
                 <select
                   :value="customer.paymentMethod"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   @change="handlePaymentMethodChange"
                 >
                   <option value="pix">Pix</option>
@@ -209,7 +209,7 @@
                   <input
                     :value="customer.address"
                     type="text"
-                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                     placeholder="Rua, numero e complemento"
                     @input="handleTextInput('address', $event)"
                   />
@@ -220,7 +220,7 @@
                   <input
                     :value="customer.neighborhood"
                     type="text"
-                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                     placeholder="Bairro"
                     @input="handleTextInput('neighborhood', $event)"
                   />
@@ -231,7 +231,7 @@
                   <input
                     :value="customer.city"
                     type="text"
-                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                     placeholder="Cidade"
                     @input="handleTextInput('city', $event)"
                   />
@@ -243,7 +243,7 @@
                 <textarea
                   :value="customer.notes"
                   rows="4"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
                   placeholder="Preferencias, horario de entrega ou detalhes do pedido"
                   @input="handleTextInput('notes', $event)"
                 />
@@ -281,7 +281,7 @@
 
               <button
                 type="button"
-                class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                class="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
                 :disabled="items.length === 0 || isSubmitting"
                 @click="$emit('submitOrder')"
               >

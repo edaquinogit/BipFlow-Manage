@@ -19,8 +19,26 @@ export function sanitizePayloadForDjango(
     ...cleanData
   } = rawPayload as Partial<Product> & Record<string, unknown>
 
-  if (typeof cleanData.image === 'string' || !cleanData.image) {
+  if (!cleanData.image) {
     delete cleanData.image
+  }
+
+  if (Array.isArray(cleanData.images)) {
+    const normalizedImages = cleanData.images.filter((entry) => {
+      if (!entry) {
+        return false
+      }
+
+      return typeof entry === 'string' || entry instanceof File
+    })
+
+    if (normalizedImages.length > 0) {
+      cleanData.images = normalizedImages.slice(0, 3) as Partial<Product>['images']
+    } else {
+      delete cleanData.images
+    }
+  } else {
+    delete cleanData.images
   }
 
   return { ...cleanData } as Partial<Product>

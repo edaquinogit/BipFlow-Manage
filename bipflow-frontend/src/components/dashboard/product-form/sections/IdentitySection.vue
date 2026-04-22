@@ -11,6 +11,7 @@ import FormInput from '@/components/common/FormInput.vue';
  */
 const name = defineModel<string>('name', { default: '' });
 const sku = defineModel<string>('sku', { default: '' });
+const description = defineModel<string>('description', { default: '' });
 const category = defineModel<string | number | null>('category', { default: null });
 
 interface Props {
@@ -80,6 +81,23 @@ defineProps<Props>();
           {{ errors.category[0] }}
         </p>
       </div>
+    </div>
+
+    <div class="flex flex-col gap-2 group">
+      <label class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-indigo-400 transition-colors">
+        Public Description
+      </label>
+      <textarea
+        v-model="description"
+        name="description"
+        data-cy="input-product-description"
+        rows="4"
+        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all outline-none placeholder:text-zinc-700 shadow-inner resize-none"
+        placeholder="Describe the product for the public storefront: ingredients, materials, diferencials or usage details."
+      />
+      <p v-if="errors.description" class="text-[9px] text-red-500 font-black uppercase tracking-widest animate-pulse">
+        {{ errors.description[0] }}
+      </p>
     </div>
   </section>
 </template>

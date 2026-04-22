@@ -94,3 +94,39 @@ class Product(models.Model):
     def __str__(self) -> str:
         """Return product SKU and name as string representation."""
         return f"{self.sku} - {self.name}"
+
+    @property
+    def public_image_urls(self) -> list[str]:
+        """Return all public-facing product image paths preserving display order."""
+        urls: list[str] = []
+
+        if self.image:
+            urls.append(self.image.url)
+
+        urls.extend(
+            gallery_item.image.url
+            for gallery_item in self.gallery_images.all()
+            if gallery_item.image
+        )
+
+        return urls[:3]
+
+
+class ProductGalleryImage(models.Model):
+    """Additional product images used by the public detail gallery."""
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='gallery_images',
+    )
+    image = models.ImageField(upload_to='products/%Y/%m/')
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['position', 'id']
+
+    def __str__(self) -> str:
+        """Return a compact identifier for admin/debug purposes."""
+        return f'{self.product_id} - gallery image {self.position}'

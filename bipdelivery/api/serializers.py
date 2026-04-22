@@ -1,7 +1,11 @@
+import re
 from decimal import Decimal
+from urllib.parse import urljoin, urlparse
+
+from django.conf import settings
 from rest_framework import serializers
 
-from .models import Category, Product
+from .models import Category, Product, ProductGalleryImage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -21,15 +25,242 @@ class ProductSerializer(serializers.ModelSerializer):
     """
 
     category_name = serializers.ReadOnlyField(source='category.name')
+    images = serializers.SerializerMethodField()
+    uploaded_images = serializers.ListField(
+        child=serializers.ImageField(),
+        write_only=True,
+        required=False,
+        max_length=3,
+    )
+    existing_images = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False,
+        max_length=3,
+    )
 
     class Meta:
         model = Product
         fields = [
             'id', 'sku', 'name', 'slug', 'description',
             'price', 'size', 'stock_quantity', 'is_available',
-            'image', 'category', 'category_name', 'created_at'
+            'image', 'images', 'uploaded_images', 'existing_images',
+            'category', 'category_name', 'created_at'
         ]
         read_only_fields = ['id', 'slug', 'created_at', 'category_name']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        request_images = self._resolve_ordered_request_images(self.instance)
+
+        if request_images is not None:
+            total_images = len(request_images)
+        else:
+            uploaded_images = attrs.get('uploaded_images', [])
+            existing_images = attrs.get('existing_images', [])
+            direct_image = attrs.get('image')
+            total_images = len(uploaded_images) + len(existing_images) + (1 if direct_image else 0)
+
+        if total_images > 3:
+            raise serializers.ValidationError({
+                'uploaded_images': 'Cada produto pode ter no maximo 3 imagens.'
+            })
+
+        return attrs
+
+    def get_images(self, instance):
+        request = self.context.get('request')
+        image_urls = instance.public_image_urls
+
+        if request is not None:
+            return [request.build_absolute_uri(url) for url in image_urls]
+
+        base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
+        return [urljoin(base_url, url) for url in image_urls]
+
+    def _replace_gallery(self, instance: Product, ordered_files: list) -> None:
+        """Persist gallery images while keeping the first image as product cover."""
+        cover_image = ordered_files[0] if ordered_files else None
+        instance.image = cover_image
+        instance.save(update_fields=['image'])
+
+        instance.gallery_images.all().delete()
+
+        for index, image_file in enumerate(ordered_files[1:], start=1):
+            ProductGalleryImage.objects.create(
+                product=instance,
+                image=image_file,
+                position=index,
+            )
+
+    def _build_current_image_lookup(self, instance: Product | None) -> dict[str, object]:
+        if not instance:
+            return {}
+
+        request = self.context.get('request')
+        base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
+        current_by_url: dict[str, object] = {}
+
+        def register_image(image_field) -> None:
+            if not image_field:
+                return
+
+            relative_url = image_field.url
+            absolute_url = (
+                request.build_absolute_uri(relative_url)
+                if request is not None
+                else urljoin(base_url, relative_url)
+            )
+
+            current_by_url[relative_url] = image_field
+            current_by_url[absolute_url] = image_field
+            current_by_url[urlparse(relative_url).path] = image_field
+            current_by_url[urlparse(absolute_url).path] = image_field
+
+        register_image(instance.image)
+
+        for gallery_item in instance.gallery_images.all():
+            register_image(gallery_item.image)
+
+        return current_by_url
+
+    def _resolve_existing_image(self, instance: Product | None, url: str):
+        if not instance or not url:
+            return None
+
+        current_by_url = self._build_current_image_lookup(instance)
+        normalized_url = url.strip()
+        normalized_path = urlparse(normalized_url).path
+        return current_by_url.get(normalized_url) or current_by_url.get(normalized_path)
+
+    def _resolve_existing_images(self, instance: Product | None, urls: list[str]) -> list:
+        resolved_files = []
+
+        for url in urls:
+            resolved_image = self._resolve_existing_image(instance, url)
+            if resolved_image is not None:
+                resolved_files.append(resolved_image)
+
+        return resolved_files[:3]
+
+    def _collect_indexed_request_values(self, request, field_name: str, *, files: bool) -> list[tuple[int, object]]:
+        source = request.FILES if files else request.data
+        entries: list[tuple[int, object]] = []
+        pattern = re.compile(rf'^{re.escape(field_name)}\[(\d+)\]$')
+
+        if not hasattr(source, 'keys'):
+            return entries
+
+        for key in source.keys():
+            match = pattern.match(str(key))
+            if not match:
+                continue
+
+            index = int(match.group(1))
+            values = source.getlist(key) if hasattr(source, 'getlist') else [source.get(key)]
+
+            for value in values:
+                if value in (None, ''):
+                    continue
+                entries.append((index, value))
+
+        return sorted(entries, key=lambda item: item[0])
+
+    def _extract_ordered_request_images(self) -> list[object] | None:
+        request = self.context.get('request')
+        if request is None:
+            return None
+
+        ordered_entries: list[tuple[int, object]] = []
+        cover_image = request.FILES.get('image')
+
+        if cover_image is not None:
+            ordered_entries.append((0, cover_image))
+
+        indexed_existing = self._collect_indexed_request_values(request, 'existing_images', files=False)
+        indexed_uploaded = self._collect_indexed_request_values(request, 'uploaded_images', files=True)
+
+        if indexed_existing or indexed_uploaded:
+            ordered_entries.extend(indexed_existing)
+            ordered_entries.extend(indexed_uploaded)
+            ordered_entries.sort(key=lambda item: item[0])
+            return [value for _, value in ordered_entries]
+
+        fallback_entries: list[object] = []
+        if cover_image is not None:
+            fallback_entries.append(cover_image)
+
+        if hasattr(request.data, 'getlist'):
+            fallback_entries.extend(
+                value for value in request.data.getlist('existing_images')
+                if isinstance(value, str) and value.strip()
+            )
+
+        if hasattr(request.FILES, 'getlist'):
+            fallback_entries.extend(
+                value for value in request.FILES.getlist('uploaded_images')
+                if value is not None
+            )
+
+        return fallback_entries or None
+
+    def _resolve_ordered_request_images(self, instance: Product | None) -> list | None:
+        ordered_entries = self._extract_ordered_request_images()
+        if ordered_entries is None:
+            return None
+
+        resolved_images = []
+        for entry in ordered_entries:
+            if isinstance(entry, str):
+                resolved_image = self._resolve_existing_image(instance, entry)
+                if resolved_image is not None:
+                    resolved_images.append(resolved_image)
+                continue
+
+            resolved_images.append(entry)
+
+        return resolved_images[:3]
+
+    def create(self, validated_data):
+        ordered_request_images = self._resolve_ordered_request_images(None)
+        uploaded_images = list(validated_data.pop('uploaded_images', []))
+        validated_data.pop('existing_images', [])
+        direct_image = validated_data.pop('image', None)
+
+        if ordered_request_images is not None:
+            product = super().create(validated_data)
+            self._replace_gallery(product, ordered_request_images[:3])
+            return product
+
+        if direct_image:
+            uploaded_images.insert(0, direct_image)
+
+        product = super().create(validated_data)
+        self._replace_gallery(product, uploaded_images[:3])
+        return product
+
+    def update(self, instance, validated_data):
+        ordered_request_images = self._resolve_ordered_request_images(instance)
+        uploaded_images = list(validated_data.pop('uploaded_images', []))
+        existing_images = list(validated_data.pop('existing_images', []))
+        direct_image = validated_data.pop('image', None)
+
+        product = super().update(instance, validated_data)
+
+        if ordered_request_images is not None:
+            self._replace_gallery(product, ordered_request_images[:3])
+            return product
+
+        next_images = self._resolve_existing_images(product, existing_images)
+        if direct_image:
+            next_images.insert(0, direct_image)
+        next_images.extend(uploaded_images)
+
+        if existing_images or uploaded_images or direct_image is not None:
+            self._replace_gallery(product, next_images[:3])
+
+        return product
 
     def to_representation(self, instance):
         """
@@ -45,11 +276,8 @@ class ProductSerializer(serializers.ModelSerializer):
                 data['image'] = request.build_absolute_uri(instance.image.url)
             else:
                 # Fallback: build URL manually if no request context
-                import urllib.parse
-
-                from django.conf import settings
                 base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
-                data['image'] = urllib.parse.urljoin(base_url, instance.image.url)
+                data['image'] = urljoin(base_url, instance.image.url)
         else:
             data['image'] = None
 

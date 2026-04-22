@@ -25,13 +25,13 @@ describe('sanitizePayloadForDjango', () => {
     expect(result.image).toBe(file)
   })
 
-  it('removes persisted image urls to avoid overwriting binary uploads with text', () => {
+  it('preserves persisted cover urls so multipart assembly can keep the first slot', () => {
     const result = sanitizePayloadForDjango({
       name: 'Produto existente',
       image: 'http://127.0.0.1:8000/media/products/2026/04/image.png',
     })
 
-    expect(result.image).toBeUndefined()
+    expect(result.image).toBe('http://127.0.0.1:8000/media/products/2026/04/image.png')
   })
 
   it('removes empty image values while keeping editable business fields', () => {
@@ -48,5 +48,45 @@ describe('sanitizePayloadForDjango', () => {
     expect(result.name).toBe('Produto sem imagem')
     expect(result.category).toEqual({ id: 4, name: 'Categoria 2', slug: 'categoria-2' })
     expect(result.is_available).toBeUndefined()
+  })
+
+  it('preserves mixed gallery payloads with uploaded files and persisted urls', () => {
+    const secondFile = new File(['binary-image-2'], 'product-2.png', {
+      type: 'image/png',
+    })
+
+    const result = sanitizePayloadForDjango({
+      name: 'Produto com galeria',
+      images: [
+        'http://127.0.0.1:8000/media/products/2026/04/image.png',
+        secondFile,
+      ],
+    })
+
+    expect(result.images).toEqual([
+      'http://127.0.0.1:8000/media/products/2026/04/image.png',
+      secondFile,
+    ])
+  })
+
+  it('preserves existing cover plus gallery so all 3 public images can be rebuilt', () => {
+    const galleryFile = new File(['binary-image-3'], 'product-3.png', {
+      type: 'image/png',
+    })
+
+    const result = sanitizePayloadForDjango({
+      name: 'Produto com capa persistida',
+      image: 'http://127.0.0.1:8000/media/products/2026/04/cover.png',
+      images: [
+        'http://127.0.0.1:8000/media/products/2026/04/gallery-1.png',
+        galleryFile,
+      ],
+    })
+
+    expect(result.image).toBe('http://127.0.0.1:8000/media/products/2026/04/cover.png')
+    expect(result.images).toEqual([
+      'http://127.0.0.1:8000/media/products/2026/04/gallery-1.png',
+      galleryFile,
+    ])
   })
 })

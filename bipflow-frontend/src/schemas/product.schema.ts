@@ -26,6 +26,14 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/webp",
 ];
 
+const ProductGalleryImageSchema = z.union([
+  z.string().url(),
+  z
+    .instanceof(File)
+    .refine((file) => file.size <= MAX_FILE_SIZE, `Image too heavy. Max limit is 2MB.`)
+    .refine((file) => ACCEPTED_IMAGE_TYPES.includes(file.type), "Only .jpg, .png and .webp formats are supported."),
+]);
+
 const productBase = {
   name: z
     .string()
@@ -85,6 +93,12 @@ const productBase = {
     }, "Only .jpg, .png and .webp formats are supported.")
     .nullable()
     .optional(),
+
+  images: z
+    .array(ProductGalleryImageSchema)
+    .max(3, "You can upload up to 3 images per product.")
+    .optional()
+    .default([]),
 };
 
 // Schema de Leitura (API Response)
@@ -156,5 +170,6 @@ export const createEmptyProduct = (): ProductFormData => ({
   sku: "",
   size: "",
   image: null,
+  images: [],
   description: "",
 });

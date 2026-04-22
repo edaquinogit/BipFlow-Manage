@@ -8,6 +8,7 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -77,6 +78,13 @@ class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAnyReadIsAuthenticatedWrite]
     pagination_class = ProductListPagination
 
+    def get_object(self):
+        """
+        Support standard lookup by ID while keeping queryset optimizations.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        return super().get_object()
+
     def get_queryset(self):
         """
         Override get_queryset to apply filtering and optimization.
@@ -90,7 +98,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         Returns:
             QuerySet: Optimized queryset with filters and select_related()
         """
-        queryset = Product.objects.select_related('category')
+        queryset = Product.objects.select_related('category').prefetch_related('gallery_images')
 
         # 🔍 TEXT SEARCH: Search in name, SKU, and description
         search_term = self.request.query_params.get('search', '').strip()
@@ -135,6 +143,22 @@ class ProductViewSet(viewsets.ModelViewSet):
                 pass  # Invalid price format, skip
 
         return queryset
+
+    @action(detail=False, methods=['get'], url_path=r'by-slug/(?P<slug>[^/]+)')
+    def by_slug(self, request, slug=None):
+        """
+        Retrieve a public product detail payload by slug.
+
+        This keeps public storefront links stable and shareable without
+        exposing implementation details such as numeric IDs in the URL.
+        """
+        product = self.get_queryset().filter(slug=slug).first()
+
+        if product is None:
+            raise NotFound(detail='Produto nao encontrado.')
+
+        serializer = self.get_serializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['patch'])
     def bulk_update_category(self, request):

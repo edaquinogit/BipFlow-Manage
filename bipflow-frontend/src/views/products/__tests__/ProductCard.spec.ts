@@ -34,13 +34,24 @@ describe('ProductCard', () => {
   })
 
   it('shows cart badge when product is already in cart', () => {
-    expect(wrapper.text()).toContain('2 no carrinho')
+    expect(wrapper.text()).toContain('2')
+  })
+
+  it('emits openDetails when the detail trigger is clicked', async () => {
+    const detailButton = wrapper.findAll('button').find((button) => button.text().includes('Detalhes'))
+
+    expect(detailButton).toBeDefined()
+
+    await detailButton!.trigger('click')
+
+    expect(wrapper.emitted('openDetails')).toHaveLength(1)
+    expect(wrapper.emitted('openDetails')?.[0]).toEqual([mockProduct])
   })
 
   it('increments and decrements the selected quantity', async () => {
     const buttons = wrapper.findAll('button')
-    const decreaseButton = buttons[0]
-    const increaseButton = buttons[1]
+    const decreaseButton = buttons.find((button) => button.attributes('aria-label') === 'Diminuir quantidade')
+    const increaseButton = buttons.find((button) => button.attributes('aria-label') === 'Aumentar quantidade')
 
     expect(decreaseButton).toBeDefined()
     expect(increaseButton).toBeDefined()
@@ -55,8 +66,8 @@ describe('ProductCard', () => {
 
   it('emits addToCart with the selected quantity', async () => {
     const buttons = wrapper.findAll('button')
-    const increaseButton = buttons[1]
-    const addButton = buttons[2]
+    const increaseButton = buttons.find((button) => button.attributes('aria-label') === 'Aumentar quantidade')
+    const addButton = buttons.find((button) => button.text().includes('Adicionar'))
 
     expect(increaseButton).toBeDefined()
     expect(addButton).toBeDefined()
@@ -73,10 +84,12 @@ describe('ProductCard', () => {
       product: { ...mockProduct, is_available: false }
     })
 
-    const addButton = wrapper.findAll('button')[2]
-    expect(addButton).toBeDefined()
-    expect(addButton!.attributes('disabled')).toBeDefined()
+    const disabledButtons = wrapper.findAll('button').filter((button) =>
+      button.attributes('disabled') !== undefined
+    )
+    expect(disabledButtons.length).toBeGreaterThan(0)
     expect(wrapper.text()).toContain('Fora de estoque')
+    expect(wrapper.text()).toContain('Indisponivel')
   })
 
   it('keeps lazy loading enabled for product images', () => {

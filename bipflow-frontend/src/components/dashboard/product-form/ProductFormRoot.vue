@@ -35,7 +35,9 @@ const createEmptyForm = (): Partial<Product> => ({
   category: undefined,
   sku: '',
   size: '',
-  image: null
+  image: null,
+  images: [],
+  description: '',
 });
 
 const normalizeInitialFormData = (
@@ -55,6 +57,15 @@ const normalizeInitialFormData = (
     'id' in nextForm.category
   ) {
     nextForm.category = nextForm.category.id;
+  }
+
+  if (Array.isArray(nextForm.images)) {
+    const coverImage = typeof nextForm.image === 'string' ? nextForm.image : null;
+    const galleryImages = coverImage
+      ? nextForm.images.filter((imageUrl) => imageUrl !== coverImage)
+      : nextForm.images;
+
+    nextForm.images = galleryImages.slice(0, 2);
   }
 
   return nextForm;
@@ -140,6 +151,7 @@ const title = computed(() => props.initialData ? 'Update Asset' : 'New Product')
           <IdentitySection 
             v-model:name="form.name" 
             v-model:sku="form.sku" 
+            v-model:description="form.description"
             v-model:category="form.category"
             :categories="categories"
             :errors="errors"
@@ -153,8 +165,9 @@ const title = computed(() => props.initialData ? 'Update Asset' : 'New Product')
           />
 
           <MediaSection 
-            v-model="form.image"
-            :error="errors.image?.[0]"
+            v-model:cover-image="form.image"
+            v-model:gallery-images="form.images"
+            :error="errors.image?.[0] || errors.images?.[0] || errors.uploaded_images?.[0]"
           />
         </form>
 

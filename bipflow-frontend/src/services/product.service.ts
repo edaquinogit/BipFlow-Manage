@@ -1,7 +1,7 @@
 import api from "./api";
 import { z } from "zod";
 import { Logger } from "./logger";
-import { ProductSchema, type Product } from "../schemas/product.schema";
+import { ProductSchema, type Product as AdminProduct } from "../schemas/product.schema";
 import {
   isAxiosError,
   isZodError,
@@ -10,8 +10,8 @@ import {
 } from "../types/errors";
 import type { ProductFilterPayload } from "../types/filters";
 import { filtersToQueryParams } from "../types/filters";
-import type { PaginatedProductsResponse, ProductFilters } from "../types/product";
-import { PaginatedProductsResponseSchema } from "../types/product";
+import type { PaginatedProductsResponse, ProductDetail, ProductFilters } from "../types/product";
+import { PaginatedProductsResponseSchema, ProductDetailSchema } from "../types/product";
 
 /**
  * Product Service - Business Logic Layer
@@ -82,7 +82,7 @@ class ProductService {
    * Normalize collection endpoints that may return either a raw array or
    * a paginated DRF payload with a `results` array.
    */
-  private extractProductList(data: unknown): Product[] {
+  private extractProductList(data: unknown): AdminProduct[] {
     const normalizedArrayData = Array.isArray(data)
       ? this.normalizeProductCollection(data)
       : data;
@@ -100,14 +100,14 @@ class ProductService {
       const normalized = ProductSchema.array().safeParse(normalizedResults);
 
       if (normalized.success) {
-        return normalized.data as Product[];
+        return normalized.data as AdminProduct[];
       }
 
       Logger.warn(
         "Paginated product results failed admin schema validation",
         buildErrorContext(normalized.error, { endpoint: this.endpoint })
       );
-      return normalizedResults as Product[];
+      return normalizedResults as AdminProduct[];
     }
 
     Logger.warn(
@@ -126,7 +126,7 @@ class ProductService {
    * @returns Array of validated Product objects
    * @throws Error if API request fails completely
    */
-  async getAll(): Promise<Product[]> {
+  async getAll(): Promise<AdminProduct[]> {
     try {
       const { data } = await api.get<unknown>(this.endpoint);
       return this.extractProductList(data);
@@ -152,7 +152,7 @@ class ProductService {
    * @returns Array of validated Product objects matching the filters
    * @throws Error if API request fails completely
    */
-  async getFiltered(filters: Partial<ProductFilterPayload>): Promise<Product[]> {
+  async getFiltered(filters: Partial<ProductFilterPayload>): Promise<AdminProduct[]> {
     try {
       const queryParams = filtersToQueryParams(filters);
       const queryString = queryParams.toString();
@@ -247,6 +247,31 @@ class ProductService {
     }
   }
 
+  async getPublicBySlug(slug: string): Promise<ProductDetail> {
+    try {
+      const { data } = await api.get<unknown>(`${this.endpoint}by-slug/${encodeURIComponent(slug)}/`)
+      const normalizedData = this.normalizeProductRecord(data)
+      const validation = ProductDetailSchema.safeParse(normalizedData)
+
+      if (!validation.success) {
+        Logger.warn(
+          'Public product detail response validation failed',
+          buildErrorContext(validation.error, {
+            endpoint: `${this.endpoint}by-slug/${slug}/`,
+            slug,
+          })
+        )
+
+        return normalizedData as ProductDetail
+      }
+
+      return validation.data
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, 'Fetch Public Product By Slug')
+      throw error
+    }
+  }
+
   /**
    * Create a new product with optional image upload.
    *
@@ -257,7 +282,7 @@ class ProductService {
    * @returns Created Product object with server-assigned ID and image URL
    * @throws Error if validation or API request fails
    */
-  async create(payload: FormData): Promise<Product> {
+  async create(payload: FormData): Promise<AdminProduct> {
     try {
       const { data } = await api.post<unknown>(this.endpoint, payload, {
         headers: {
@@ -285,8 +310,8 @@ class ProductService {
    */
   async update(
     id: number,
-    productData: Partial<Product> | FormData,
-  ): Promise<Product> {
+    productData: Partial<AdminProduct> | FormData,
+  ): Promise<AdminProduct> {
     try {
       const isFormData = productData instanceof FormData;
 
@@ -309,7 +334,7 @@ class ProductService {
           `Product schema mismatch after update [ID: ${id}]`,
           buildErrorContext(validation.error, { productId: id })
         );
-        return data as Product;
+        return data as AdminProduct;
       }
 
       return validation.data;

@@ -6,6 +6,7 @@ import { useProductSearch } from '@/composables/useProductSearch'
 import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
+import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
   useProductSearch: vi.fn()
@@ -25,13 +26,18 @@ vi.mock('@/services/category.service', () => ({
   },
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: vi.fn(),
+  useRouter: vi.fn(),
+}))
+
 const ProductCardStub = defineComponent({
   name: 'ProductCard',
   props: {
     product: { type: Object, required: true },
     cartQuantity: { type: Number, default: 0 },
   },
-  emits: ['add-to-cart'],
+  emits: ['add-to-cart', 'open-details'],
   template: '<div class="product-card-stub">{{ product.name }}</div>',
 })
 
@@ -75,6 +81,8 @@ const CartDrawerStub = defineComponent({
 
 describe('ProductsView', () => {
   let wrapper: ReturnType<typeof mount>
+  const routerPush = vi.fn()
+  const routerReplace = vi.fn(() => Promise.resolve())
 
   const mockProducts = [
     {
@@ -167,6 +175,13 @@ describe('ProductsView', () => {
     vi.mocked(useProductSearch).mockReturnValue(searchState as any)
     vi.mocked(useCart).mockReturnValue(cartState as any)
     vi.mocked(useToast).mockReturnValue(toastMock as any)
+    vi.mocked(useRoute).mockReturnValue({
+      query: {},
+    } as any)
+    vi.mocked(useRouter).mockReturnValue({
+      push: routerPush,
+      replace: routerReplace,
+    } as any)
     vi.mocked(categoryService.getAll).mockResolvedValue([
       { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
     ] as any)
@@ -175,14 +190,24 @@ describe('ProductsView', () => {
     await nextTick()
   })
 
+  it('navigates to product details when a card requests it', async () => {
+    const cardComponent = wrapper.findComponent(ProductCardStub)
+    await cardComponent.vm.$emit('open-details', mockProducts[0])
+
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'public.product-details',
+      params: { slug: 'test-product' },
+    })
+  })
+
   it('renders catalog header and products', () => {
-    expect(wrapper.find('h1').text()).toContain('Produtos prontos')
+    expect(wrapper.find('h1').text()).toContain('Produtos para escolher rapido')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })
 
-  it('renders filters and cart drawer components', () => {
-    expect(wrapper.find('.product-filters-stub').exists()).toBe(true)
+  it('renders category shortcuts and cart drawer components', () => {
+    expect(wrapper.text()).toContain('Todas as categorias')
     expect(wrapper.find('.cart-drawer-stub').exists()).toBe(true)
   })
 
@@ -195,16 +220,6 @@ describe('ProductsView', () => {
     await categoryButton!.trigger('click')
 
     expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1 })
-  })
-
-  it('forwards ProductFilters events to search actions', async () => {
-    const filtersComponent = wrapper.findComponent(ProductFiltersStub)
-
-    await filtersComponent.vm.$emit('update-filters', { search: 'monitor' })
-    await filtersComponent.vm.$emit('clear-filters')
-
-    expect(searchState.updateFilters).toHaveBeenCalledWith({ search: 'monitor' })
-    expect(searchState.clearFilters).toHaveBeenCalled()
   })
 
   it('adds product to cart and shows toast feedback', async () => {

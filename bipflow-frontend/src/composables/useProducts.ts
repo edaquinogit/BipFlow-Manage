@@ -84,19 +84,45 @@ export function useProducts() {
   const _preparePayload = (data: Partial<Product>): FormData => {
     const formData = new FormData();
     const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+    const orderedExistingImages: Array<{ index: number; value: string }> = [];
+    const orderedUploadedImages: Array<{ index: number; value: File }> = [];
 
     Object.entries(data).forEach(([key, value]) => {
       if (value === null || value === undefined || value === "") return;
 
-      // Handle image file validation
+      // Handle cover image file validation
       if (key === "image") {
         if (value instanceof File) {
           if (value.size > MAX_FILE_SIZE) {
             throw new Error("Image file size cannot exceed 2MB.");
           }
           formData.append(key, value);
+        } else if (typeof value === "string" && value.trim()) {
+          orderedExistingImages.push({ index: 0, value });
         }
-        // Skip string URLs to prevent overwriting binary with text
+        return;
+      }
+
+      // Handle gallery image files and persisted urls while preserving slot order.
+      if (key === "images" && Array.isArray(value)) {
+        const hasCoverSlot = data.image instanceof File || (typeof data.image === "string" && data.image.trim() !== "");
+
+        value.slice(0, 3).forEach((entry, galleryIndex) => {
+          const slotIndex = hasCoverSlot ? galleryIndex + 1 : galleryIndex;
+
+          if (entry instanceof File) {
+            if (entry.size > MAX_FILE_SIZE) {
+              throw new Error("Image file size cannot exceed 2MB.");
+            }
+
+            orderedUploadedImages.push({ index: slotIndex, value: entry });
+            return;
+          }
+
+          if (typeof entry === "string" && entry.trim()) {
+            orderedExistingImages.push({ index: slotIndex, value: entry });
+          }
+        });
         return;
       }
 
@@ -117,6 +143,18 @@ export function useProducts() {
         formData.append(key, String(value));
       }
     });
+
+    orderedExistingImages
+      .sort((left, right) => left.index - right.index)
+      .forEach(({ index, value }) => {
+        formData.append(`existing_images[${index}]`, value);
+      });
+
+    orderedUploadedImages
+      .sort((left, right) => left.index - right.index)
+      .forEach(({ index, value }) => {
+        formData.append(`uploaded_images[${index}]`, value);
+      });
 
     return formData;
   };

@@ -6,6 +6,7 @@ import type { RouteRecordRaw } from 'vue-router'
  */
 export const PublicRoutes = {
   Products: 'public.products',
+  ProductDetails: 'public.product-details',
 } as const
 
 /**
@@ -20,6 +21,18 @@ export const publicRoutes: RouteRecordRaw[] = [
     component: () => import(/* webpackChunkName: "public-products" */ '@/views/products/ProductsView.vue'),
     meta: {
       title: 'Produtos',
+      requiresAuth: false,
+      public: true,
+      module: 'catalog'
+    }
+  },
+  {
+    path: '/produtos/:slug',
+    alias: ['/products/:slug'],
+    name: PublicRoutes.ProductDetails,
+    component: () => import(/* webpackChunkName: "public-product-details" */ '@/views/products/ProductDetailView.vue'),
+    meta: {
+      title: 'Produto',
       requiresAuth: false,
       public: true,
       module: 'catalog'

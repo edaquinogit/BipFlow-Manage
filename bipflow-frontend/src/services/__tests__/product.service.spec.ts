@@ -34,6 +34,7 @@ describe("ProductService", () => {
           is_available: true,
           size: null,
           image: null,
+          images: [],
           category_name: "Electronics",
           slug: "notebook",
           created_at: "2026-04-20T10:00:00Z",
@@ -68,6 +69,7 @@ describe("ProductService", () => {
             category_name: "Photo",
             size: null,
             image: null,
+            images: [],
             stock_quantity: 4,
             is_available: true,
             created_at: "2026-04-20T10:00:00Z",
@@ -106,6 +108,9 @@ describe("ProductService", () => {
             category: 5,
             category_name: "Audio",
             image: "http://localhost:8000/media/products/2026/headphones.png",
+            images: [
+              "http://localhost:8000/media/products/2026/headphones.png",
+            ],
             stock_quantity: 8,
             is_available: true,
             created_at: "2026-04-20T10:00:00Z",
@@ -123,5 +128,41 @@ describe("ProductService", () => {
       slug: null,
     });
     expect(response.results[0]?.image).toContain("/media/products/");
+  });
+
+  it("fetches a public product detail by slug", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        id: 15,
+        name: "Premium Burger",
+        slug: "premium-burger",
+        description: "Burger com blend especial",
+        sku: "BRG-015",
+        price: "32.00",
+        category: 2,
+        category_name: "Lanches",
+        size: "Grande",
+        image: null,
+        images: [
+          "http://localhost:8000/media/products/2026/premium-burger-1.png",
+          "http://localhost:8000/media/products/2026/premium-burger-2.png",
+        ],
+        stock_quantity: 9,
+        is_available: true,
+        created_at: "2026-04-20T10:00:00Z",
+      },
+    } as never);
+
+    const product = await ProductService.getPublicBySlug("premium-burger");
+
+    expect(api.get).toHaveBeenCalledWith("v1/products/by-slug/premium-burger/");
+    expect(product.category).toEqual({
+      id: 2,
+      name: "Lanches",
+      slug: null,
+    });
+    expect(product.description).toBe("Burger com blend especial");
+    expect(product.size).toBe("Grande");
+    expect(product.images).toHaveLength(2);
   });
 });

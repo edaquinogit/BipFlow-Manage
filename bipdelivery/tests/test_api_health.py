@@ -16,13 +16,18 @@ Run tests with:
 """
 
 import os
+import tempfile
 from decimal import Decimal
+from io import BytesIO
 from typing import Any
 
 import django
 import pytest
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test.utils import override_settings
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -33,6 +38,19 @@ django.setup()
 from bipdelivery.api.models import Category, Product  # noqa: E402
 
 pytestmark = pytest.mark.django_db
+
+
+def build_test_image(filename: str) -> SimpleUploadedFile:
+    """Create a tiny valid PNG upload for multipart API tests."""
+    image_buffer = BytesIO()
+    Image.new('RGB', (2, 2), color=(240, 120, 160)).save(image_buffer, format='PNG')
+    image_buffer.seek(0)
+
+    return SimpleUploadedFile(
+        filename,
+        image_buffer.read(),
+        content_type='image/png',
+    )
 
 
 class CategoryAPIHealthTest(TestCase):
@@ -212,6 +230,14 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Laptop')
 
+    def test_product_retrieve_by_slug(self) -> None:
+        """Should retrieve product detail by slug for public storefront routes."""
+        response: Any = self.client.get(f'/api/v1/products/by-slug/{self.product.slug}/')  # type: ignore
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Laptop')
+        self.assertEqual(response.data['slug'], self.product.slug)
+        self.assertIn('images', response.data)
+
     def test_product_update(self) -> None:
         """Should update product via PUT endpoint."""
         self.client.force_authenticate(user=self.user)
@@ -224,6 +250,64 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Updated Laptop')
         self.assertEqual(response.data['stock_quantity'], 8)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_product_create_preserves_three_images_in_multipart_payload(self) -> None:
+        """Create should keep cover plus two gallery images in display order."""
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            'name': 'Burger Triplo',
+            'sku': 'BRG-003',
+            'price': '29.90',
+            'stock_quantity': 9,
+            'category': self.category.id,  # type: ignore[arg-type]
+            'image': build_test_image('cover.png'),
+            'uploaded_images[1]': build_test_image('gallery-1.png'),
+            'uploaded_images[2]': build_test_image('gallery-2.png'),
+        }
+
+        response: Any = self.client.post('/api/v1/products/', payload, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        self.assertEqual(len(response.data['images']), 3)
+        self.assertIn('cover', response.data['images'][0])
+        self.assertIn('gallery-1', response.data['images'][1])
+        self.assertIn('gallery-2', response.data['images'][2])
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_product_update_preserves_existing_absolute_image_urls(self) -> None:
+        """Patch should keep all existing images when dashboard sends absolute urls."""
+        self.client.force_authenticate(user=self.user)
+        create_payload = {
+            'name': 'Pizza Premium',
+            'sku': 'PZA-900',
+            'price': '49.90',
+            'stock_quantity': 6,
+            'category': self.category.id,  # type: ignore[arg-type]
+            'image': build_test_image('pizza-cover.png'),
+            'uploaded_images[1]': build_test_image('pizza-gallery-1.png'),
+            'uploaded_images[2]': build_test_image('pizza-gallery-2.png'),
+        }
+        create_response: Any = self.client.post('/api/v1/products/', create_payload, format='multipart')
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, msg=create_response.data)
+
+        product_id = create_response.data['id']
+        update_payload = {
+            'name': 'Pizza Premium Atualizada',
+            'existing_images[0]': create_response.data['images'][0],
+            'existing_images[1]': create_response.data['images'][1],
+            'existing_images[2]': create_response.data['images'][2],
+        }
+
+        response: Any = self.client.patch(
+            f'/api/v1/products/{product_id}/',
+            update_payload,
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data['name'], 'Pizza Premium Atualizada')
+        self.assertEqual(len(response.data['images']), 3)
 
     def test_product_delete(self) -> None:
         """Should delete product via DELETE endpoint."""
