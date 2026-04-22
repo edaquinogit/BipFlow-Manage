@@ -21,7 +21,7 @@
     {
       "label": "🚀 Django: Start Server",
       "type": "shell",
-      "command": "cd bipdelivery; python manage.py runserver",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py runserver",
       "problemMatcher": ["$python"],
       "group": {
         "kind": "test",
@@ -36,7 +36,7 @@
     {
       "label": "🗄️ Django: Run Migrations",
       "type": "shell",
-      "command": "cd bipdelivery; python manage.py migrate",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py migrate",
       "problemMatcher": ["$python"],
       "presentation": {
         "reveal": "always",
@@ -46,7 +46,7 @@
     {
       "label": "🧑‍💻 Django: Create Superuser",
       "type": "shell",
-      "command": "cd bipdelivery; python manage.py createsuperuser",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py createsuperuser",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -56,7 +56,7 @@
     {
       "label": "🧪 Run All Tests",
       "type": "shell",
-      "command": "cd bipdelivery; python -m pytest -v --tb=short",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe -m pytest -v --tb=short",
       "problemMatcher": ["$python"],
       "group": {
         "kind": "test",
@@ -70,7 +70,7 @@
     {
       "label": "✨ Lint & Format Code",
       "type": "shell",
-      "command": "cd bipdelivery; python -m ruff check . --fix && python -m black . --line-length=100",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe -m ruff check . --fix && venv\\Scripts\\python.exe -m black . --line-length=100",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -80,7 +80,7 @@
     {
       "label": "📊 Check Code Quality",
       "type": "shell",
-      "command": "cd bipdelivery; python -m ruff check . --statistics",
+      "command": "cd bipdelivery; venv\\Scripts\\python.exe -m ruff check . --statistics",
       "problemMatcher": ["$python"],
       "presentation": {
         "reveal": "always",
