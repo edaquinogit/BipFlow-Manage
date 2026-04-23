@@ -5,34 +5,33 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0001_initial'),
+        ("api", "0001_initial"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='product',
-            name='is_available',
+            model_name="product",
+            name="is_available",
         ),
         migrations.AddField(
-            model_name='product',
-            name='image',
-            field=models.ImageField(blank=True, null=True, upload_to='products/'),
+            model_name="product",
+            name="image",
+            field=models.ImageField(blank=True, null=True, upload_to="products/"),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='category',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='api.category'),
+            model_name="product",
+            name="category",
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="api.category"),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='description',
+            model_name="product",
+            name="description",
             field=models.TextField(),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='name',
+            model_name="product",
+            name="name",
             field=models.CharField(max_length=255),
         ),
     ]

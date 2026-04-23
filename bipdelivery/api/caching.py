@@ -4,12 +4,8 @@ Cache headers e ETags para otimizar transferência de dados.
 Segue RFC 7232 (HTTP Conditional Requests).
 """
 
-from django.utils.decorators import decorator_from_middleware
-from django.middleware.http import ConditionalGetMiddleware
-from django.views.decorators.http import condition, cache_page
+from django.views.decorators.http import cache_page
 from functools import wraps
-import hashlib
-import json
 
 
 def etag_func(request, *args, **kwargs):
@@ -28,16 +24,19 @@ def cache_product_list(timeout=300):
     - Invalidado automaticamente quando novo produto é criado
     - Cache-Control: public, max-age=300
     """
+
     def decorator(view_func):
         @wraps(view_func)
         @cache_page(timeout)  # Django cache framework
         def wrapped_view(request, *args, **kwargs):
             # Adiciona headers HTTP
             response = view_func(request, *args, **kwargs)
-            response['Cache-Control'] = f'public, max-age={timeout}'
-            response['Vary'] = 'Accept, Authorization'  # Vary por auth
+            response["Cache-Control"] = f"public, max-age={timeout}"
+            response["Vary"] = "Accept, Authorization"  # Vary por auth
             return response
+
         return wrapped_view
+
     return decorator
 
 

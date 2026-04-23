@@ -3,9 +3,17 @@ from decimal import Decimal
 from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
 
 from .models import Category, Product, ProductGalleryImage
+
+User = get_user_model()
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -13,7 +21,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'description']
+        fields = ["id", "name", "slug", "description"]
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -24,7 +32,7 @@ class ProductSerializer(serializers.ModelSerializer):
     Includes read-only computed fields for category relationships.
     """
 
-    category_name = serializers.ReadOnlyField(source='category.name')
+    category_name = serializers.ReadOnlyField(source="category.name")
     images = serializers.SerializerMethodField()
     uploaded_images = serializers.ListField(
         child=serializers.ImageField(),
@@ -42,12 +50,24 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'sku', 'name', 'slug', 'description',
-            'price', 'size', 'stock_quantity', 'is_available',
-            'image', 'images', 'uploaded_images', 'existing_images',
-            'category', 'category_name', 'created_at'
+            "id",
+            "sku",
+            "name",
+            "slug",
+            "description",
+            "price",
+            "size",
+            "stock_quantity",
+            "is_available",
+            "image",
+            "images",
+            "uploaded_images",
+            "existing_images",
+            "category",
+            "category_name",
+            "created_at",
         ]
-        read_only_fields = ['id', 'slug', 'created_at', 'category_name']
+        read_only_fields = ["id", "slug", "created_at", "category_name"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -57,33 +77,33 @@ class ProductSerializer(serializers.ModelSerializer):
         if request_images is not None:
             total_images = len(request_images)
         else:
-            uploaded_images = attrs.get('uploaded_images', [])
-            existing_images = attrs.get('existing_images', [])
-            direct_image = attrs.get('image')
+            uploaded_images = attrs.get("uploaded_images", [])
+            existing_images = attrs.get("existing_images", [])
+            direct_image = attrs.get("image")
             total_images = len(uploaded_images) + len(existing_images) + (1 if direct_image else 0)
 
         if total_images > 3:
-            raise serializers.ValidationError({
-                'uploaded_images': 'Cada produto pode ter no maximo 3 imagens.'
-            })
+            raise serializers.ValidationError(
+                {"uploaded_images": "Cada produto pode ter no maximo 3 imagens."}
+            )
 
         return attrs
 
     def get_images(self, instance):
-        request = self.context.get('request')
+        request = self.context.get("request")
         image_urls = instance.public_image_urls
 
         if request is not None:
             return [request.build_absolute_uri(url) for url in image_urls]
 
-        base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
+        base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
         return [urljoin(base_url, url) for url in image_urls]
 
     def _replace_gallery(self, instance: Product, ordered_files: list) -> None:
         """Persist gallery images while keeping the first image as product cover."""
         cover_image = ordered_files[0] if ordered_files else None
         instance.image = cover_image
-        instance.save(update_fields=['image'])
+        instance.save(update_fields=["image"])
 
         instance.gallery_images.all().delete()
 
@@ -98,8 +118,8 @@ class ProductSerializer(serializers.ModelSerializer):
         if not instance:
             return {}
 
-        request = self.context.get('request')
-        base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
+        request = self.context.get("request")
+        base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
         current_by_url: dict[str, object] = {}
 
         def register_image(image_field) -> None:
@@ -144,12 +164,14 @@ class ProductSerializer(serializers.ModelSerializer):
 
         return resolved_files[:3]
 
-    def _collect_indexed_request_values(self, request, field_name: str, *, files: bool) -> list[tuple[int, object]]:
+    def _collect_indexed_request_values(
+        self, request, field_name: str, *, files: bool
+    ) -> list[tuple[int, object]]:
         source = request.FILES if files else request.data
         entries: list[tuple[int, object]] = []
-        pattern = re.compile(rf'^{re.escape(field_name)}\[(\d+)\]$')
+        pattern = re.compile(rf"^{re.escape(field_name)}\[(\d+)\]$")
 
-        if not hasattr(source, 'keys'):
+        if not hasattr(source, "keys"):
             return entries
 
         for key in source.keys():
@@ -158,28 +180,32 @@ class ProductSerializer(serializers.ModelSerializer):
                 continue
 
             index = int(match.group(1))
-            values = source.getlist(key) if hasattr(source, 'getlist') else [source.get(key)]
+            values = source.getlist(key) if hasattr(source, "getlist") else [source.get(key)]
 
             for value in values:
-                if value in (None, ''):
+                if value in (None, ""):
                     continue
                 entries.append((index, value))
 
         return sorted(entries, key=lambda item: item[0])
 
     def _extract_ordered_request_images(self) -> list[object] | None:
-        request = self.context.get('request')
+        request = self.context.get("request")
         if request is None:
             return None
 
         ordered_entries: list[tuple[int, object]] = []
-        cover_image = request.FILES.get('image')
+        cover_image = request.FILES.get("image")
 
         if cover_image is not None:
             ordered_entries.append((0, cover_image))
 
-        indexed_existing = self._collect_indexed_request_values(request, 'existing_images', files=False)
-        indexed_uploaded = self._collect_indexed_request_values(request, 'uploaded_images', files=True)
+        indexed_existing = self._collect_indexed_request_values(
+            request, "existing_images", files=False
+        )
+        indexed_uploaded = self._collect_indexed_request_values(
+            request, "uploaded_images", files=True
+        )
 
         if indexed_existing or indexed_uploaded:
             ordered_entries.extend(indexed_existing)
@@ -191,16 +217,16 @@ class ProductSerializer(serializers.ModelSerializer):
         if cover_image is not None:
             fallback_entries.append(cover_image)
 
-        if hasattr(request.data, 'getlist'):
+        if hasattr(request.data, "getlist"):
             fallback_entries.extend(
-                value for value in request.data.getlist('existing_images')
+                value
+                for value in request.data.getlist("existing_images")
                 if isinstance(value, str) and value.strip()
             )
 
-        if hasattr(request.FILES, 'getlist'):
+        if hasattr(request.FILES, "getlist"):
             fallback_entries.extend(
-                value for value in request.FILES.getlist('uploaded_images')
-                if value is not None
+                value for value in request.FILES.getlist("uploaded_images") if value is not None
             )
 
         return fallback_entries or None
@@ -224,9 +250,9 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         ordered_request_images = self._resolve_ordered_request_images(None)
-        uploaded_images = list(validated_data.pop('uploaded_images', []))
-        validated_data.pop('existing_images', [])
-        direct_image = validated_data.pop('image', None)
+        uploaded_images = list(validated_data.pop("uploaded_images", []))
+        validated_data.pop("existing_images", [])
+        direct_image = validated_data.pop("image", None)
 
         if ordered_request_images is not None:
             product = super().create(validated_data)
@@ -242,9 +268,9 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         ordered_request_images = self._resolve_ordered_request_images(instance)
-        uploaded_images = list(validated_data.pop('uploaded_images', []))
-        existing_images = list(validated_data.pop('existing_images', []))
-        direct_image = validated_data.pop('image', None)
+        uploaded_images = list(validated_data.pop("uploaded_images", []))
+        existing_images = list(validated_data.pop("existing_images", []))
+        direct_image = validated_data.pop("image", None)
 
         product = super().update(instance, validated_data)
 
@@ -269,17 +295,17 @@ class ProductSerializer(serializers.ModelSerializer):
         Converts the relative image path to an absolute URL for API responses.
         """
         data = super().to_representation(instance)
-        request = self.context.get('request')
+        request = self.context.get("request")
 
         if instance.image:
             if request is not None:
-                data['image'] = request.build_absolute_uri(instance.image.url)
+                data["image"] = request.build_absolute_uri(instance.image.url)
             else:
                 # Fallback: build URL manually if no request context
-                base_url = getattr(settings, 'BASE_URL', 'http://127.0.0.1:8000')
-                data['image'] = urljoin(base_url, instance.image.url)
+                base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
+                data["image"] = urljoin(base_url, instance.image.url)
         else:
-            data['image'] = None
+            data["image"] = None
 
         return data
 
@@ -297,8 +323,8 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(max_length=32)
     email = serializers.EmailField(required=False, allow_blank=True)
-    delivery_method = serializers.ChoiceField(choices=['delivery', 'pickup'])
-    payment_method = serializers.ChoiceField(choices=['pix', 'card', 'cash'])
+    delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
+    payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
     address = serializers.CharField(required=False, allow_blank=True, max_length=255)
     neighborhood = serializers.CharField(required=False, allow_blank=True, max_length=255)
     city = serializers.CharField(required=False, allow_blank=True, max_length=255)
@@ -306,15 +332,15 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """Require address details only when delivery is selected."""
-        if attrs['delivery_method'] == 'delivery':
+        if attrs["delivery_method"] == "delivery":
             required_fields = {
-                'address': 'address is required for delivery orders',
-                'neighborhood': 'neighborhood is required for delivery orders',
-                'city': 'city is required for delivery orders',
+                "address": "address is required for delivery orders",
+                "neighborhood": "neighborhood is required for delivery orders",
+                "city": "city is required for delivery orders",
             }
 
             for field_name, error_message in required_fields.items():
-                if not attrs.get(field_name, '').strip():
+                if not attrs.get(field_name, "").strip():
                     raise serializers.ValidationError({field_name: error_message})
 
         return attrs
@@ -329,7 +355,7 @@ class CheckoutRequestSerializer(serializers.Serializer):
     def validate_items(self, value):
         """Ensure the cart has at least one item."""
         if not value:
-            raise serializers.ValidationError('items must contain at least one product')
+            raise serializers.ValidationError("items must contain at least one product")
         return value
 
 
@@ -350,8 +376,8 @@ class CheckoutCustomerResponseSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     phone = serializers.CharField()
     email = serializers.CharField(allow_blank=True)
-    delivery_method = serializers.ChoiceField(choices=['delivery', 'pickup'])
-    payment_method = serializers.ChoiceField(choices=['pix', 'card', 'cash'])
+    delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
+    payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
     address = serializers.CharField(allow_blank=True)
     neighborhood = serializers.CharField(allow_blank=True)
     city = serializers.CharField(allow_blank=True)
@@ -364,8 +390,93 @@ class CheckoutResponseSerializer(serializers.Serializer):
     order_reference = serializers.CharField()
     items = CheckoutItemResponseSerializer(many=True)
     customer = CheckoutCustomerResponseSerializer()
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    total = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    delivery_fee = serializers.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
+    total = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     message = serializers.CharField()
     whatsapp_url = serializers.CharField(allow_blank=True)
+
+
+class RegisterUserSerializer(serializers.Serializer):
+    """Register a new user and keep the account inactive until email verification."""
+
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+
+    def validate_email(self, value: str) -> str:
+        normalized_email = value.strip().lower()
+        if User.objects.filter(email__iexact=normalized_email).exists():
+            raise serializers.ValidationError("Ja existe uma conta cadastrada com este email.")
+        return normalized_email
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        password = attrs.get("password", "")
+        confirm_password = attrs.get("confirm_password", "")
+
+        if password != confirm_password:
+            raise serializers.ValidationError(
+                {"confirm_password": "As senhas informadas nao coincidem."}
+            )
+
+        preview_user = User(
+            username=attrs.get("email", ""),
+            email=attrs.get("email", ""),
+        )
+
+        try:
+            validate_password(password, user=preview_user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError({"password": list(error.messages)}) from error
+
+        return attrs
+
+    def create(self, validated_data):
+        email = validated_data["email"]
+        password = validated_data["password"]
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            is_active=False,
+        )
+        return user
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    """Validate a uid/token pair and activate the related user account."""
+
+    uid = serializers.CharField()
+    token = serializers.CharField()
+
+    default_error_messages = {
+        "invalid_link": "O link de verificacao e invalido ou expirou.",
+    }
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        uid = attrs.get("uid", "").strip()
+        token = attrs.get("token", "").strip()
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError({"uid": self.error_messages["invalid_link"]})
+
+        if not default_token_generator.check_token(user, token):
+            raise serializers.ValidationError({"token": self.error_messages["invalid_link"]})
+
+        attrs["user"] = user
+        return attrs
+
+    @staticmethod
+    def build_verification_payload(user) -> dict[str, str]:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        return {"uid": uid, "token": token}

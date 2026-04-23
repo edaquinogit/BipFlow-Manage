@@ -1,7 +1,14 @@
 import api from "./api";
 import { Logger } from "./logger";
 import { tokenStore } from "./token-store";
-import type { LoginCredentials, LoginResponse } from "../types/auth";
+import type {
+  LoginCredentials,
+  LoginResponse,
+  RegisterPayload,
+  RegisterResponse,
+  VerifyEmailPayload,
+  VerifyEmailResponse,
+} from "../types/auth";
 import {
   isAxiosError,
   buildErrorContext,
@@ -52,6 +59,65 @@ export const authService = {
       Logger.error("Authentication failed",
         buildErrorContext(error as ApplicationError, {
           email: credentials.email,
+          errorMessage,
+        })
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Register a new user account.
+   *
+   * The backend creates the account in an inactive state and sends
+   * a verification email before allowing login.
+   */
+  async register(payload: RegisterPayload): Promise<RegisterResponse> {
+    try {
+      const { data } = await api.post<RegisterResponse>("auth/register/", payload);
+
+      Logger.info("User registration submitted successfully", {
+        email: payload.email,
+      });
+      return data;
+    } catch (error: unknown) {
+      const errorMessage = isAxiosError(error)
+        ? error.response?.data?.detail || error.message
+        : error instanceof Error
+        ? error.message
+        : "Registration failed";
+
+      Logger.error("Registration failed",
+        buildErrorContext(error as ApplicationError, {
+          email: payload.email,
+          errorMessage,
+        })
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Verify a user email using the tokenized link payload.
+   */
+  async verifyEmail(payload: VerifyEmailPayload): Promise<VerifyEmailResponse> {
+    try {
+      const { data } = await api.post<VerifyEmailResponse>("auth/verify-email/", payload);
+
+      Logger.info("Email verified successfully", {
+        hasUid: Boolean(payload.uid),
+      });
+      return data;
+    } catch (error: unknown) {
+      const errorMessage = isAxiosError(error)
+        ? error.response?.data?.detail || error.message
+        : error instanceof Error
+        ? error.message
+        : "Email verification failed";
+
+      Logger.error("Email verification failed",
+        buildErrorContext(error as ApplicationError, {
+          hasUid: Boolean(payload.uid),
           errorMessage,
         })
       );

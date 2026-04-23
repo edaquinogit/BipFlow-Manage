@@ -5,11 +5,10 @@ from django.urls import include, path
 
 urlpatterns = [
     # 🔐 ADMINISTRATIVE INTERFACE
-    path('admin/', admin.site.urls),
-
+    path("admin/", admin.site.urls),
     # 🚀 API GATEWAY (Versioned)
     # Centraliza todas as rotas de negócio e autenticação
-    path('api/', include('bipdelivery.api.urls')),
+    path("api/", include("bipdelivery.api.urls")),
 ]
 
 # 🖼️ STATIC & MEDIA ASSETS

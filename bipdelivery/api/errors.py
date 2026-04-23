@@ -21,7 +21,7 @@ def error_response(
     error_type: str,
     message: str,
     status_code: int = status.HTTP_400_BAD_REQUEST,
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[Dict[str, Any]] = None,
 ) -> Response:
     """
     Create a standardized error response.
@@ -36,53 +36,50 @@ def error_response(
         DRF Response with standardized error format
     """
     response_data = {
-        'error': error_type,
-        'message': message,
+        "error": error_type,
+        "message": message,
     }
 
     if details:
-        response_data['details'] = details
+        response_data["details"] = details
 
     return Response(response_data, status=status_code)
 
 
 # Convenience functions for common error types
 
+
 def validation_error(
-    message: str = 'Dados inválidos fornecidos.',
-    details: Optional[Dict[str, Any]] = None
+    message: str = "Dados inválidos fornecidos.", details: Optional[Dict[str, Any]] = None
 ) -> Response:
     """Return validation error response."""
-    return error_response('VALIDATION_ERROR', message, status.HTTP_400_BAD_REQUEST, details)
+    return error_response("VALIDATION_ERROR", message, status.HTTP_400_BAD_REQUEST, details)
 
 
 def not_found_error(
-    message: str = 'O recurso solicitado não foi encontrado.',
-    details: Optional[Dict[str, Any]] = None
+    message: str = "O recurso solicitado não foi encontrado.",
+    details: Optional[Dict[str, Any]] = None,
 ) -> Response:
     """Return not found error response."""
-    return error_response('NOT_FOUND', message, status.HTTP_404_NOT_FOUND, details)
+    return error_response("NOT_FOUND", message, status.HTTP_404_NOT_FOUND, details)
 
 
 def permission_denied_error(
-    message: str = 'Você não tem permissão para executar esta ação.',
-    details: Optional[Dict[str, Any]] = None
+    message: str = "Você não tem permissão para executar esta ação.",
+    details: Optional[Dict[str, Any]] = None,
 ) -> Response:
     """Return permission denied error response."""
-    return error_response('PERMISSION_DENIED', message, status.HTTP_403_FORBIDDEN, details)
+    return error_response("PERMISSION_DENIED", message, status.HTTP_403_FORBIDDEN, details)
 
 
 def conflict_error(
-    message: str = 'Conflito com o estado atual do recurso.',
-    details: Optional[Dict[str, Any]] = None
+    message: str = "Conflito com o estado atual do recurso.",
+    details: Optional[Dict[str, Any]] = None,
 ) -> Response:
     """Return conflict error response."""
-    return error_response('CONFLICT', message, status.HTTP_409_CONFLICT, details)
+    return error_response("CONFLICT", message, status.HTTP_409_CONFLICT, details)
 
 
-def business_logic_error(
-    message: str,
-    details: Optional[Dict[str, Any]] = None
-) -> Response:
+def business_logic_error(message: str, details: Optional[Dict[str, Any]] = None) -> Response:
     """Return business logic error response."""
-    return error_response('BUSINESS_LOGIC_ERROR', message, status.HTTP_400_BAD_REQUEST, details)
+    return error_response("BUSINESS_LOGIC_ERROR", message, status.HTTP_400_BAD_REQUEST, details)

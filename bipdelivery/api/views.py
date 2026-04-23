@@ -2,6 +2,7 @@ from decimal import Decimal
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.deletion import ProtectedError
@@ -21,6 +22,8 @@ from .serializers import (
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
     ProductSerializer,
+    RegisterUserSerializer,
+    VerifyEmailSerializer,
 )
 
 
@@ -36,7 +39,7 @@ class AllowAnyReadIsAuthenticatedWrite(BasePermission):
 
     def has_permission(self, request, view):
         # Allow anonymous users to read (GET, HEAD, OPTIONS)
-        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if request.method in ("GET", "HEAD", "OPTIONS"):
             return True
         # Require authentication for mutations (POST, PUT, PATCH, DELETE)
         return bool(request.user and request.user.is_authenticated)
@@ -82,7 +85,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         """
         Support standard lookup by ID while keeping queryset optimizations.
         """
-        queryset = self.filter_queryset(self.get_queryset())
         return super().get_object()
 
     def get_queryset(self):
@@ -98,19 +100,19 @@ class ProductViewSet(viewsets.ModelViewSet):
         Returns:
             QuerySet: Optimized queryset with filters and select_related()
         """
-        queryset = Product.objects.select_related('category').prefetch_related('gallery_images')
+        queryset = Product.objects.select_related("category").prefetch_related("gallery_images")
 
         # 🔍 TEXT SEARCH: Search in name, SKU, and description
-        search_term = self.request.query_params.get('search', '').strip()
+        search_term = self.request.query_params.get("search", "").strip()
         if search_term:
             queryset = queryset.filter(
-                Q(name__icontains=search_term) |
-                Q(sku__icontains=search_term) |
-                Q(description__icontains=search_term)
+                Q(name__icontains=search_term)
+                | Q(sku__icontains=search_term)
+                | Q(description__icontains=search_term)
             )
 
         # 🏷️ CATEGORY FILTER: By ID or slug
-        category_filter = self.request.query_params.get('category', '').strip()
+        category_filter = self.request.query_params.get("category", "").strip()
         if category_filter:
             # Try to match by ID first, then by slug
             try:
@@ -121,21 +123,21 @@ class ProductViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(category__slug=category_filter)
 
         # 📊 STOCK AVAILABILITY FILTER
-        in_stock_param = self.request.query_params.get('in_stock', '').lower()
-        if in_stock_param in ('true', '1', 'yes'):
+        in_stock_param = self.request.query_params.get("in_stock", "").lower()
+        if in_stock_param in ("true", "1", "yes"):
             queryset = queryset.filter(is_available=True, stock_quantity__gt=0)
-        elif in_stock_param in ('false', '0', 'no'):
+        elif in_stock_param in ("false", "0", "no"):
             queryset = queryset.filter(Q(is_available=False) | Q(stock_quantity=0))
 
         # 💰 PRICE RANGE FILTERS
-        min_price = self.request.query_params.get('min_price')
+        min_price = self.request.query_params.get("min_price")
         if min_price:
             try:
                 queryset = queryset.filter(price__gte=float(min_price))
             except ValueError:
                 pass  # Invalid price format, skip
 
-        max_price = self.request.query_params.get('max_price')
+        max_price = self.request.query_params.get("max_price")
         if max_price:
             try:
                 queryset = queryset.filter(price__lte=float(max_price))
@@ -144,7 +146,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    @action(detail=False, methods=['get'], url_path=r'by-slug/(?P<slug>[^/]+)')
+    @action(detail=False, methods=["get"], url_path=r"by-slug/(?P<slug>[^/]+)")
     def by_slug(self, request, slug=None):
         """
         Retrieve a public product detail payload by slug.
@@ -155,12 +157,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_queryset().filter(slug=slug).first()
 
         if product is None:
-            raise NotFound(detail='Produto nao encontrado.')
+            raise NotFound(detail="Produto nao encontrado.")
 
         serializer = self.get_serializer(product)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['patch'])
+    @action(detail=False, methods=["patch"])
     def bulk_update_category(self, request):
         """
         Bulk update category for multiple products.
@@ -185,32 +187,32 @@ class ProductViewSet(viewsets.ModelViewSet):
             "new_category": {"id": 3, "name": "Electronics"}
         }
         """
-        product_ids = request.data.get('product_ids', [])
-        new_category_id = request.data.get('new_category_id')
+        product_ids = request.data.get("product_ids", [])
+        new_category_id = request.data.get("new_category_id")
 
         # Input validation
         if not product_ids or not isinstance(product_ids, list):
-            return validation_error('product_ids deve ser uma lista não vazia.')
+            return validation_error("product_ids deve ser uma lista não vazia.")
 
         if not new_category_id:
-            return validation_error('new_category_id é obrigatório.')
+            return validation_error("new_category_id é obrigatório.")
 
         try:
             new_category_id = int(new_category_id)
         except (ValueError, TypeError):
-            return validation_error('new_category_id deve ser um número inteiro válido.')
+            return validation_error("new_category_id deve ser um número inteiro válido.")
 
         # Validate category exists
         try:
             new_category = Category.objects.get(id=new_category_id)
         except Category.DoesNotExist:
-            return not_found_error(f'Categoria com id {new_category_id} não existe.')
+            return not_found_error(f"Categoria com id {new_category_id} não existe.")
 
         # Convert product_ids to integers and validate
         try:
             product_ids = [int(pid) for pid in product_ids]
         except (ValueError, TypeError):
-            return validation_error('Todos os product_ids devem ser números inteiros válidos.')
+            return validation_error("Todos os product_ids devem ser números inteiros válidos.")
 
         # Use atomic transaction for data integrity
         with transaction.atomic():
@@ -219,7 +221,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             products_to_update = Product.objects.filter(id__in=product_ids)
 
             # Check if all requested products exist
-            found_ids = set(products_to_update.values_list('id', flat=True))
+            found_ids = set(products_to_update.values_list("id", flat=True))
             missing_ids = set(product_ids) - found_ids
 
             if missing_ids:
@@ -230,15 +232,18 @@ class ProductViewSet(viewsets.ModelViewSet):
             # Perform bulk update using QuerySet.update() for efficiency
             update_count = products_to_update.update(category_id=new_category_id)
 
-            return Response({
-                "updated_count": update_count,
-                "updated_products": product_ids,
-                "new_category": {
-                    "id": new_category.id,
-                    "name": new_category.name,
-                    "slug": new_category.slug
-                }
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "updated_count": update_count,
+                    "updated_products": product_ids,
+                    "new_category": {
+                        "id": new_category.id,
+                        "name": new_category.name,
+                        "slug": new_category.slug,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
 
     def get_serializer(self, *args, **kwargs):
         """
@@ -247,9 +252,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         Allows partial field updates for PUT/PATCH requests.
         Ensures request context is passed to serializer for absolute URL generation.
         """
-        if self.request.method in ('PUT', 'PATCH'):
-            kwargs['partial'] = True
-        kwargs['context'] = {'request': self.request}
+        if self.request.method in ("PUT", "PATCH"):
+            kwargs["partial"] = True
+        kwargs["context"] = {"request": self.request}
         return super().get_serializer(*args, **kwargs)
 
 
@@ -286,7 +291,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
         try:
             instance.delete()
         except ProtectedError:
-            return business_logic_error('Não é possível excluir categoria porque ela possui produtos relacionados.')
+            return business_logic_error(
+                "Não é possível excluir categoria porque ela possui produtos relacionados."
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -304,88 +311,96 @@ class CheckoutWhatsAppView(APIView):
 
     @staticmethod
     def _normalize_phone(phone: str) -> str:
-        return ''.join(character for character in phone if character.isdigit())
+        return "".join(character for character in phone if character.isdigit())
 
     @staticmethod
     def _payment_label(payment_method: str) -> str:
         return {
-            'pix': 'Pix',
-            'card': 'Cartao',
-            'cash': 'Dinheiro',
+            "pix": "Pix",
+            "card": "Cartao",
+            "cash": "Dinheiro",
         }.get(payment_method, payment_method)
 
     @staticmethod
     def _delivery_label(delivery_method: str) -> str:
-        return 'Delivery' if delivery_method == 'delivery' else 'Retirada'
+        return "Delivery" if delivery_method == "delivery" else "Retirada"
 
     def post(self, request, *args, **kwargs):
         serializer = CheckoutRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
-        cart_items = validated_data['items']
-        customer = validated_data['customer']
-        product_ids = [item['product_id'] for item in cart_items]
+        cart_items = validated_data["items"]
+        customer = validated_data["customer"]
+        product_ids = [item["product_id"] for item in cart_items]
 
-        products = Product.objects.select_related('category').filter(id__in=product_ids)
+        products = Product.objects.select_related("category").filter(id__in=product_ids)
         products_by_id = {product.id: product for product in products}
         missing_ids = [product_id for product_id in product_ids if product_id not in products_by_id]
 
         if missing_ids:
-            raise serializers.ValidationError({
-                'items': [f'Products not found: {", ".join(str(product_id) for product_id in missing_ids)}']
-            })
+            raise serializers.ValidationError(
+                {
+                    "items": [
+                        f'Products not found: {", ".join(str(product_id) for product_id in missing_ids)}'
+                    ]
+                }
+            )
 
         normalized_items = []
-        subtotal = Decimal('0.00')
+        subtotal = Decimal("0.00")
 
         for item in cart_items:
-            product = products_by_id[item['product_id']]
-            quantity = item['quantity']
+            product = products_by_id[item["product_id"]]
+            quantity = item["quantity"]
 
             if not product.is_available or product.stock_quantity <= 0:
-                raise serializers.ValidationError({
-                    'items': [f'Product "{product.name}" is currently unavailable']
-                })
+                raise serializers.ValidationError(
+                    {"items": [f'Product "{product.name}" is currently unavailable']}
+                )
 
             if quantity > product.stock_quantity:
-                raise serializers.ValidationError({
-                    'items': [
-                        f'Requested quantity for "{product.name}" exceeds available stock ({product.stock_quantity})'
-                    ]
-                })
+                raise serializers.ValidationError(
+                    {
+                        "items": [
+                            f'Requested quantity for "{product.name}" exceeds available stock ({product.stock_quantity})'
+                        ]
+                    }
+                )
 
             unit_price = Decimal(product.price)
             line_total = unit_price * quantity
             subtotal += line_total
 
-            normalized_items.append({
-                'product_id': product.id,
-                'product_name': product.name,
-                'sku': product.sku or '',
-                'quantity': quantity,
-                'unit_price': unit_price.quantize(Decimal('0.01')),
-                'line_total': line_total.quantize(Decimal('0.01')),
-            })
+            normalized_items.append(
+                {
+                    "product_id": product.id,
+                    "product_name": product.name,
+                    "sku": product.sku or "",
+                    "quantity": quantity,
+                    "unit_price": unit_price.quantize(Decimal("0.01")),
+                    "line_total": line_total.quantize(Decimal("0.01")),
+                }
+            )
 
         delivery_fee = (
             settings.ORDER_DELIVERY_FEE
-            if customer['delivery_method'] == 'delivery'
-            else Decimal('0.00')
+            if customer["delivery_method"] == "delivery"
+            else Decimal("0.00")
         )
         total = subtotal + delivery_fee
 
-        order_reference = timezone.localtime().strftime('BPF-%Y%m%d-%H%M%S')
-        customer_name = customer['full_name'].strip()
-        customer_phone = customer['phone'].strip()
-        customer_email = customer.get('email', '').strip()
-        notes = customer.get('notes', '').strip()
+        order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S")
+        customer_name = customer["full_name"].strip()
+        customer_phone = customer["phone"].strip()
+        customer_email = customer.get("email", "").strip()
+        notes = customer.get("notes", "").strip()
 
         message_lines = [
-            'Pedido BipFlow',
-            f'Referencia: {order_reference}',
-            '',
-            'Itens do pedido:',
+            "Pedido BipFlow",
+            f"Referencia: {order_reference}",
+            "",
+            "Itens do pedido:",
             *[
                 (
                     f'{index + 1}. {item["product_name"]} '
@@ -393,57 +408,120 @@ class CheckoutWhatsAppView(APIView):
                 )
                 for index, item in enumerate(normalized_items)
             ],
-            '',
-            f'Subtotal: R$ {subtotal:.2f}',
-            f'Entrega: R$ {delivery_fee:.2f}',
-            f'Total: R$ {total:.2f}',
-            '',
-            f'Cliente: {customer_name}',
-            f'WhatsApp: {customer_phone}',
+            "",
+            f"Subtotal: R$ {subtotal:.2f}",
+            f"Entrega: R$ {delivery_fee:.2f}",
+            f"Total: R$ {total:.2f}",
+            "",
+            f"Cliente: {customer_name}",
+            f"WhatsApp: {customer_phone}",
             f'Email: {customer_email or "Nao informado"}',
             f'Entrega: {self._delivery_label(customer["delivery_method"])}',
             f'Pagamento: {self._payment_label(customer["payment_method"])}',
         ]
 
-        if customer['delivery_method'] == 'delivery':
-            message_lines.extend([
-                f'Endereco: {customer["address"].strip()}',
-                f'Bairro: {customer["neighborhood"].strip()}',
-                f'Cidade: {customer["city"].strip()}',
-            ])
+        if customer["delivery_method"] == "delivery":
+            message_lines.extend(
+                [
+                    f'Endereco: {customer["address"].strip()}',
+                    f'Bairro: {customer["neighborhood"].strip()}',
+                    f'Cidade: {customer["city"].strip()}',
+                ]
+            )
 
         if notes:
-            message_lines.append(f'Observacoes: {notes}')
+            message_lines.append(f"Observacoes: {notes}")
 
-        message = '\n'.join(message_lines)
+        message = "\n".join(message_lines)
         whatsapp_phone = self._normalize_phone(settings.WHATSAPP_ORDER_PHONE)
         whatsapp_url = (
-            f'https://wa.me/{whatsapp_phone}?text={quote(message)}'
-            if whatsapp_phone
-            else ''
+            f"https://wa.me/{whatsapp_phone}?text={quote(message)}" if whatsapp_phone else ""
         )
 
         response_payload = {
-            'order_reference': order_reference,
-            'items': normalized_items,
-            'customer': {
-                'full_name': customer_name,
-                'phone': customer_phone,
-                'email': customer_email,
-                'delivery_method': customer['delivery_method'],
-                'payment_method': customer['payment_method'],
-                'address': customer.get('address', '').strip(),
-                'neighborhood': customer.get('neighborhood', '').strip(),
-                'city': customer.get('city', '').strip(),
-                'notes': notes,
+            "order_reference": order_reference,
+            "items": normalized_items,
+            "customer": {
+                "full_name": customer_name,
+                "phone": customer_phone,
+                "email": customer_email,
+                "delivery_method": customer["delivery_method"],
+                "payment_method": customer["payment_method"],
+                "address": customer.get("address", "").strip(),
+                "neighborhood": customer.get("neighborhood", "").strip(),
+                "city": customer.get("city", "").strip(),
+                "notes": notes,
             },
-            'subtotal': subtotal.quantize(Decimal('0.01')),
-            'delivery_fee': delivery_fee.quantize(Decimal('0.01')),
-            'total': total.quantize(Decimal('0.01')),
-            'message': message,
-            'whatsapp_url': whatsapp_url,
+            "subtotal": subtotal.quantize(Decimal("0.01")),
+            "delivery_fee": delivery_fee.quantize(Decimal("0.01")),
+            "total": total.quantize(Decimal("0.01")),
+            "message": message,
+            "whatsapp_url": whatsapp_url,
         }
 
         output_serializer = CheckoutResponseSerializer(data=response_payload)
         output_serializer.is_valid(raise_exception=True)
         return Response(output_serializer.data, status=status.HTTP_200_OK)
+
+
+class RegisterUserView(APIView):
+    """Create a new inactive user account and send an email verification link."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        serializer = RegisterUserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            user = serializer.save()
+            verification_payload = VerifyEmailSerializer.build_verification_payload(user)
+            verification_url = (
+                f"{settings.FRONTEND_BASE_URL}/verify-email"
+                f'?uid={verification_payload["uid"]}&token={verification_payload["token"]}'
+            )
+
+            send_mail(
+                subject="Confirme seu cadastro no BipFlow",
+                message=(
+                    "Seu cadastro foi criado com sucesso.\n\n"
+                    f"Confirme seu email acessando o link abaixo:\n{verification_url}\n\n"
+                    "Se voce nao solicitou esta conta, ignore esta mensagem."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+
+        return Response(
+            {
+                "message": "Cadastro realizado. Verifique seu email para ativar a conta.",
+                "email": user.email,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyEmailView(APIView):
+    """Activate a pending user account after validating the email token."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        serializer = VerifyEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        if not user.is_active:
+            user.is_active = True
+            user.save(update_fields=["is_active"])
+
+        return Response(
+            {
+                "message": "Email verificado com sucesso. Sua conta ja pode ser utilizada.",
+                "email": user.email,
+            },
+            status=status.HTTP_200_OK,
+        )

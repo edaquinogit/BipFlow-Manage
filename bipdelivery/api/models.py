@@ -14,7 +14,7 @@ class Category(models.Model):
 
     class Meta:
         verbose_name_plural = "Categories"
-        ordering = ['name']
+        ordering = ["name"]
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -32,6 +32,7 @@ class Category(models.Model):
         """Return the category name as string representation."""
         return self.name
 
+
 class Product(models.Model):
     """Product model representing items in the inventory system."""
 
@@ -39,39 +40,43 @@ class Product(models.Model):
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
-        related_name='products',
-        help_text="Product category (deletes protected)"
+        related_name="products",
+        help_text="Product category (deletes protected)",
     )
 
     # Unique Identification (Essential for Barcode/Scanner)
     sku = models.CharField(
-    max_length=50,
-    unique=True,
-    blank=True,
-    null=True,
-    help_text="Unique product code (SKU/Barcode)"
-)
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Unique product code (SKU/Barcode)",
+    )
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=False, blank=True, null=True)
 
     # Details
-    description = models.TextField(blank=True, help_text="Complete description for online storefront")
+    description = models.TextField(
+        blank=True, help_text="Complete description for online storefront"
+    )
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    size = models.CharField(max_length=50, blank=True, null=True, help_text="E.g: S, M, L or 42, 44")
+    size = models.CharField(
+        max_length=50, blank=True, null=True, help_text="E.g: S, M, L or 42, 44"
+    )
 
     # Inventory
     stock_quantity = models.PositiveIntegerField(default=0)
     is_available = models.BooleanField(default=True)
 
     # Media
-    image = models.ImageField(upload_to='products/%Y/%m/', null=True, blank=True)
+    image = models.ImageField(upload_to="products/%Y/%m/", null=True, blank=True)
 
     # Audit (Current market standard)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -118,15 +123,15 @@ class ProductGalleryImage(models.Model):
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
-        related_name='gallery_images',
+        related_name="gallery_images",
     )
-    image = models.ImageField(upload_to='products/%Y/%m/')
+    image = models.ImageField(upload_to="products/%Y/%m/")
     position = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['position', 'id']
+        ordering = ["position", "id"]
 
     def __str__(self) -> str:
         """Return a compact identifier for admin/debug purposes."""
-        return f'{self.product_id} - gallery image {self.position}'
+        return f"{self.product_id} - gallery image {self.position}"

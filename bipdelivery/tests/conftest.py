@@ -10,5 +10,5 @@ import os
 import django
 
 # Set up Django settings module
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bipdelivery.core.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()

@@ -6,80 +6,93 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0003_product_is_available_alter_product_category_and_more'),
+        ("api", "0003_product_is_available_alter_product_category_and_more"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='category',
-            options={'ordering': ['name'], 'verbose_name_plural': 'Categories'},
+            name="category",
+            options={"ordering": ["name"], "verbose_name_plural": "Categories"},
         ),
         migrations.AlterModelOptions(
-            name='product',
-            options={'ordering': ['-created_at']},
+            name="product",
+            options={"ordering": ["-created_at"]},
         ),
         migrations.AddField(
-            model_name='category',
-            name='created_at',
+            model_name="category",
+            name="created_at",
             field=models.DateTimeField(auto_now_add=True, default=django.utils.timezone.now),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='category',
-            name='slug',
+            model_name="category",
+            name="slug",
             field=models.SlugField(blank=True, null=True, unique=True),
         ),
         migrations.AddField(
-            model_name='product',
-            name='created_at',
+            model_name="product",
+            name="created_at",
             field=models.DateTimeField(auto_now_add=True, default=django.utils.timezone.now),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='product',
-            name='size',
-            field=models.CharField(blank=True, help_text='Ex: P, M, G ou 42, 44', max_length=50, null=True),
+            model_name="product",
+            name="size",
+            field=models.CharField(
+                blank=True, help_text="Ex: P, M, G ou 42, 44", max_length=50, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='product',
-            name='sku',
-            field=models.CharField(blank=True, help_text='Código único do produto (SKU/Barcode)', max_length=50, null=True, unique=True),
+            model_name="product",
+            name="sku",
+            field=models.CharField(
+                blank=True,
+                help_text="Código único do produto (SKU/Barcode)",
+                max_length=50,
+                null=True,
+                unique=True,
+            ),
         ),
         migrations.AddField(
-            model_name='product',
-            name='slug',
+            model_name="product",
+            name="slug",
             field=models.SlugField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='product',
-            name='stock_quantity',
+            model_name="product",
+            name="stock_quantity",
             field=models.PositiveIntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='product',
-            name='updated_at',
+            model_name="product",
+            name="updated_at",
             field=models.DateTimeField(auto_now=True),
         ),
         migrations.AlterField(
-            model_name='category',
-            name='name',
+            model_name="category",
+            name="name",
             field=models.CharField(max_length=100, unique=True),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='category',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='products', to='api.category'),
+            model_name="product",
+            name="category",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="products",
+                to="api.category",
+            ),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='description',
-            field=models.TextField(blank=True, help_text='Descrição completa para a vitrine online'),
+            model_name="product",
+            name="description",
+            field=models.TextField(
+                blank=True, help_text="Descrição completa para a vitrine online"
+            ),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='image',
-            field=models.ImageField(blank=True, null=True, upload_to='products/%Y/%m/'),
+            model_name="product",
+            name="image",
+            field=models.ImageField(blank=True, null=True, upload_to="products/%Y/%m/"),
         ),
     ]

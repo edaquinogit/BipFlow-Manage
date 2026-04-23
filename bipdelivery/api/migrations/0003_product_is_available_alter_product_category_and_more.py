@@ -5,25 +5,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0002_remove_product_is_available_product_image_and_more'),
+        ("api", "0002_remove_product_is_available_product_image_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='product',
-            name='is_available',
+            model_name="product",
+            name="is_available",
             field=models.BooleanField(default=True),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='category',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='products', to='api.category'),
+            model_name="product",
+            name="category",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="products",
+                to="api.category",
+            ),
         ),
         migrations.AlterField(
-            model_name='product',
-            name='description',
+            model_name="product",
+            name="description",
             field=models.TextField(blank=True),
         ),
     ]
