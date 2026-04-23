@@ -7,7 +7,6 @@ import type { RouteRecordRaw } from "vue-router";
 export const AuthRouteNames = {
   Login: "auth.login",
   Register: "auth.register",
-  VerifyEmail: "auth.verify-email",
   ForgotPassword: "auth.forgot-password",
   ResetPassword: "auth.reset-password",
 } as const;
@@ -39,12 +38,6 @@ export const authRoutes: RouteRecordRaw[] = [
     name: AuthRouteNames.Register,
     component: () => import(/* webpackChunkName: "auth-register" */ "@/views/auth/RegisterView.vue"),
     meta: guestMeta("Criar Conta")
-  },
-  {
-    path: "/verify-email",
-    name: AuthRouteNames.VerifyEmail,
-    component: () => import(/* webpackChunkName: "auth-verify-email" */ "@/views/auth/VerifyEmailView.vue"),
-    meta: guestMeta("Verificar Email")
   },
   {
     path: "/forgot-password",

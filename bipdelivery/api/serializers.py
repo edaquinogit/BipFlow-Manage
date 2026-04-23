@@ -400,7 +400,7 @@ class CheckoutResponseSerializer(serializers.Serializer):
 
 
 class RegisterUserSerializer(serializers.Serializer):
-    """Register a new user and keep the account inactive until email verification."""
+    """Register a new active user account with password validation."""
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
@@ -442,19 +442,30 @@ class RegisterUserSerializer(serializers.Serializer):
             username=email,
             email=email,
             password=password,
-            is_active=False,
+            is_active=True,
         )
         return user
 
 
-class VerifyEmailSerializer(serializers.Serializer):
-    """Validate a uid/token pair and activate the related user account."""
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Validate a password reset request without exposing whether the email exists."""
+
+    email = serializers.EmailField()
+
+    def validate_email(self, value: str) -> str:
+        return value.strip().lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Validate a reset token and set a new password for the related user."""
 
     uid = serializers.CharField()
     token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
 
     default_error_messages = {
-        "invalid_link": "O link de verificacao e invalido ou expirou.",
+        "invalid_link": "O link de recuperacao e invalido ou expirou.",
     }
 
     def validate(self, attrs):
@@ -462,6 +473,8 @@ class VerifyEmailSerializer(serializers.Serializer):
 
         uid = attrs.get("uid", "").strip()
         token = attrs.get("token", "").strip()
+        password = attrs.get("password", "")
+        confirm_password = attrs.get("confirm_password", "")
 
         try:
             user_id = force_str(urlsafe_base64_decode(uid))
@@ -472,11 +485,21 @@ class VerifyEmailSerializer(serializers.Serializer):
         if not default_token_generator.check_token(user, token):
             raise serializers.ValidationError({"token": self.error_messages["invalid_link"]})
 
+        if password != confirm_password:
+            raise serializers.ValidationError(
+                {"confirm_password": "As senhas informadas nao coincidem."}
+            )
+
+        try:
+            validate_password(password, user=user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError({"password": list(error.messages)}) from error
+
         attrs["user"] = user
         return attrs
 
     @staticmethod
-    def build_verification_payload(user) -> dict[str, str]:
+    def build_reset_payload(user) -> dict[str, str]:
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         return {"uid": uid, "token": token}

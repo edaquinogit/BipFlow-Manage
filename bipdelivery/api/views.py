@@ -2,6 +2,7 @@ from decimal import Decimal
 from urllib.parse import quote
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Q
@@ -21,10 +22,13 @@ from .serializers import (
     CategorySerializer,
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     ProductSerializer,
     RegisterUserSerializer,
-    VerifyEmailSerializer,
 )
+
+User = get_user_model()
 
 
 class AllowAnyReadIsAuthenticatedWrite(BasePermission):
@@ -465,7 +469,7 @@ class CheckoutWhatsAppView(APIView):
 
 
 class RegisterUserView(APIView):
-    """Create a new inactive user account and send an email verification link."""
+    """Create a new active user account after validating email and password."""
 
     permission_classes = []
     authentication_classes = []
@@ -473,54 +477,79 @@ class RegisterUserView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = RegisterUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        with transaction.atomic():
-            user = serializer.save()
-            verification_payload = VerifyEmailSerializer.build_verification_payload(user)
-            verification_url = (
-                f"{settings.FRONTEND_BASE_URL}/verify-email"
-                f'?uid={verification_payload["uid"]}&token={verification_payload["token"]}'
-            )
-
-            send_mail(
-                subject="Confirme seu cadastro no BipFlow",
-                message=(
-                    "Seu cadastro foi criado com sucesso.\n\n"
-                    f"Confirme seu email acessando o link abaixo:\n{verification_url}\n\n"
-                    "Se voce nao solicitou esta conta, ignore esta mensagem."
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
+        user = serializer.save()
 
         return Response(
             {
-                "message": "Cadastro realizado. Verifique seu email para ativar a conta.",
+                "message": "Cadastro realizado com sucesso. Voce ja pode acessar sua conta.",
                 "email": user.email,
             },
             status=status.HTTP_201_CREATED,
         )
 
 
-class VerifyEmailView(APIView):
-    """Activate a pending user account after validating the email token."""
+class PasswordResetRequestView(APIView):
+    """Send a password reset link when the submitted email belongs to an active user."""
 
     permission_classes = []
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
-        serializer = VerifyEmailSerializer(data=request.data)
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        user = (
+            User.objects.filter(email__iexact=email, is_active=True)
+            .order_by("id")
+            .first()
+        )
+
+        # Always return the same public response to avoid account enumeration.
+        public_response = {
+            "message": "Se este email existir, enviaremos um link seguro para redefinir a senha.",
+            "email": email,
+        }
+
+        if user is not None:
+            reset_payload = PasswordResetConfirmSerializer.build_reset_payload(user)
+            reset_url = (
+                f"{settings.FRONTEND_BASE_URL}/reset-password"
+                f'?uid={reset_payload["uid"]}&token={reset_payload["token"]}'
+            )
+
+            send_mail(
+                subject="Recuperacao de senha BipFlow",
+                message=(
+                    "Recebemos uma solicitacao para redefinir sua senha.\n\n"
+                    f"Acesse o link seguro abaixo para criar uma nova senha:\n{reset_url}\n\n"
+                    "Se voce nao solicitou esta alteracao, ignore esta mensagem."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+
+        return Response(public_response, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    """Reset a user password after validating the signed email token."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = serializer.validated_data["user"]
-        if not user.is_active:
-            user.is_active = True
-            user.save(update_fields=["is_active"])
+        user.set_password(serializer.validated_data["password"])
+        user.save(update_fields=["password"])
 
         return Response(
             {
-                "message": "Email verificado com sucesso. Sua conta ja pode ser utilizada.",
+                "message": "Senha redefinida com sucesso. Voce ja pode acessar sua conta.",
                 "email": user.email,
             },
             status=status.HTTP_200_OK,

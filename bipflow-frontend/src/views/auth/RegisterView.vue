@@ -104,8 +104,8 @@ const handleRegister = async () => {
               Crie acesso administrativo com validacao por email.
             </h1>
             <p class="max-w-md text-sm leading-7 text-gray-300">
-              Novas contas nascem inativas. O acesso ao dashboard so e liberado depois que o
-              email for confirmado pelo link enviado ao usuario.
+              Novas contas sao criadas ativas apos validacao de email e senha. A confirmacao por
+              email fica reservada para recuperacao de senha.
             </p>
           </div>
         </div>
@@ -115,8 +115,7 @@ const handleRegister = async () => {
             <ShieldCheckIcon class="mb-3 h-6 w-6 text-emerald-300" />
             <p class="text-sm font-semibold text-white">Padrao de seguranca</p>
             <p class="mt-2 text-sm leading-6 text-gray-400">
-              Senha validada no frontend e no backend, conta inativa ate confirmacao e token
-              assinado pelo Django.
+              Senha validada no frontend e no backend, com protecao contra emails duplicados.
             </p>
           </div>
 
@@ -137,7 +136,7 @@ const handleRegister = async () => {
             </p>
             <h2 class="mt-3 text-3xl font-bold tracking-tight text-white">Criar conta</h2>
             <p class="mt-2 text-sm leading-6 text-gray-400">
-              Use um email valido. Enviaremos um link para liberar o primeiro acesso.
+              Use um email valido e uma senha forte para liberar o acesso administrativo.
             </p>
           </div>
 

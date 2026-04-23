@@ -4,10 +4,12 @@ import { tokenStore } from "./token-store";
 import type {
   LoginCredentials,
   LoginResponse,
+  ConfirmResetPayload,
+  ConfirmResetResponse,
   RegisterPayload,
   RegisterResponse,
-  VerifyEmailPayload,
-  VerifyEmailResponse,
+  RequestResetPayload,
+  RequestResetResponse,
 } from "../types/auth";
 import {
   isAxiosError,
@@ -69,8 +71,7 @@ export const authService = {
   /**
    * Register a new user account.
    *
-   * The backend creates the account in an inactive state and sends
-   * a verification email before allowing login.
+   * The backend creates an active account after validating the password.
    */
   async register(payload: RegisterPayload): Promise<RegisterResponse> {
     try {
@@ -98,13 +99,44 @@ export const authService = {
   },
 
   /**
-   * Verify a user email using the tokenized link payload.
+   * Request a secure password reset link by email.
    */
-  async verifyEmail(payload: VerifyEmailPayload): Promise<VerifyEmailResponse> {
+  async requestPasswordReset(payload: RequestResetPayload): Promise<RequestResetResponse> {
     try {
-      const { data } = await api.post<VerifyEmailResponse>("auth/verify-email/", payload);
+      const { data } = await api.post<RequestResetResponse>("auth/password-reset/", payload);
 
-      Logger.info("Email verified successfully", {
+      Logger.info("Password reset requested", {
+        email: payload.email,
+      });
+      return data;
+    } catch (error: unknown) {
+      const errorMessage = isAxiosError(error)
+        ? error.response?.data?.detail || error.message
+        : error instanceof Error
+        ? error.message
+        : "Password reset request failed";
+
+      Logger.error("Password reset request failed",
+        buildErrorContext(error as ApplicationError, {
+          email: payload.email,
+          errorMessage,
+        })
+      );
+      throw error;
+    }
+  },
+
+  /**
+   * Confirm password reset using the secure tokenized email link.
+   */
+  async confirmPasswordReset(payload: ConfirmResetPayload): Promise<ConfirmResetResponse> {
+    try {
+      const { data } = await api.post<ConfirmResetResponse>(
+        "auth/password-reset/confirm/",
+        payload
+      );
+
+      Logger.info("Password reset confirmed", {
         hasUid: Boolean(payload.uid),
       });
       return data;
@@ -113,9 +145,9 @@ export const authService = {
         ? error.response?.data?.detail || error.message
         : error instanceof Error
         ? error.message
-        : "Email verification failed";
+        : "Password reset confirmation failed";
 
-      Logger.error("Email verification failed",
+      Logger.error("Password reset confirmation failed",
         buildErrorContext(error as ApplicationError, {
           hasUid: Boolean(payload.uid),
           errorMessage,

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import {
-  ArrowTopRightOnSquareIcon,
-  ShoppingBagIcon,
-} from '@heroicons/vue/24/outline'
+import { ShoppingBagIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
 import { DashboardRoutes } from '@/router/dashboard.routes'
@@ -42,90 +39,37 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 p-4 text-white">
-    <div
-      class="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 shadow-2xl shadow-black/30 lg:grid-cols-[1.08fr_0.92fr]"
-    >
-      <section
-        class="relative hidden overflow-hidden border-r border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.14),_transparent_30%),linear-gradient(160deg,_rgba(2,6,23,0.98),_rgba(17,24,39,0.96))] p-10 lg:flex lg:flex-col lg:justify-between"
+  <main class="login-shell min-h-screen overflow-hidden bg-gray-950 px-4 py-6 text-white sm:px-6">
+    <div class="login-orbit" aria-hidden="true"></div>
+    <div class="login-grid" aria-hidden="true"></div>
+
+    <section class="relative z-10 flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div
+        class="login-card w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-gray-900/85 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8"
       >
-        <div class="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div class="absolute left-10 top-10 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl"></div>
-          <div class="absolute bottom-10 right-10 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl"></div>
-        </div>
+        <div class="login-card-glow" aria-hidden="true"></div>
 
-        <div class="relative space-y-8">
-          <span
-            class="inline-flex w-fit items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200"
-          >
-            Jornada pública
-          </span>
-
-          <div class="space-y-4">
-            <h1 class="max-w-lg text-4xl font-bold tracking-tight text-white xl:text-5xl">
-              O catálogo público fica acessível desde o primeiro carregamento.
-            </h1>
-            <p class="max-w-md text-sm leading-7 text-gray-300">
-              Para visualizar a experiência do cliente, validar a vitrine ou testar a jornada
-              de compra, o acesso pode acontecer sem autenticação. O login continua reservado
-              para o fluxo administrativo.
-            </p>
-          </div>
-
-          <RouterLink
-            :to="{ name: PublicRoutes.Products }"
-            class="group inline-flex w-fit items-center gap-3 rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition-all hover:border-cyan-300/50 hover:bg-cyan-400/15 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 focus:ring-offset-2 focus:ring-offset-gray-950"
-          >
-            <ShoppingBagIcon class="h-5 w-5 transition-transform group-hover:scale-105" />
-            <span>Abrir catálogo público</span>
-            <ArrowTopRightOnSquareIcon
-              class="h-4 w-4 text-cyan-100/80 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-            />
-          </RouterLink>
-        </div>
-
-        <div class="relative grid gap-4">
-          <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <p class="text-sm font-semibold text-white">Onde acessar</p>
-            <p class="mt-2 font-mono text-xs text-cyan-200">http://localhost:5173/produtos</p>
-          </div>
-
-          <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <p class="text-sm font-semibold text-white">Por que esse atalho existe</p>
-            <p class="mt-2 text-sm leading-6 text-gray-400">
-              Ele reduz fricção para quem precisa testar a jornada pública sem se perder entre
-              rotas administrativas.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="flex items-center p-6 sm:p-10">
-        <div class="mx-auto w-full max-w-md">
+        <div class="relative">
           <div class="mb-8 text-center">
-            <h2 class="text-3xl font-bold tracking-tight text-white">BipFlow Manage</h2>
-            <p class="mt-2 text-sm text-gray-400">Sign in to manage your operation safely</p>
-          </div>
-
-          <div class="mb-6 rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-left lg:hidden">
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
-              Catálogo público
-            </p>
-            <p class="mt-2 text-sm leading-6 text-gray-400">
-              Quer navegar como cliente? O catálogo fica disponível sem autenticação.
-            </p>
-            <RouterLink
-              :to="{ name: PublicRoutes.Products }"
-              class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-300 transition-colors hover:text-cyan-200"
+            <div
+              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-zinc-950 shadow-lg shadow-black/30"
             >
-              <ShoppingBagIcon class="h-4 w-4" />
-              <span>Ir para o catálogo</span>
-            </RouterLink>
+              <span class="text-lg font-black tracking-tighter text-indigo-500">BF</span>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">
+              Painel Administrativo
+            </p>
+            <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              BipFlow Manage
+            </h1>
+            <p class="mt-2 text-sm leading-6 text-gray-400">
+              Acesse seu painel para gerenciar produtos, categorias e operacao.
+            </p>
           </div>
 
           <div
             v-if="errorMessage"
-            class="mb-6 rounded-lg border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-400"
+            class="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300"
           >
             {{ errorMessage }}
           </div>
@@ -138,8 +82,9 @@ const handleLogin = async () => {
               <input
                 v-model="form.email"
                 type="email"
-                placeholder="ceo@bipflow.com"
-                class="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-600"
+                autocomplete="email"
+                placeholder="admin@bipflow.com"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                 required
               />
             </div>
@@ -151,8 +96,9 @@ const handleLogin = async () => {
               <input
                 v-model="form.password"
                 type="password"
+                autocomplete="current-password"
                 placeholder="........"
-                class="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-600"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                 required
               />
             </div>
@@ -160,45 +106,133 @@ const handleLogin = async () => {
             <button
               type="submit"
               :disabled="isLoading"
-              class="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-700"
+              class="flex w-full items-center justify-center rounded-xl bg-white py-3 text-xs font-black uppercase tracking-widest text-black shadow-xl shadow-white/5 transition-all hover:-translate-y-0.5 hover:bg-zinc-200 disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               <span
                 v-if="isLoading"
-                class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white"
+                class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-gray-950/20 border-t-gray-950"
               ></span>
               {{ isLoading ? 'Authenticating...' : 'Sign In' }}
             </button>
           </form>
 
-          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <div class="mt-5 flex flex-col gap-3 sm:flex-row">
             <RouterLink
-              :to="{ name: PublicRoutes.Products }"
-              class="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-cyan-200 transition-all hover:border-cyan-300/40 hover:bg-cyan-400/15"
+              :to="{ name: AuthRouteNames.ForgotPassword }"
+              class="inline-flex flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-zinc-400 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-300"
             >
-              <ShoppingBagIcon class="h-4 w-4" />
-              Catalogo publico
+              Recuperar senha
             </RouterLink>
+
             <RouterLink
               :to="{ name: AuthRouteNames.Register }"
-              class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-gray-200 transition-all hover:border-white/20 hover:bg-white/[0.08]"
+              class="inline-flex flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-gray-300 transition-all hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
             >
               Criar conta
             </RouterLink>
           </div>
 
-          <div class="mt-8 space-y-4">
-            <p class="text-center text-sm text-gray-500">
-              By signing in, you agree to our
-              <a href="#" class="text-blue-500 hover:underline">Terms of Service</a>.
-            </p>
-
-            <p class="text-center text-xs leading-6 text-gray-500">
-              Se a sua intenção for validar a experiência do cliente, use o acesso rápido para o
-              catálogo público nesta mesma tela.
+          <div class="mt-7 border-t border-white/10 pt-5 text-center">
+            <RouterLink
+              :to="{ name: PublicRoutes.Products }"
+              class="group inline-flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 transition-colors hover:text-indigo-400"
+            >
+              <ShoppingBagIcon class="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+              Ver catalogo publico
+            </RouterLink>
+            <p class="mt-4 text-xs leading-5 text-gray-600">
+              Acesso administrativo protegido por credenciais. Use uma conta autorizada.
             </p>
           </div>
         </div>
-      </section>
-    </div>
-  </div>
+      </div>
+    </section>
+  </main>
 </template>
+
+<style scoped>
+.login-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12), transparent 32rem),
+    radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
+    #09090b;
+}
+
+.login-orbit {
+  position: absolute;
+  inset: -18rem;
+  background:
+    conic-gradient(
+      from 180deg,
+      transparent 0deg,
+      rgba(99, 102, 241, 0.08) 72deg,
+      transparent 150deg,
+      rgba(255, 255, 255, 0.07) 240deg,
+      transparent 360deg
+    );
+  filter: blur(36px);
+  animation: login-orbit-spin 24s linear infinite;
+}
+
+.login-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
+
+.login-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -2;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.42),
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.16)
+  );
+  opacity: 0.55;
+}
+
+.login-card-glow {
+  position: absolute;
+  inset: auto -30% -30% -30%;
+  height: 16rem;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 66%);
+  animation: login-glow-float 8s ease-in-out infinite alternate;
+}
+
+@keyframes login-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes login-glow-float {
+  from {
+    transform: translate3d(-4%, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(4%, -8%, 0) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-orbit,
+  .login-card-glow {
+    animation: none;
+  }
+}
+</style>
