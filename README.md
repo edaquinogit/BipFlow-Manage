@@ -73,6 +73,11 @@ python manage.py runserver
 
 API local: `http://127.0.0.1:8000/api/`
 
+Observacao sobre banco local:
+- `bipdelivery/db.sqlite3` e um artefato de desenvolvimento local.
+- Esse arquivo nao deve ser versionado nem entrar em commits.
+- Para resetar a base local, prefira remover o arquivo localmente e rodar `python manage.py migrate` novamente.
+
 ### 2. Frontend
 
 ```powershell
@@ -130,6 +135,10 @@ npm run typecheck
 ### Backend sem dependencias
 
 Se aparecer `ModuleNotFoundError: No module named 'django'`, ative a virtualenv correta antes de executar o servidor ou os testes.
+
+### Banco SQLite aparecendo no Git
+
+Se `bipdelivery/db.sqlite3` aparecer como modificado no `git status`, trate isso como dado local. O fluxo esperado do projeto e manter o schema em migrations e deixar o arquivo SQLite fora do versionamento.
 
 ### Frontend com bindings nativos quebrados
 

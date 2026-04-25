@@ -1,77 +1,46 @@
 # Node.js
 node_modules/
-npm-debug.log
+npm-debug.log*
+dist/
+.cache/
 coverage/
-.env
-
-# Banco local
-db.sqlite3
 
 # Python
 __pycache__/
-*.pyc
-venv/
-.venv/
-
-# Java
-target/
-*.class
-
-# Vue.js
-dist/
-.cache/
-
-
-coverage/
-coverage/
-node_modules/
-.venv/
-*.sqlite3
-*.sqlite3
-bipdelivery/db.sqlite3
-cypress/screenshots/
-cypress/videos/
-
-# --- Enterprise Clean Sweep ---
-**/staticfiles/
-**/static_root/
-**/*.sqlite3
-**/*.log
-.env
-.venv/
-node_modules/
-dist/
-__pycache__/
 *.py[cod]
-
-# Virtual environments
-.venv
+.venv/
 .venv_linux/
 venv/
-
-# Test coverage
-.coverage
 .pytest_cache/
+.coverage
 htmlcov/
 
-# Database
+# Environment files
+.env
+.env.local
+
+# Local databases
 *.sqlite3
+bipdelivery/db.sqlite3
 db.sqlite3
 
-# Media files (local uploads)
+# Runtime artifacts
+**/*.log
 bipdelivery/media/
 bipdelivery/staticfiles/
+**/staticfiles/
+**/static_root/
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
-
-# Backup files
+# Backups
 *.bak
 *.backup
+
+# Java
+target/
+*.class

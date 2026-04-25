@@ -50,6 +50,11 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+Observacao de higiene:
+- `bipdelivery/db.sqlite3` e apenas banco local de desenvolvimento.
+- O arquivo nao deve ser commitado.
+- O versionamento oficial do schema acontece pelas migrations em `bipdelivery/api/migrations/`.
+
 Variaveis relevantes em `.env`:
 
 - `DJANGO_ENV`
@@ -99,6 +104,10 @@ pytest
 ruff check .
 black . --line-length 100
 ```
+
+Antes de abrir commit ou pull request:
+- confirme que `bipdelivery/db.sqlite3` nao entrou no staging
+- confirme que novas alteracoes estruturais de banco foram registradas em migration
 
 Cobertura atual do backend inclui:
 
