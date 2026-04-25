@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="border-b border-slate-200 bg-white/92 backdrop-blur">
-      <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <div class="mx-auto flex max-w-5xl px-4 py-4 sm:px-6 lg:px-8">
         <button
           type="button"
           class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
@@ -12,64 +12,21 @@
           </svg>
           Voltar ao catalogo
         </button>
-
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div v-if="product" class="max-w-3xl">
-            <p class="text-sm font-semibold uppercase tracking-[0.26em] text-rose-600">
-              {{ product.category.name }}
-            </p>
-            <h1 class="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
-              {{ product.name }}
-            </h1>
-            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-              {{ productDescription }}
-            </p>
-          </div>
-
-          <div v-if="product" class="grid gap-3 sm:grid-cols-3">
-            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Valor
-              </p>
-              <p class="mt-2 text-xl font-semibold text-slate-900">
-                {{ formatBRL(product.price) }}
-              </p>
-            </div>
-
-            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Tamanho
-              </p>
-              <p class="mt-2 text-xl font-semibold text-slate-900">
-                {{ product.size || 'Sob consulta' }}
-              </p>
-            </div>
-
-            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Estoque
-              </p>
-              <p class="mt-2 text-xl font-semibold text-slate-900">
-                {{ availabilitySummary }}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-8 pb-32 sm:px-6 lg:px-8">
-      <div v-if="isLoading" class="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_380px]">
+    <main class="mx-auto max-w-5xl px-4 py-6 pb-32 sm:px-6 lg:px-8">
+      <div v-if="isLoading" class="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(360px,440px)] lg:items-start lg:justify-center">
         <div class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm animate-pulse">
-          <div class="aspect-square bg-slate-200" />
+          <div class="aspect-[4/3] bg-slate-200 lg:aspect-square" />
         </div>
 
-        <div class="space-y-4">
-          <div class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
-            <div class="h-5 w-32 rounded bg-slate-200" />
-            <div class="mt-4 h-10 rounded bg-slate-200" />
-            <div class="mt-4 h-24 rounded bg-slate-200" />
-          </div>
+        <div class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
+          <div class="h-4 w-32 rounded bg-slate-200" />
+          <div class="mt-4 h-8 rounded bg-slate-200" />
+          <div class="mt-5 h-10 w-40 rounded bg-slate-200" />
+          <div class="mt-5 h-24 rounded bg-slate-200" />
+          <div class="mt-6 h-36 rounded bg-slate-200" />
         </div>
       </div>
 
@@ -104,15 +61,15 @@
         </div>
       </div>
 
-      <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_380px]">
-        <section class="space-y-6">
+      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(360px,440px)] lg:items-start lg:justify-center">
+        <section class="min-w-0 space-y-4">
           <div
-            class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm"
+            class="w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
             @mouseenter="pauseCarousel"
             @mouseleave="resumeCarousel"
           >
             <div
-              class="relative aspect-square overflow-hidden bg-slate-100 touch-pan-y"
+              class="relative aspect-[4/3] overflow-hidden bg-white touch-pan-y lg:aspect-square"
               @pointerdown="handlePointerDown"
               @pointermove="handlePointerMove"
               @pointerup="handlePointerUp"
@@ -124,7 +81,7 @@
                   :key="activeImageSource"
                   :src="activeImageSource"
                   :alt="`Imagem do produto ${product.name}`"
-                  class="h-full w-full object-cover select-none"
+                  class="h-full w-full select-none object-contain p-5 sm:p-8"
                   loading="eager"
                   draggable="false"
                   @error="handleImageError"
@@ -145,12 +102,12 @@
             </div>
           </div>
 
-          <div v-if="productImages.length > 1" class="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          <div v-if="productImages.length > 1" class="flex gap-3 overflow-x-auto pb-1">
             <button
               v-for="imageUrl in productImages"
               :key="imageUrl"
               type="button"
-              class="overflow-hidden rounded-[20px] border bg-white transition"
+              class="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-white transition sm:h-24 sm:w-24"
               :class="imageUrl === activeImageSource
                 ? 'border-rose-300 shadow-sm'
                 : 'border-slate-200 hover:border-slate-300'"
@@ -161,60 +118,19 @@
                 <img
                   :src="imageUrl"
                   :alt="`Miniatura do produto ${product.name}`"
-                  class="h-full w-full object-cover"
+                  class="h-full w-full object-contain p-1.5"
                 />
               </div>
             </button>
           </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Descricao completa
-              </p>
-              <p class="mt-3 text-sm leading-7 text-slate-600">
-                {{ productDescription }}
-              </p>
-            </article>
-
-            <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Informacoes do produto
-              </p>
-              <dl class="mt-4 space-y-4 text-sm text-slate-600">
-                <div class="flex items-center justify-between gap-4">
-                  <dt>Tamanho</dt>
-                  <dd class="font-semibold text-slate-900">{{ product.size || 'Sob consulta' }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-4">
-                  <dt>SKU</dt>
-                  <dd class="font-semibold text-slate-900">{{ product.sku || 'Nao informado' }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-4">
-                  <dt>Categoria</dt>
-                  <dd class="font-semibold text-slate-900">{{ product.category.name }}</dd>
-                </div>
-                <div class="flex items-center justify-between gap-4">
-                  <dt>Disponibilidade</dt>
-                  <dd class="font-semibold" :class="availabilityToneClass">{{ availabilityLabel }}</dd>
-                </div>
-              </dl>
-            </article>
-          </div>
         </section>
 
-        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Compra rapida
-                </p>
-                <p class="mt-2 text-3xl font-semibold text-slate-900">
-                  {{ formatBRL(product.price) }}
-                </p>
-              </div>
-
+        <aside class="min-w-0 lg:sticky lg:top-6 lg:self-start">
+          <section class="w-full max-w-full rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
+                {{ product.category.name }}
+              </p>
               <span
                 class="rounded-full px-3 py-1 text-xs font-semibold"
                 :class="product.is_available ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'"
@@ -223,11 +139,36 @@
               </span>
             </div>
 
-            <p class="mt-4 text-sm leading-6 text-slate-600">
-              {{ purchaseSupportCopy }}
+            <h1 class="mt-3 text-2xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-3xl">
+              {{ product.name }}
+            </h1>
+
+            <p class="mt-5 text-3xl font-semibold tracking-tight text-slate-900">
+              {{ formatBRL(product.price) }}
             </p>
 
-            <div class="mt-5 rounded-[28px] border border-rose-100 bg-rose-50/70 p-4">
+            <p class="mt-3 text-sm leading-6 text-slate-600">
+              {{ productDescription }}
+            </p>
+
+            <dl class="mt-6 divide-y divide-slate-200 border-y border-slate-200 text-sm text-slate-600">
+              <div class="flex items-center justify-between gap-4 py-3">
+                <dt>Tamanho</dt>
+                <dd class="text-right font-semibold text-slate-900">{{ product.size || 'Sob consulta' }}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-4 py-3">
+                <dt>SKU</dt>
+                <dd class="text-right font-semibold text-slate-900">{{ product.sku || 'Nao informado' }}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-4 py-3">
+                <dt>Estoque</dt>
+                <dd class="text-right font-semibold" :class="availabilityToneClass">
+                  {{ product.is_available ? `${product.stock_quantity} un.` : 'Indisponivel' }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="mt-6 border-t border-slate-200 pt-5">
               <div class="flex flex-col gap-4">
                 <div class="flex items-center justify-between gap-4">
                   <div>
@@ -290,7 +231,12 @@
               </div>
             </div>
 
-            <div class="mt-5 grid gap-3">
+            <div class="mt-5 grid gap-3 border-t border-slate-200 pt-5">
+              <div class="text-sm text-slate-600">
+                <p class="font-semibold text-slate-900">{{ itemCount }} item<span v-if="itemCount !== 1">s</span> no pedido</p>
+                <p class="mt-1">Total atual: {{ formatBRL(total) }}</p>
+              </div>
+
               <button
                 type="button"
                 class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
@@ -298,11 +244,6 @@
               >
                 Abrir carrinho
               </button>
-
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <p class="font-semibold text-slate-900">{{ itemCount }} item<span v-if="itemCount !== 1">s</span> no pedido</p>
-                <p class="mt-1">Total atual: {{ formatBRL(total) }}</p>
-              </div>
             </div>
           </section>
         </aside>
@@ -617,33 +558,9 @@ const availabilityLabel = computed(() => {
   return product.value.stock_quantity <= 5 ? 'Ultimas unidades' : 'Disponivel'
 })
 
-const availabilitySummary = computed(() => {
-  if (!product.value?.is_available) {
-    return 'Indisponivel'
-  }
-
-  return `${product.value.stock_quantity} un.`
-})
-
 const availabilityToneClass = computed(() => (
   product.value?.is_available ? 'text-rose-700' : 'text-slate-600'
 ))
-
-const purchaseSupportCopy = computed(() => {
-  if (!product.value) {
-    return ''
-  }
-
-  if (!product.value.is_available) {
-    return 'Este item esta fora de estoque no momento, mas voce ainda pode explorar outros produtos da categoria.'
-  }
-
-  if (cartQuantity.value > 0) {
-    return `${cartQuantity.value} unidade${cartQuantity.value !== 1 ? 's' : ''} ja adicionada${cartQuantity.value !== 1 ? 's' : ''}. Ajuste a quantidade se quiser reforcar o pedido.`
-  }
-
-  return 'Descricao, tamanho e compra reunidos em um unico fluxo para decisao rapida e sem atrito.'
-})
 
 const addToCartLabel = computed(() => {
   if (!product.value?.is_available) {
