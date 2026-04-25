@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .errors import business_logic_error, not_found_error, validation_error
 from .models import Category, Product
@@ -26,6 +27,15 @@ from .serializers import (
     PasswordResetRequestSerializer,
     ProductSerializer,
     RegisterUserSerializer,
+)
+from .throttling import (
+    AuthIpThrottle,
+    LoginIdentityThrottle,
+    PasswordResetConfirmIdentityThrottle,
+    PasswordResetIdentityThrottle,
+    RegistrationIdentityThrottle,
+    TokenRefreshIdentityThrottle,
+    TokenRefreshIpThrottle,
 )
 
 User = get_user_model()
@@ -468,11 +478,24 @@ class CheckoutWhatsAppView(APIView):
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 
+class LoginTokenObtainPairView(TokenObtainPairView):
+    """JWT login endpoint protected by IP and submitted-identity throttles."""
+
+    throttle_classes = [AuthIpThrottle, LoginIdentityThrottle]
+
+
+class RefreshTokenView(TokenRefreshView):
+    """JWT refresh endpoint protected against retry storms and token replay abuse."""
+
+    throttle_classes = [TokenRefreshIpThrottle, TokenRefreshIdentityThrottle]
+
+
 class RegisterUserView(APIView):
     """Create a new active user account after validating email and password."""
 
     permission_classes = []
     authentication_classes = []
+    throttle_classes = [AuthIpThrottle, RegistrationIdentityThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = RegisterUserSerializer(data=request.data)
@@ -493,17 +516,14 @@ class PasswordResetRequestView(APIView):
 
     permission_classes = []
     authentication_classes = []
+    throttle_classes = [AuthIpThrottle, PasswordResetIdentityThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"]
-        user = (
-            User.objects.filter(email__iexact=email, is_active=True)
-            .order_by("id")
-            .first()
-        )
+        user = User.objects.filter(email__iexact=email, is_active=True).order_by("id").first()
 
         # Always return the same public response to avoid account enumeration.
         public_response = {
@@ -538,6 +558,7 @@ class PasswordResetConfirmView(APIView):
 
     permission_classes = []
     authentication_classes = []
+    throttle_classes = [AuthIpThrottle, PasswordResetConfirmIdentityThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = PasswordResetConfirmSerializer(data=request.data)

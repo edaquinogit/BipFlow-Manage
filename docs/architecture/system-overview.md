@@ -61,6 +61,7 @@ Responsavel por:
 - CRUD de produtos
 - CRUD de categorias
 - autenticacao JWT
+- throttling dos endpoints sensiveis de autenticacao
 - regras de permissao publica para leitura e autenticada para escrita
 - upload e serializacao de imagens
 - validacao server-side do checkout via WhatsApp
@@ -103,6 +104,7 @@ Estrutura funcional relevante:
 - O frontend nao deve conhecer detalhes brutos do backend fora da camada de `services`.
 - O backend centraliza validacoes criticas de estoque, disponibilidade e taxa de entrega.
 - O catalogo publico e o dashboard compartilham a mesma API versionada.
+- Login, cadastro, reset de senha e refresh de token usam throttling por IP e por identidade submetida.
 - A documentacao deve priorizar o fluxo Django + Vue, porque este e o caminho implementado e testado no repositorio.
 
 ## Fora Do Escopo Deste Documento
@@ -111,4 +113,4 @@ Este documento nao descreve:
 
 - arquitetura aspiracional futura
 - integracoes que nao aparecem no codigo principal atual
-- relatorios historicos de entrega ou auditoria mantidos na raiz
+- relatorios historicos de entrega ou auditoria pontual

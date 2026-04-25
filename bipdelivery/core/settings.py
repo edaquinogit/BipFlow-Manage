@@ -11,8 +11,11 @@ from dotenv import load_dotenv
 # ðŸ›°ï¸ BASE DIRECTORY & PATHS
 # ------------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 
-# Load .env values into environment variables
+# Load documented root .env first, then allow a backend-local .env for developers
+# who prefer keeping Django-only overrides beside manage.py.
+load_dotenv(PROJECT_ROOT / ".env")
 load_dotenv(BASE_DIR / ".env")
 
 # ------------------------------------------------------------------------------
@@ -25,6 +28,13 @@ def get_bool_env(key: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_env_value(key: str, default: str) -> str:
+    value = os.environ.get(key)
+    if value is None:
+        return default
+    return value.strip() or default
 
 
 def is_test_mode() -> bool:
@@ -202,6 +212,28 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "bipdelivery.api.pagination.StandardPagination",
     "PAGE_SIZE": 12,
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": get_env_value("BIPFLOW_THROTTLE_ANON", "20/hour"),
+        "user": get_env_value("BIPFLOW_THROTTLE_USER", "100/hour"),
+        "product_list": get_env_value("BIPFLOW_THROTTLE_PRODUCT_LIST", "500/hour"),
+        "auth_ip": get_env_value("BIPFLOW_THROTTLE_AUTH_IP", "10/minute"),
+        "auth_login_identity": get_env_value("BIPFLOW_THROTTLE_AUTH_LOGIN_IDENTITY", "5/minute"),
+        "auth_register_identity": get_env_value(
+            "BIPFLOW_THROTTLE_AUTH_REGISTER_IDENTITY", "3/hour"
+        ),
+        "auth_password_reset_identity": get_env_value(
+            "BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_IDENTITY", "3/hour"
+        ),
+        "auth_password_reset_confirm_identity": get_env_value(
+            "BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_CONFIRM_IDENTITY", "5/hour"
+        ),
+        "auth_token_refresh_ip": get_env_value(
+            "BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IP", "30/minute"
+        ),
+        "auth_token_refresh_identity": get_env_value(
+            "BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IDENTITY", "10/minute"
+        ),
+    },
 }
 
 # ðŸ›°ï¸ JWT CONFIGURATION (Token Standards)

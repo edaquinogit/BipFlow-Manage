@@ -10,6 +10,7 @@
     "frontend:build": "npm --prefix bipflow-frontend run build",
     "frontend:typecheck": "npm --prefix bipflow-frontend run typecheck",
     "frontend:lint": "npm --prefix bipflow-frontend run lint",
+    "frontend:lint:fix": "npm --prefix bipflow-frontend run lint:fix",
     "frontend:test:unit": "npm --prefix bipflow-frontend run test:unit:run",
     "frontend:test:e2e": "npm --prefix bipflow-frontend run test:e2e:run",
     "prepare": "husky install"

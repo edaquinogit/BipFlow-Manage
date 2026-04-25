@@ -1,9 +1,10 @@
 from django.urls import include, path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from bipdelivery.api.views import (
+    LoginTokenObtainPairView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
+    RefreshTokenView,
     RegisterUserView,
 )
 
@@ -17,7 +18,7 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
-    path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("auth/token/", LoginTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("auth/token/refresh/", RefreshTokenView.as_view(), name="token_refresh"),
     path("v1/", include("bipdelivery.api.v1_urls")),
 ]

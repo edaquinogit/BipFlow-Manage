@@ -21,6 +21,8 @@ Versionamento de negocio:
 O backend usa JWT com Simple JWT.
 No frontend, a persistencia de sessao deve usar o par `access_token` + `refresh_token`
 armazenado pela camada centralizada de autenticacao.
+Os endpoints publicos de autenticacao possuem throttling por IP e por identidade
+submetida para reduzir brute force, credential stuffing e abuso de reset de senha.
 
 ### Obter token
 
@@ -56,6 +58,26 @@ Notas operacionais:
 - o frontend deve chamar `auth/token/refresh/` relativo ao `VITE_API_URL`
 - o frontend nao deve usar chaves legadas como `token` para controle de sessao
 - guards de rota e interceptors devem consultar a mesma fonte de verdade de autenticacao
+- quando um limite e excedido, a API retorna `429 Too Many Requests` e informa
+  `Retry-After` quando o DRF consegue calcular a janela restante
+
+### Throttling de auth
+
+Limites padrao do backend atual:
+
+| Escopo | Endpoints | Limite padrao |
+| --- | --- | --- |
+| IP sensivel | `/api/auth/token/`, `/api/auth/register/`, `/api/auth/password-reset/`, `/api/auth/password-reset/confirm/` | `10/minute` |
+| Login por identidade | `/api/auth/token/` usando `username` ou `email` submetido | `5/minute` |
+| Cadastro por email | `/api/auth/register/` usando `email` submetido | `3/hour` |
+| Reset por email | `/api/auth/password-reset/` usando `email` submetido | `3/hour` |
+| Confirmacao de reset por uid | `/api/auth/password-reset/confirm/` usando `uid` submetido | `5/hour` |
+| Refresh por IP | `/api/auth/token/refresh/` | `30/minute` |
+| Refresh por token | `/api/auth/token/refresh/` usando `refresh` submetido | `10/minute` |
+
+Os identificadores sensiveis entram no cache de throttle como hash SHA-256, nao
+como email, uid ou refresh token em texto claro. Os valores podem ser ajustados
+via variaveis `BIPFLOW_THROTTLE_*` descritas no guia de desenvolvimento.
 
 ## Politica De Permissao
 

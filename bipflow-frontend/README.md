@@ -68,6 +68,7 @@ npm run build
 npm run preview
 npm run typecheck
 npm run lint
+npm run lint:fix
 npm run format
 npm run test:unit:run
 npm run test:e2e:run
@@ -97,10 +98,15 @@ Padroes atuais:
 
 ```powershell
 npm run lint
+npm run lint:fix
 npm run typecheck
 npm run test:unit:run
 npm run test:e2e:run
 ```
+
+Uso recomendado:
+- `npm run lint` para auditoria sem alterar arquivos
+- `npm run lint:fix` para correcao automatica local quando necessario
 
 Cobertura funcional relevante:
 

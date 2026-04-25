@@ -12,9 +12,9 @@ O repositorio esta organizado em tres frentes principais:
 
 O fluxo principal do produto hoje acontece entre `bipflow-frontend` e `bipdelivery`. O servico `api-order-validation` nao faz parte do runtime padrao da aplicacao web.
 
-## Fontes De Verdade
+## Documentacao Oficial
 
-Para reduzir divergencia entre documentacao e codigo, estes arquivos devem ser tratados como referencia principal:
+Para reduzir divergencia entre documentacao e codigo, estes arquivos sao a documentacao operacional do projeto:
 
 - Arquitetura geral: [docs/architecture/system-overview.md](docs/architecture/system-overview.md)
 - Guia de desenvolvimento: [docs/development-guide.md](docs/development-guide.md)
@@ -22,7 +22,7 @@ Para reduzir divergencia entre documentacao e codigo, estes arquivos devem ser t
 - Frontend: [bipflow-frontend/README.md](bipflow-frontend/README.md)
 - Backend: `requirements.txt`, `bipdelivery/core/settings.py`, `bipdelivery/api/`
 
-Arquivos de resumo antigos na raiz, como relatarios de entrega, auditorias e checklists, devem ser lidos como contexto historico, nao como documentacao operacional atual.
+A raiz mantem apenas documentacao essencial. Relatorios historicos, auditorias pontuais e checklists de entrega foram removidos para evitar conflito com o estado atual do codigo.
 
 ## Stack Atual
 
@@ -98,6 +98,7 @@ npm run frontend:dev
 npm run frontend:build
 npm run frontend:typecheck
 npm run frontend:lint
+npm run frontend:lint:fix
 npm run frontend:test:unit
 npm run frontend:test:e2e
 ```
@@ -120,12 +121,18 @@ cd bipflow-frontend
 npm run test:unit:run
 npm run test:e2e:run
 npm run lint
+npm run lint:fix
 npm run typecheck
 ```
+
+Observacao sobre qualidade:
+- `npm run lint` deve ser usado para auditoria sem alterar arquivos.
+- `npm run lint:fix` aplica correcoes automaticas quando apropriado.
 
 ## Convencoes Do Projeto
 
 - Leitura publica e escrita autenticada nos endpoints principais de produtos e categorias.
+- Endpoints sensiveis de autenticacao usam throttling por IP e por identidade submetida.
 - O frontend deve consumir a API via `services/`, nao espalhar chamadas HTTP direto nas views.
 - Contratos de resposta devem ser validados por schemas quando o modulo ja segue esse padrao.
 - Documentacao deve descrever comportamento real do codigo, nao roadmap, suposicoes ou arquitetura aspiracional.

@@ -54,6 +54,8 @@ Observacao de higiene:
 - `bipdelivery/db.sqlite3` e apenas banco local de desenvolvimento.
 - O arquivo nao deve ser commitado.
 - O versionamento oficial do schema acontece pelas migrations em `bipdelivery/api/migrations/`.
+- O Django carrega `.env` da raiz do repositorio e tambem aceita `bipdelivery/.env`
+  para overrides locais especificos do backend.
 
 Variaveis relevantes em `.env`:
 
@@ -62,6 +64,16 @@ Variaveis relevantes em `.env`:
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `CORS_ALLOWED_ORIGINS`
+- `BIPFLOW_THROTTLE_ANON`
+- `BIPFLOW_THROTTLE_USER`
+- `BIPFLOW_THROTTLE_PRODUCT_LIST`
+- `BIPFLOW_THROTTLE_AUTH_IP`
+- `BIPFLOW_THROTTLE_AUTH_LOGIN_IDENTITY`
+- `BIPFLOW_THROTTLE_AUTH_REGISTER_IDENTITY`
+- `BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_IDENTITY`
+- `BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_CONFIRM_IDENTITY`
+- `BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IP`
+- `BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IDENTITY`
 - `WHATSAPP_ORDER_PHONE`
 - `ORDER_DELIVERY_FEE`
 
@@ -114,8 +126,24 @@ Cobertura atual do backend inclui:
 - saude da API
 - CRUD principal
 - regras de protecao de categorias
+- throttling de endpoints sensiveis de autenticacao
 - checkout via WhatsApp
 - servicao de media
+
+### Seguranca Backend
+
+Os endpoints publicos de autenticacao usam throttling do Django REST Framework:
+
+- login: limite por IP e por `username`/`email` submetido
+- cadastro: limite por IP e por `email` submetido
+- solicitacao de reset: limite por IP e por `email` submetido
+- confirmacao de reset: limite por IP e por `uid` submetido
+- refresh de token: limite por IP e por `refresh` submetido
+
+O projeto usa o cache Django configurado em `bipdelivery/core/settings.py` para
+armazenar as janelas de throttle. No estado atual do projeto, o backend local
+usa `LocMemCache`; em producao horizontal, configure um cache compartilhado para
+que os limites nao fiquem isolados por processo.
 
 ### Frontend
 
@@ -124,6 +152,7 @@ cd bipflow-frontend
 npm run test:unit:run
 npm run test:e2e:run
 npm run lint
+npm run lint:fix
 npm run typecheck
 ```
 
@@ -133,6 +162,10 @@ Cobertura atual do frontend inclui:
 - composables de busca e produtos
 - views e componentes da experiencia de produtos
 - fluxos E2E para sincronizacao de produto e upload de midia
+
+Convencao operacional de lint:
+- `npm run lint` e somente leitura e deve ser usado em auditoria, pre-review e CI
+- `npm run lint:fix` fica reservado para correcao automatica local
 
 ## Padroes De Codigo
 
@@ -147,5 +180,5 @@ Cobertura atual do frontend inclui:
 
 - Documente apenas o que ja existe no codigo.
 - Se um endpoint, comando ou fluxo mudar, atualize a documentacao no mesmo ciclo da mudanca.
-- Evite arquivos de "summary", "final report" ou "complete" como fonte de verdade funcional.
+- Nao crie arquivos de "summary", "final report" ou "complete" como fonte de verdade funcional.
 - Quando necessario criar novos documentos, prefira guias curtos por assunto em vez de relatorios extensos.
