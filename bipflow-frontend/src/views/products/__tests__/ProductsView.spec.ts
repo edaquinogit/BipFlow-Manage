@@ -6,6 +6,7 @@ import { useProductSearch } from '@/composables/useProductSearch'
 import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
+import { deliveryRegionService } from '@/services/delivery-region.service'
 import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
@@ -23,6 +24,12 @@ vi.mock('@/composables/useToast', () => ({
 vi.mock('@/services/category.service', () => ({
   categoryService: {
     getAll: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/delivery-region.service', () => ({
+  deliveryRegionService: {
+    getActive: vi.fn(),
   },
 }))
 
@@ -70,6 +77,7 @@ const CartDrawerStub = defineComponent({
     isOpen: { type: Boolean, required: true },
     items: { type: Array, required: true },
     customer: { type: Object, required: true },
+    deliveryRegions: { type: Array, required: true },
     itemCount: { type: Number, required: true },
     subtotal: { type: Number, required: true },
     deliveryFee: { type: Number, required: true },
@@ -132,6 +140,9 @@ describe('ProductsView', () => {
       email: '',
       deliveryMethod: 'delivery',
       paymentMethod: 'pix',
+      deliveryRegionId: null,
+      deliveryRegionName: '',
+      deliveryRegionFee: 12,
       address: '',
       neighborhood: '',
       city: '',
@@ -172,6 +183,9 @@ describe('ProductsView', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
 
+    searchState.products.value = mockProducts
+    cartState.itemCount.value = 0
+
     vi.mocked(useProductSearch).mockReturnValue(searchState as any)
     vi.mocked(useCart).mockReturnValue(cartState as any)
     vi.mocked(useToast).mockReturnValue(toastMock as any)
@@ -185,6 +199,7 @@ describe('ProductsView', () => {
     vi.mocked(categoryService.getAll).mockResolvedValue([
       { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
     ] as any)
+    vi.mocked(deliveryRegionService.getActive).mockResolvedValue([])
 
     wrapper = mountView()
     await nextTick()
@@ -209,6 +224,20 @@ describe('ProductsView', () => {
   it('renders category shortcuts and cart drawer components', () => {
     expect(wrapper.text()).toContain('Todas as categorias')
     expect(wrapper.find('.cart-drawer-stub').exists()).toBe(true)
+  })
+
+  it('shows the floating cart action after an item is added', async () => {
+    expect(wrapper.find('[aria-label="Abrir carrinho com 1 item"]').exists()).toBe(false)
+
+    cartState.itemCount.value = 1
+    await nextTick()
+
+    const floatingCartButton = wrapper.find('[aria-label="Abrir carrinho com 1 item"]')
+    expect(floatingCartButton.exists()).toBe(true)
+
+    await floatingCartButton.trigger('click')
+
+    expect(wrapper.findComponent(CartDrawerStub).props('isOpen')).toBe(true)
   })
 
   it('updates filters when quick category is clicked', async () => {

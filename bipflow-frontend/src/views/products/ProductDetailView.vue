@@ -15,7 +15,7 @@
       </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-6 pb-32 sm:px-6 lg:px-8">
+    <main class="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
       <div v-if="isLoading" class="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(360px,440px)] lg:items-start lg:justify-center">
         <div class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm animate-pulse">
           <div class="aspect-[4/3] bg-slate-200 lg:aspect-square" />
@@ -230,91 +230,21 @@
                 </button>
               </div>
             </div>
-
-            <div class="mt-5 grid gap-3 border-t border-slate-200 pt-5">
-              <div class="text-sm text-slate-600">
-                <p class="font-semibold text-slate-900">{{ itemCount }} item<span v-if="itemCount !== 1">s</span> no pedido</p>
-                <p class="mt-1">Total atual: {{ formatBRL(total) }}</p>
-              </div>
-
-              <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-                @click="isCartOpen = true"
-              >
-                Abrir carrinho
-              </button>
-            </div>
           </section>
         </aside>
       </div>
     </main>
 
-    <Transition name="cart-bar">
-      <div
-        v-if="itemCount > 0"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/96 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-20px_45px_-30px_rgba(15,23,42,0.35)] backdrop-blur"
-      >
-        <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            class="flex min-w-0 flex-1 items-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-100"
-            aria-label="Abrir carrinho"
-            @click="isCartOpen = true"
-          >
-            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 .98-.8L20 7H7" />
-                <circle cx="10" cy="19" r="1.5" />
-                <circle cx="17" cy="19" r="1.5" />
-              </svg>
-            </span>
-
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-semibold text-slate-900">
-                {{ itemCount }} item<span v-if="itemCount !== 1">s</span> no carrinho
-              </span>
-              <span class="block truncate text-sm text-slate-500">
-                {{ floatingCartMessage }}
-              </span>
-            </span>
-
-            <span class="shrink-0 text-right">
-              <span class="block text-lg font-semibold text-slate-900">
-                {{ formatBRL(total) }}
-              </span>
-              <span class="block text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                Total
-              </span>
-            </span>
-          </button>
-
-          <div class="grid gap-3 sm:w-auto sm:grid-cols-[minmax(0,180px)_minmax(0,180px)]">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-              @click="isCartOpen = true"
-            >
-              Revisar pedido
-            </button>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-              :disabled="items.length === 0 || isSubmittingOrder"
-              @click="handleSubmitOrder"
-            >
-              {{ isSubmittingOrder ? 'Processando...' : 'Finalizar pedido' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <FloatingCartButton
+      :item-count="itemCount"
+      @open-cart="isCartOpen = true"
+    />
 
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
       :customer="customer"
+      :delivery-regions="deliveryRegions"
       :item-count="itemCount"
       :subtotal="subtotal"
       :delivery-fee="deliveryFee"
@@ -332,15 +262,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
+import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
+import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
 import productService from '@/services/product.service'
+import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
@@ -361,6 +294,7 @@ const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
 `)}`
 
 const product = ref<ProductDetail | null>(null)
+const deliveryRegions = ref<DeliveryRegion[]>([])
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
@@ -378,7 +312,6 @@ const {
   items,
   customer,
   itemCount,
-  uniqueItemCount,
   subtotal,
   deliveryFee,
   total,
@@ -574,14 +507,6 @@ const addToCartLabel = computed(() => {
   return 'Adicionar ao carrinho'
 })
 
-const floatingCartMessage = computed(() => {
-  if (customer.value.fullName.trim()) {
-    return `Pedido em preparo para ${customer.value.fullName.trim()}.`
-  }
-
-  return `${uniqueItemCount.value} produto${uniqueItemCount.value !== 1 ? 's' : ''} diferente${uniqueItemCount.value !== 1 ? 's' : ''} pronto${uniqueItemCount.value !== 1 ? 's' : ''} para fechamento.`
-})
-
 async function loadProduct(): Promise<void> {
   const slug = typeof route.params.slug === 'string' ? route.params.slug : ''
 
@@ -612,6 +537,21 @@ async function loadProduct(): Promise<void> {
     isLoading.value = false
   }
 }
+
+async function loadDeliveryRegions(): Promise<void> {
+  try {
+    deliveryRegions.value = await deliveryRegionService.getActive()
+  } catch (error) {
+    deliveryRegions.value = []
+    Logger.warn('Failed to load delivery regions from product detail', {
+      error: error instanceof Error ? error.message : 'unknown_error',
+    })
+  }
+}
+
+onMounted(() => {
+  void loadDeliveryRegions()
+})
 
 watch(productImages, () => {
   startCarousel()
@@ -698,6 +638,12 @@ function validateCheckoutData(): boolean {
   }
 
   if (customer.value.deliveryMethod === 'delivery') {
+    if (deliveryRegions.value.length > 0 && !customer.value.deliveryRegionId) {
+      toast.info('Selecione a regiao de entrega para calcular o frete.')
+      isCartOpen.value = true
+      return false
+    }
+
     const hasAddress =
       customer.value.address.trim() &&
       customer.value.neighborhood.trim() &&
@@ -753,17 +699,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.cart-bar-enter-active,
-.cart-bar-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.cart-bar-enter-from,
-.cart-bar-leave-to {
-  opacity: 0;
-  transform: translateY(16px);
-}
-
 .carousel-slide-next-enter-active,
 .carousel-slide-next-leave-active,
 .carousel-slide-prev-enter-active,

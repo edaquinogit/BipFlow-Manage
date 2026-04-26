@@ -11,6 +11,9 @@ const defaultCustomer: CartCustomer = {
   email: '',
   deliveryMethod: 'delivery',
   paymentMethod: 'pix',
+  deliveryRegionId: null,
+  deliveryRegionName: '',
+  deliveryRegionFee: 12,
   address: '',
   neighborhood: '',
   city: '',
@@ -110,7 +113,9 @@ export function useCart() {
   const isEmpty = computed(() => items.value.length === 0)
 
   const deliveryFee = computed(() =>
-    customer.value.deliveryMethod === 'delivery' && items.value.length > 0 ? 12 : 0
+    customer.value.deliveryMethod === 'delivery' && items.value.length > 0
+      ? Number(customer.value.deliveryRegionFee ?? 12)
+      : 0
   )
 
   const total = computed(() => subtotal.value + deliveryFee.value)
@@ -198,6 +203,10 @@ export function useCart() {
     ]
 
     if (customer.value.deliveryMethod === 'delivery') {
+      if (customer.value.deliveryRegionName.trim()) {
+        lines.push(`Regiao: ${customer.value.deliveryRegionName.trim()}`)
+      }
+
       lines.push(
         `Endereco: ${customer.value.address || 'Nao informado'}`,
         `Bairro: ${customer.value.neighborhood || 'Nao informado'}`,

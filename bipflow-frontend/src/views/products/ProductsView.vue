@@ -63,7 +63,7 @@
     </header>
 
     <main
-      class="mx-auto max-w-7xl px-4 py-8 pb-32 sm:px-6 lg:px-8"
+      class="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 lg:px-8"
       :aria-busy="isLoading ? 'true' : 'false'"
     >
       <p class="sr-only" aria-live="polite">{{ liveRegionMessage }}</p>
@@ -181,71 +181,16 @@
       </div>
     </main>
 
-    <Transition name="cart-bar">
-      <div
-        v-if="itemCount > 0"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/96 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-20px_45px_-30px_rgba(15,23,42,0.35)] backdrop-blur"
-      >
-        <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            class="flex min-w-0 flex-1 items-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-100"
-            aria-label="Abrir carrinho"
-            @click="isCartOpen = true"
-          >
-            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 .98-.8L20 7H7" />
-                <circle cx="10" cy="19" r="1.5" />
-                <circle cx="17" cy="19" r="1.5" />
-              </svg>
-            </span>
-
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-semibold text-slate-900">
-                {{ itemCount }} item<span v-if="itemCount !== 1">s</span> no carrinho
-              </span>
-              <span class="block truncate text-sm text-slate-500">
-                {{ floatingCartMessage }}
-              </span>
-            </span>
-
-            <span class="shrink-0 text-right">
-              <span class="block text-lg font-semibold text-slate-900">
-                {{ formatBRL(total) }}
-              </span>
-              <span class="block text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                Total
-              </span>
-            </span>
-          </button>
-
-          <div class="grid gap-3 sm:w-auto sm:grid-cols-[minmax(0,180px)_minmax(0,180px)]">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-              @click="isCartOpen = true"
-            >
-              Revisar pedido
-            </button>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-              :disabled="items.length === 0 || isSubmittingOrder"
-              @click="handleSubmitOrder"
-            >
-              {{ isSubmittingOrder ? 'Processando...' : 'Finalizar pedido' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+    <FloatingCartButton
+      :item-count="itemCount"
+      @open-cart="isCartOpen = true"
+    />
 
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
       :customer="customer"
+      :delivery-regions="deliveryRegions"
       :item-count="itemCount"
       :subtotal="subtotal"
       :delivery-fee="deliveryFee"
@@ -267,6 +212,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryValue } from 'vue-router'
 import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
+import FloatingCartButton from './FloatingCartButton.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import { useCart } from '@/composables/useCart'
@@ -274,10 +220,11 @@ import { useProductSearch } from '@/composables/useProductSearch'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
 import { categoryService } from '@/services/category.service'
+import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
+import type { DeliveryRegion } from '@/types/delivery'
 import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
-import { formatBRL } from '@/utils/formatters'
 
 function parseNumberParam(
   value: LocationQueryValue | LocationQueryValue[] | undefined
@@ -312,6 +259,7 @@ const router = useRouter()
 const toast = useToast()
 const loadMoreTrigger = ref<HTMLDivElement | null>(null)
 const categories = ref<Category[]>([])
+const deliveryRegions = ref<DeliveryRegion[]>([])
 const isCartOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
@@ -346,7 +294,6 @@ const {
   items,
   customer,
   itemCount,
-  uniqueItemCount,
   subtotal,
   deliveryFee,
   total,
@@ -402,14 +349,6 @@ const liveRegionMessage = computed(() => {
   return `${products.value.length} produtos exibidos. ${showingRange.value}`
 })
 
-const floatingCartMessage = computed(() => {
-  if (customer.value.fullName.trim()) {
-    return `Pedido em preparo para ${customer.value.fullName.trim()}.`
-  }
-
-  return `${uniqueItemCount.value} produto${uniqueItemCount.value !== 1 ? 's' : ''} diferente${uniqueItemCount.value !== 1 ? 's' : ''} pronto${uniqueItemCount.value !== 1 ? 's' : ''} para fechamento.`
-})
-
 function buildQueryFromState(): Record<string, string> {
   const query: Record<string, string> = {}
 
@@ -460,6 +399,17 @@ async function loadCategories(): Promise<void> {
   } catch (err) {
     categories.value = []
     Logger.warn('Failed to load public categories', {
+      error: err instanceof Error ? err.message : 'unknown_error',
+    })
+  }
+}
+
+async function loadDeliveryRegions(): Promise<void> {
+  try {
+    deliveryRegions.value = await deliveryRegionService.getActive()
+  } catch (err) {
+    deliveryRegions.value = []
+    Logger.warn('Failed to load delivery regions', {
       error: err instanceof Error ? err.message : 'unknown_error',
     })
   }
@@ -544,7 +494,10 @@ watch(loadMoreTrigger, async () => {
 })
 
 onMounted(async () => {
-  await loadCategories()
+  await Promise.allSettled([
+    loadCategories(),
+    loadDeliveryRegions(),
+  ])
   await nextTick()
   connectLoadMoreObserver()
 })
@@ -624,6 +577,12 @@ function validateCheckoutData(): boolean {
   }
 
   if (customer.value.deliveryMethod === 'delivery') {
+    if (deliveryRegions.value.length > 0 && !customer.value.deliveryRegionId) {
+      toast.info('Selecione a regiao de entrega para calcular o frete.')
+      isCartOpen.value = true
+      return false
+    }
+
     const hasAddress =
       customer.value.address.trim() &&
       customer.value.neighborhood.trim() &&
@@ -673,16 +632,3 @@ async function handleSubmitOrder(): Promise<void> {
   }
 }
 </script>
-
-<style scoped>
-.cart-bar-enter-active,
-.cart-bar-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.cart-bar-enter-from,
-.cart-bar-leave-to {
-  opacity: 0;
-  transform: translateY(16px);
-}
-</style>

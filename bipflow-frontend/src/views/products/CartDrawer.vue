@@ -205,6 +205,29 @@
 
               <template v-if="customer.deliveryMethod === 'delivery'">
                 <label class="sm:col-span-2">
+                  <span class="mb-2 block text-sm font-medium text-slate-700">Regiao de entrega</span>
+                  <select
+                    :value="customer.deliveryRegionId ?? ''"
+                    class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                    @change="handleDeliveryRegionChange"
+                  >
+                    <option value="" :disabled="deliveryRegions.length > 0">
+                      {{ deliveryRegions.length > 0 ? 'Selecione a regiao' : 'Frete padrao' }}
+                    </option>
+                    <option
+                      v-for="region in deliveryRegions"
+                      :key="region.id"
+                      :value="region.id"
+                    >
+                      {{ region.name }} - {{ formatBRL(region.delivery_fee) }}
+                    </option>
+                  </select>
+                  <span class="mt-2 block text-xs text-slate-500">
+                    Escolha uma regiao para calcular o frete do pedido.
+                  </span>
+                </label>
+
+                <label class="sm:col-span-2">
                   <span class="mb-2 block text-sm font-medium text-slate-700">Endereco</span>
                   <input
                     :value="customer.address"
@@ -296,6 +319,7 @@
 </template>
 
 <script setup lang="ts">
+import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
@@ -307,10 +331,11 @@ const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   </svg>
 `)}`;
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
   items: CartItem[]
   customer: CartCustomer
+  deliveryRegions: DeliveryRegion[]
   itemCount: number
   subtotal: number
   deliveryFee: number
@@ -339,12 +364,45 @@ function handleTextInput<K extends keyof CartCustomer>(field: K, event: Event): 
 
 function handleDeliveryMethodChange(event: Event): void {
   const target = event.target as HTMLSelectElement
-  updateField('deliveryMethod', target.value as CartCustomer['deliveryMethod'])
+  const deliveryMethod = target.value as CartCustomer['deliveryMethod']
+
+  emit('updateCustomer', {
+    deliveryMethod,
+    ...(deliveryMethod === 'pickup'
+      ? {
+          deliveryRegionId: null,
+          deliveryRegionName: '',
+          deliveryRegionFee: 12,
+        }
+      : {}),
+  })
 }
 
 function handlePaymentMethodChange(event: Event): void {
   const target = event.target as HTMLSelectElement
   updateField('paymentMethod', target.value as CartCustomer['paymentMethod'])
+}
+
+function handleDeliveryRegionChange(event: Event): void {
+  const target = event.target as HTMLSelectElement
+  const regionId = Number(target.value)
+  const selectedRegion = props.deliveryRegions.find((region) => region.id === regionId)
+
+  if (!selectedRegion) {
+    emit('updateCustomer', {
+      deliveryRegionId: null,
+      deliveryRegionName: '',
+      deliveryRegionFee: 12,
+    })
+    return
+  }
+
+  emit('updateCustomer', {
+    deliveryRegionId: selectedRegion.id,
+    deliveryRegionName: selectedRegion.name,
+    deliveryRegionFee: Number(selectedRegion.delivery_fee),
+    city: selectedRegion.city || props.customer.city,
+  })
 }
 </script>
 

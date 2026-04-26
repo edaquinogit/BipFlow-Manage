@@ -18,6 +18,7 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
       email: customer.email.trim(),
       delivery_method: customer.deliveryMethod,
       payment_method: customer.paymentMethod,
+      delivery_region_id: customer.deliveryRegionId,
       address: customer.address.trim(),
       neighborhood: customer.neighborhood.trim(),
       city: customer.city.trim(),

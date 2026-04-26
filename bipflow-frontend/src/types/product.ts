@@ -73,6 +73,9 @@ export interface CartCustomer {
   email: string
   deliveryMethod: 'delivery' | 'pickup'
   paymentMethod: 'pix' | 'card' | 'cash'
+  deliveryRegionId: number | null
+  deliveryRegionName: string
+  deliveryRegionFee: number
   address: string
   neighborhood: string
   city: string
@@ -90,6 +93,7 @@ export interface CheckoutPayloadCustomer {
   email: string
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
+  delivery_region_id: number | null
   address: string
   neighborhood: string
   city: string
@@ -113,7 +117,9 @@ export interface CheckoutResponseItem {
 export interface CheckoutResponse {
   order_reference: string
   items: CheckoutResponseItem[]
-  customer: CheckoutPayloadCustomer
+  customer: CheckoutPayloadCustomer & {
+    delivery_region_name?: string
+  }
   subtotal: string
   delivery_fee: string
   total: string
