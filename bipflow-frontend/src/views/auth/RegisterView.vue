@@ -1,14 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import {
-  ArrowLeftIcon,
-  CheckCircleIcon,
-  ShieldCheckIcon,
-} from '@heroicons/vue/24/outline'
+import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
-import { PublicRoutes } from '@/router/public.routes'
 import type { ApiError } from '@/types/auth'
 
 const isSubmitting = ref(false)
@@ -80,74 +75,42 @@ const handleRegister = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 p-4 text-white">
-    <main
-      class="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl border border-gray-800 bg-gray-900 shadow-2xl shadow-black/30 lg:grid-cols-[0.95fr_1.05fr]"
-    >
-      <section class="hidden border-r border-gray-800 bg-gray-950/70 p-10 lg:flex lg:flex-col lg:justify-between">
-        <div class="space-y-6">
-          <RouterLink
-            :to="{ name: AuthRouteNames.Login }"
-            class="inline-flex items-center gap-2 text-sm font-semibold text-gray-400 transition-colors hover:text-white"
-          >
-            <ArrowLeftIcon class="h-4 w-4" />
-            Voltar ao login
-          </RouterLink>
+  <main class="register-shell min-h-screen overflow-hidden bg-gray-950 px-4 py-6 text-white sm:px-6">
+    <div class="register-orbit" aria-hidden="true"></div>
+    <div class="register-grid" aria-hidden="true"></div>
 
-          <div class="space-y-4">
-            <span
-              class="inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200"
+    <section class="relative z-10 flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div
+        class="register-card w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-gray-900/85 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8"
+      >
+        <div class="register-card-glow" aria-hidden="true"></div>
+
+        <div class="relative">
+          <div class="mb-8 text-center">
+            <div
+              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-zinc-950 shadow-lg shadow-black/30"
             >
-              Conta segura
-            </span>
-            <h1 class="max-w-lg text-4xl font-bold tracking-tight text-white">
-              Crie acesso administrativo com validacao por email.
+              <span class="text-lg font-black tracking-tighter text-indigo-500">BF</span>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">
+              Novo acesso
+            </p>
+            <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              Criar conta
             </h1>
-            <p class="max-w-md text-sm leading-7 text-gray-300">
-              Novas contas sao criadas ativas apos validacao de email e senha. A confirmacao por
-              email fica reservada para recuperacao de senha.
-            </p>
-          </div>
-        </div>
-
-        <div class="grid gap-4">
-          <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-            <ShieldCheckIcon class="mb-3 h-6 w-6 text-emerald-300" />
-            <p class="text-sm font-semibold text-white">Padrao de seguranca</p>
-            <p class="mt-2 text-sm leading-6 text-gray-400">
-              Senha validada no frontend e no backend, com protecao contra emails duplicados.
-            </p>
-          </div>
-
-          <RouterLink
-            :to="{ name: PublicRoutes.Products }"
-            class="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-5 text-sm font-semibold text-cyan-200 transition-all hover:border-cyan-300/40 hover:bg-cyan-400/15"
-          >
-            Acessar catalogo publico sem criar conta
-          </RouterLink>
-        </div>
-      </section>
-
-      <section class="flex items-center p-6 sm:p-10">
-        <div class="mx-auto w-full max-w-md">
-          <div class="mb-8">
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-              Novo usuario
-            </p>
-            <h2 class="mt-3 text-3xl font-bold tracking-tight text-white">Criar conta</h2>
-            <p class="mt-2 text-sm leading-6 text-gray-400">
-              Use um email valido e uma senha forte para liberar o acesso administrativo.
+            <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-400">
+              Configure uma credencial administrativa segura para acessar o BipFlow Manage.
             </p>
           </div>
 
           <div
             v-if="successMessage"
-            class="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100"
+            class="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100"
           >
             <div class="flex gap-3">
               <CheckCircleIcon class="h-5 w-5 shrink-0 text-emerald-300" />
               <div>
-                <p class="font-semibold">Cadastro recebido</p>
+                <p class="font-semibold">Conta criada</p>
                 <p class="mt-1 leading-6 text-emerald-100/80">{{ successMessage }}</p>
               </div>
             </div>
@@ -170,7 +133,7 @@ const handleRegister = async () => {
                 type="email"
                 autocomplete="email"
                 placeholder="admin@bipflow.com"
-                class="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                 required
               />
             </div>
@@ -184,7 +147,7 @@ const handleRegister = async () => {
                 type="password"
                 autocomplete="new-password"
                 placeholder="Crie uma senha segura"
-                class="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                 required
               />
             </div>
@@ -198,12 +161,12 @@ const handleRegister = async () => {
                 type="password"
                 autocomplete="new-password"
                 placeholder="Repita a senha"
-                class="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                 required
               />
             </div>
 
-            <ul class="grid gap-2 rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+            <ul class="grid gap-2 border-t border-white/10 pt-4">
               <li
                 v-for="rule in passwordRules"
                 :key="rule.label"
@@ -221,22 +184,112 @@ const handleRegister = async () => {
             <button
               type="submit"
               :disabled="isSubmitting || !isFormReady"
-              class="flex w-full items-center justify-center rounded-xl bg-emerald-500 py-3 text-xs font-bold uppercase tracking-widest text-gray-950 shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              class="flex w-full items-center justify-center rounded-xl bg-white py-3 text-xs font-black uppercase tracking-widest text-black shadow-xl shadow-white/5 transition-all hover:-translate-y-0.5 hover:bg-zinc-200 disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {{ isSubmitting ? 'Criando conta...' : 'Criar conta segura' }}
             </button>
           </form>
 
-          <div class="mt-8 flex flex-col gap-3 text-center text-sm text-gray-500">
-            <RouterLink :to="{ name: AuthRouteNames.Login }" class="font-semibold text-blue-400 hover:text-blue-300">
+          <div class="mt-7 border-t border-white/10 pt-5 text-center">
+            <RouterLink
+              :to="{ name: AuthRouteNames.Login }"
+              class="text-sm font-semibold text-zinc-400 transition-colors hover:text-indigo-300"
+            >
               Ja tenho conta administrativa
             </RouterLink>
-            <RouterLink :to="{ name: PublicRoutes.Products }" class="font-semibold text-cyan-300 hover:text-cyan-200">
-              Ver catalogo publico
-            </RouterLink>
+            <p class="mt-4 text-xs leading-5 text-gray-600">
+              Contas administrativas devem ser usadas apenas por pessoas autorizadas.
+            </p>
           </div>
         </div>
-      </section>
-    </main>
-  </div>
+      </div>
+    </section>
+  </main>
 </template>
+
+<style scoped>
+.register-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12), transparent 32rem),
+    radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
+    #09090b;
+}
+
+.register-orbit {
+  position: absolute;
+  inset: -18rem;
+  background:
+    conic-gradient(
+      from 180deg,
+      transparent 0deg,
+      rgba(99, 102, 241, 0.08) 72deg,
+      transparent 150deg,
+      rgba(255, 255, 255, 0.06) 240deg,
+      transparent 360deg
+    );
+  filter: blur(36px);
+  animation: register-orbit-spin 24s linear infinite;
+}
+
+.register-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
+
+.register-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.register-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -2;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.42),
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.14)
+  );
+  opacity: 0.55;
+}
+
+.register-card-glow {
+  position: absolute;
+  inset: auto -30% -30% -30%;
+  height: 16rem;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 66%);
+  animation: register-glow-float 8s ease-in-out infinite alternate;
+}
+
+@keyframes register-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes register-glow-float {
+  from {
+    transform: translate3d(-4%, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(4%, -8%, 0) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-orbit,
+  .register-card-glow {
+    animation: none;
+  }
+}
+</style>

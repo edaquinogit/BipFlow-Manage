@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ShoppingBagIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
 import { DashboardRoutes } from '@/router/dashboard.routes'
-import { PublicRoutes } from '@/router/public.routes'
 import type { ApiError } from '@/types/auth'
 
 const router = useRouter()
@@ -133,14 +131,7 @@ const handleLogin = async () => {
           </div>
 
           <div class="mt-7 border-t border-white/10 pt-5 text-center">
-            <RouterLink
-              :to="{ name: PublicRoutes.Products }"
-              class="group inline-flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 transition-colors hover:text-indigo-400"
-            >
-              <ShoppingBagIcon class="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
-              Ver catalogo publico
-            </RouterLink>
-            <p class="mt-4 text-xs leading-5 text-gray-600">
+            <p class="text-xs leading-5 text-gray-600">
               Acesso administrativo protegido por credenciais. Use uma conta autorizada.
             </p>
           </div>
