@@ -135,3 +135,107 @@ class ProductGalleryImage(models.Model):
     def __str__(self) -> str:
         """Return a compact identifier for admin/debug purposes."""
         return f"{self.product_id} - gallery image {self.position}"
+
+
+class DeliveryRegion(models.Model):
+    """Configurable delivery fee by operating region."""
+
+    name = models.CharField(max_length=120, unique=True)
+    city = models.CharField(max_length=120, blank=True)
+    neighborhoods = models.TextField(blank=True, help_text="Optional comma-separated neighborhood hints")
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        """Return the region name for admin/debug purposes."""
+        return self.name
+
+
+class SaleOrder(models.Model):
+    """Persisted checkout record used by the management dashboard."""
+
+    STATUS_PREPARED = "prepared"
+    STATUS_CHOICES = [
+        (STATUS_PREPARED, "Prepared"),
+        ("sent", "Sent"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    DELIVERY_CHOICES = [
+        ("delivery", "Delivery"),
+        ("pickup", "Pickup"),
+    ]
+
+    PAYMENT_CHOICES = [
+        ("pix", "Pix"),
+        ("card", "Card"),
+        ("cash", "Cash"),
+    ]
+
+    order_reference = models.CharField(max_length=32, unique=True, db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED)
+
+    customer_name = models.CharField(max_length=255)
+    customer_phone = models.CharField(max_length=32)
+    customer_email = models.EmailField(blank=True)
+    delivery_method = models.CharField(max_length=16, choices=DELIVERY_CHOICES)
+    payment_method = models.CharField(max_length=16, choices=PAYMENT_CHOICES)
+    address = models.CharField(max_length=255, blank=True)
+    neighborhood = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
+    delivery_region = models.ForeignKey(
+        DeliveryRegion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+    delivery_region_name = models.CharField(max_length=120, blank=True)
+    notes = models.TextField(blank=True)
+
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    message = models.TextField(blank=True)
+    whatsapp_url = models.URLField(max_length=2048, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        """Return a readable order identifier for admin/debug purposes."""
+        return self.order_reference
+
+
+class SaleOrderItem(models.Model):
+    """Snapshot of a product line at checkout time."""
+
+    order = models.ForeignKey(SaleOrder, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sale_items",
+    )
+    product_name = models.CharField(max_length=255)
+    sku = models.CharField(max_length=50, blank=True)
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    line_total = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        """Return a compact line summary."""
+        return f"{self.product_name} x{self.quantity}"

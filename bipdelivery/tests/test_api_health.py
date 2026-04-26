@@ -35,7 +35,7 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
-from bipdelivery.api.models import Category, Product  # noqa: E402
+from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
@@ -399,6 +399,105 @@ class CheckoutWhatsAppAPITest(TestCase):
         )
         self.assertIn("Pedido BipFlow", response.data["message"])
         self.assertEqual(response.data["items"][0]["product_name"], "Combo Executivo")
+        self.assertTrue(
+            SaleOrder.objects.filter(order_reference=response.data["order_reference"]).exists()
+        )
+
+    def test_checkout_uses_delivery_region_fee(self) -> None:
+        """Checkout should use the selected active delivery region fee."""
+        region = DeliveryRegion.objects.create(
+            name="Centro expandido",
+            city="Salvador",
+            delivery_fee=Decimal("18.50"),
+        )
+        payload = {
+            "items": [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 1,
+                }
+            ],
+            "customer": {
+                "full_name": "Cliente Teste",
+                "phone": "(71) 99999-0000",
+                "email": "",
+                "delivery_method": "delivery",
+                "payment_method": "pix",
+                "delivery_region_id": region.id,
+                "address": "Rua A, 123",
+                "neighborhood": "Centro",
+                "city": "Salvador",
+                "notes": "",
+            },
+        }
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["delivery_fee"], "18.50")
+        self.assertEqual(response.data["total"], "61.00")
+        self.assertEqual(response.data["customer"]["delivery_region_name"], "Centro expandido")
+        self.assertIn("Regiao: Centro expandido", response.data["message"])
+
+    def test_public_delivery_regions_returns_only_active_regions(self) -> None:
+        """Public active regions endpoint should hide inactive options."""
+        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Inativa",
+            city="Salvador",
+            delivery_fee=Decimal("22.00"),
+            is_active=False,
+        )
+
+        response: Any = self.client.get("/api/v1/delivery-regions/active/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["name"], "Centro")
+
+    def test_sales_history_requires_authentication(self) -> None:
+        """Sales history is a dashboard-only authenticated endpoint."""
+        response: Any = self.client.get("/api/v1/sales-orders/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_sales_history_returns_checkout_orders(self) -> None:
+        """Authenticated dashboard users should see persisted checkout orders."""
+        user = User.objects.create_user(username="salesuser", password="testpass123")
+
+        payload = {
+            "items": [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 1,
+                }
+            ],
+            "customer": {
+                "full_name": "Cliente Teste",
+                "phone": "(71) 99999-0000",
+                "email": "",
+                "delivery_method": "pickup",
+                "payment_method": "card",
+                "address": "",
+                "neighborhood": "",
+                "city": "",
+                "notes": "",
+            },
+        }
+        checkout_response: Any = self.client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.get("/api/v1/sales-orders/?page_size=5")
+
+        self.assertEqual(checkout_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["results"][0]["order_reference"],
+            checkout_response.data["order_reference"],
+        )
+        self.assertEqual(response.data["results"][0]["item_count"], 1)
 
     def test_checkout_requires_delivery_address_for_delivery_orders(self) -> None:
         """Delivery orders should require address fields."""

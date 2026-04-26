@@ -11,22 +11,24 @@ from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .errors import business_logic_error, not_found_error, validation_error
-from .models import Category, Product
+from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem
 from .pagination import ProductListPagination, StandardPagination
 from .serializers import (
     CategorySerializer,
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
+    DeliveryRegionSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProductSerializer,
     RegisterUserSerializer,
+    SaleOrderSerializer,
 )
 from .throttling import (
     AuthIpThrottle,
@@ -311,6 +313,61 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class DeliveryRegionViewSet(viewsets.ModelViewSet):
+    """Manage delivery pricing by region while exposing active regions publicly."""
+
+    serializer_class = DeliveryRegionSerializer
+    permission_classes = [AllowAnyReadIsAuthenticatedWrite]
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        """Return all regions to dashboard users and only active ones publicly."""
+        queryset = DeliveryRegion.objects.all()
+
+        if self.request.method in ("GET", "HEAD", "OPTIONS") and not (
+            self.request.user and self.request.user.is_authenticated
+        ):
+            queryset = queryset.filter(is_active=True)
+
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def active(self, request):
+        """Return active delivery regions for the public checkout form."""
+        serializer = self.get_serializer(
+            DeliveryRegion.objects.filter(is_active=True),
+            many=True,
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only sales history for authenticated dashboard users."""
+
+    serializer_class = SaleOrderSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        """Return recent sales with optional search and status filters."""
+        queryset = SaleOrder.objects.prefetch_related("items").all()
+
+        status_filter = self.request.query_params.get("status", "").strip()
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        search_term = self.request.query_params.get("search", "").strip()
+        if search_term:
+            queryset = queryset.filter(
+                Q(order_reference__icontains=search_term)
+                | Q(customer_name__icontains=search_term)
+                | Q(customer_phone__icontains=search_term)
+                | Q(items__product_name__icontains=search_term)
+            ).distinct()
+
+        return queryset
+
+
 class CheckoutWhatsAppView(APIView):
     """
     Prepare a checkout note and WhatsApp redirect for the public catalog.
@@ -397,14 +454,30 @@ class CheckoutWhatsAppView(APIView):
                 }
             )
 
-        delivery_fee = (
-            settings.ORDER_DELIVERY_FEE
-            if customer["delivery_method"] == "delivery"
-            else Decimal("0.00")
-        )
+        delivery_region = None
+        delivery_region_id = customer.get("delivery_region_id")
+
+        if customer["delivery_method"] == "delivery" and delivery_region_id:
+            delivery_region = DeliveryRegion.objects.filter(
+                id=delivery_region_id,
+                is_active=True,
+            ).first()
+
+            if delivery_region is None:
+                raise serializers.ValidationError(
+                    {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
+                )
+
+        delivery_fee = Decimal("0.00")
+        if customer["delivery_method"] == "delivery":
+            delivery_fee = (
+                Decimal(delivery_region.delivery_fee)
+                if delivery_region is not None
+                else settings.ORDER_DELIVERY_FEE
+            )
         total = subtotal + delivery_fee
 
-        order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S")
+        order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S-%f")
         customer_name = customer["full_name"].strip()
         customer_phone = customer["phone"].strip()
         customer_email = customer.get("email", "").strip()
@@ -435,6 +508,9 @@ class CheckoutWhatsAppView(APIView):
         ]
 
         if customer["delivery_method"] == "delivery":
+            if delivery_region is not None:
+                message_lines.append(f"Regiao: {delivery_region.name}")
+
             message_lines.extend(
                 [
                     f'Endereco: {customer["address"].strip()}',
@@ -461,6 +537,8 @@ class CheckoutWhatsAppView(APIView):
                 "email": customer_email,
                 "delivery_method": customer["delivery_method"],
                 "payment_method": customer["payment_method"],
+                "delivery_region_id": delivery_region.id if delivery_region is not None else None,
+                "delivery_region_name": delivery_region.name if delivery_region is not None else "",
                 "address": customer.get("address", "").strip(),
                 "neighborhood": customer.get("neighborhood", "").strip(),
                 "city": customer.get("city", "").strip(),
@@ -472,6 +550,41 @@ class CheckoutWhatsAppView(APIView):
             "message": message,
             "whatsapp_url": whatsapp_url,
         }
+
+        with transaction.atomic():
+            sale_order = SaleOrder.objects.create(
+                order_reference=order_reference,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_email=customer_email,
+                delivery_method=customer["delivery_method"],
+                payment_method=customer["payment_method"],
+                delivery_region=delivery_region,
+                delivery_region_name=delivery_region.name if delivery_region is not None else "",
+                address=customer.get("address", "").strip(),
+                neighborhood=customer.get("neighborhood", "").strip(),
+                city=customer.get("city", "").strip(),
+                notes=notes,
+                subtotal=subtotal.quantize(Decimal("0.01")),
+                delivery_fee=delivery_fee.quantize(Decimal("0.01")),
+                total=total.quantize(Decimal("0.01")),
+                message=message,
+                whatsapp_url=whatsapp_url,
+            )
+            SaleOrderItem.objects.bulk_create(
+                [
+                    SaleOrderItem(
+                        order=sale_order,
+                        product=products_by_id.get(item["product_id"]),
+                        product_name=item["product_name"],
+                        sku=item["sku"],
+                        quantity=item["quantity"],
+                        unit_price=item["unit_price"],
+                        line_total=item["line_total"],
+                    )
+                    for item in normalized_items
+                ]
+            )
 
         output_serializer = CheckoutResponseSerializer(data=response_payload)
         output_serializer.is_valid(raise_exception=True)

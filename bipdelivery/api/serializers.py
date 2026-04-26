@@ -11,7 +11,14 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
 
-from .models import Category, Product, ProductGalleryImage
+from .models import (
+    Category,
+    DeliveryRegion,
+    Product,
+    ProductGalleryImage,
+    SaleOrder,
+    SaleOrderItem,
+)
 
 User = get_user_model()
 
@@ -310,6 +317,24 @@ class ProductSerializer(serializers.ModelSerializer):
         return data
 
 
+class DeliveryRegionSerializer(serializers.ModelSerializer):
+    """Delivery region fee configuration used by dashboard and public checkout."""
+
+    class Meta:
+        model = DeliveryRegion
+        fields = [
+            "id",
+            "name",
+            "city",
+            "neighborhoods",
+            "delivery_fee",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
 class CheckoutItemInputSerializer(serializers.Serializer):
     """Serializer for each cart item sent during checkout."""
 
@@ -325,6 +350,7 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_blank=True)
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
+    delivery_region_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     address = serializers.CharField(required=False, allow_blank=True, max_length=255)
     neighborhood = serializers.CharField(required=False, allow_blank=True, max_length=255)
     city = serializers.CharField(required=False, allow_blank=True, max_length=255)
@@ -381,6 +407,8 @@ class CheckoutCustomerResponseSerializer(serializers.Serializer):
     address = serializers.CharField(allow_blank=True)
     neighborhood = serializers.CharField(allow_blank=True)
     city = serializers.CharField(allow_blank=True)
+    delivery_region_id = serializers.IntegerField(allow_null=True, required=False)
+    delivery_region_name = serializers.CharField(allow_blank=True, required=False)
     notes = serializers.CharField(allow_blank=True)
 
 
@@ -397,6 +425,55 @@ class CheckoutResponseSerializer(serializers.Serializer):
     total = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     message = serializers.CharField()
     whatsapp_url = serializers.CharField(allow_blank=True)
+
+
+class SaleOrderItemSerializer(serializers.ModelSerializer):
+    """Read-only sale item snapshot for dashboard history."""
+
+    product_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = SaleOrderItem
+        fields = [
+            "id",
+            "product_id",
+            "product_name",
+            "sku",
+            "quantity",
+            "unit_price",
+            "line_total",
+        ]
+
+
+class SaleOrderSerializer(serializers.ModelSerializer):
+    """Read-only sale order payload for the dashboard menu and history screens."""
+
+    items = SaleOrderItemSerializer(many=True, read_only=True)
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SaleOrder
+        fields = [
+            "id",
+            "order_reference",
+            "status",
+            "customer_name",
+            "customer_phone",
+            "customer_email",
+            "delivery_method",
+            "payment_method",
+            "subtotal",
+            "delivery_fee",
+            "delivery_region_name",
+            "total",
+            "created_at",
+            "item_count",
+            "items",
+        ]
+
+    def get_item_count(self, order: SaleOrder) -> int:
+        """Return the total number of product units in the order."""
+        return sum(item.quantity for item in order.items.all())
 
 
 class RegisterUserSerializer(serializers.Serializer):
