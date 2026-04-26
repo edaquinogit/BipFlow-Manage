@@ -36,6 +36,7 @@ const isDashboardMenuOpen = ref(false);
  */
 const assetIdToPurge = ref<number | null>(null);
 const selectedProduct = ref<Product | null>(null);
+const currentUserName = ref<string | null>(null);
 const recentSales = ref<SaleOrder[]>([]);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 
@@ -105,6 +106,16 @@ const lowStockProducts = computed(() => (
 const handleOpenNewPanel = () => {
   selectedProduct.value = null;
   isPanelOpen.value = true;
+};
+
+const fetchCurrentUser = async (): Promise<void> => {
+  try {
+    const currentUser = await authService.getCurrentUser();
+    currentUserName.value = currentUser.display_name || currentUser.email || currentUser.username;
+  } catch (error: unknown) {
+    Logger.warn('Failed to fetch dashboard user profile', { error });
+    currentUserName.value = null;
+  }
 };
 
 const fetchSalesHistory = async (): Promise<void> => {
@@ -317,6 +328,7 @@ const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
  */
 onMounted(async () => {
   await Promise.allSettled([
+    fetchCurrentUser(),
     fetchData(),
     fetchCategories(),
     fetchSalesHistory(),
@@ -327,7 +339,10 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30 font-sans antialiased" data-cy="dashboard-view">
-    <DashboardHeader @open-menu="handleOpenDashboardMenu" />
+    <DashboardHeader
+      :user-name="currentUserName"
+      @open-menu="handleOpenDashboardMenu"
+    />
 
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
       <StatsGrid

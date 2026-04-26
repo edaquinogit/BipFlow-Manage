@@ -23,6 +23,7 @@ from .serializers import (
     CategorySerializer,
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
+    CurrentUserSerializer,
     DeliveryRegionSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -601,6 +602,16 @@ class RefreshTokenView(TokenRefreshView):
     """JWT refresh endpoint protected against retry storms and token replay abuse."""
 
     throttle_classes = [TokenRefreshIpThrottle, TokenRefreshIdentityThrottle]
+
+
+class CurrentUserView(APIView):
+    """Return the authenticated user's dashboard profile summary."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        serializer = CurrentUserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RegisterUserView(APIView):

@@ -53,6 +53,40 @@ def build_test_image(filename: str) -> SimpleUploadedFile:
     )
 
 
+class CurrentUserAPITest(TestCase):
+    """Test authenticated user summary endpoint."""
+
+    client: APIClient
+    user: User
+
+    def setUp(self) -> None:
+        """Initialize test client and authenticated user data."""
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="ednaldo@example.com",
+            email="ednaldo@example.com",
+            password="testpass123",
+            first_name="Ednaldo",
+            last_name="Aquino",
+        )
+
+    def test_current_user_requires_authentication(self) -> None:
+        """Current user endpoint should be available only to authenticated users."""
+        response: Any = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_current_user_returns_display_name(self) -> None:
+        """Current user endpoint should expose a human-friendly display name."""
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], "ednaldo@example.com")
+        self.assertEqual(response.data["display_name"], "Ednaldo Aquino")
+
+
 class CategoryAPIHealthTest(TestCase):
     """Test Category endpoints are functioning."""
 

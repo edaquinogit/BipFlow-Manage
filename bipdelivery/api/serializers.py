@@ -23,6 +23,28 @@ from .models import (
 User = get_user_model()
 
 
+class CurrentUserSerializer(serializers.ModelSerializer):
+    """Authenticated user summary for dashboard personalization."""
+
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "first_name", "last_name", "display_name"]
+        read_only_fields = fields
+
+    def get_display_name(self, user: User) -> str:
+        """Return the best available human-friendly user name."""
+        full_name = user.get_full_name().strip()
+        if full_name:
+            return full_name
+
+        if user.email:
+            return user.email.split("@", 1)[0]
+
+        return user.username
+
+
 class CategorySerializer(serializers.ModelSerializer):
     """Serializer for Category model with essential fields only."""
 

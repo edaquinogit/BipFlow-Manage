@@ -4,6 +4,7 @@ import { tokenStore } from "./token-store";
 import type {
   LoginCredentials,
   LoginResponse,
+  CurrentUser,
   ConfirmResetPayload,
   ConfirmResetResponse,
   RegisterPayload,
@@ -96,6 +97,14 @@ export const authService = {
       );
       throw error;
     }
+  },
+
+  /**
+   * Fetch the authenticated user profile used by dashboard personalization.
+   */
+  async getCurrentUser(): Promise<CurrentUser> {
+    const { data } = await api.get<CurrentUser>("auth/me/");
+    return data;
   },
 
   /**

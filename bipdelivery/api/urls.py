@@ -1,6 +1,7 @@
 from django.urls import include, path
 
 from bipdelivery.api.views import (
+    CurrentUserView,
     LoginTokenObtainPairView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -12,6 +13,7 @@ app_name = "api"
 
 urlpatterns = [
     path("auth/register/", RegisterUserView.as_view(), name="register"),
+    path("auth/me/", CurrentUserView.as_view(), name="current_user"),
     path("auth/password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
     path(
         "auth/password-reset/confirm/",

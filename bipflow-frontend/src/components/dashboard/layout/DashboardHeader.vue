@@ -1,13 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { 
   Bars3Icon,
   CpuChipIcon, 
   GlobeAmericasIcon 
 } from '@heroicons/vue/24/outline';
 
+const props = defineProps<{
+  userName: string | null
+}>();
+
 defineEmits<{
   openMenu: []
 }>();
+
+const welcomeMessage = computed(() => (
+  props.userName ? `Bem-vindo, ${props.userName}` : 'Bem-vindo'
+));
 </script>
 
 <template>
@@ -40,7 +49,16 @@ defineEmits<{
         </div>
       </div>
 
-      <div class="flex items-center gap-4">
+      <div class="flex min-w-0 items-center gap-3 sm:gap-4">
+        <div class="flex min-w-0 flex-col items-end">
+          <span class="hidden text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 sm:block">
+            Operador
+          </span>
+          <span class="max-w-[8rem] truncate text-xs font-bold text-white sm:max-w-[13rem] sm:text-sm">
+            {{ welcomeMessage }}
+          </span>
+        </div>
+
         <button 
           type="button"
           class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-zinc-900/60 text-zinc-400 transition-all duration-300 hover:border-indigo-400/40 hover:bg-indigo-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
