@@ -96,12 +96,33 @@ npm run test:e2e:run
 - `src/services/sales.service.ts`: historico recente de vendas.
 - `src/services/order.service.ts`: checkout via WhatsApp.
 
+## Contrato Do Fluxo De Produto
+
+O dashboard cria e edita produtos pelo fluxo abaixo:
+
+1. `ProductFormRoot.vue` mantem o estado editavel do formulario.
+2. `ProductFormSchema` valida o contrato de escrita antes do submit.
+3. `DashboardView.vue` remove campos somente leitura antes de sincronizar.
+4. `useProducts.ts` monta `FormData`, preserva arquivos e envia `category`
+   como ID para o Django.
+5. `product.service.ts` normaliza a resposta do Django para a UI.
+
+Regras atuais:
+
+- categoria e obrigatoria para criar produto;
+- o backend recebe `category` como ID numerico;
+- o frontend pode exibir categoria como objeto `{ id, name, slug }`;
+- preco e estoque sao normalizados como numeros no formulario;
+- limpar o campo de preco ou estoque emite `0`, nao string vazia;
+- ate 3 imagens publicas sao preservadas entre capa e galeria.
+
 ## Qualidade
 
 ```powershell
 npm run typecheck
 npm run lint
 npm run test:unit:run
+npm run build
 npm run test:e2e:run
 ```
 
@@ -110,6 +131,8 @@ Uso recomendado:
 - `npm run lint` para auditoria sem alterar arquivos.
 - `npm run lint:fix` para correcao automatica local.
 - `npm run typecheck` antes de commitar mudancas em contratos ou views.
+- `npm run test:unit:run` antes de commitar mudancas em services, schemas,
+  composables ou componentes de formulario.
 
 ## Convencoes
 

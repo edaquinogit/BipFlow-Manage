@@ -28,6 +28,9 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
   historico recente de vendas, catalogo publico, carrinho e checkout.
 - Contrato de auth: tokens JWT persistidos somente por
   `src/services/token-store.ts`.
+- Contrato de produtos: mutacoes passam por `ProductFormSchema`,
+  `sanitizePayloadForDjango`, `useProducts` e `product.service` antes de chegar
+  ao Django.
 
 ### Motor Node da raiz
 
@@ -172,7 +175,23 @@ Frontend:
 - composables de busca, produtos e carrinho;
 - views publicas de produtos;
 - botao flutuante do carrinho;
+- formulario administrativo de produto com validacao de categoria obrigatoria,
+  coercao numerica de preco/estoque e payload multipart com categoria;
 - validacoes unitarias e fluxos E2E existentes.
+
+## Verificacao Local Atual
+
+Ultima verificacao registrada nesta documentacao: 2026-04-26.
+
+Frontend:
+
+```powershell
+npm run typecheck
+npm run test:unit:run
+npm run build
+```
+
+Resultado: typecheck, 37 testes unitarios e build de producao passaram.
 
 ## Padroes De Codigo
 

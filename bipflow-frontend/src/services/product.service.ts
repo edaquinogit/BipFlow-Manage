@@ -290,7 +290,7 @@ class ProductService {
         },
       });
 
-      return ProductSchema.parse(data);
+      return ProductSchema.parse(this.normalizeProductRecord(data));
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Create Product");
       throw error;
@@ -327,14 +327,15 @@ class ProductService {
         }
       );
 
-      const validation = ProductSchema.safeParse(data);
+      const normalizedData = this.normalizeProductRecord(data);
+      const validation = ProductSchema.safeParse(normalizedData);
 
       if (!validation.success) {
         Logger.warn(
           `Product schema mismatch after update [ID: ${id}]`,
           buildErrorContext(validation.error, { productId: id })
         );
-        return data as AdminProduct;
+        return normalizedData as AdminProduct;
       }
 
       return validation.data;

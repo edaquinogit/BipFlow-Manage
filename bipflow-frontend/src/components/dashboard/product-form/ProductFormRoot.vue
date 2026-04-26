@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
-import { ProductSchema, type Product } from '@/schemas/product.schema';
+import { computed, ref, watch } from 'vue';
+import { ProductFormSchema, type Product, type ProductFormData } from '@/schemas/product.schema';
 
 // Sections
 import IdentitySection from '@/components/dashboard/product-form/sections/IdentitySection.vue';
@@ -20,15 +20,28 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'save', data: Product): void;
+  (e: 'save', data: ProductFormData): void;
 }>();
 
 // --- 🛠️ STATE MANAGEMENT ---
 const isSubmitting = ref(false);
 const errors = ref<Record<string, string[]>>({});
 
+type ProductFormState = {
+  name: string;
+  price: number;
+  stock_quantity: number;
+  category: ProductFormData['category'] | null | undefined;
+  sku: string;
+  size: string;
+  image: ProductFormData['image'];
+  images: ProductFormData['images'];
+  description: string;
+  is_available?: boolean;
+};
+
 // Factory para estado limpo
-const createEmptyForm = (): Partial<Product> => ({
+const createEmptyForm = (): ProductFormState => ({
   name: '',
   price: 0,
   stock_quantity: 0,
@@ -40,38 +53,53 @@ const createEmptyForm = (): Partial<Product> => ({
   description: '',
 });
 
+const toNumberOrZero = (value: unknown): number => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const resolveCategoryId = (
+  category: Product['category']
+): ProductFormState['category'] => {
+  if (!category) {
+    return undefined;
+  }
+
+  if (typeof category === 'object' && 'id' in category) {
+    return category.id;
+  }
+
+  return category;
+};
+
 const normalizeInitialFormData = (
   product: Product | null | undefined
-): Partial<Product> => {
+): ProductFormState => {
   if (!product) {
     return createEmptyForm();
   }
 
-  const nextForm = { ...product } as Partial<Product> & {
-    category?: Product['category'];
+  const coverImage = typeof product.image === 'string' ? product.image : null;
+  const productImages = Array.isArray(product.images) ? product.images : [];
+  const galleryImages = coverImage
+    ? productImages.filter((imageUrl) => imageUrl !== coverImage)
+    : productImages;
+
+  return {
+    name: product.name ?? '',
+    price: toNumberOrZero(product.price),
+    stock_quantity: Math.trunc(toNumberOrZero(product.stock_quantity)),
+    category: resolveCategoryId(product.category),
+    sku: product.sku ?? '',
+    size: product.size ?? '',
+    image: product.image ?? null,
+    images: galleryImages.slice(0, 2),
+    description: product.description ?? '',
+    is_available: product.is_available ?? true,
   };
-
-  if (
-    nextForm.category &&
-    typeof nextForm.category === 'object' &&
-    'id' in nextForm.category
-  ) {
-    nextForm.category = nextForm.category.id;
-  }
-
-  if (Array.isArray(nextForm.images)) {
-    const coverImage = typeof nextForm.image === 'string' ? nextForm.image : null;
-    const galleryImages = coverImage
-      ? nextForm.images.filter((imageUrl) => imageUrl !== coverImage)
-      : nextForm.images;
-
-    nextForm.images = galleryImages.slice(0, 2);
-  }
-
-  return nextForm;
 };
 
-const form = ref<any>(createEmptyForm());
+const form = ref<ProductFormState>(createEmptyForm());
 
 /**
  * 🛰️ ENGINE SYNC
@@ -94,16 +122,16 @@ const handleSubmit = async () => {
   // Pequeno delay para estabilidade do DOM
   await new Promise(resolve => setTimeout(resolve, 50));
 
-  const result = ProductSchema.safeParse(form.value);
+  const result = ProductFormSchema.safeParse(form.value);
 
   if (!result.success) {
-    errors.value = result.error.flatten().fieldErrors;
+    errors.value = result.error.flatten().fieldErrors as Record<string, string[]>;
     isSubmitting.value = false;
     return;
   }
 
   try {
-    emit('save', result.data as Product);
+    emit('save', result.data);
   } finally {
     isSubmitting.value = false;
   }

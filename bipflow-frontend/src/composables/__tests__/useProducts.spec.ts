@@ -76,6 +76,7 @@ describe("useProducts Composable", () => {
         name: "Premium Product",
         price: 150.00,
         stock_quantity: 10,
+        category: 2,
         image: mockFile,
       };
 
@@ -106,6 +107,7 @@ describe("useProducts Composable", () => {
       if (imageInPayload instanceof File) {
         expect(imageInPayload.name).toBe("test-product.png");
       }
+      expect((sentPayload as FormData).get("category")).toBe("2");
 
       // Assertion: Verify response includes absolute media URL
       expect(result!.image).toMatch(/^http.*media/);

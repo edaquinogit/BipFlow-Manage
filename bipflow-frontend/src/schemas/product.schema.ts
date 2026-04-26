@@ -25,6 +25,7 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/png",
   "image/webp",
 ];
+const REQUIRED_CATEGORY_MESSAGE = "Please select a classification";
 
 const ProductGalleryImageSchema = z.union([
   z.string().url(),
@@ -33,6 +34,20 @@ const ProductGalleryImageSchema = z.union([
     .refine((file) => file.size <= MAX_FILE_SIZE, `Image too heavy. Max limit is 2MB.`)
     .refine((file) => ACCEPTED_IMAGE_TYPES.includes(file.type), "Only .jpg, .png and .webp formats are supported."),
 ]);
+
+const OptionalCategoryReferenceSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.union([
+    z.coerce.number().int().positive(REQUIRED_CATEGORY_MESSAGE),
+    CategorySchema,
+    z.undefined(),
+  ]),
+);
+
+const RequiredCategoryIdSchema = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? 0 : value),
+  z.coerce.number().int().positive(REQUIRED_CATEGORY_MESSAGE),
+);
 
 const productBase = {
   name: z
@@ -60,15 +75,8 @@ const productBase = {
     .nonnegative("Stock cannot be negative")
     .default(0),
 
-  // Categoria: Suporta ID (Number) ou Objeto Completo
-  category: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : val),
-    z.union([
-      z.coerce.number().positive("Please select a classification"),
-      CategorySchema,
-      z.undefined(),
-    ]),
-  ),
+  // Categoria de leitura: suporta ID cru do Django, objeto normalizado ou payload legado sem categoria.
+  category: OptionalCategoryReferenceSchema,
 
   is_available: z.boolean().default(true),
   size: z.string().nullable().optional(),
@@ -121,12 +129,9 @@ export const ProductSchema = z.object({
 });
 
 // Schema de Escrita (Formulário)
-export const ProductFormSchema = ProductSchema.omit({
-  id: true,
-  category_name: true,
-  created_at: true,
-  updated_at: true,
-  slug: true,
+export const ProductFormSchema = z.object({
+  ...productBase,
+  category: RequiredCategoryIdSchema,
 });
 
 /**
@@ -160,8 +165,11 @@ export const CreateOrderSchema = z.object({
 export type Product = z.infer<typeof ProductSchema>;
 export type Category = z.infer<typeof CategorySchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
+export type ProductFormDraft = Partial<Omit<ProductFormData, "category">> & {
+  category?: ProductFormData["category"] | null;
+};
 
-export const createEmptyProduct = (): ProductFormData => ({
+export const createEmptyProduct = (): ProductFormDraft => ({
   name: "",
   price: 0,
   stock_quantity: 0,

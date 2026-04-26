@@ -6,8 +6,27 @@
  */
 
 // Sincronização direta com o Estado Global do Formulário (ProductFormRoot)
-const price = defineModel<number>('price', { default: 0 });
-const stock = defineModel<number>('stock', { default: 0 });
+const normalizeNumberModel = (value: unknown): number => {
+  if (value === '' || value === null || value === undefined) {
+    return 0;
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const normalizeStockModel = (value: unknown): number => {
+  return Math.max(0, Math.trunc(normalizeNumberModel(value)));
+};
+
+const price = defineModel<number>('price', {
+  default: 0,
+  set: normalizeNumberModel,
+});
+const stock = defineModel<number>('stock', {
+  default: 0,
+  set: normalizeStockModel,
+});
 const size = defineModel<string>('size', { default: '' });
 
 interface Props {
@@ -38,7 +57,7 @@ defineProps<Props>();
           <span class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-sm pointer-events-none">$</span>
           <input 
             type="number" 
-            v-model="price" 
+            v-model.number="price"
             name="price"
             data-cy="input-product-price"
             step="0.01"
@@ -58,7 +77,7 @@ defineProps<Props>();
         </label>
         <input 
           type="number" 
-          v-model="stock" 
+          v-model.number="stock"
           name="stock_quantity"
           data-cy="input-product-stock"
           min="0"

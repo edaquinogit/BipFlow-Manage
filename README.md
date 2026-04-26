@@ -127,6 +127,7 @@ Frontend:
 npm run frontend:typecheck
 npm run frontend:lint
 npm run frontend:test:unit
+npm run frontend:build
 ```
 
 ## Convencoes

@@ -183,11 +183,22 @@ Campos principais:
 - `category_name`
 - `created_at`
 
-Upload:
+Contrato de escrita:
+
+- `POST` exige `name`, `price`, `stock_quantity` e `category`;
+- `category` deve ser o ID numerico de uma categoria existente;
+- `price` aceita valor decimal;
+- `stock_quantity` deve ser inteiro nao negativo;
+- `PATCH` aceita atualizacao parcial, mas o dashboard envia o formulario
+  normalizado com os campos de negocio atuais.
+
+Upload e galeria:
 
 - aceita JSON ou `multipart/form-data`;
 - `image` define a capa;
 - `uploaded_images` e `existing_images` controlam galeria;
+- o frontend envia slots ordenados como `existing_images[0]`,
+  `uploaded_images[1]` e assim por diante para preservar ordem visual;
 - cada produto pode ter no maximo 3 imagens.
 
 Atualizacao em lote:
