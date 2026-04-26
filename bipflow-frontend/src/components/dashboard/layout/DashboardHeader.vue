@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
-import { authService } from '@/services/auth.service';
 import { 
-  ArrowLeftOnRectangleIcon, 
+  Bars3Icon,
   CpuChipIcon, 
   GlobeAmericasIcon 
 } from '@heroicons/vue/24/outline';
 
-const router = useRouter();
-
-const handleLogout = () => {
-  authService.logout();
-  router.push('/login');
-};
+defineEmits<{
+  openMenu: []
+}>();
 </script>
 
 <template>
@@ -47,14 +42,12 @@ const handleLogout = () => {
 
       <div class="flex items-center gap-4">
         <button 
-          @click="handleLogout" 
-          class="group flex items-center gap-3 px-5 py-2.5 rounded-xl border border-white/5 bg-zinc-900/50 hover:bg-red-500/10 hover:border-red-500/20 transition-all duration-300"
+          type="button"
+          class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-zinc-900/60 text-zinc-400 transition-all duration-300 hover:border-indigo-400/40 hover:bg-indigo-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          aria-label="Abrir menu do dashboard"
+          @click="$emit('openMenu')"
         >
-          <div class="flex flex-col items-end">
-            <span class="text-[9px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-red-400">Terminate</span>
-            <span class="text-[8px] font-bold text-zinc-600 uppercase">Session</span>
-          </div>
-          <ArrowLeftOnRectangleIcon class="w-5 h-5 text-zinc-500 group-hover:text-red-500 group-hover:translate-x-1 transition-all" />
+          <Bars3Icon class="h-5 w-5 transition-transform group-hover:scale-110" />
         </button>
       </div>
 
