@@ -1,65 +1,70 @@
 # BipFlow Manage
 
-Plataforma de gestao de catalogo e pedidos com backend Django REST, frontend Vue 3 e um servico Node isolado para validacao de pedidos.
+Plataforma de gestao de catalogo, frete e pedidos. O fluxo principal do produto
+usa backend Django REST, frontend Vue 3 e checkout publico com geracao de pedido
+para WhatsApp.
 
-## Visao Geral
+## Estado Atual
 
-O repositorio esta organizado em tres frentes principais:
+O repositorio tem tres superficies de codigo:
 
-- `bipdelivery/`: backend Django + Django REST Framework responsavel por produtos, categorias, autenticacao JWT e checkout via WhatsApp.
-- `bipflow-frontend/`: aplicacao Vue 3 + TypeScript para dashboard autenticado e catalogo publico.
-- `api-order-validation/`: servico Node independente, mantido como projeto paralelo de validacao de pedidos.
+- `bipdelivery/`: backend principal em Django REST. Mantem autenticacao JWT,
+  produtos, categorias, regioes de entrega, checkout, pedidos persistidos e
+  historico de vendas.
+- `bipflow-frontend/`: aplicacao Vue 3 + TypeScript. Entrega o dashboard
+  autenticado, o menu operacional, o catalogo publico, o carrinho e o checkout.
+- `index.js` + `src/` + `docs/swagger.js`: motor Node independente de
+  integracao de pedidos em `/api/v1/orders`. Ele nao participa do runtime
+  normal Django + Vue.
 
-O fluxo principal do produto hoje acontece entre `bipflow-frontend` e `bipdelivery`. O servico `api-order-validation` nao faz parte do runtime padrao da aplicacao web.
+`api-order-validation/` permanece no repositorio como pacote/test harness
+isolado ligado ao motor Node. Ele nao faz parte do fluxo web principal.
 
 ## Documentacao Oficial
 
-Para reduzir divergencia entre documentacao e codigo, estes arquivos sao a documentacao operacional do projeto:
+- [docs/README.md](docs/README.md): indice da documentacao viva.
+- [docs/architecture/system-overview.md](docs/architecture/system-overview.md):
+  arquitetura real do projeto.
+- [docs/development-guide.md](docs/development-guide.md): setup, comandos,
+  qualidade e manutencao.
+- [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
+  Django.
+- [bipflow-frontend/README.md](bipflow-frontend/README.md): guia especifico do
+  frontend.
 
-- Arquitetura geral: [docs/architecture/system-overview.md](docs/architecture/system-overview.md)
-- Guia de desenvolvimento: [docs/development-guide.md](docs/development-guide.md)
-- Contrato da API: [docs/api/reference.md](docs/api/reference.md)
-- Frontend: [bipflow-frontend/README.md](bipflow-frontend/README.md)
-- Backend: `requirements.txt`, `bipdelivery/core/settings.py`, `bipdelivery/api/`
+O historico de mudancas deve ser consultado pelo Git. Relatorios historicos,
+placeholders de OpenAPI e documentos aspiracionais nao sao mantidos como fonte
+de verdade.
 
-A raiz mantem apenas documentacao essencial. Relatorios historicos, auditorias pontuais e checklists de entrega foram removidos para evitar conflito com o estado atual do codigo.
+## Stack
 
-## Stack Atual
+- Python 3.12+ para Django 6.
+- Django 6, Django REST Framework e Simple JWT.
+- SQLite em desenvolvimento local.
+- Node.js 18+ e npm.
+- Vue 3, TypeScript, Vite, Vue Router e Axios.
+- Vitest, Cypress, ESLint, Ruff e Pytest.
 
-- Python 3.11+
-- Django 6
-- Django REST Framework
-- Simple JWT
-- Node.js 18+
-- Vue 3
-- TypeScript
-- Vite
-- Vitest
-- Cypress
-- SQLite para desenvolvimento local
-
-## Estrutura Do Repositorio
+## Estrutura
 
 ```text
 BipFlow-Manage/
-|-- bipdelivery/
-|   |-- api/
-|   |-- core/
-|   `-- tests/
-|-- bipflow-frontend/
-|   |-- src/
-|   |-- cypress/
-|   `-- package.json
-|-- api-order-validation/
+|-- bipdelivery/              # Backend Django REST
+|-- bipflow-frontend/         # Frontend Vue 3
+|-- api-order-validation/     # Pacote isolado/test harness do motor Node
 |-- docs/
-|-- package.json
+|   |-- api/
+|   `-- architecture/
+|-- src/                      # Suporte do motor Node da raiz
+|-- index.js                  # Motor Node de integracao de pedidos
+|-- package.json              # Scripts da raiz e motor Node
 |-- requirements.txt
 `-- .env.example
 ```
 
 ## Setup Rapido
 
-### 1. Backend
+### Backend Django
 
 ```powershell
 python -m venv .venv
@@ -73,12 +78,7 @@ python manage.py runserver
 
 API local: `http://127.0.0.1:8000/api/`
 
-Observacao sobre banco local:
-- `bipdelivery/db.sqlite3` e um artefato de desenvolvimento local.
-- Esse arquivo nao deve ser versionado nem entrar em commits.
-- Para resetar a base local, prefira remover o arquivo localmente e rodar `python manage.py migrate` novamente.
-
-### 2. Frontend
+### Frontend Vue
 
 ```powershell
 cd bipflow-frontend
@@ -89,9 +89,17 @@ npm run dev
 
 Aplicacao local: `http://127.0.0.1:5173/`
 
-### 3. Scripts De Orquestracao Na Raiz
+### Motor Node Da Raiz
 
-A raiz do repositorio nao substitui o ambiente do frontend. Ela oferece atalhos para o time:
+```powershell
+npm install
+npm run dev
+```
+
+Motor local: `http://localhost:3000/`
+Swagger local do motor Node: `http://localhost:3000/api-docs`
+
+## Atalhos Na Raiz
 
 ```powershell
 npm run frontend:dev
@@ -103,54 +111,30 @@ npm run frontend:test:unit
 npm run frontend:test:e2e
 ```
 
-## Comandos Principais
+## Qualidade
 
-### Backend
-
-```powershell
-cd bipdelivery
-pytest
-ruff check .
-black . --line-length 100
-```
-
-### Frontend
+Backend:
 
 ```powershell
-cd bipflow-frontend
-npm run test:unit:run
-npm run test:e2e:run
-npm run lint
-npm run lint:fix
-npm run typecheck
+python bipdelivery\manage.py check
+python -m pytest bipdelivery/tests
+ruff check bipdelivery/api bipdelivery/tests
 ```
 
-Observacao sobre qualidade:
-- `npm run lint` deve ser usado para auditoria sem alterar arquivos.
-- `npm run lint:fix` aplica correcoes automaticas quando apropriado.
+Frontend:
 
-## Convencoes Do Projeto
+```powershell
+npm run frontend:typecheck
+npm run frontend:lint
+npm run frontend:test:unit
+```
 
-- Leitura publica e escrita autenticada nos endpoints principais de produtos e categorias.
-- Endpoints sensiveis de autenticacao usam throttling por IP e por identidade submetida.
-- O frontend deve consumir a API via `services/`, nao espalhar chamadas HTTP direto nas views.
-- Contratos de resposta devem ser validados por schemas quando o modulo ja segue esse padrao.
-- Documentacao deve descrever comportamento real do codigo, nao roadmap, suposicoes ou arquitetura aspiracional.
+## Convencoes
 
-## Problemas Comuns
-
-### Backend sem dependencias
-
-Se aparecer `ModuleNotFoundError: No module named 'django'`, ative a virtualenv correta antes de executar o servidor ou os testes.
-
-### Banco SQLite aparecendo no Git
-
-Se `bipdelivery/db.sqlite3` aparecer como modificado no `git status`, trate isso como dado local. O fluxo esperado do projeto e manter o schema em migrations e deixar o arquivo SQLite fora do versionamento.
-
-### Frontend com bindings nativos quebrados
-
-Nao compartilhe `node_modules` entre Windows e WSL. Ao trocar de ambiente, reinstale as dependencias no ambiente atual.
-
-### Scripts ausentes na raiz
-
-Os scripts web completos vivem em `bipflow-frontend/package.json`. Use a raiz apenas como atalho de orquestracao.
+- `bipdelivery/db.sqlite3`, `db.sqlite3`, `node_modules/`, uploads, logs e
+  artefatos de build sao dados locais e nao devem entrar em commits.
+- A API Django publica leitura de catalogo e exige JWT para escrita
+  administrativa.
+- Chamadas HTTP do frontend devem passar por `src/services/`.
+- Tokens JWT devem ser persistidos apenas por `token-store.ts`.
+- A documentacao deve acompanhar codigo existente, nao roadmap.

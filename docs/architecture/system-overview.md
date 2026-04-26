@@ -1,116 +1,125 @@
 # Visao Geral Da Arquitetura
 
-Resumo da arquitetura real mantida no repositorio, com foco no fluxo principal em producao do projeto.
+Este documento descreve a arquitetura implementada hoje no repositorio.
 
-## Contexto
-
-O BipFlow hoje opera com duas aplicacoes centrais acopladas por HTTP:
-
-- `bipdelivery`: backend Django REST
-- `bipflow-frontend`: frontend Vue 3
-
-Ha tambem um servico paralelo em `api-order-validation`, mas ele nao compoe o fluxo principal do catalogo e do dashboard web.
-
-## Mapa De Componentes
+## Fluxo Principal
 
 ```text
-Usuario
+Usuario administrativo ou cliente publico
   |
-  | navega / interage
   v
 Frontend Vue 3 (bipflow-frontend)
   |
-  | HTTP JSON / multipart
+  | HTTP JSON ou multipart
   v
 Backend Django REST (bipdelivery)
   |
-  | ORM
+  | ORM / File storage local em desenvolvimento
   v
-SQLite em desenvolvimento
+SQLite + MEDIA_ROOT
 ```
 
-Recursos complementares:
+O caminho acima e o produto principal: dashboard autenticado, catalogo publico,
+carrinho, frete por regiao, checkout e historico de vendas.
 
-- JWT para autenticacao de escrita
-- arquivos de imagem em `MEDIA_ROOT`
-- checkout publico com geracao de mensagem para WhatsApp
+## Sistemas Separados
 
-## Responsabilidades Por Aplicacao
+Tambem existem componentes Node no repositorio:
 
-### Frontend Vue
+- `index.js`, `src/`, `services/` e `docs/swagger.js`: motor Node independente
+  para integracao de pedidos.
+- `api-order-validation/`: pacote/test harness isolado ligado ao motor Node.
 
-Responsavel por:
+Esses componentes nao participam do runtime normal Django + Vue.
 
-- dashboard autenticado para gestao de produtos e categorias
-- catalogo publico em `/produtos`
-- filtros, busca, ordenacao e paginacao no catalogo
-- carrinho local e coleta de dados do cliente
-- chamada ao endpoint de checkout para montar a mensagem final do pedido
+## Frontend Vue
 
-Estrutura funcional relevante:
+Responsabilidades:
 
-- `src/services/`: integracao HTTP e regras de consumo da API
-- `src/composables/`: estado reutilizavel de busca, carrinho e listagens
-- `src/views/dashboard/`: area autenticada
-- `src/views/products/`: experiencia publica de catalogo e checkout
+- proteger o dashboard por guarda de rota autenticada;
+- exibir saudacao com o usuario retornado por `GET /api/auth/me/`;
+- listar e gerenciar produtos no dashboard;
+- abrir menu operacional com historico de vendas, alertas de estoque, atalhos e
+  gestao de regioes de entrega;
+- expor catalogo publico em `/produtos`;
+- carregar regioes ativas de entrega no carrinho;
+- enviar checkout para a API Django e abrir o fluxo de WhatsApp.
 
-### Backend Django
+Camadas relevantes:
 
-Responsavel por:
+- `src/services/`: acesso HTTP e contratos de API.
+- `src/composables/`: estado reutilizavel.
+- `src/views/dashboard/`: experiencia administrativa.
+- `src/views/products/`: catalogo publico, detalhe e checkout.
+- `src/types/` e `src/schemas/`: contratos compartilhados no frontend.
 
-- CRUD de produtos
-- CRUD de categorias
-- autenticacao JWT
-- throttling dos endpoints sensiveis de autenticacao
-- regras de permissao publica para leitura e autenticada para escrita
-- upload e serializacao de imagens
-- validacao server-side do checkout via WhatsApp
+## Backend Django
 
-Estrutura funcional relevante:
+Responsabilidades:
+
+- autenticar via JWT;
+- expor perfil autenticado em `auth/me`;
+- aplicar throttling em endpoints sensiveis de auth;
+- manter produtos, categorias e galerias de imagens;
+- manter regioes de entrega e taxa por regiao;
+- validar checkout no servidor;
+- persistir pedidos como `SaleOrder` e `SaleOrderItem`;
+- expor historico de vendas para usuarios autenticados.
+
+Arquivos principais:
 
 - `bipdelivery/api/models.py`
 - `bipdelivery/api/serializers.py`
 - `bipdelivery/api/views.py`
-- `bipdelivery/api/pagination.py`
+- `bipdelivery/api/v1_urls.py`
 - `bipdelivery/core/settings.py`
 
 ## Contratos Principais
 
-### Produtos
+Produtos:
 
-- Endpoint base: `/api/v1/products/`
-- Leitura publica
-- Escrita autenticada
-- Resposta paginada
-- `category` retorna id
-- `category_name` retorna o nome denormalizado
+- `/api/v1/products/`
+- leitura publica;
+- escrita autenticada;
+- filtros por busca, categoria, estoque e preco;
+- detalhe publico por slug em `/api/v1/products/by-slug/{slug}/`;
+- ate 3 imagens por produto.
 
-### Categorias
+Categorias:
 
-- Endpoint base: `/api/v1/categories/`
-- Leitura publica
-- Escrita autenticada
-- Exclusao protegida quando ha produtos relacionados
+- `/api/v1/categories/`
+- leitura publica;
+- escrita autenticada;
+- exclusao bloqueada quando ha produtos associados.
 
-### Checkout
+Regioes de entrega:
 
-- Endpoint: `/api/v1/checkout/whatsapp/`
-- Publico
-- Recalcula totais no backend
-- Gera mensagem e URL de redirecionamento para WhatsApp
+- `/api/v1/delivery-regions/`
+- leitura publica mostra apenas regioes ativas para usuarios anonimos;
+- usuarios autenticados veem e gerenciam todas;
+- `/api/v1/delivery-regions/active/` alimenta o carrinho publico.
 
-## Decisoes Arquiteturais Importantes
+Checkout:
 
-- O frontend nao deve conhecer detalhes brutos do backend fora da camada de `services`.
-- O backend centraliza validacoes criticas de estoque, disponibilidade e taxa de entrega.
-- O catalogo publico e o dashboard compartilham a mesma API versionada.
-- Login, cadastro, reset de senha e refresh de token usam throttling por IP e por identidade submetida.
-- A documentacao deve priorizar o fluxo Django + Vue, porque este e o caminho implementado e testado no repositorio.
+- `/api/v1/checkout/whatsapp/`
+- publico;
+- recalcula totais no backend;
+- usa taxa da regiao de entrega quando enviada;
+- persiste pedido e itens;
+- retorna mensagem e URL `wa.me` quando `WHATSAPP_ORDER_PHONE` esta configurado.
 
-## Fora Do Escopo Deste Documento
+Vendas:
 
-Este documento nao descreve:
+- `/api/v1/sales-orders/`
+- somente autenticado;
+- read-only;
+- suporta filtros `status` e `search`.
 
-- arquitetura aspiracional futura
-- integracoes que nao aparecem no codigo principal atual
-- relatorios historicos de entrega ou auditoria pontual
+## Decisoes Arquiteturais
+
+- O backend e a autoridade para preco, estoque, disponibilidade, frete e total.
+- O frontend nao grava tokens fora de `token-store.ts`.
+- O frontend nao deve espalhar chamadas `axios` fora de `src/services/`.
+- O dashboard consome historico de vendas persistido pelo checkout publico.
+- Documentacao deve representar o codigo atual e ser removida quando virar
+  placeholder, relatorio historico ou plano nao implementado.

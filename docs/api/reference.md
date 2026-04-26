@@ -1,43 +1,73 @@
-# Referencia Da API
+# Referencia Da API Django
 
 Contrato funcional dos endpoints implementados em `bipdelivery/api/`.
 
-## Base URL
+## Base
 
-Ambiente local:
+Local:
 
 ```text
 http://127.0.0.1:8000/api/
 ```
 
-Versionamento de negocio:
+API versionada:
 
 ```text
 /api/v1/
 ```
 
+Esta referencia nao descreve o motor Node da raiz. A documentacao Swagger desse
+motor fica em `/api-docs` quando `npm run dev` esta ativo.
+
 ## Autenticacao
 
-O backend usa JWT com Simple JWT.
-No frontend, a persistencia de sessao deve usar o par `access_token` + `refresh_token`
-armazenado pela camada centralizada de autenticacao.
-Os endpoints publicos de autenticacao possuem throttling por IP e por identidade
-submetida para reduzir brute force, credential stuffing e abuso de reset de senha.
+O backend usa Simple JWT. O frontend guarda `access_token` e `refresh_token`
+somente via `bipflow-frontend/src/services/token-store.ts`.
 
-### Obter token
+### Login
 
 ```http
 POST /api/auth/token/
 ```
 
-Payload esperado:
+```json
+{
+  "username": "admin@example.com",
+  "password": "senha"
+}
+```
+
+Resposta:
 
 ```json
 {
-  "username": "seu-usuario",
-  "password": "sua-senha"
+  "access": "jwt-access",
+  "refresh": "jwt-refresh"
 }
 ```
+
+### Usuario autenticado
+
+```http
+GET /api/auth/me/
+Authorization: Bearer <access>
+```
+
+Resposta:
+
+```json
+{
+  "id": 1,
+  "username": "admin@example.com",
+  "email": "admin@example.com",
+  "first_name": "Ednaldo",
+  "last_name": "Aquino",
+  "display_name": "Ednaldo Aquino"
+}
+```
+
+`display_name` usa nome completo quando existe; caso contrario, usa a parte
+local do email ou o `username`.
 
 ### Renovar token
 
@@ -45,147 +75,122 @@ Payload esperado:
 POST /api/auth/token/refresh/
 ```
 
-Payload esperado:
-
 ```json
 {
-  "refresh": "refresh-token"
+  "refresh": "jwt-refresh"
 }
 ```
 
-Notas operacionais:
+### Cadastro
 
-- o frontend deve chamar `auth/token/refresh/` relativo ao `VITE_API_URL`
-- o frontend nao deve usar chaves legadas como `token` para controle de sessao
-- guards de rota e interceptors devem consultar a mesma fonte de verdade de autenticacao
-- quando um limite e excedido, a API retorna `429 Too Many Requests` e informa
-  `Retry-After` quando o DRF consegue calcular a janela restante
+```http
+POST /api/auth/register/
+```
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "senha-segura",
+  "confirm_password": "senha-segura"
+}
+```
+
+### Reset de senha
+
+```http
+POST /api/auth/password-reset/
+POST /api/auth/password-reset/confirm/
+```
+
+O reset evita enumeracao de contas e usa token assinado do Django.
 
 ### Throttling de auth
 
-Limites padrao do backend atual:
-
-| Escopo | Endpoints | Limite padrao |
+| Escopo | Endpoints | Padrao |
 | --- | --- | --- |
-| IP sensivel | `/api/auth/token/`, `/api/auth/register/`, `/api/auth/password-reset/`, `/api/auth/password-reset/confirm/` | `10/minute` |
-| Login por identidade | `/api/auth/token/` usando `username` ou `email` submetido | `5/minute` |
-| Cadastro por email | `/api/auth/register/` usando `email` submetido | `3/hour` |
-| Reset por email | `/api/auth/password-reset/` usando `email` submetido | `3/hour` |
-| Confirmacao de reset por uid | `/api/auth/password-reset/confirm/` usando `uid` submetido | `5/hour` |
-| Refresh por IP | `/api/auth/token/refresh/` | `30/minute` |
-| Refresh por token | `/api/auth/token/refresh/` usando `refresh` submetido | `10/minute` |
+| IP sensivel | login, cadastro, reset e confirmacao de reset | `10/minute` |
+| Login por identidade | `username` ou `email` submetido | `5/minute` |
+| Cadastro por email | `email` submetido | `3/hour` |
+| Reset por email | `email` submetido | `3/hour` |
+| Confirmacao por uid | `uid` submetido | `5/hour` |
+| Refresh por IP | token refresh | `30/minute` |
+| Refresh por token | `refresh` submetido | `10/minute` |
 
-Os identificadores sensiveis entram no cache de throttle como hash SHA-256, nao
-como email, uid ou refresh token em texto claro. Os valores podem ser ajustados
-via variaveis `BIPFLOW_THROTTLE_*` descritas no guia de desenvolvimento.
+Quando o limite e excedido, a API retorna `429 Too Many Requests`.
 
-## Politica De Permissao
+## Permissoes
 
-- `GET`, `HEAD` e `OPTIONS` em produtos e categorias sao publicos.
-- `POST`, `PUT`, `PATCH` e `DELETE` exigem usuario autenticado.
-- O endpoint de checkout via WhatsApp e publico.
+- Produtos, categorias e regioes de entrega: leitura publica, escrita
+  autenticada.
+- Regioes de entrega para usuario anonimo: somente regioes ativas.
+- Checkout WhatsApp: publico.
+- Historico de vendas: autenticado e read-only.
 
-## Produtos
+## Paginacao
 
-### Listar produtos
-
-```http
-GET /api/v1/products/
-```
-
-Query params aceitos pelo backend:
-
-- `search`
-- `category`
-- `in_stock`
-- `min_price`
-- `max_price`
-- `page`
-- `page_size`
-
-Resposta paginada:
+Respostas paginadas usam este formato:
 
 ```json
 {
   "count": 1,
   "next": null,
   "previous": null,
-  "page_size": 12,
+  "page_size": 20,
   "total_pages": 1,
-  "results": [
-    {
-      "id": 1,
-      "sku": "LAP-001",
-      "name": "Laptop",
-      "slug": "laptop-ab12cd34",
-      "description": "",
-      "price": "999.99",
-      "size": null,
-      "stock_quantity": 5,
-      "is_available": true,
-      "image": "http://127.0.0.1:8000/media/products/2026/04/item.png",
-      "category": 2,
-      "category_name": "Eletronicos",
-      "created_at": "2026-04-21T01:00:00Z"
-    }
-  ]
+  "results": []
 }
 ```
 
-Notas importantes:
+Produtos usam `page_size` padrao 12 e maximo 50. As demais listas usam padrao
+20 e maximo 100.
 
-- `category` retorna o id numerico da categoria.
-- `category_name` vem denormalizado para facilitar o consumo no frontend.
-- `is_available` e recalculado pelo model a partir de `stock_quantity`.
-- A paginacao de produtos usa `12` itens por pagina por padrao.
-
-### Criar produto
+## Produtos
 
 ```http
+GET /api/v1/products/
 POST /api/v1/products/
-Authorization: Bearer <token>
+GET /api/v1/products/{id}/
+PATCH /api/v1/products/{id}/
+DELETE /api/v1/products/{id}/
+GET /api/v1/products/by-slug/{slug}/
+PATCH /api/v1/products/bulk_update_category/
 ```
+
+Query params de listagem:
+
+- `search`
+- `category` por id ou slug
+- `in_stock` com `true`, `false`, `1`, `0`, `yes` ou `no`
+- `min_price`
+- `max_price`
+- `page`
+- `page_size`
 
 Campos principais:
 
-- `name`
+- `id`
 - `sku`
-- `price`
-- `stock_quantity`
-- `category`
+- `name`
+- `slug`
 - `description`
+- `price`
 - `size`
+- `stock_quantity`
+- `is_available`
 - `image`
+- `images`
+- `category`
+- `category_name`
+- `created_at`
 
-Observacoes:
+Upload:
 
-- aceita payload JSON ou `multipart/form-data`
-- gera `slug` automaticamente quando ausente
+- aceita JSON ou `multipart/form-data`;
+- `image` define a capa;
+- `uploaded_images` e `existing_images` controlam galeria;
+- cada produto pode ter no maximo 3 imagens.
 
-### Atualizar produto
-
-```http
-PATCH /api/v1/products/{id}/
-Authorization: Bearer <token>
-```
-
-O backend aceita atualizacao parcial.
-
-### Remover produto
-
-```http
-DELETE /api/v1/products/{id}/
-Authorization: Bearer <token>
-```
-
-### Atualizar categoria em lote
-
-```http
-PATCH /api/v1/products/bulk_update_category/
-Authorization: Bearer <token>
-```
-
-Payload:
+Atualizacao em lote:
 
 ```json
 {
@@ -196,64 +201,53 @@ Payload:
 
 ## Categorias
 
-### Listar categorias
-
 ```http
 GET /api/v1/categories/
-```
-
-Resposta paginada:
-
-```json
-{
-  "count": 2,
-  "next": null,
-  "previous": null,
-  "page_size": 20,
-  "total_pages": 1,
-  "results": [
-    {
-      "id": 1,
-      "name": "Lanches",
-      "slug": "lanches",
-      "description": "Itens do cardapio rapido"
-    }
-  ]
-}
-```
-
-### Criar categoria
-
-```http
 POST /api/v1/categories/
-Authorization: Bearer <token>
+GET /api/v1/categories/{id}/
+PUT /api/v1/categories/{id}/
+PATCH /api/v1/categories/{id}/
+DELETE /api/v1/categories/{id}/
 ```
 
 Campos:
 
+- `id`
 - `name`
 - `slug`
 - `description`
 
-### Atualizar categoria
+Se houver produtos associados, a remocao retorna erro de regra de negocio.
+
+## Regioes De Entrega
 
 ```http
-PUT /api/v1/categories/{id}/
-Authorization: Bearer <token>
+GET /api/v1/delivery-regions/
+POST /api/v1/delivery-regions/
+GET /api/v1/delivery-regions/{id}/
+PATCH /api/v1/delivery-regions/{id}/
+DELETE /api/v1/delivery-regions/{id}/
+GET /api/v1/delivery-regions/active/
 ```
 
-### Remover categoria
+Campos:
 
-```http
-DELETE /api/v1/categories/{id}/
-Authorization: Bearer <token>
-```
+- `id`
+- `name`
+- `city`
+- `neighborhoods`
+- `delivery_fee`
+- `is_active`
+- `created_at`
+- `updated_at`
 
-Se a categoria possuir produtos relacionados, a remocao retorna `400 Bad Request`.
+Notas:
+
+- usuarios anonimos recebem apenas regioes ativas;
+- usuarios autenticados podem listar, criar, editar e remover regioes;
+- o carrinho publico usa `/active/` para calcular frete.
 
 ## Checkout Via WhatsApp
-
-### Preparar pedido
 
 ```http
 POST /api/v1/checkout/whatsapp/
@@ -272,9 +266,10 @@ Payload:
   "customer": {
     "full_name": "Cliente Teste",
     "phone": "(71) 99999-0000",
-    "email": "cliente@teste.com",
+    "email": "cliente@example.com",
     "delivery_method": "delivery",
     "payment_method": "pix",
+    "delivery_region_id": 3,
     "address": "Rua A, 123",
     "neighborhood": "Centro",
     "city": "Salvador",
@@ -283,15 +278,18 @@ Payload:
 }
 ```
 
-Comportamento:
+Regras:
 
-- valida se todos os produtos existem
-- valida disponibilidade e estoque
-- recalcula subtotal, taxa de entrega e total no servidor
-- exige endereco quando `delivery_method = delivery`
-- monta a mensagem final e, se configurado, devolve a URL `wa.me`
+- `items` nao pode ser vazio;
+- produtos precisam existir, estar disponiveis e ter estoque;
+- entrega exige `address`, `neighborhood` e `city`;
+- quando `delivery_region_id` ativo e enviado, o backend usa a taxa da regiao;
+- sem regiao enviada, entrega usa `ORDER_DELIVERY_FEE`;
+- retirada usa taxa `0.00`;
+- o pedido e persistido em `SaleOrder` com itens em `SaleOrderItem`;
+- `order_reference` segue o prefixo `BPF`.
 
-Campos de resposta:
+Resposta:
 
 - `order_reference`
 - `items`
@@ -301,3 +299,37 @@ Campos de resposta:
 - `total`
 - `message`
 - `whatsapp_url`
+
+## Historico De Vendas
+
+```http
+GET /api/v1/sales-orders/
+GET /api/v1/sales-orders/{id}/
+```
+
+Somente autenticado. O viewset e read-only.
+
+Query params:
+
+- `status`
+- `search`
+- `page`
+- `page_size`
+
+Campos principais:
+
+- `id`
+- `order_reference`
+- `status`
+- `customer_name`
+- `customer_phone`
+- `customer_email`
+- `delivery_method`
+- `payment_method`
+- `subtotal`
+- `delivery_fee`
+- `delivery_region_name`
+- `total`
+- `created_at`
+- `item_count`
+- `items`

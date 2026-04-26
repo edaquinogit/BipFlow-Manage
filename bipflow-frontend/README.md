@@ -1,13 +1,18 @@
 # BipFlow Frontend
 
-Aplicacao Vue 3 + TypeScript responsavel por duas experiencias principais:
+Aplicacao Vue 3 + TypeScript do BipFlow. Ela entrega o dashboard autenticado e o
+catalogo publico de produtos.
 
-- dashboard autenticado de gestao
-- catalogo publico com carrinho e fechamento via WhatsApp
+## Escopo Atual
 
-## Escopo
-
-Este diretorio e a fonte de verdade do stack frontend. Dependencias web, scripts de build, testes e configuracoes de qualidade devem ser mantidos aqui.
+- Dashboard em `/` protegido por JWT.
+- Saudacao com o usuario autenticado via `GET /api/auth/me/`.
+- Menu operacional com atalhos, historico recente de vendas, alertas de estoque
+  e gestao de regioes de entrega.
+- Catalogo publico em `/produtos` e `/products`.
+- Detalhe publico por slug.
+- Carrinho local com frete por regiao ativa.
+- Checkout via endpoint Django `/api/v1/checkout/whatsapp/`.
 
 ## Stack
 
@@ -17,23 +22,27 @@ Este diretorio e a fonte de verdade do stack frontend. Dependencias web, scripts
 - Vue Router
 - Axios
 - Zod
+- Tailwind
+- Heroicons
 - Vitest
 - Cypress
 - ESLint
 - Prettier
 
-## Estrutura Principal
+## Estrutura
 
 ```text
 src/
-|-- services/        # integracao com API
+|-- components/      # componentes reutilizaveis
 |-- composables/     # estado e comportamento reutilizavel
-|-- views/
-|   |-- dashboard/   # area autenticada
-|   `-- products/    # catalogo publico e checkout
-|-- router/          # definicao de rotas
-|-- schemas/         # validacao e contratos
-`-- components/      # componentes reutilizaveis
+|-- router/          # rotas publicas, auth e dashboard
+|-- schemas/         # validacao quando o modulo usa Zod
+|-- services/        # integracao HTTP
+|-- types/           # contratos TypeScript
+`-- views/
+    |-- auth/
+    |-- dashboard/
+    `-- products/
 ```
 
 ## Ambiente
@@ -54,11 +63,13 @@ npm run dev
 
 Aplicacao local: `http://127.0.0.1:5173/`
 
-Rotas relevantes:
+Rotas:
 
-- `/`: dashboard autenticado
-- `/produtos`: catalogo publico
-- `/products`: alias para o catalogo publico
+- `/`: dashboard autenticado.
+- `/produtos`: catalogo publico.
+- `/produtos/:slug`: detalhe publico.
+- `/products` e `/products/:slug`: aliases.
+- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao.
 
 ## Scripts
 
@@ -74,49 +85,37 @@ npm run test:unit:run
 npm run test:e2e:run
 ```
 
-## Integracao Com A API
+## Services Principais
 
-O frontend consome a API Django versionada em `/api/v1/`.
-
-Services principais:
-
-- `src/services/product.service.ts`
-- `src/services/category.service.ts`
-- `src/services/order.service.ts`
-- `src/services/auth.service.ts`
-- `src/services/token-store.ts`
-
-Padroes atuais:
-
-- produtos e categorias sao consumidos via camada de service
-- respostas podem ser validadas com Zod quando o modulo ja adota esse padrao
-- o checkout e concluido via endpoint de WhatsApp, nao por persistencia local no frontend
-- autenticacao JWT usa `tokenStore` como unica fonte de verdade para `access_token` e `refresh_token`
-- guards de rota e interceptors nao devem ler ou gravar tokens diretamente fora da camada de servico
+- `src/services/api.ts`: instancia Axios, injecao de Bearer token e refresh.
+- `src/services/auth.service.ts`: login, cadastro, reset e usuario atual.
+- `src/services/token-store.ts`: unica fonte de verdade para tokens.
+- `src/services/product.service.ts`: catalogo, dashboard, slug e lote.
+- `src/services/category.service.ts`: categorias.
+- `src/services/delivery-region.service.ts`: regioes de entrega.
+- `src/services/sales.service.ts`: historico recente de vendas.
+- `src/services/order.service.ts`: checkout via WhatsApp.
 
 ## Qualidade
 
 ```powershell
-npm run lint
-npm run lint:fix
 npm run typecheck
+npm run lint
 npm run test:unit:run
 npm run test:e2e:run
 ```
 
 Uso recomendado:
-- `npm run lint` para auditoria sem alterar arquivos
-- `npm run lint:fix` para correcao automatica local quando necessario
 
-Cobertura funcional relevante:
-
-- services e composables ligados a produtos e categorias
-- componentes e views do catalogo publico
-- cenarios E2E de sincronizacao e upload
+- `npm run lint` para auditoria sem alterar arquivos.
+- `npm run lint:fix` para correcao automatica local.
+- `npm run typecheck` antes de commitar mudancas em contratos ou views.
 
 ## Convencoes
 
-- nao espalhar `axios` direto nas views
-- manter contratos alinhados entre `services`, `schemas` e `types`
-- usar `Logger` em vez de logs permanentes no console
-- preferir componentes pequenos e orientados a responsabilidade
+- Nao usar `axios` diretamente nas views.
+- Manter contratos alinhados entre `services`, `types` e `schemas`.
+- Guardas de rota e interceptors devem consultar `authService` e `tokenStore`.
+- Nao persistir pedido no frontend; o checkout e validado e persistido no
+  backend Django.
+- Usar `Logger` em vez de logs permanentes no console.

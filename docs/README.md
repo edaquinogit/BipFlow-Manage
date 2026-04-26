@@ -1,34 +1,42 @@
 # Documentacao BipFlow
 
-Esta pasta concentra a documentacao viva do projeto. O objetivo e manter poucos arquivos, com responsabilidade clara e alinhados ao codigo.
+Esta pasta contem a documentacao viva do projeto. Ela deve ser curta, verificavel
+no codigo e suficiente para operar o estado atual do repositorio.
 
-## Documentos Oficiais
+## Documentos Mantidos
 
-- [README principal](../README.md): visao geral, setup rapido e convencoes do repositorio.
-- [system-overview.md](architecture/system-overview.md): arquitetura real do fluxo Django + Vue.
-- [development-guide.md](development-guide.md): setup local, qualidade, seguranca backend e manutencao.
-- [reference.md](api/reference.md): contrato funcional da API Django.
-- [README frontend](../bipflow-frontend/README.md): stack, scripts e convencoes do Vue.
+- [README principal](../README.md): visao geral, stack e setup rapido.
+- [Arquitetura](architecture/system-overview.md): responsabilidades de cada
+  aplicacao e limites entre Django, Vue e motor Node.
+- [Guia de desenvolvimento](development-guide.md): ambiente local, comandos,
+  qualidade e manutencao.
+- [Referencia da API Django](api/reference.md): endpoints implementados em
+  `bipdelivery/api/`.
+- [README frontend](../bipflow-frontend/README.md): detalhes da aplicacao Vue.
 
-## Ordem De Leitura Recomendada
+## Arquivos De Apoio
 
-1. [system-overview.md](architecture/system-overview.md)
-2. [development-guide.md](development-guide.md)
-3. [reference.md](api/reference.md)
+- `docs/swagger.js` e usado pelo motor Node da raiz para servir `/api-docs`.
+  Ele nao e a referencia da API Django.
 
-## Escopo
+## Removidos Como Fonte De Verdade
 
-- `architecture/`: visao de alto nivel do sistema e das responsabilidades de cada aplicacao.
-- `api/`: contrato funcional dos endpoints mantidos pelo backend Django.
-- `development-guide.md`: setup, fluxo local, qualidade e praticas de manutencao.
+- `docs/api/openapi.yaml`: era apenas placeholder sem paths reais.
+- `CHANGELOG.md`: estava desatualizado e citava documentos que nao existem mais.
+  O historico oficial deve ser consultado pelo Git.
+
+## Ordem De Leitura
+
+1. [README principal](../README.md)
+2. [Arquitetura](architecture/system-overview.md)
+3. [Guia de desenvolvimento](development-guide.md)
+4. [Referencia da API Django](api/reference.md)
 
 ## Regra De Manutencao
 
-Antes de atualizar a documentacao:
+Antes de alterar documentacao:
 
-- confirme o comportamento no codigo antes de escrever
-- prefira citar arquivos, endpoints e comandos reais
-- evite descrever componentes que nao participam do fluxo principal atual
-- nao recrie relatorios de entrega, auditoria ou "summary" como fonte de verdade paralela
-
-Se um documento desta pasta divergir do codigo, o correto e ajustar o documento imediatamente ou remover a afirmacao duvidosa.
+- confirme endpoints, comandos e arquivos no codigo;
+- remova afirmacoes especulativas ou historicas que nao ajudam a operacao atual;
+- prefira documentos pequenos e com responsabilidade clara;
+- atualize a documentacao no mesmo ciclo da mudanca de codigo.

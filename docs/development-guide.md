@@ -1,37 +1,48 @@
 # Guia De Desenvolvimento
 
-Este guia descreve o fluxo local recomendado para trabalhar no BipFlow sem depender de suposicoes sobre o ambiente.
+Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 
 ## Pre-Requisitos
 
-- Python 3.11+
-- Node.js 18+
-- npm 9+
-- Git
+- Python 3.12+.
+- Node.js 18+.
+- npm 9+.
+- Git.
 
 ## Aplicacoes Do Repositorio
 
 ### Backend principal
 
-- Local: `bipdelivery/`
-- Stack: Django + Django REST Framework
-- Responsabilidades: autenticacao JWT, CRUD de produtos, CRUD de categorias, checkout via WhatsApp, servicao de media em desenvolvimento
+- Local: `bipdelivery/`.
+- Stack: Django 6, Django REST Framework, Simple JWT e SQLite local.
+- Responsabilidades: autenticacao, perfil autenticado, produtos, categorias,
+  regioes de entrega, checkout via WhatsApp, pedidos persistidos, historico de
+  vendas e media em desenvolvimento.
 
 ### Frontend principal
 
-- Local: `bipflow-frontend/`
-- Stack: Vue 3 + TypeScript + Vite
-- Responsabilidades: dashboard autenticado, catalogo publico, carrinho local, integracao com API Django
-- Contrato de auth: tokens JWT persistidos exclusivamente via `bipflow-frontend/src/services/token-store.ts`
+- Local: `bipflow-frontend/`.
+- Stack: Vue 3, TypeScript, Vite, Vue Router, Axios e Tailwind.
+- Responsabilidades: dashboard autenticado, saudacao do usuario, menu
+  operacional, gestao de produtos, gestao de frete, alertas de estoque,
+  historico recente de vendas, catalogo publico, carrinho e checkout.
+- Contrato de auth: tokens JWT persistidos somente por
+  `src/services/token-store.ts`.
 
-### Servico paralelo
+### Motor Node da raiz
 
-- Local: `api-order-validation/`
-- Stack: Node + Express
-- Papel: projeto isolado de validacao de pedidos
-- Observacao: nao participa do fluxo padrao entre frontend e backend Django
+- Local: `index.js`, `src/`, `services/` e `docs/swagger.js`.
+- Stack: Express, Better SQLite3, Pino, Zod e Swagger.
+- Responsabilidades: endpoint independente `POST /api/v1/orders`, health check
+  `/health` e documentacao Swagger em `/api-docs`.
+- Observacao: nao faz parte do runtime normal Django + Vue.
 
-## Setup Do Backend
+### Pacote `api-order-validation/`
+
+- Papel atual: pacote isolado/test harness historico ligado ao motor Node.
+- Observacao: nao deve ser tratado como backend principal do produto.
+
+## Setup Do Backend Django
 
 Na raiz do repositorio:
 
@@ -50,32 +61,32 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Observacao de higiene:
-- `bipdelivery/db.sqlite3` e apenas banco local de desenvolvimento.
-- O arquivo nao deve ser commitado.
-- O versionamento oficial do schema acontece pelas migrations em `bipdelivery/api/migrations/`.
-- O Django carrega `.env` da raiz do repositorio e tambem aceita `bipdelivery/.env`
-  para overrides locais especificos do backend.
+URLs locais:
 
-Variaveis relevantes em `.env`:
+- API: `http://127.0.0.1:8000/api/`
+- Admin: `http://127.0.0.1:8000/admin/`
+- Catalogo servido pelo frontend: `http://127.0.0.1:5173/produtos`
+
+Higiene local:
+
+- `bipdelivery/db.sqlite3` e banco local.
+- O schema oficial vive nas migrations em `bipdelivery/api/migrations/`.
+- Uploads, logs, staticfiles e bancos SQLite nao devem entrar no Git.
+
+Variaveis relevantes:
 
 - `DJANGO_ENV`
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `CORS_ALLOWED_ORIGINS`
-- `BIPFLOW_THROTTLE_ANON`
-- `BIPFLOW_THROTTLE_USER`
-- `BIPFLOW_THROTTLE_PRODUCT_LIST`
-- `BIPFLOW_THROTTLE_AUTH_IP`
-- `BIPFLOW_THROTTLE_AUTH_LOGIN_IDENTITY`
-- `BIPFLOW_THROTTLE_AUTH_REGISTER_IDENTITY`
-- `BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_IDENTITY`
-- `BIPFLOW_THROTTLE_AUTH_PASSWORD_RESET_CONFIRM_IDENTITY`
-- `BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IP`
-- `BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IDENTITY`
+- `BASE_URL`
+- `FRONTEND_BASE_URL`
+- `EMAIL_BACKEND`
+- `DEFAULT_FROM_EMAIL`
 - `WHATSAPP_ORDER_PHONE`
 - `ORDER_DELIVERY_FEE`
+- `BIPFLOW_THROTTLE_*`
 
 ## Setup Do Frontend
 
@@ -86,99 +97,89 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Variaveis relevantes em `.env.local`:
+Variaveis:
 
-- `VITE_API_URL`
-- `VITE_DEBUG`
+- `VITE_API_URL=http://127.0.0.1:8000/api/`
+- `VITE_DEBUG=true`
 
-## Fluxo Local
+Rotas atuais:
 
-### Backend
+- `/`: dashboard autenticado.
+- `/produtos`: catalogo publico.
+- `/produtos/:slug`: detalhe publico do produto.
+- `/products` e `/products/:slug`: aliases em ingles.
+- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao.
 
-- Servidor: `python manage.py runserver`
-- API base: `http://127.0.0.1:8000/api/`
-- Admin Django: `http://127.0.0.1:8000/admin/`
+## Setup Do Motor Node
 
-### Frontend
+```powershell
+npm install
+npm run dev
+```
 
-- Servidor: `npm run dev`
-- Aplicacao: `http://127.0.0.1:5173/`
-- Catalogo publico: `/produtos`
-- Dashboard autenticado: `/`
+URLs locais:
+
+- `GET /health`
+- `POST /api/v1/orders`
+- `GET /api-docs`
+
+O banco `db.sqlite3` gerado pelo motor Node e local e ignorado pelo Git.
 
 ## Qualidade E Testes
 
-### Backend
+Backend:
 
 ```powershell
-cd bipdelivery
-pytest
-ruff check .
-black . --line-length 100
+python bipdelivery\manage.py check
+python -m pytest bipdelivery/tests
+ruff check bipdelivery/api bipdelivery/tests
 ```
 
-Antes de abrir commit ou pull request:
-- confirme que `bipdelivery/db.sqlite3` nao entrou no staging
-- confirme que novas alteracoes estruturais de banco foram registradas em migration
-
-Cobertura atual do backend inclui:
-
-- saude da API
-- CRUD principal
-- regras de protecao de categorias
-- throttling de endpoints sensiveis de autenticacao
-- checkout via WhatsApp
-- servicao de media
-
-### Seguranca Backend
-
-Os endpoints publicos de autenticacao usam throttling do Django REST Framework:
-
-- login: limite por IP e por `username`/`email` submetido
-- cadastro: limite por IP e por `email` submetido
-- solicitacao de reset: limite por IP e por `email` submetido
-- confirmacao de reset: limite por IP e por `uid` submetido
-- refresh de token: limite por IP e por `refresh` submetido
-
-O projeto usa o cache Django configurado em `bipdelivery/core/settings.py` para
-armazenar as janelas de throttle. No estado atual do projeto, o backend local
-usa `LocMemCache`; em producao horizontal, configure um cache compartilhado para
-que os limites nao fiquem isolados por processo.
-
-### Frontend
+Frontend:
 
 ```powershell
-cd bipflow-frontend
-npm run test:unit:run
-npm run test:e2e:run
-npm run lint
-npm run lint:fix
-npm run typecheck
+npm run frontend:typecheck
+npm run frontend:lint
+npm run frontend:test:unit
+npm run frontend:test:e2e
 ```
 
-Cobertura atual do frontend inclui:
+Motor Node da raiz:
 
-- services de produtos e categorias
-- composables de busca e produtos
-- views e componentes da experiencia de produtos
-- fluxos E2E para sincronizacao de produto e upload de midia
+```powershell
+npm run dev
+```
 
-Convencao operacional de lint:
-- `npm run lint` e somente leitura e deve ser usado em auditoria, pre-review e CI
-- `npm run lint:fix` fica reservado para correcao automatica local
+`api-order-validation/` possui pacote proprio. Rode comandos dentro da pasta
+apenas quando estiver trabalhando nesse pacote.
+
+## Cobertura Atual
+
+Backend:
+
+- autenticacao, refresh e throttling;
+- endpoint `auth/me`;
+- CRUD de categorias e produtos;
+- filtros, galeria de imagens e busca por slug;
+- regioes de entrega;
+- checkout via WhatsApp com persistencia de `SaleOrder`;
+- historico autenticado de vendas;
+- servico local de media.
+
+Frontend:
+
+- services de produtos e categorias;
+- composables de busca, produtos e carrinho;
+- views publicas de produtos;
+- botao flutuante do carrinho;
+- validacoes unitarias e fluxos E2E existentes.
 
 ## Padroes De Codigo
 
-- Prefira nomes orientados ao dominio.
-- Mantenha componentes, services e composables com responsabilidade unica.
-- Centralize acesso HTTP em `src/services/`.
-- Em frontend, trate `token-store.ts` como unica fonte de verdade para persistencia de tokens.
-- Sempre que o modulo ja usar schema validation, atualize schema e service juntos.
-- Em backend, preserve regras de permissao publica para leitura e autenticada para escrita quando alterar produtos e categorias.
-
-## Regras De Documentacao
-
-- Documente apenas o que ja existe no codigo.
-- Se um endpoint, comando ou fluxo mudar, atualize a documentacao no mesmo ciclo da mudanca.
-- Nao crie arquivos de "summary", "final report" ou "complete" como fonte de verdade funcional.
-- Quando necessario criar novos documentos, prefira guias curtos por assunto em vez de relatorios extensos.
+- Centralize HTTP em `src/services/`.
+- Mantenha `token-store.ts` como unica fonte de verdade de tokens.
+- Atualize `types`, `schemas` e `services` juntos quando o contrato mudar.
+- Em backend, mantenha leitura publica e escrita autenticada quando alterar
+  recursos do catalogo.
+- Use migrations para mudancas estruturais de banco.
+- Nao use documentacao para registrar planos futuros como se fossem estado atual.

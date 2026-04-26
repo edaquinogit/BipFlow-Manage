@@ -1,8 +1,0 @@
-openapi: 3.0.3
-info:
-  title: BipFlow API
-  version: "1.0"
-  description: >
-    Placeholder intencional. O contrato funcional mantido manualmente e validado
-    contra o codigo atual esta em `docs/api/reference.md`.
-paths: {}
