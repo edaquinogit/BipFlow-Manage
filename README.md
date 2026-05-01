@@ -1,56 +1,118 @@
 # BipFlow Manage
 
-Plataforma de gestao de catalogo, frete e pedidos. O fluxo principal do produto
-usa backend Django REST, frontend Vue 3 e checkout publico com geracao de pedido
-para WhatsApp.
+Plataforma full-stack para pequenos negócios que precisam controlar catálogo,
+frete, pedidos e checkout via WhatsApp sem depender de planilhas ou mensagens
+soltas. O fluxo principal usa backend Django REST, frontend Vue 3 + TypeScript
+e checkout público com geração de pedido para WhatsApp.
 
-## Proposta De Valor
+## Visão Rápida
 
-O BipFlow demonstra uma aplicacao full-stack operavel para pequenos negocios:
-dashboard administrativo, catalogo publico, carrinho, frete por regiao,
-checkout via WhatsApp e historico de vendas persistido. O objetivo tecnico e
-mostrar codigo de produto, nao apenas CRUD isolado.
+- Dashboard administrativo com autenticação, papéis de acesso e rotas
+  protegidas.
+- Catálogo público com produtos, categorias, carrinho e detalhe por slug.
+- Frete por região, calculado e validado no backend.
+- Checkout via WhatsApp com pedido persistido no histórico de vendas.
+- Backend como autoridade para preço, estoque, disponibilidade, frete e totais.
+- Qualidade verificada com testes backend, typecheck, lint, testes frontend e
+  build.
 
-## Diferenciais Tecnicos
+## Demonstração E Evidências
 
-- Backend Django REST como autoridade para preco, estoque, frete e totais.
-- Frontend Vue 3 + TypeScript com services, composables e validacao por Zod.
-- Autenticacao JWT com refresh token e throttling nos fluxos sensiveis.
-- RBAC de dashboard: leitura publica, escrita administrativa por papel.
+Este projeto também possui material de apresentação fora do repositório:
+
+- **Vídeo completo no LinkedIn:** [demonstração explicada do fluxo do produto](https://www.linkedin.com/posts/ednaldo-aquino-backend_opentowork-vagasti-desenvolvedor-ugcPost-7455073194668888064-kCBE).
+- **Carrossel técnico no LinkedIn:** [9 slides explicando arquitetura, stack e
+  decisões de engenharia](https://www.linkedin.com/posts/ednaldo-aquino-backend_estagio-opentowork-desenvolvedor-ugcPost-7454498028276760578-zi7X).
+- **Código-fonte:** este repositório mantém a implementação, documentação e
+  comandos de validação.
+
+Acesse os materiais pelo perfil:
+[LinkedIn - Ednaldo Aquino](https://www.linkedin.com/in/ednaldo-aquino-backend/)
+
+## Para Recrutadores
+
+Este repositório também funciona como evidência prática do meu perfil em
+desenvolvimento full-stack junior. Para uma avaliação rápida:
+
+- [Currículo ATS em DOCX](docs/career/Ednaldo_Aquino_Curriculo_ATS.docx):
+  versão adequada para envio em processos seletivos e leitura por sistemas ATS.
+- [Currículo em Markdown](docs/career/Ednaldo_Aquino_Curriculo_ATS.md):
+  versão aberta, revisável e alinhada ao projeto.
+- O estudo de caso STAR abaixo resume contexto, responsabilidade técnica,
+  ações implementadas e resultado entregue.
+- A seção de qualidade lista os comandos usados para validar backend, frontend,
+  testes, lint, typecheck e build.
+
+## Por Que Este Projeto Existe
+
+Pequenos negócios que vendem por WhatsApp normalmente precisam controlar
+catálogo, disponibilidade, endereço, taxa de entrega, pedido e histórico em
+ferramentas separadas. Isso aumenta retrabalho e risco de erro no valor final.
+
+O BipFlow centraliza esse fluxo em uma aplicação operável: o cliente navega no
+catálogo público, monta o carrinho, escolhe a entrega, envia o pedido para
+WhatsApp e o backend registra a venda para consulta posterior no dashboard.
+
+## Estudo De Caso STAR
+
+**Situação:** vendas por WhatsApp dependem muito de processos manuais para
+catálogo, frete, carrinho, pedido e histórico de vendas.
+
+**Tarefa:** construir uma aplicação full-stack que conectasse catálogo público,
+dashboard administrativo, cálculo de frete, checkout e persistência de pedidos,
+mantendo o backend como fonte de verdade das regras de negócio.
+
+**Ação:** implementei um backend Django REST com autenticação JWT, RBAC,
+throttling, produtos, categorias, regiões de entrega, checkout validado no
+servidor e histórico de vendas. No frontend, organizei uma aplicação Vue 3 +
+TypeScript com services, composables, validação por Zod, dashboard protegido e
+fluxo público de compra.
+
+**Resultado:** o projeto entrega administração de catálogo, compra pública,
+cálculo de frete, geração de pedido via WhatsApp e registro persistido para
+consulta posterior. Também mantém documentação versionada e comandos de
+qualidade para validar backend e frontend.
+
+## Diferenciais Técnicos
+
+- Backend Django REST como autoridade para preço, estoque, frete e totais.
+- Frontend Vue 3 + TypeScript com services, composables e validação por Zod.
+- Autenticação JWT com refresh token e throttling nos fluxos sensíveis.
+- RBAC de dashboard: leitura pública, escrita administrativa por papel.
 - Upload de imagens com galeria limitada e ordem preservada.
-- Testes backend, typecheck, lint, testes unitarios frontend e build validado.
-- Documentacao curta, versionada e alinhada ao codigo real.
+- Testes backend, typecheck, lint, testes unitários frontend e build validado.
+- Documentação curta, versionada e alinhada ao código real.
 
 ## Estado Atual
 
-O repositorio tem tres superficies de codigo:
+O repositório tem três superfícies de código:
 
-- `bipdelivery/`: backend principal em Django REST. Mantem autenticacao JWT,
-  RBAC, produtos, categorias, regioes de entrega, checkout, pedidos persistidos
-  e historico de vendas.
-- `bipflow-frontend/`: aplicacao Vue 3 + TypeScript. Entrega o dashboard
-  autenticado, o menu operacional, o catalogo publico, o carrinho e o checkout.
+- `bipdelivery/`: backend principal em Django REST. Mantém autenticação JWT,
+  RBAC, produtos, categorias, regiões de entrega, checkout, pedidos persistidos
+  e histórico de vendas.
+- `bipflow-frontend/`: aplicação Vue 3 + TypeScript. Entrega o dashboard
+  autenticado, o menu operacional, o catálogo público, o carrinho e o checkout.
 - `index.js` + `src/` + `docs/swagger.js`: motor Node independente de
-  integracao de pedidos em `/api/v1/orders`. Ele nao participa do runtime
+  integração de pedidos em `/api/v1/orders`. Ele não participa do runtime
   normal Django + Vue.
 
-`api-order-validation/` permanece no repositorio como pacote/test harness
-isolado ligado ao motor Node. Ele nao faz parte do fluxo web principal.
+`api-order-validation/` permanece no repositório como pacote/test harness
+isolado ligado ao motor Node. Ele não faz parte do fluxo web principal.
 
-## Documentacao Oficial
+## Documentação Oficial
 
-- [docs/README.md](docs/README.md): indice da documentacao viva.
+- [docs/README.md](docs/README.md): índice da documentação viva.
 - [docs/architecture/system-overview.md](docs/architecture/system-overview.md):
   arquitetura real do projeto.
 - [docs/development-guide.md](docs/development-guide.md): setup, comandos,
-  qualidade e manutencao.
+  qualidade e manutenção.
 - [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
   Django.
-- [bipflow-frontend/README.md](bipflow-frontend/README.md): guia especifico do
+- [bipflow-frontend/README.md](bipflow-frontend/README.md): guia específico do
   frontend.
 
-O historico de mudancas deve ser consultado pelo Git. Relatorios historicos,
-placeholders de OpenAPI e documentos aspiracionais nao sao mantidos como fonte
+O histórico de mudanças deve ser consultado pelo Git. Relatórios históricos,
+placeholders de OpenAPI e documentos aspiracionais não são mantidos como fonte
 de verdade.
 
 ## Stack
@@ -62,16 +124,16 @@ de verdade.
 - Vue 3, TypeScript, Vite, Vue Router e Axios.
 - Vitest, Cypress, ESLint, Ruff e Pytest.
 
-## Seguranca E Acesso
+## Segurança E Acesso
 
-- Cadastro publico cria uma conta comum ativa, sem poderes administrativos.
-- Produtos, categorias e regioes de entrega tem leitura publica.
+- Cadastro público cria uma conta comum ativa, sem poderes administrativos.
+- Produtos, categorias e regiões de entrega têm leitura pública.
 - Escrita administrativa exige `is_staff`, `is_superuser` ou grupo
   `admin`/`manager`.
-- Historico de vendas exige papel de dashboard: `staff`, `superuser`, `admin`,
+- Histórico de vendas exige papel de dashboard: `staff`, `superuser`, `admin`,
   `manager` ou `viewer`.
-- O frontend redireciona usuarios sem papel de dashboard para `/403`, mas a
-  protecao real fica no backend.
+- O frontend redireciona usuários sem papel de dashboard para `/403`, mas a
+  proteção real fica no backend.
 
 ## Estrutura
 
@@ -82,15 +144,16 @@ BipFlow-Manage/
 |-- api-order-validation/     # Pacote isolado/test harness do motor Node
 |-- docs/
 |   |-- api/
-|   `-- architecture/
+|   |-- architecture/
+|   `-- career/
 |-- src/                      # Suporte do motor Node da raiz
-|-- index.js                  # Motor Node de integracao de pedidos
+|-- index.js                  # Motor Node de integração de pedidos
 |-- package.json              # Scripts da raiz e motor Node
 |-- requirements.txt
 `-- .env.example
 ```
 
-## Setup Rapido
+## Setup Rápido
 
 ### Backend Django
 
@@ -116,7 +179,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Aplicacao local: `http://127.0.0.1:5173/`
+Aplicação local: `http://127.0.0.1:5173/`
 
 ### Motor Node Da Raiz
 
@@ -160,12 +223,12 @@ npm run frontend:test:unit
 npm run frontend:build
 ```
 
-## Convencoes
+## Convenções
 
 - `bipdelivery/db.sqlite3`, `db.sqlite3`, `node_modules/`, uploads, logs e
-  artefatos de build sao dados locais e nao devem entrar em commits.
-- A API Django publica leitura de catalogo e exige papel administrativo para
+  artefatos de build são dados locais e não devem entrar em commits.
+- A API Django publica leitura de catálogo e exige papel administrativo para
   escrita.
 - Chamadas HTTP do frontend devem passar por `src/services/`.
 - Tokens JWT devem ser persistidos apenas por `token-store.ts`.
-- A documentacao deve acompanhar codigo existente, nao roadmap.
+- A documentação deve acompanhar código existente, não roadmap.
