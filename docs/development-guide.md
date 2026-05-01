@@ -17,7 +17,7 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 - Stack: Django 6, Django REST Framework, Simple JWT e SQLite local.
 - Responsabilidades: autenticacao, perfil autenticado, produtos, categorias,
   regioes de entrega, checkout via WhatsApp, pedidos persistidos, historico de
-  vendas e media em desenvolvimento.
+  vendas, RBAC de dashboard e media em desenvolvimento.
 
 ### Frontend principal
 
@@ -61,6 +61,7 @@ Depois:
 ```powershell
 cd bipdelivery
 python manage.py migrate
+python manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
 python manage.py runserver
 ```
 
@@ -107,7 +108,7 @@ Variaveis:
 
 Rotas atuais:
 
-- `/`: dashboard autenticado.
+- `/`: dashboard autenticado e restrito a papel de dashboard.
 - `/produtos`: catalogo publico.
 - `/produtos/:slug`: detalhe publico do produto.
 - `/products` e `/products/:slug`: aliases em ingles.
@@ -147,6 +148,17 @@ npm run frontend:test:unit
 npm run frontend:test:e2e
 ```
 
+Para Cypress, o usuario usado por `cy.loginViaApi()` deve existir no backend e
+ter `is_staff=True` ou grupo `admin`/`manager`. Os defaults locais sao
+`admin@example.com` e `admin123`, mas podem ser sobrescritos por
+`adminUsername` e `adminPassword` na configuracao do Cypress.
+
+Se estiver com um banco limpo, rode antes:
+
+```powershell
+python bipdelivery\manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
+```
+
 Motor Node da raiz:
 
 ```powershell
@@ -166,7 +178,7 @@ Backend:
 - filtros, galeria de imagens e busca por slug;
 - regioes de entrega;
 - checkout via WhatsApp com persistencia de `SaleOrder`;
-- historico autenticado de vendas;
+- historico de vendas restrito a papel de dashboard;
 - servico local de media.
 
 Frontend:
@@ -198,7 +210,7 @@ Resultado: typecheck, 37 testes unitarios e build de producao passaram.
 - Centralize HTTP em `src/services/`.
 - Mantenha `token-store.ts` como unica fonte de verdade de tokens.
 - Atualize `types`, `schemas` e `services` juntos quando o contrato mudar.
-- Em backend, mantenha leitura publica e escrita autenticada quando alterar
-  recursos do catalogo.
+- Em backend, mantenha leitura publica e escrita restrita a papel
+  administrativo quando alterar recursos do catalogo.
 - Use migrations para mudancas estruturais de banco.
 - Nao use documentacao para registrar planos futuros como se fossem estado atual.

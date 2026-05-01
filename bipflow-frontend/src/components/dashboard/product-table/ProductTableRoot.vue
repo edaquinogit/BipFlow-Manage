@@ -58,7 +58,7 @@ const onDelete = (id: number) => {
     </Transition>
 
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse table-auto">
+      <table class="w-full text-left border-collapse table-auto" data-cy="product-table">
         <thead>
           <tr class="bg-zinc-800/50 text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black border-b border-zinc-800">
             <th class="px-6 py-5">

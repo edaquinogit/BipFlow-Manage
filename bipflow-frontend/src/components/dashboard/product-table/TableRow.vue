@@ -38,7 +38,10 @@ const formatCurrency = (value: number) => {
 </script>
 
 <template>
-  <tr class="group hover:bg-zinc-800/40 transition-all duration-200 border-b border-zinc-800/50 last:border-0">
+  <tr
+    class="group hover:bg-zinc-800/40 transition-all duration-200 border-b border-zinc-800/50 last:border-0"
+    data-cy="product-table-row"
+  >
 
     <!-- Custom Themed Checkbox -->
     <td class="px-6 py-4">

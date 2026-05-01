@@ -4,13 +4,30 @@ Plataforma de gestao de catalogo, frete e pedidos. O fluxo principal do produto
 usa backend Django REST, frontend Vue 3 e checkout publico com geracao de pedido
 para WhatsApp.
 
+## Proposta De Valor
+
+O BipFlow demonstra uma aplicacao full-stack operavel para pequenos negocios:
+dashboard administrativo, catalogo publico, carrinho, frete por regiao,
+checkout via WhatsApp e historico de vendas persistido. O objetivo tecnico e
+mostrar codigo de produto, nao apenas CRUD isolado.
+
+## Diferenciais Tecnicos
+
+- Backend Django REST como autoridade para preco, estoque, frete e totais.
+- Frontend Vue 3 + TypeScript com services, composables e validacao por Zod.
+- Autenticacao JWT com refresh token e throttling nos fluxos sensiveis.
+- RBAC de dashboard: leitura publica, escrita administrativa por papel.
+- Upload de imagens com galeria limitada e ordem preservada.
+- Testes backend, typecheck, lint, testes unitarios frontend e build validado.
+- Documentacao curta, versionada e alinhada ao codigo real.
+
 ## Estado Atual
 
 O repositorio tem tres superficies de codigo:
 
 - `bipdelivery/`: backend principal em Django REST. Mantem autenticacao JWT,
-  produtos, categorias, regioes de entrega, checkout, pedidos persistidos e
-  historico de vendas.
+  RBAC, produtos, categorias, regioes de entrega, checkout, pedidos persistidos
+  e historico de vendas.
 - `bipflow-frontend/`: aplicacao Vue 3 + TypeScript. Entrega o dashboard
   autenticado, o menu operacional, o catalogo publico, o carrinho e o checkout.
 - `index.js` + `src/` + `docs/swagger.js`: motor Node independente de
@@ -45,6 +62,17 @@ de verdade.
 - Vue 3, TypeScript, Vite, Vue Router e Axios.
 - Vitest, Cypress, ESLint, Ruff e Pytest.
 
+## Seguranca E Acesso
+
+- Cadastro publico cria uma conta comum ativa, sem poderes administrativos.
+- Produtos, categorias e regioes de entrega tem leitura publica.
+- Escrita administrativa exige `is_staff`, `is_superuser` ou grupo
+  `admin`/`manager`.
+- Historico de vendas exige papel de dashboard: `staff`, `superuser`, `admin`,
+  `manager` ou `viewer`.
+- O frontend redireciona usuarios sem papel de dashboard para `/403`, mas a
+  protecao real fica no backend.
+
 ## Estrutura
 
 ```text
@@ -73,6 +101,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 cd bipdelivery
 python manage.py migrate
+python manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
 python manage.py runserver
 ```
 
@@ -117,6 +146,7 @@ Backend:
 
 ```powershell
 python bipdelivery\manage.py check
+python bipdelivery\manage.py seed_dashboard_roles
 python -m pytest bipdelivery/tests
 ruff check bipdelivery/api bipdelivery/tests
 ```
@@ -134,8 +164,8 @@ npm run frontend:build
 
 - `bipdelivery/db.sqlite3`, `db.sqlite3`, `node_modules/`, uploads, logs e
   artefatos de build sao dados locais e nao devem entrar em commits.
-- A API Django publica leitura de catalogo e exige JWT para escrita
-  administrativa.
+- A API Django publica leitura de catalogo e exige papel administrativo para
+  escrita.
 - Chamadas HTTP do frontend devem passar por `src/services/`.
 - Tokens JWT devem ser persistidos apenas por `token-store.ts`.
 - A documentacao deve acompanhar codigo existente, nao roadmap.

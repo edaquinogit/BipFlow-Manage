@@ -165,6 +165,7 @@ const title = computed(() => props.initialData ? 'Update Asset' : 'New Product')
           </div>
           <button 
             @click="emit('close')" 
+            data-cy="btn-close-form"
             class="h-10 w-10 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition-all active:scale-90"
           >
             ✕

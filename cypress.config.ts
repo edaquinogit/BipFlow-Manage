@@ -26,6 +26,9 @@ export default defineConfig({
     // 🌍 ENVIRONMENT VARIABLES
     env: {
       apiUrl: "http://127.0.0.1:8000",
+      apiBaseUrl: "http://127.0.0.1:8000/api",
+      adminUsername: "admin@example.com",
+      adminPassword: "admin123",
       storageKey: "access_token",
     },
 

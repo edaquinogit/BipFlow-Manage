@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -19,6 +19,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .errors import business_logic_error, not_found_error, validation_error
 from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem
 from .pagination import ProductListPagination, StandardPagination
+from .permissions import (
+    AllowAnyReadDashboardWrite,
+    IsDashboardReadRole,
+    has_dashboard_read_access,
+)
 from .serializers import (
     CategorySerializer,
     CheckoutRequestSerializer,
@@ -44,24 +49,6 @@ from .throttling import (
 User = get_user_model()
 
 
-class AllowAnyReadIsAuthenticatedWrite(BasePermission):
-    """
-    Custom permission:
-    - Allows anonymous GET (list, retrieve)
-    - Requires authentication for POST, PUT, PATCH, DELETE
-
-    Perfect for public product catalogs where users can browse
-    but only authenticated users can modify.
-    """
-
-    def has_permission(self, request, view):
-        # Allow anonymous users to read (GET, HEAD, OPTIONS)
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        # Require authentication for mutations (POST, PUT, PATCH, DELETE)
-        return bool(request.user and request.user.is_authenticated)
-
-
 class ProductViewSet(viewsets.ModelViewSet):
     """
     ViewSet for CRUD operations on Product instances.
@@ -83,9 +70,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     - min_price: Minimum price filter
     - max_price: Maximum price filter
 
-    Permissions: AllowAnyReadIsAuthenticatedWrite
+    Permissions: AllowAnyReadDashboardWrite
     - GET requests: Anyone (authenticated or anonymous)
-    - POST, PUT, PATCH, DELETE: Authenticated users only
+    - POST, PUT, PATCH, DELETE: staff, superuser, admin or manager role only
 
     Performance:
     - Uses select_related() for category to prevent N+1 queries
@@ -95,7 +82,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [AllowAnyReadIsAuthenticatedWrite]
+    permission_classes = [AllowAnyReadDashboardWrite]
     pagination_class = ProductListPagination
 
     def get_object(self):
@@ -288,14 +275,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
     - PUT /categories/{id}/ - Update category (requires JWT authentication)
     - DELETE /categories/{id}/ - Delete category (requires JWT authentication)
 
-    Permissions: AllowAnyReadIsAuthenticatedWrite
+    Permissions: AllowAnyReadDashboardWrite
     - GET requests: Anyone (authenticated or anonymous)
-    - POST, PUT, PATCH, DELETE: Authenticated users only
+    - POST, PUT, PATCH, DELETE: staff, superuser, admin or manager role only
     """
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [AllowAnyReadIsAuthenticatedWrite]
+    permission_classes = [AllowAnyReadDashboardWrite]
     pagination_class = StandardPagination
 
     def destroy(self, request, *args, **kwargs):
@@ -318,15 +305,15 @@ class DeliveryRegionViewSet(viewsets.ModelViewSet):
     """Manage delivery pricing by region while exposing active regions publicly."""
 
     serializer_class = DeliveryRegionSerializer
-    permission_classes = [AllowAnyReadIsAuthenticatedWrite]
+    permission_classes = [AllowAnyReadDashboardWrite]
     pagination_class = StandardPagination
 
     def get_queryset(self):
         """Return all regions to dashboard users and only active ones publicly."""
         queryset = DeliveryRegion.objects.all()
 
-        if self.request.method in ("GET", "HEAD", "OPTIONS") and not (
-            self.request.user and self.request.user.is_authenticated
+        if self.request.method in ("GET", "HEAD", "OPTIONS") and not has_dashboard_read_access(
+            self.request.user
         ):
             queryset = queryset.filter(is_active=True)
 
@@ -346,7 +333,7 @@ class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only sales history for authenticated dashboard users."""
 
     serializer_class = SaleOrderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsDashboardReadRole]
     pagination_class = StandardPagination
 
     def get_queryset(self):

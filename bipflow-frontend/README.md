@@ -5,7 +5,7 @@ catalogo publico de produtos.
 
 ## Escopo Atual
 
-- Dashboard em `/` protegido por JWT.
+- Dashboard em `/` protegido por JWT e papel de dashboard.
 - Saudacao com o usuario autenticado via `GET /api/auth/me/`.
 - Menu operacional com atalhos, historico recente de vendas, alertas de estoque
   e gestao de regioes de entrega.
@@ -65,7 +65,7 @@ Aplicacao local: `http://127.0.0.1:5173/`
 
 Rotas:
 
-- `/`: dashboard autenticado.
+- `/`: dashboard autenticado e restrito a papel de dashboard.
 - `/produtos`: catalogo publico.
 - `/produtos/:slug`: detalhe publico.
 - `/products` e `/products/:slug`: aliases.
@@ -126,6 +126,15 @@ npm run build
 npm run test:e2e:run
 ```
 
+Para testes E2E, o comando `cy.loginViaApi()` usa um usuario administrativo do
+backend. Configure `adminUsername`, `adminPassword`, `apiUrl` e `apiBaseUrl` no
+Cypress quando os defaults locais nao forem usados. Em banco limpo, crie o
+admin local com:
+
+```powershell
+python ..\bipdelivery\manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
+```
+
 Uso recomendado:
 
 - `npm run lint` para auditoria sem alterar arquivos.
@@ -139,6 +148,7 @@ Uso recomendado:
 - Nao usar `axios` diretamente nas views.
 - Manter contratos alinhados entre `services`, `types` e `schemas`.
 - Guardas de rota e interceptors devem consultar `authService` e `tokenStore`.
+- Usuarios sem `can_access_dashboard` devem ser enviados para `/403`.
 - Nao persistir pedido no frontend; o checkout e validado e persistido no
   backend Django.
 - Usar `Logger` em vez de logs permanentes no console.

@@ -19,6 +19,11 @@ from .models import (
     SaleOrder,
     SaleOrderItem,
 )
+from .permissions import (
+    get_user_roles,
+    has_dashboard_read_access,
+    has_dashboard_write_access,
+)
 
 User = get_user_model()
 
@@ -27,10 +32,25 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     """Authenticated user summary for dashboard personalization."""
 
     display_name = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+    can_access_dashboard = serializers.SerializerMethodField()
+    can_manage_catalog = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "display_name"]
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "display_name",
+            "is_staff",
+            "is_superuser",
+            "roles",
+            "can_access_dashboard",
+            "can_manage_catalog",
+        ]
         read_only_fields = fields
 
     def get_display_name(self, user: User) -> str:
@@ -43,6 +63,18 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             return user.email.split("@", 1)[0]
 
         return user.username
+
+    def get_roles(self, user: User) -> list[str]:
+        """Return dashboard role labels assigned through Django groups/staff flags."""
+        return get_user_roles(user)
+
+    def get_can_access_dashboard(self, user: User) -> bool:
+        """Expose whether the user can read private dashboard resources."""
+        return has_dashboard_read_access(user)
+
+    def get_can_manage_catalog(self, user: User) -> bool:
+        """Expose whether the user can mutate catalog and freight resources."""
+        return has_dashboard_write_access(user)
 
 
 class CategorySerializer(serializers.ModelSerializer):

@@ -108,13 +108,21 @@ const handleOpenNewPanel = () => {
   isPanelOpen.value = true;
 };
 
-const fetchCurrentUser = async (): Promise<void> => {
+const fetchCurrentUser = async (): Promise<boolean> => {
   try {
     const currentUser = await authService.getCurrentUser();
+
+    if (!currentUser.can_access_dashboard) {
+      await router.replace('/403');
+      return false;
+    }
+
     currentUserName.value = currentUser.display_name || currentUser.email || currentUser.username;
+    return true;
   } catch (error: unknown) {
     Logger.warn('Failed to fetch dashboard user profile', { error });
     currentUserName.value = null;
+    return false;
   }
 };
 
@@ -327,8 +335,13 @@ const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
  * ⚡ SYSTEM BOOTSTRAP
  */
 onMounted(async () => {
+  const canAccessDashboard = await fetchCurrentUser();
+
+  if (!canAccessDashboard) {
+    return;
+  }
+
   await Promise.allSettled([
-    fetchCurrentUser(),
     fetchData(),
     fetchCategories(),
     fetchSalesHistory(),

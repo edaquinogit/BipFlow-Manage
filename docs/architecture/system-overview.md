@@ -36,7 +36,7 @@ Esses componentes nao participam do runtime normal Django + Vue.
 
 Responsabilidades:
 
-- proteger o dashboard por guarda de rota autenticada;
+- proteger o dashboard por guarda de rota autenticada e papel de dashboard;
 - exibir saudacao com o usuario retornado por `GET /api/auth/me/`;
 - listar e gerenciar produtos no dashboard;
 - abrir menu operacional com historico de vendas, alertas de estoque, atalhos e
@@ -59,12 +59,14 @@ Responsabilidades:
 
 - autenticar via JWT;
 - expor perfil autenticado em `auth/me`;
+- aplicar RBAC de dashboard com `is_staff`, `is_superuser` e grupos
+  `admin`/`manager`/`viewer`;
 - aplicar throttling em endpoints sensiveis de auth;
 - manter produtos, categorias e galerias de imagens;
 - manter regioes de entrega e taxa por regiao;
 - validar checkout no servidor;
 - persistir pedidos como `SaleOrder` e `SaleOrderItem`;
-- expor historico de vendas para usuarios autenticados.
+- expor historico de vendas para usuarios com papel de dashboard.
 
 Arquivos principais:
 
@@ -80,7 +82,7 @@ Produtos:
 
 - `/api/v1/products/`
 - leitura publica;
-- escrita autenticada;
+- escrita por `staff`, `superuser`, `admin` ou `manager`;
 - filtros por busca, categoria, estoque e preco;
 - detalhe publico por slug em `/api/v1/products/by-slug/{slug}/`;
 - ate 3 imagens por produto.
@@ -89,14 +91,16 @@ Categorias:
 
 - `/api/v1/categories/`
 - leitura publica;
-- escrita autenticada;
+- escrita por `staff`, `superuser`, `admin` ou `manager`;
 - exclusao bloqueada quando ha produtos associados.
 
 Regioes de entrega:
 
 - `/api/v1/delivery-regions/`
-- leitura publica mostra apenas regioes ativas para usuarios anonimos;
-- usuarios autenticados veem e gerenciam todas;
+- leitura publica mostra apenas regioes ativas para usuarios anonimos e
+  autenticados sem papel de dashboard;
+- usuarios com papel de dashboard veem todas;
+- `staff`, `superuser`, `admin` e `manager` gerenciam;
 - `/api/v1/delivery-regions/active/` alimenta o carrinho publico.
 
 Checkout:
@@ -111,13 +115,15 @@ Checkout:
 Vendas:
 
 - `/api/v1/sales-orders/`
-- somente autenticado;
+- somente papel de dashboard;
 - read-only;
 - suporta filtros `status` e `search`.
 
 ## Decisoes Arquiteturais
 
 - O backend e a autoridade para preco, estoque, disponibilidade, frete e total.
+- O backend e a barreira de seguranca: cadastro publico nao concede papel de
+  dashboard nem permissao de escrita.
 - O frontend nao grava tokens fora de `token-store.ts`.
 - O frontend nao deve espalhar chamadas `axios` fora de `src/services/`.
 - O dashboard consome historico de vendas persistido pelo checkout publico.

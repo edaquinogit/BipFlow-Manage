@@ -39,7 +39,10 @@ def api_client():
 def authenticated_user(db):
     """Fixture providing an authenticated test user."""
     return User.objects.create_user(
-        username="testuser", email="testuser@example.com", password="testpass123"
+        username="testuser",
+        email="testuser@example.com",
+        password="testpass123",
+        is_staff=True,
     )
 
 

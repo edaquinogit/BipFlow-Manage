@@ -62,12 +62,21 @@ Resposta:
   "email": "admin@example.com",
   "first_name": "Ednaldo",
   "last_name": "Aquino",
-  "display_name": "Ednaldo Aquino"
+  "display_name": "Ednaldo Aquino",
+  "is_staff": true,
+  "is_superuser": false,
+  "roles": ["staff"],
+  "can_access_dashboard": true,
+  "can_manage_catalog": true
 }
 ```
 
 `display_name` usa nome completo quando existe; caso contrario, usa a parte
 local do email ou o `username`.
+
+Os campos `roles`, `can_access_dashboard` e `can_manage_catalog` expoem o RBAC
+usado pelo dashboard. Usuarios criados pelo cadastro publico nascem ativos, mas
+sem permissao administrativa.
 
 ### Renovar token
 
@@ -95,6 +104,11 @@ POST /api/auth/register/
 }
 ```
 
+O cadastro publico cria uma conta ativa comum. Essa conta nao recebe acesso de
+dashboard, escrita administrativa ou historico de vendas ate ser promovida para
+`is_staff`/`is_superuser` ou adicionada aos grupos `admin`, `manager` ou
+`viewer`.
+
 ### Reset de senha
 
 ```http
@@ -120,11 +134,12 @@ Quando o limite e excedido, a API retorna `429 Too Many Requests`.
 
 ## Permissoes
 
-- Produtos, categorias e regioes de entrega: leitura publica, escrita
-  autenticada.
+- Produtos, categorias e regioes de entrega: leitura publica, escrita apenas
+  para `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
 - Regioes de entrega para usuario anonimo: somente regioes ativas.
 - Checkout WhatsApp: publico.
-- Historico de vendas: autenticado e read-only.
+- Historico de vendas: read-only para `is_staff`, `is_superuser` ou usuarios
+  nos grupos `admin`/`manager`/`viewer`.
 
 ## Paginacao
 
@@ -155,6 +170,9 @@ DELETE /api/v1/products/{id}/
 GET /api/v1/products/by-slug/{slug}/
 PATCH /api/v1/products/bulk_update_category/
 ```
+
+Leitura e publica. Escrita exige `staff`, `superuser`, grupo `admin` ou grupo
+`manager`.
 
 Query params de listagem:
 
@@ -221,6 +239,9 @@ PATCH /api/v1/categories/{id}/
 DELETE /api/v1/categories/{id}/
 ```
 
+Leitura e publica. Escrita exige `staff`, `superuser`, grupo `admin` ou grupo
+`manager`.
+
 Campos:
 
 - `id`
@@ -254,8 +275,11 @@ Campos:
 
 Notas:
 
-- usuarios anonimos recebem apenas regioes ativas;
-- usuarios autenticados podem listar, criar, editar e remover regioes;
+- usuarios anonimos e autenticados sem papel de dashboard recebem apenas
+  regioes ativas;
+- usuarios com papel de dashboard veem todas;
+- somente `staff`, `superuser`, grupo `admin` ou grupo `manager` cria, edita e
+  remove regioes;
 - o carrinho publico usa `/active/` para calcular frete.
 
 ## Checkout Via WhatsApp
@@ -318,7 +342,7 @@ GET /api/v1/sales-orders/
 GET /api/v1/sales-orders/{id}/
 ```
 
-Somente autenticado. O viewset e read-only.
+Somente usuarios com papel de dashboard. O viewset e read-only.
 
 Query params:
 

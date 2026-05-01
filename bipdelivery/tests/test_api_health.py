@@ -18,13 +18,14 @@ Run tests with:
 import os
 import tempfile
 from decimal import Decimal
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Any
 
 import django
 import pytest
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from PIL import Image
@@ -85,6 +86,21 @@ class CurrentUserAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["email"], "ednaldo@example.com")
         self.assertEqual(response.data["display_name"], "Ednaldo Aquino")
+        self.assertFalse(response.data["can_access_dashboard"])
+        self.assertFalse(response.data["can_manage_catalog"])
+
+    def test_current_user_exposes_dashboard_role_capabilities(self) -> None:
+        """Current user endpoint should expose dashboard RBAC capabilities."""
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["can_access_dashboard"])
+        self.assertTrue(response.data["can_manage_catalog"])
+        self.assertIn("staff", response.data["roles"])
 
 
 class CategoryAPIHealthTest(TestCase):
@@ -97,7 +113,11 @@ class CategoryAPIHealthTest(TestCase):
     def setUp(self) -> None:
         """Initialize test client and create test data."""
         self.client = APIClient()
-        self.user = User.objects.create_user(username="testuser", password="testpass123")
+        self.user = User.objects.create_user(
+            username="testuser",
+            password="testpass123",
+            is_staff=True,
+        )
         self.category = Category.objects.create(name="Electronics", slug="electronics")
 
     def test_category_list_requires_auth(self) -> None:
@@ -165,7 +185,11 @@ class ProductAPIHealthTest(TestCase):
     def setUp(self) -> None:
         """Initialize test client and create test data."""
         self.client = APIClient()
-        self.user = User.objects.create_user(username="testuser", password="testpass123")
+        self.user = User.objects.create_user(
+            username="testuser",
+            password="testpass123",
+            is_staff=True,
+        )
         self.category = Category.objects.create(name="Electronics", slug="electronics")
         self.product = Product.objects.create(
             name="Laptop",
@@ -232,6 +256,42 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["name"], "Desktop")
         self.assertIsNotNone(response.data["slug"])
+
+    def test_regular_authenticated_user_cannot_create_product(self) -> None:
+        """Registered non-staff users should not receive catalog write access."""
+        regular_user = User.objects.create_user(username="regular", password="testpass123")
+        self.client.force_authenticate(user=regular_user)
+        payload = {
+            "name": "Blocked Product",
+            "sku": "BLK-001",
+            "price": "19.99",
+            "stock_quantity": 2,
+            "category": self.category.id,  # type: ignore[arg-type]
+        }
+
+        response: Any = self.client.post("/api/v1/products/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Product.objects.filter(sku="BLK-001").exists())
+
+    def test_manager_group_user_can_create_product(self) -> None:
+        """Manager group members should be able to mutate catalog resources."""
+        manager_group = Group.objects.create(name="manager")
+        manager_user = User.objects.create_user(username="manager", password="testpass123")
+        manager_user.groups.add(manager_group)
+        self.client.force_authenticate(user=manager_user)
+        payload = {
+            "name": "Manager Product",
+            "sku": "MGR-001",
+            "price": "39.99",
+            "stock_quantity": 5,
+            "category": self.category.id,  # type: ignore[arg-type]
+        }
+
+        response: Any = self.client.post("/api/v1/products/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["sku"], "MGR-001")
 
     def test_product_create_auto_generates_slug(self) -> None:
         """Product slug should be auto-generated if not provided."""
@@ -382,6 +442,35 @@ class DjangoHealthTest(TestCase):
         self.assertTrue(any("JWT" in cls for cls in auth_classes))
 
 
+class DashboardRoleSeedCommandTest(TestCase):
+    """Test reproducible dashboard RBAC bootstrapping."""
+
+    def test_seed_dashboard_roles_creates_expected_groups(self) -> None:
+        """Management command should create the canonical dashboard groups."""
+        call_command("seed_dashboard_roles", stdout=StringIO())
+
+        self.assertTrue(Group.objects.filter(name="admin").exists())
+        self.assertTrue(Group.objects.filter(name="manager").exists())
+        self.assertTrue(Group.objects.filter(name="viewer").exists())
+
+    def test_seed_dashboard_roles_can_create_staff_admin_user(self) -> None:
+        """Management command should provision the Cypress-compatible admin user."""
+        call_command(
+            "seed_dashboard_roles",
+            email="admin@example.com",
+            password="admin123",
+            role="admin",
+            staff=True,
+            stdout=StringIO(),
+        )
+
+        user = User.objects.get(email="admin@example.com")
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.check_password("admin123"))
+        self.assertTrue(user.groups.filter(name="admin").exists())
+
+
 class CheckoutWhatsAppAPITest(TestCase):
     """Test the public checkout preparation endpoint."""
 
@@ -489,15 +578,101 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["name"], "Centro")
 
+    def test_delivery_region_list_hides_inactive_for_anonymous_users(self) -> None:
+        """Public delivery region list should not expose inactive regions."""
+        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Inativa",
+            city="Salvador",
+            delivery_fee=Decimal("22.00"),
+            is_active=False,
+        )
+
+        response: Any = self.client.get("/api/v1/delivery-regions/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["name"], "Centro")
+
+    def test_delivery_region_list_hides_inactive_for_regular_authenticated_users(self) -> None:
+        """Authenticated users without dashboard role should only see active regions."""
+        user = User.objects.create_user(username="regularregion", password="testpass123")
+        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Inativa",
+            city="Salvador",
+            delivery_fee=Decimal("22.00"),
+            is_active=False,
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.get("/api/v1/delivery-regions/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["name"], "Centro")
+
+    def test_delivery_region_list_exposes_inactive_for_dashboard_users(self) -> None:
+        """Dashboard users should see active and inactive delivery regions."""
+        user = User.objects.create_user(
+            username="dashboardregion",
+            password="testpass123",
+            is_staff=True,
+        )
+        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Inativa",
+            city="Salvador",
+            delivery_fee=Decimal("22.00"),
+            is_active=False,
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.get("/api/v1/delivery-regions/")
+
+        region_names = {region["name"] for region in response.data["results"]}
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertSetEqual(region_names, {"Centro", "Inativa"})
+
+    def test_regular_authenticated_user_cannot_create_delivery_region(self) -> None:
+        """Registered non-dashboard users should not mutate freight rules."""
+        user = User.objects.create_user(username="regularfreight", password="testpass123")
+        self.client.force_authenticate(user=user)
+        payload = {
+            "name": "Bloqueada",
+            "city": "Salvador",
+            "delivery_fee": "30.00",
+            "is_active": True,
+        }
+
+        response: Any = self.client.post("/api/v1/delivery-regions/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(DeliveryRegion.objects.filter(name="Bloqueada").exists())
+
     def test_sales_history_requires_authentication(self) -> None:
         """Sales history is a dashboard-only authenticated endpoint."""
         response: Any = self.client.get("/api/v1/sales-orders/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_sales_history_denies_regular_authenticated_users(self) -> None:
+        """Registered users without a dashboard role should not see private sales data."""
+        user = User.objects.create_user(username="regularsales", password="testpass123")
+        self.client.force_authenticate(user=user)
+
+        response: Any = self.client.get("/api/v1/sales-orders/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_authenticated_sales_history_returns_checkout_orders(self) -> None:
         """Authenticated dashboard users should see persisted checkout orders."""
-        user = User.objects.create_user(username="salesuser", password="testpass123")
+        user = User.objects.create_user(
+            username="salesuser",
+            password="testpass123",
+            is_staff=True,
+        )
 
         payload = {
             "items": [

@@ -7,6 +7,11 @@ export interface CurrentUser {
   first_name: string;
   last_name: string;
   display_name: string;
+  is_staff: boolean;
+  is_superuser: boolean;
+  roles: string[];
+  can_access_dashboard: boolean;
+  can_manage_catalog: boolean;
 }
 export interface RegisterPayload { email: string; password: string; confirm_password: string; }
 export interface RegisterResponse { message: string; email: string; }
