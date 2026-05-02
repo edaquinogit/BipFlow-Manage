@@ -45,10 +45,10 @@ const handleSaveCategory = async (categoryData: Partial<Category>) => {
     await addCategory(categoryData);
 
     togglePanel(false);
-    success('Category created successfully');
+    success('Categoria criada com sucesso.');
   } catch (err) {
-    activeError.value = "Failed to sync with BipFlow Engine. Please verify your data.";
-    toastError('Failed to save category');
+    activeError.value = "Nao foi possivel sincronizar com o BipFlow. Verifique os dados.";
+    toastError('Nao foi possivel salvar a categoria.');
   } finally {
     isSaving.value = false;
   }
@@ -61,8 +61,9 @@ const confirmDeletion = async (id: number | undefined) => {
   if (confirmed) {
     try {
       await deleteCategory(id);
+      success('Categoria removida com sucesso.');
     } catch (err) {
-      alert("Critical Error: Could not delete the record.");
+      toastError('Nao foi possivel remover a categoria.');
     }
   }
 };

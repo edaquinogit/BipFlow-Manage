@@ -201,7 +201,6 @@
       @remove-item="removeItem"
       @update-quantity="updateQuantity"
       @update-customer="updateCustomer"
-      @copy-order="handleCopyOrder"
       @submit-order="handleSubmitOrder"
     />
   </div>
@@ -304,7 +303,6 @@ const {
   updateCustomer,
   resetCustomer,
   getProductQuantity,
-  buildOrderSummary,
 } = useCart()
 
 let loadMoreObserver: IntersectionObserver | null = null
@@ -536,26 +534,6 @@ function handleOpenDetails(product: Product): void {
     name: PublicRoutes.ProductDetails,
     params: { slug: product.slug },
   })
-}
-
-async function handleCopyOrder(): Promise<void> {
-  if (items.value.length === 0) {
-    toast.info('Adicione produtos ao carrinho antes de copiar o pedido.')
-    return
-  }
-
-  const summary = buildOrderSummary()
-
-  try {
-    if (!navigator.clipboard?.writeText) {
-      throw new Error('clipboard_unavailable')
-    }
-
-    await navigator.clipboard.writeText(summary)
-    toast.success('Resumo do pedido copiado. Agora voce pode compartilhar com o cliente ou atendimento.')
-  } catch {
-    toast.error('Nao foi possivel copiar o pedido automaticamente neste navegador.')
-  }
 }
 
 function validateCheckoutData(): boolean {

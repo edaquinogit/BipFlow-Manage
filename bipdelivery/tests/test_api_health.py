@@ -16,14 +16,16 @@ Run tests with:
 """
 
 import os
-import tempfile
 from decimal import Decimal
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import django
 import pytest
 from django.contrib.auth.models import Group, User
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
@@ -36,9 +38,12 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
-from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder  # noqa: E402
+from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder, StoreSettings  # noqa: E402
 
 pytestmark = pytest.mark.django_db
+
+TEST_TEMP_ROOT = Path(__file__).resolve().parents[2] / ".codex-tmp" / "django-test-media"
+TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def build_test_image(filename: str) -> SimpleUploadedFile:
@@ -52,6 +57,13 @@ def build_test_image(filename: str) -> SimpleUploadedFile:
         image_buffer.read(),
         content_type="image/png",
     )
+
+
+def build_test_media_root() -> str:
+    """Create a writable media root for upload tests on Windows sandboxes."""
+    media_root = TEST_TEMP_ROOT / f"media-{uuid4().hex}"
+    media_root.mkdir(parents=True)
+    return str(media_root)
 
 
 class CurrentUserAPITest(TestCase):
@@ -333,7 +345,7 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.data["name"], "Updated Laptop")
         self.assertEqual(response.data["stock_quantity"], 8)
 
-    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    @override_settings(MEDIA_ROOT=build_test_media_root())
     def test_product_create_preserves_three_images_in_multipart_payload(self) -> None:
         """Create should keep cover plus two gallery images in display order."""
         self.client.force_authenticate(user=self.user)
@@ -356,7 +368,7 @@ class ProductAPIHealthTest(TestCase):
         self.assertIn("gallery-1", response.data["images"][1])
         self.assertIn("gallery-2", response.data["images"][2])
 
-    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    @override_settings(MEDIA_ROOT=build_test_media_root())
     def test_product_update_preserves_existing_absolute_image_urls(self) -> None:
         """Patch should keep all existing images when dashboard sends absolute urls."""
         self.client.force_authenticate(user=self.user)
@@ -471,6 +483,57 @@ class DashboardRoleSeedCommandTest(TestCase):
         self.assertTrue(user.groups.filter(name="admin").exists())
 
 
+class StoreSettingsAPITest(TestCase):
+    """Test dashboard-owned store settings endpoint."""
+
+    client: APIClient
+    user: User
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="settingsuser",
+            password="testpass123",
+            is_staff=True,
+        )
+
+    def test_store_settings_requires_authentication(self) -> None:
+        """Store settings should be private to dashboard users."""
+        response: Any = self.client.get("/api/v1/store-settings/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_user_can_update_store_whatsapp(self) -> None:
+        """Dashboard writers should be able to persist the store WhatsApp number."""
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.patch(
+            "/api/v1/store-settings/",
+            {"whatsapp_phone": "+55 (71) 99999-9999"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data["whatsapp_phone"], "5571999999999")
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5571999999999")
+        self.assertTrue(response.data["is_whatsapp_configured"])
+        self.assertEqual(StoreSettings.get_solo().whatsapp_phone, "5571999999999")
+
+    def test_regular_user_cannot_update_store_settings(self) -> None:
+        """Regular authenticated users should not mutate operational settings."""
+        regular_user = User.objects.create_user(username="regularsettings", password="testpass123")
+        self.client.force_authenticate(user=regular_user)
+
+        response: Any = self.client.patch(
+            "/api/v1/store-settings/",
+            {"whatsapp_phone": "5571999999999"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(StoreSettings.objects.count(), 0)
+
+
 class CheckoutWhatsAppAPITest(TestCase):
     """Test the public checkout preparation endpoint."""
 
@@ -479,6 +542,7 @@ class CheckoutWhatsAppAPITest(TestCase):
     product: Product
 
     def setUp(self) -> None:
+        cache.clear()
         self.client = APIClient()
         self.category = Category.objects.create(name="Lanches", slug="lanches")
         self.product = Product.objects.create(
@@ -488,6 +552,22 @@ class CheckoutWhatsAppAPITest(TestCase):
             stock_quantity=8,
             category=self.category,
         )
+
+    def _build_pickup_payload(self, items: list[dict[str, int]]) -> dict[str, Any]:
+        return {
+            "items": items,
+            "customer": {
+                "full_name": "Cliente Teste",
+                "phone": "(71) 99999-0000",
+                "email": "",
+                "delivery_method": "pickup",
+                "payment_method": "card",
+                "address": "",
+                "neighborhood": "",
+                "city": "",
+                "notes": "",
+            },
+        }
 
     def test_checkout_builds_whatsapp_payload(self) -> None:
         """Checkout should return totals, note text and WhatsApp URL."""
@@ -525,6 +605,102 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertTrue(
             SaleOrder.objects.filter(order_reference=response.data["order_reference"]).exists()
         )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 6)
+        self.assertTrue(self.product.is_available)
+
+    def test_checkout_uses_dashboard_whatsapp_before_env_fallback(self) -> None:
+        """Checkout should redirect to the WhatsApp configured in the dashboard."""
+        StoreSettings.objects.create(whatsapp_phone="5588999999999")
+        payload = self._build_pickup_payload(
+            [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 1,
+                }
+            ]
+        )
+
+        with self.settings(WHATSAPP_ORDER_PHONE="5571000000000"):
+            response: Any = self.client.post(
+                "/api/v1/checkout/whatsapp/",
+                payload,
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            response.data["whatsapp_url"].startswith("https://wa.me/5588999999999?text=")
+        )
+
+    def test_checkout_marks_product_unavailable_when_stock_is_consumed(self) -> None:
+        """Checkout should reserve stock and update availability when stock reaches zero."""
+        payload = self._build_pickup_payload(
+            [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 8,
+                }
+            ]
+        )
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 0)
+        self.assertFalse(self.product.is_available)
+
+    def test_checkout_merges_duplicate_product_lines_before_reserving_stock(self) -> None:
+        """Duplicate cart lines should become one reserved quantity for the product."""
+        payload = self._build_pickup_payload(
+            [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 2,
+                },
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 3,
+                },
+            ]
+        )
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["items"][0]["quantity"], 5)
+        self.assertEqual(response.data["subtotal"], "212.50")
+        self.assertEqual(len(response.data["items"]), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 3)
+
+        order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(order.items.get().quantity, 5)
+
+    def test_checkout_rejects_duplicate_lines_when_aggregated_quantity_exceeds_stock(
+        self,
+    ) -> None:
+        """Aggregated duplicate quantities should not bypass stock validation."""
+        payload = self._build_pickup_payload(
+            [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 5,
+                },
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 4,
+                },
+            ]
+        )
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertFalse(SaleOrder.objects.exists())
 
     def test_checkout_uses_delivery_region_fee(self) -> None:
         """Checkout should use the selected active delivery region fee."""

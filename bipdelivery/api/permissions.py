@@ -71,3 +71,15 @@ class IsDashboardReadRole(BasePermission):
 
     def has_permission(self, request, view) -> bool:
         return has_dashboard_read_access(request.user)
+
+
+class DashboardReadWritePermission(BasePermission):
+    """Allow dashboard readers to view settings and writers to mutate them."""
+
+    message = "Voce nao possui permissao administrativa para alterar este recurso."
+
+    def has_permission(self, request, view) -> bool:
+        if request.method in SAFE_METHODS:
+            return has_dashboard_read_access(request.user)
+
+        return has_dashboard_write_access(request.user)

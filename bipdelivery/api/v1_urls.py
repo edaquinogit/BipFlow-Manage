@@ -6,6 +6,7 @@ from .views import (
     DeliveryRegionViewSet,
     ProductViewSet,
     SaleOrderViewSet,
+    StoreSettingsView,
 )
 
 # 🛰️ ROUTER CONFIGURATION
@@ -19,5 +20,6 @@ router.register(r"sales-orders", SaleOrderViewSet, basename="sales-order")
 urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
+    path("store-settings/", StoreSettingsView.as_view(), name="store-settings"),
     path("", include(router.urls)),
 ]

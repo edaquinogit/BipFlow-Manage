@@ -29,6 +29,11 @@ interface TokenPayload {
   refresh: string
 }
 
+interface TokenRefreshPayload {
+  access: string
+  refresh?: string | null
+}
+
 /**
  * Centralized token store
  * Single module responsible for all token persistence operations
@@ -44,6 +49,24 @@ export const tokenStore = {
     }
     localStorage.setItem(TOKEN_KEYS.ACCESS, payload.access)
     localStorage.setItem(TOKEN_KEYS.REFRESH, payload.refresh)
+  },
+
+  /**
+   * Persist tokens returned by the refresh endpoint.
+   * When refresh rotation is enabled, the backend returns a new refresh token.
+   * If rotation is disabled, only the access token is updated.
+   */
+  saveRefreshedTokens(payload: TokenRefreshPayload): void {
+    if (!payload.access) {
+      throw new Error('Invalid token refresh payload: access is required')
+    }
+
+    if (payload.refresh) {
+      this.saveTokens({ access: payload.access, refresh: payload.refresh })
+      return
+    }
+
+    this.updateAccessToken(payload.access)
   },
 
   /**
@@ -105,4 +128,4 @@ export const tokenStore = {
 }
 
 export { TOKEN_KEYS }
-export type { TokenPayload, TokenKey }
+export type { TokenPayload, TokenRefreshPayload, TokenKey }

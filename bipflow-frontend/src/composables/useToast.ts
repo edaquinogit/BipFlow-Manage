@@ -18,11 +18,12 @@ interface Toast {
   id: string;
   type: ToastType;
   message: string;
-  duration?: number; // milliseconds, undefined = sticky (user must close)
+  duration?: number;
   autoClose?: boolean;
 }
 
 const toasts = ref<Toast[]>([]);
+const MAX_VISIBLE_TOASTS = 4;
 
 let toastCounter = 0;
 
@@ -37,21 +38,30 @@ function generateId(): string {
  * Add a toast notification
  * @param type - Type of notification (success, error, warning, info)
  * @param message - Message to display
- * @param duration - Auto-close duration in milliseconds (default: 5000 for success, undefined for error)
+ * @param duration - Auto-close duration in milliseconds. Use 0 to keep it visible.
  */
 function notify(type: ToastType, message: string, duration?: number): void {
-  // Default durations by type
-  const defaultDuration = type === 'error' ? undefined : 5000;
+  const defaultDurations: Record<ToastType, number> = {
+    success: 2600,
+    info: 3000,
+    warning: 3800,
+    error: 4800,
+  };
+  const resolvedDuration = duration ?? defaultDurations[type];
+
+  toasts.value = toasts.value.filter(
+    (toast) => toast.type !== type || toast.message !== message
+  );
 
   const toast: Toast = {
     id: generateId(),
     type,
     message,
-    duration: duration ?? defaultDuration,
-    autoClose: (duration ?? defaultDuration) !== undefined,
+    duration: resolvedDuration,
+    autoClose: resolvedDuration > 0,
   };
 
-  toasts.value.push(toast);
+  toasts.value = [...toasts.value, toast].slice(-MAX_VISIBLE_TOASTS);
 
   // Auto-close if duration is set
   if (toast.autoClose && toast.duration) {
@@ -64,12 +74,12 @@ function notify(type: ToastType, message: string, duration?: number): void {
 /**
  * Notify success
  */
-function success(message: string, duration = 5000): void {
+function success(message: string, duration?: number): void {
   notify('success', message, duration);
 }
 
 /**
- * Notify error (sticky by default)
+ * Notify error
  */
 function error(message: string, duration?: number): void {
   notify('error', message, duration);
@@ -78,14 +88,14 @@ function error(message: string, duration?: number): void {
 /**
  * Notify warning
  */
-function warning(message: string, duration = 5000): void {
+function warning(message: string, duration?: number): void {
   notify('warning', message, duration);
 }
 
 /**
  * Notify info
  */
-function info(message: string, duration = 5000): void {
+function info(message: string, duration?: number): void {
   notify('info', message, duration);
 }
 

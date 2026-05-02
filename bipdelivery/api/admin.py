@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem
+from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem, StoreSettings
 
 
 @admin.register(Category)
@@ -19,6 +19,12 @@ class DeliveryRegionAdmin(admin.ModelAdmin):
     list_display = ("name", "city", "delivery_fee", "is_active")
     list_filter = ("is_active", "city")
     search_fields = ("name", "city", "neighborhoods")
+
+
+@admin.register(StoreSettings)
+class StoreSettingsAdmin(admin.ModelAdmin):
+    list_display = ("id", "whatsapp_phone", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
 
 
 class SaleOrderItemInline(admin.TabularInline):

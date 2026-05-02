@@ -8,10 +8,12 @@ import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import type { FilterState } from '@/types/filters';
 import type { SaleOrder } from '@/types/sales';
+import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { authService } from '@/services/auth.service';
 import { deliveryRegionService } from '@/services/delivery-region.service';
 import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
+import { storeSettingsService } from '@/services/store-settings.service';
 
 // Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
@@ -39,6 +41,7 @@ const selectedProduct = ref<Product | null>(null);
 const currentUserName = ref<string | null>(null);
 const recentSales = ref<SaleOrder[]>([]);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
+const storeSettings = ref<StoreSettings | null>(null);
 
 /**
  * ⚙️ ASYNC ACTION STATES
@@ -53,6 +56,9 @@ const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
 const isSavingDeliveryRegion = ref(false);
 const deletingDeliveryRegionId = ref<number | null>(null);
+const isStoreSettingsLoading = ref(false);
+const storeSettingsError = ref<string | null>(null);
+const isSavingStoreSettings = ref(false);
 
 // Composables (Data Layer)
 const {
@@ -154,10 +160,25 @@ const fetchDeliveryRegions = async (): Promise<void> => {
   }
 };
 
+const fetchStoreSettings = async (): Promise<void> => {
+  isStoreSettingsLoading.value = true;
+  storeSettingsError.value = null;
+
+  try {
+    storeSettings.value = await storeSettingsService.get();
+  } catch (error: unknown) {
+    Logger.warn('Failed to fetch store settings', { error });
+    storeSettingsError.value = 'Nao foi possivel carregar o WhatsApp da loja agora.';
+  } finally {
+    isStoreSettingsLoading.value = false;
+  }
+};
+
 const handleOpenDashboardMenu = (): void => {
   isDashboardMenuOpen.value = true;
   void fetchSalesHistory();
   void fetchDeliveryRegions();
+  void fetchStoreSettings();
 };
 
 const handleCreateProductFromMenu = (): void => {
@@ -226,6 +247,20 @@ const handleDeleteDeliveryRegion = async (regionId: number): Promise<void> => {
   }
 };
 
+const handleSaveStoreSettings = async (payload: StoreSettingsPayload): Promise<void> => {
+  isSavingStoreSettings.value = true;
+
+  try {
+    storeSettings.value = await storeSettingsService.update(payload);
+    success('WhatsApp da loja atualizado.');
+  } catch (error: unknown) {
+    Logger.error('Store settings save failed', { error });
+    toastError('Nao foi possivel salvar o WhatsApp da loja.');
+  } finally {
+    isSavingStoreSettings.value = false;
+  }
+};
+
 const handleEditRequest = (product: Product) => {
   // Deep clone to prevent memory reference issues
   selectedProduct.value = { ...product };
@@ -248,10 +283,10 @@ const handleSave = async (payload: Partial<Product>) => {
 
     if (selectedProduct.value?.id) {
       await updateProduct(selectedProduct.value.id, dataToSync);
-      success('Product updated successfully');
+      success('Produto atualizado com sucesso.');
     } else {
       await createProduct(dataToSync);
-      success('Product created successfully');
+      success('Produto criado com sucesso.');
     }
 
     // Sincronização de Estado (Resolve o bug do Avatar)
@@ -259,7 +294,7 @@ const handleSave = async (payload: Partial<Product>) => {
     handleClosePanel();
 
   } catch (err) {
-    toastError('Failed to save product. Please try again.');
+    toastError('Nao foi possivel salvar o produto. Tente novamente.');
   } finally {
     isSaving.value = false;
   }
@@ -279,11 +314,11 @@ const executeDelete = async (): Promise<void> => {
   isDeletingAction.value = true;
   try {
     await deleteProduct(assetIdToPurge.value);
-    success('Product deleted successfully.');
+    success('Produto removido com sucesso.');
     await fetchData();
   } catch (error: unknown) {
     Logger.error('Product deletion failed', { error });
-    toastError('Failed to delete product. Please try again.');
+    toastError('Nao foi possivel remover o produto. Tente novamente.');
   } finally {
     isDeletingAction.value = false;
     isDeleteModalOpen.value = false;
@@ -316,7 +351,7 @@ const handleClearSelection = (): void => {
 
 const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
   if (selectedAssetIds.value.size === 0) {
-    toastError('Select at least one asset before changing category.');
+    toastError('Selecione pelo menos um produto antes de alterar a categoria.');
     return;
   }
 
@@ -325,7 +360,7 @@ const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
     await bulkUpdateCategory(Array.from(selectedAssetIds.value), categoryId);
   } catch (error: unknown) {
     Logger.error('Bulk category update failed', { error, categoryId });
-    toastError('Failed to update selected assets.');
+    toastError('Nao foi possivel atualizar os produtos selecionados.');
   } finally {
     isBulkUpdating.value = false;
   }
@@ -345,7 +380,8 @@ onMounted(async () => {
     fetchData(),
     fetchCategories(),
     fetchSalesHistory(),
-    fetchDeliveryRegions()
+    fetchDeliveryRegions(),
+    fetchStoreSettings()
   ]);
 });
 </script>
@@ -400,6 +436,10 @@ onMounted(async () => {
       :delivery-regions-error="deliveryRegionsError"
       :is-saving-delivery-region="isSavingDeliveryRegion"
       :deleting-delivery-region-id="deletingDeliveryRegionId"
+      :store-settings="storeSettings"
+      :is-store-settings-loading="isStoreSettingsLoading"
+      :store-settings-error="storeSettingsError"
+      :is-saving-store-settings="isSavingStoreSettings"
       :out-of-stock-products="outOfStockProducts"
       :low-stock-products="lowStockProducts"
       @close="isDashboardMenuOpen = false"
@@ -409,6 +449,7 @@ onMounted(async () => {
       @open-store="handleOpenStore"
       @save-delivery-region="handleSaveDeliveryRegion"
       @delete-delivery-region="handleDeleteDeliveryRegion"
+      @save-store-settings="handleSaveStoreSettings"
     />
 
     <ProductForm

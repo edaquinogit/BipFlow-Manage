@@ -1,6 +1,6 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { Logger } from "./logger";
-import { tokenStore } from "./token-store";
+import { tokenStore, type TokenRefreshPayload } from "./token-store";
 
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
@@ -21,12 +21,33 @@ if (!import.meta.env.VITE_API_URL && import.meta.env.MODE !== 'test') {
 
 // Global state to prevent multiple auth failure redirects
 let isAuthFailureInProgress = false;
+let refreshRequest: Promise<TokenRefreshPayload> | null = null;
 
 /**
  * 🛑 Request Cancellation System
  * Cancel all pending requests during logout to prevent "Pending" waterfall
  */
 const pendingRequests = new Map<string, AbortController>();
+
+function refreshAuthTokens(refreshToken: string): Promise<TokenRefreshPayload> {
+  if (!refreshRequest) {
+    const refreshInstance = axios.create({ baseURL: API_BASE_URL });
+
+    refreshRequest = refreshInstance
+      .post<TokenRefreshPayload>("auth/token/refresh/", {
+        refresh: refreshToken,
+      })
+      .then((response) => {
+        tokenStore.saveRefreshedTokens(response.data);
+        return response.data;
+      })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+
+  return refreshRequest;
+}
 
 // Instância principal
 const api = axios.create({
@@ -104,16 +125,7 @@ api.interceptors.response.use(
             Logger.info("Attempting to refresh access token");
           }
 
-          // Isolated instance for refresh (Clean Architecture Pattern)
-          const refreshInstance = axios.create({ baseURL: API_BASE_URL });
-          const res = await refreshInstance.post("auth/token/refresh/", {
-            refresh: refreshToken,
-          });
-
-          const { access } = res.data;
-
-          // Atomic state synchronization
-          tokenStore.updateAccessToken(access);
+          const { access } = await refreshAuthTokens(refreshToken);
 
           // Re-execute original request with new Authorization header
           if (originalRequest.headers) {

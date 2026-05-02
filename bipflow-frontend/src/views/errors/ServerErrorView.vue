@@ -18,7 +18,7 @@ const navigateToDashboard = () => router.push({ name: 'dashboard-overview' });
  */
 const reportIssue = () => {
   Logger.info('Server error issue reported by user');
-  toast.info('Report sent. Our team has been notified.');
+  toast.info('Relato enviado. Nossa equipe ja foi notificada.');
 };
 </script>
 

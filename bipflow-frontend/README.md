@@ -9,6 +9,7 @@ catalogo publico de produtos.
 - Saudacao com o usuario autenticado via `GET /api/auth/me/`.
 - Menu operacional com atalhos, historico recente de vendas, alertas de estoque
   e gestao de regioes de entrega.
+- Configuracao do WhatsApp da loja para receber pedidos da vitrine.
 - Catalogo publico em `/produtos` e `/products`.
 - Detalhe publico por slug.
 - Carrinho local com frete por regiao ativa.
@@ -94,6 +95,7 @@ npm run test:e2e:run
 - `src/services/category.service.ts`: categorias.
 - `src/services/delivery-region.service.ts`: regioes de entrega.
 - `src/services/sales.service.ts`: historico recente de vendas.
+- `src/services/store-settings.service.ts`: configuracoes operacionais da loja.
 - `src/services/order.service.ts`: checkout via WhatsApp.
 
 ## Contrato Do Fluxo De Produto

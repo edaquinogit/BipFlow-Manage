@@ -28,7 +28,7 @@ export function useCategories() {
       lastFetched.value = Date.now();
 
     } catch (err) {
-      error.value = "Registry connection failed.";
+      error.value = "Nao foi possivel carregar as categorias.";
     } finally {
       loading.value = false;
     }
@@ -45,7 +45,7 @@ export function useCategories() {
       categories.value = [...categories.value, newCategory];
       return newCategory;
     } catch (err) {
-      error.value = "Failed to create new classification.";
+      error.value = "Nao foi possivel criar a categoria.";
       throw err;
     } finally {
       loading.value = false;
@@ -67,7 +67,8 @@ export function useCategories() {
     } catch (err) {
       // Rollback em caso de erro no servidor
       categories.value = previousState;
-      error.value = "Decommission failed. Rollback executed.";
+      error.value = "Nao foi possivel remover a categoria.";
+      throw err;
     }
   };
 

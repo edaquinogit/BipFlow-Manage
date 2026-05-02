@@ -15,16 +15,31 @@ def _hash_cache_identifier(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _request_data_value(request, fields: Iterable[str], *, lower: bool = True) -> str | None:
+def _request_field_value(data, field_path: str):
+    current_value = data
+
+    for field_name in field_path.split("."):
+        if isinstance(current_value, (list, tuple)):
+            current_value = current_value[0] if current_value else None
+
+        if current_value is None or not hasattr(current_value, "get"):
+            return None
+
+        current_value = current_value.get(field_name)
+
+    if isinstance(current_value, (list, tuple)):
+        current_value = current_value[0] if current_value else None
+
+    return current_value
+
+
+def _request_data_value(request, fields: Iterable[str]) -> str | None:
     data = getattr(request, "data", {})
     if not hasattr(data, "get"):
         return None
 
     for field in fields:
-        value = data.get(field)
-        if isinstance(value, (list, tuple)):
-            value = value[0] if value else None
-
+        value = _request_field_value(data, field)
         if value is None:
             continue
 
@@ -32,9 +47,14 @@ def _request_data_value(request, fields: Iterable[str], *, lower: bool = True) -
         if not normalized_value:
             continue
 
-        return normalized_value.lower() if lower else normalized_value
+        return normalized_value
 
     return None
+
+
+def _normalize_phone_identifier(value: str) -> str:
+    digits = "".join(character for character in value if character.isdigit())
+    return digits or value.strip().lower()
 
 
 class UserThrottle(UserRateThrottle):
@@ -74,6 +94,14 @@ class AuthIpThrottle(AnonRateThrottle):
     scope = "auth_ip"
 
 
+class CheckoutIpThrottle(AnonRateThrottle):
+    """
+    Limit anonymous checkout creation bursts by client IP.
+    """
+
+    scope = "checkout_ip"
+
+
 class SubmittedFieldThrottle(SimpleRateThrottle):
     """
     Base throttle that keys the rate limit by submitted sensitive fields.
@@ -82,19 +110,33 @@ class SubmittedFieldThrottle(SimpleRateThrottle):
     identity_fields: tuple[str, ...] = ()
     lower_identity = True
 
+    def normalize_identifier(self, identifier: str) -> str:
+        return identifier.lower() if self.lower_identity else identifier
+
     def get_cache_key(self, request, view):
-        identifier = _request_data_value(
-            request,
-            self.identity_fields,
-            lower=self.lower_identity,
-        )
+        identifier = _request_data_value(request, self.identity_fields)
         if identifier is None:
             return None
+
+        identifier = self.normalize_identifier(identifier)
 
         return self.cache_format % {
             "scope": self.scope,
             "ident": _hash_cache_identifier(identifier),
         }
+
+
+class CheckoutPhoneThrottle(SubmittedFieldThrottle):
+    """
+    Limit repeated checkout attempts for the same submitted customer phone.
+    """
+
+    scope = "checkout_phone"
+    identity_fields = ("customer.phone",)
+    lower_identity = False
+
+    def normalize_identifier(self, identifier: str) -> str:
+        return _normalize_phone_identifier(identifier)
 
 
 class LoginIdentityThrottle(SubmittedFieldThrottle):

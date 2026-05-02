@@ -217,6 +217,8 @@ REST_FRAMEWORK = {
         "user": get_env_value("BIPFLOW_THROTTLE_USER", "100/hour"),
         "product_list": get_env_value("BIPFLOW_THROTTLE_PRODUCT_LIST", "500/hour"),
         "auth_ip": get_env_value("BIPFLOW_THROTTLE_AUTH_IP", "10/minute"),
+        "checkout_ip": get_env_value("BIPFLOW_THROTTLE_CHECKOUT_IP", "5/minute"),
+        "checkout_phone": get_env_value("BIPFLOW_THROTTLE_CHECKOUT_PHONE", "3/hour"),
         "auth_login_identity": get_env_value("BIPFLOW_THROTTLE_AUTH_LOGIN_IDENTITY", "5/minute"),
         "auth_register_identity": get_env_value(
             "BIPFLOW_THROTTLE_AUTH_REGISTER_IDENTITY", "3/hour"

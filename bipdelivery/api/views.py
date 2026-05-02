@@ -17,10 +17,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .errors import business_logic_error, not_found_error, validation_error
-from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem
+from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem, StoreSettings
 from .pagination import ProductListPagination, StandardPagination
 from .permissions import (
     AllowAnyReadDashboardWrite,
+    DashboardReadWritePermission,
     IsDashboardReadRole,
     has_dashboard_read_access,
 )
@@ -35,9 +36,12 @@ from .serializers import (
     ProductSerializer,
     RegisterUserSerializer,
     SaleOrderSerializer,
+    StoreSettingsSerializer,
 )
 from .throttling import (
     AuthIpThrottle,
+    CheckoutIpThrottle,
+    CheckoutPhoneThrottle,
     LoginIdentityThrottle,
     PasswordResetConfirmIdentityThrottle,
     PasswordResetIdentityThrottle,
@@ -356,6 +360,28 @@ class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
+class StoreSettingsView(APIView):
+    """Read and update singleton store settings from the dashboard."""
+
+    permission_classes = [IsAuthenticated, DashboardReadWritePermission]
+
+    def get(self, request, *args, **kwargs):
+        settings_instance = StoreSettings.get_solo()
+        serializer = StoreSettingsSerializer(settings_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        settings_instance = StoreSettings.get_solo()
+        serializer = StoreSettingsSerializer(
+            settings_instance,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class CheckoutWhatsAppView(APIView):
     """
     Prepare a checkout note and WhatsApp redirect for the public catalog.
@@ -367,10 +393,7 @@ class CheckoutWhatsAppView(APIView):
 
     permission_classes = []
     authentication_classes = []
-
-    @staticmethod
-    def _normalize_phone(phone: str) -> str:
-        return "".join(character for character in phone if character.isdigit())
+    throttle_classes = [CheckoutIpThrottle, CheckoutPhoneThrottle]
 
     @staticmethod
     def _payment_label(payment_method: str) -> str:
@@ -384,34 +407,54 @@ class CheckoutWhatsAppView(APIView):
     def _delivery_label(delivery_method: str) -> str:
         return "Delivery" if delivery_method == "delivery" else "Retirada"
 
-    def post(self, request, *args, **kwargs):
-        serializer = CheckoutRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    @staticmethod
+    def _aggregate_cart_quantities(cart_items) -> dict[int, int]:
+        quantities_by_product_id: dict[int, int] = {}
 
-        validated_data = serializer.validated_data
-        cart_items = validated_data["items"]
-        customer = validated_data["customer"]
-        product_ids = [item["product_id"] for item in cart_items]
+        for item in cart_items:
+            product_id = item["product_id"]
+            quantities_by_product_id[product_id] = (
+                quantities_by_product_id.get(product_id, 0) + item["quantity"]
+            )
 
-        products = Product.objects.select_related("category").filter(id__in=product_ids)
+        return quantities_by_product_id
+
+    @staticmethod
+    def _raise_missing_products_error(missing_ids: list[int]) -> None:
+        raise serializers.ValidationError(
+            {
+                "items": [
+                    f'Products not found: {", ".join(str(product_id) for product_id in missing_ids)}'
+                ]
+            }
+        )
+
+    def _lock_cart_products(self, quantities_by_product_id: dict[int, int]) -> dict[int, Product]:
+        product_ids = list(quantities_by_product_id)
+        products = (
+            Product.objects.select_for_update()
+            .select_related("category")
+            .filter(id__in=sorted(product_ids))
+            .order_by("id")
+        )
         products_by_id = {product.id: product for product in products}
         missing_ids = [product_id for product_id in product_ids if product_id not in products_by_id]
 
         if missing_ids:
-            raise serializers.ValidationError(
-                {
-                    "items": [
-                        f'Products not found: {", ".join(str(product_id) for product_id in missing_ids)}'
-                    ]
-                }
-            )
+            self._raise_missing_products_error(missing_ids)
 
+        return products_by_id
+
+    @staticmethod
+    def _normalize_reserved_items(
+        quantities_by_product_id: dict[int, int],
+        products_by_id: dict[int, Product],
+    ) -> tuple[list[dict], Decimal]:
         normalized_items = []
         subtotal = Decimal("0.00")
 
-        for item in cart_items:
-            product = products_by_id[item["product_id"]]
-            quantity = item["quantity"]
+        for product_id, quantity in quantities_by_product_id.items():
+            product = products_by_id[product_id]
 
             if not product.is_available or product.stock_quantity <= 0:
                 raise serializers.ValidationError(
@@ -427,8 +470,8 @@ class CheckoutWhatsAppView(APIView):
                     }
                 )
 
-            unit_price = Decimal(product.price)
-            line_total = unit_price * quantity
+            unit_price = Decimal(product.price).quantize(Decimal("0.01"))
+            line_total = (unit_price * quantity).quantize(Decimal("0.01"))
             subtotal += line_total
 
             normalized_items.append(
@@ -437,10 +480,42 @@ class CheckoutWhatsAppView(APIView):
                     "product_name": product.name,
                     "sku": product.sku or "",
                     "quantity": quantity,
-                    "unit_price": unit_price.quantize(Decimal("0.01")),
-                    "line_total": line_total.quantize(Decimal("0.01")),
+                    "unit_price": unit_price,
+                    "line_total": line_total,
                 }
             )
+
+        return normalized_items, subtotal
+
+    def _reserve_cart_stock(self, cart_items) -> tuple[list[dict], Decimal, dict[int, Product]]:
+        quantities_by_product_id = self._aggregate_cart_quantities(cart_items)
+        products_by_id = self._lock_cart_products(quantities_by_product_id)
+        normalized_items, subtotal = self._normalize_reserved_items(
+            quantities_by_product_id,
+            products_by_id,
+        )
+        timestamp = timezone.now()
+
+        for product_id, quantity in quantities_by_product_id.items():
+            product = products_by_id[product_id]
+            product.stock_quantity -= quantity
+            product.is_available = product.stock_quantity > 0
+            product.updated_at = timestamp
+
+        Product.objects.bulk_update(
+            list(products_by_id.values()),
+            ["stock_quantity", "is_available", "updated_at"],
+        )
+
+        return normalized_items, subtotal, products_by_id
+
+    def post(self, request, *args, **kwargs):
+        serializer = CheckoutRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        cart_items = validated_data["items"]
+        customer = validated_data["customer"]
 
         delivery_region = None
         delivery_region_id = customer.get("delivery_region_id")
@@ -456,90 +531,69 @@ class CheckoutWhatsAppView(APIView):
                     {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
                 )
 
-        delivery_fee = Decimal("0.00")
-        if customer["delivery_method"] == "delivery":
-            delivery_fee = (
-                Decimal(delivery_region.delivery_fee)
-                if delivery_region is not None
-                else settings.ORDER_DELIVERY_FEE
-            )
-        total = subtotal + delivery_fee
-
         order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S-%f")
         customer_name = customer["full_name"].strip()
         customer_phone = customer["phone"].strip()
         customer_email = customer.get("email", "").strip()
         notes = customer.get("notes", "").strip()
 
-        message_lines = [
-            "Pedido BipFlow",
-            f"Referencia: {order_reference}",
-            "",
-            "Itens do pedido:",
-            *[
-                (
-                    f'{index + 1}. {item["product_name"]} '
-                    f'x{item["quantity"]} - R$ {item["line_total"]:.2f}'
+        with transaction.atomic():
+            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items)
+
+            delivery_fee = Decimal("0.00")
+            if customer["delivery_method"] == "delivery":
+                delivery_fee = (
+                    Decimal(delivery_region.delivery_fee)
+                    if delivery_region is not None
+                    else settings.ORDER_DELIVERY_FEE
                 )
-                for index, item in enumerate(normalized_items)
-            ],
-            "",
-            f"Subtotal: R$ {subtotal:.2f}",
-            f"Entrega: R$ {delivery_fee:.2f}",
-            f"Total: R$ {total:.2f}",
-            "",
-            f"Cliente: {customer_name}",
-            f"WhatsApp: {customer_phone}",
-            f'Email: {customer_email or "Nao informado"}',
-            f'Entrega: {self._delivery_label(customer["delivery_method"])}',
-            f'Pagamento: {self._payment_label(customer["payment_method"])}',
-        ]
+            total = subtotal + delivery_fee
 
-        if customer["delivery_method"] == "delivery":
-            if delivery_region is not None:
-                message_lines.append(f"Regiao: {delivery_region.name}")
+            message_lines = [
+                "Pedido BipFlow",
+                f"Referencia: {order_reference}",
+                "",
+                "Itens do pedido:",
+                *[
+                    (
+                        f'{index + 1}. {item["product_name"]} '
+                        f'x{item["quantity"]} - R$ {item["line_total"]:.2f}'
+                    )
+                    for index, item in enumerate(normalized_items)
+                ],
+                "",
+                f"Subtotal: R$ {subtotal:.2f}",
+                f"Entrega: R$ {delivery_fee:.2f}",
+                f"Total: R$ {total:.2f}",
+                "",
+                f"Cliente: {customer_name}",
+                f"WhatsApp: {customer_phone}",
+                f'Email: {customer_email or "Nao informado"}',
+                f'Entrega: {self._delivery_label(customer["delivery_method"])}',
+                f'Pagamento: {self._payment_label(customer["payment_method"])}',
+            ]
 
-            message_lines.extend(
-                [
-                    f'Endereco: {customer["address"].strip()}',
-                    f'Bairro: {customer["neighborhood"].strip()}',
-                    f'Cidade: {customer["city"].strip()}',
-                ]
+            if customer["delivery_method"] == "delivery":
+                if delivery_region is not None:
+                    message_lines.append(f"Regiao: {delivery_region.name}")
+
+                message_lines.extend(
+                    [
+                        f'Endereco: {customer["address"].strip()}',
+                        f'Bairro: {customer["neighborhood"].strip()}',
+                        f'Cidade: {customer["city"].strip()}',
+                    ]
+                )
+
+            if notes:
+                message_lines.append(f"Observacoes: {notes}")
+
+            message = "\n".join(message_lines)
+            whatsapp_phone = StoreSettings.get_configured_whatsapp_phone()
+            whatsapp_url = (
+                f"https://wa.me/{whatsapp_phone}?text={quote(message)}" if whatsapp_phone else ""
             )
 
-        if notes:
-            message_lines.append(f"Observacoes: {notes}")
-
-        message = "\n".join(message_lines)
-        whatsapp_phone = self._normalize_phone(settings.WHATSAPP_ORDER_PHONE)
-        whatsapp_url = (
-            f"https://wa.me/{whatsapp_phone}?text={quote(message)}" if whatsapp_phone else ""
-        )
-
-        response_payload = {
-            "order_reference": order_reference,
-            "items": normalized_items,
-            "customer": {
-                "full_name": customer_name,
-                "phone": customer_phone,
-                "email": customer_email,
-                "delivery_method": customer["delivery_method"],
-                "payment_method": customer["payment_method"],
-                "delivery_region_id": delivery_region.id if delivery_region is not None else None,
-                "delivery_region_name": delivery_region.name if delivery_region is not None else "",
-                "address": customer.get("address", "").strip(),
-                "neighborhood": customer.get("neighborhood", "").strip(),
-                "city": customer.get("city", "").strip(),
-                "notes": notes,
-            },
-            "subtotal": subtotal.quantize(Decimal("0.01")),
-            "delivery_fee": delivery_fee.quantize(Decimal("0.01")),
-            "total": total.quantize(Decimal("0.01")),
-            "message": message,
-            "whatsapp_url": whatsapp_url,
-        }
-
-        with transaction.atomic():
             sale_order = SaleOrder.objects.create(
                 order_reference=order_reference,
                 customer_name=customer_name,
@@ -574,8 +628,36 @@ class CheckoutWhatsAppView(APIView):
                 ]
             )
 
-        output_serializer = CheckoutResponseSerializer(data=response_payload)
-        output_serializer.is_valid(raise_exception=True)
+            response_payload = {
+                "order_reference": order_reference,
+                "items": normalized_items,
+                "customer": {
+                    "full_name": customer_name,
+                    "phone": customer_phone,
+                    "email": customer_email,
+                    "delivery_method": customer["delivery_method"],
+                    "payment_method": customer["payment_method"],
+                    "delivery_region_id": (
+                        delivery_region.id if delivery_region is not None else None
+                    ),
+                    "delivery_region_name": (
+                        delivery_region.name if delivery_region is not None else ""
+                    ),
+                    "address": customer.get("address", "").strip(),
+                    "neighborhood": customer.get("neighborhood", "").strip(),
+                    "city": customer.get("city", "").strip(),
+                    "notes": notes,
+                },
+                "subtotal": subtotal.quantize(Decimal("0.01")),
+                "delivery_fee": delivery_fee.quantize(Decimal("0.01")),
+                "total": total.quantize(Decimal("0.01")),
+                "message": message,
+                "whatsapp_url": whatsapp_url,
+            }
+
+            output_serializer = CheckoutResponseSerializer(data=response_payload)
+            output_serializer.is_valid(raise_exception=True)
+
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 

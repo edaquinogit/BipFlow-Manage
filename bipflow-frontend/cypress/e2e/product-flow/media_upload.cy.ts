@@ -161,7 +161,7 @@ describe('Product Image Upload Flow', () => {
     // Step 9: Verify success toast notification appears
     cy.get(SELECTORS.toastSuccess, { timeout: 5000 })
       .should('be.visible')
-      .and('contain', 'successfully');
+      .and('contain', 'Produto criado com sucesso');
 
     // Step 10: Verify form closed after success
     cy.get(SELECTORS.formPanel, { timeout: 3000 })
@@ -267,7 +267,7 @@ describe('Product Image Upload Flow', () => {
     // Verify error toast appears
     cy.get(SELECTORS.toastError, { timeout: 5000 })
       .should('be.visible')
-      .and('contain.text', 'Failed');
+      .and('contain.text', 'Nao foi possivel salvar o produto');
 
     // Form should remain open so user can correct
     cy.get(SELECTORS.formPanel)

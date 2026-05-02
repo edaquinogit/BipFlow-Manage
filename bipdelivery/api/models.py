@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
@@ -154,6 +155,54 @@ class DeliveryRegion(models.Model):
     def __str__(self) -> str:
         """Return the region name for admin/debug purposes."""
         return self.name
+
+
+class StoreSettings(models.Model):
+    """Singleton operational settings controlled from the dashboard."""
+
+    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    whatsapp_phone = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="WhatsApp number that receives public storefront orders.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Store settings"
+        verbose_name_plural = "Store settings"
+
+    def __str__(self) -> str:
+        """Return a readable identifier for admin/debug purposes."""
+        return "Store settings"
+
+    @staticmethod
+    def normalize_phone(phone: str) -> str:
+        """Return only phone digits for WhatsApp deep links."""
+        return "".join(character for character in phone if character.isdigit())
+
+    @property
+    def whatsapp_phone_digits(self) -> str:
+        """Expose the normalized phone currently stored in the dashboard."""
+        return self.normalize_phone(self.whatsapp_phone)
+
+    @classmethod
+    def get_solo(cls) -> "StoreSettings":
+        """Return the single dashboard settings row, creating it when needed."""
+        settings_instance, _created = cls.objects.get_or_create(singleton_key=1)
+        return settings_instance
+
+    @classmethod
+    def get_configured_whatsapp_phone(cls) -> str:
+        """Return dashboard WhatsApp phone, falling back to the environment value."""
+        settings_instance = cls.objects.filter(singleton_key=1).first()
+        dashboard_phone = settings_instance.whatsapp_phone_digits if settings_instance else ""
+
+        if dashboard_phone:
+            return dashboard_phone
+
+        return cls.normalize_phone(getattr(settings, "WHATSAPP_ORDER_PHONE", ""))
 
 
 class SaleOrder(models.Model):

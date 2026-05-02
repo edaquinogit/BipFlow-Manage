@@ -18,6 +18,7 @@ from .models import (
     ProductGalleryImage,
     SaleOrder,
     SaleOrderItem,
+    StoreSettings,
 )
 from .permissions import (
     get_user_roles,
@@ -389,6 +390,55 @@ class DeliveryRegionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class StoreSettingsSerializer(serializers.ModelSerializer):
+    """Dashboard-owned store settings used by the public checkout."""
+
+    whatsapp_phone_digits = serializers.SerializerMethodField()
+    is_whatsapp_configured = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StoreSettings
+        fields = [
+            "id",
+            "whatsapp_phone",
+            "whatsapp_phone_digits",
+            "is_whatsapp_configured",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "whatsapp_phone_digits",
+            "is_whatsapp_configured",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_whatsapp_phone(self, value: str) -> str:
+        """Accept formatted phone input but persist digits for reliable wa.me links."""
+        phone = value.strip()
+
+        if not phone:
+            return ""
+
+        phone_digits = StoreSettings.normalize_phone(phone)
+
+        if len(phone_digits) < 10 or len(phone_digits) > 15:
+            raise serializers.ValidationError(
+                "Informe o WhatsApp com DDD e codigo do pais. Ex.: 5571999999999."
+            )
+
+        return phone_digits
+
+    def get_whatsapp_phone_digits(self, settings_instance: StoreSettings) -> str:
+        """Return normalized phone digits used by checkout redirects."""
+        return settings_instance.whatsapp_phone_digits
+
+    def get_is_whatsapp_configured(self, settings_instance: StoreSettings) -> bool:
+        """Expose whether checkout can generate a direct WhatsApp URL."""
+        return bool(settings_instance.whatsapp_phone_digits)
+
+
 class CheckoutItemInputSerializer(serializers.Serializer):
     """Serializer for each cart item sent during checkout."""
 
@@ -426,17 +476,45 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
         return attrs
 
 
+CHECKOUT_HONEYPOT_FIELDS = ("website", "company")
+
+
 class CheckoutRequestSerializer(serializers.Serializer):
     """Serializer for the public product checkout request."""
 
     items = CheckoutItemInputSerializer(many=True)
     customer = CheckoutCustomerInputSerializer()
 
+    @staticmethod
+    def _submitted_text(data, field_name: str) -> str:
+        if not hasattr(data, "get"):
+            return ""
+
+        value = data.get(field_name)
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+
+        return "" if value is None else str(value).strip()
+
     def validate_items(self, value):
         """Ensure the cart has at least one item."""
         if not value:
             raise serializers.ValidationError("items must contain at least one product")
         return value
+
+    def validate(self, attrs):
+        """Reject autofilled honeypot fields without changing the public contract."""
+        initial_data = self.initial_data if hasattr(self, "initial_data") else {}
+        customer_data = initial_data.get("customer", {}) if hasattr(initial_data, "get") else {}
+
+        for field_name in CHECKOUT_HONEYPOT_FIELDS:
+            if self._submitted_text(initial_data, field_name) or self._submitted_text(
+                customer_data,
+                field_name,
+            ):
+                raise serializers.ValidationError("Invalid checkout request")
+
+        return attrs
 
 
 class CheckoutItemResponseSerializer(serializers.Serializer):

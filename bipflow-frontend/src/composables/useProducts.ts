@@ -323,7 +323,7 @@ export function useProducts() {
 
       products.value = [newProduct, ...products.value];
       Logger.info(`Product created successfully [ID: ${newProduct.id}]`);
-      toast.success("Product created successfully.");
+      toast.success("Produto criado com sucesso.");
       return newProduct;
     } catch (err: unknown) {
       const errorMessage = _extractErrorMessage(err);
@@ -337,7 +337,7 @@ export function useProducts() {
           ),
         })
       );
-      toast.error("Failed to create product. Please try again.");
+      toast.error("Nao foi possivel salvar o produto. Tente novamente.");
       throw err;
     } finally {
       loading.value = false;
@@ -366,7 +366,7 @@ export function useProducts() {
         p.id === id ? updatedProduct : p
       );
       Logger.info(`Product updated successfully [ID: ${id}]`);
-      toast.success("Product updated successfully.");
+      toast.success("Produto atualizado com sucesso.");
       return updatedProduct;
     } catch (err: unknown) {
       const errorMessage = _extractErrorMessage(err);
@@ -378,7 +378,7 @@ export function useProducts() {
           productId: id,
         })
       );
-      toast.error("Failed to update product. Please try again.");
+      toast.error("Nao foi possivel salvar o produto. Tente novamente.");
       throw err;
     } finally {
       loading.value = false;
@@ -400,7 +400,7 @@ export function useProducts() {
       await ProductService.delete(id);
       products.value = products.value.filter((p) => p.id !== id);
       Logger.info(`Product deleted successfully [ID: ${id}]`);
-      toast.success("Product deleted successfully.");
+      toast.success("Produto removido com sucesso.");
     } catch (err: unknown) {
       const errorMessage = _extractErrorMessage(err);
       error.value = `Failed to delete product: ${errorMessage}`;
@@ -411,7 +411,7 @@ export function useProducts() {
           productId: id,
         })
       );
-      toast.error("Failed to delete product. Please try again.");
+      toast.error("Nao foi possivel remover o produto. Tente novamente.");
       throw err;
     } finally {
       loading.value = false;
@@ -451,7 +451,7 @@ export function useProducts() {
           filters: filterPayload.value,
         })
       );
-      toast.error("Search failed. Please try again.");
+      toast.error("Nao foi possivel concluir a busca. Tente novamente.");
     } finally {
       isSearching.value = false;
     }
@@ -579,7 +579,7 @@ export function useProducts() {
     // Fetch all products without filters
     await fetchData();
     Logger.info("All filters cleared");
-    toast.info("Filters cleared.");
+    toast.info("Filtros removidos.");
   };
 
   // ==========================================
@@ -646,7 +646,7 @@ export function useProducts() {
       clearSelection();
 
       Logger.info(`Bulk category update completed [Products: ${productIds.length}, Category: ${categoryId}]`);
-      toast.success(`Successfully updated ${productIds.length} asset${productIds.length === 1 ? '' : 's'}`);
+      toast.success(`Categoria atualizada em ${productIds.length} produto${productIds.length === 1 ? '' : 's'}.`);
     } catch (err: unknown) {
       const errorMessage = _extractErrorMessage(err);
       error.value = `Bulk update failed: ${errorMessage}`;
@@ -658,7 +658,7 @@ export function useProducts() {
           errorMessage,
         })
       );
-      toast.error("Bulk update failed. Please try again.");
+      toast.error("Nao foi possivel atualizar os produtos selecionados.");
       throw err;
     } finally {
       loading.value = false;

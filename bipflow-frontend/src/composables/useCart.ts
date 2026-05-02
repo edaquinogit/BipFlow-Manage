@@ -1,6 +1,5 @@
 import { computed, ref, watch } from 'vue'
 import type { CartCustomer, CartItem, Product } from '@/types/product'
-import { formatBRL } from '@/utils/formatters'
 
 const CART_ITEMS_STORAGE_KEY = 'bipflow_public_cart_items'
 const CART_CUSTOMER_STORAGE_KEY = 'bipflow_public_cart_customer'
@@ -182,45 +181,6 @@ export function useCart() {
     return items.value.find((item) => item.product.id === productId)?.quantity ?? 0
   }
 
-  const buildOrderSummary = (): string => {
-    const lines = [
-      'Pedido BipFlow',
-      '',
-      ...items.value.map((item, index) => {
-        const lineTotal = parsePrice(item.product.price) * item.quantity
-        return `${index + 1}. ${item.product.name} x${item.quantity} - ${formatBRL(lineTotal)}`
-      }),
-      '',
-      `Subtotal: ${formatBRL(subtotal.value)}`,
-      `Entrega: ${formatBRL(deliveryFee.value)}`,
-      `Total: ${formatBRL(total.value)}`,
-      '',
-      `Cliente: ${customer.value.fullName || 'Nao informado'}`,
-      `Telefone: ${customer.value.phone || 'Nao informado'}`,
-      `Email: ${customer.value.email || 'Nao informado'}`,
-      `Entrega: ${customer.value.deliveryMethod === 'delivery' ? 'Delivery' : 'Retirada'}`,
-      `Pagamento: ${customer.value.paymentMethod.toUpperCase()}`,
-    ]
-
-    if (customer.value.deliveryMethod === 'delivery') {
-      if (customer.value.deliveryRegionName.trim()) {
-        lines.push(`Regiao: ${customer.value.deliveryRegionName.trim()}`)
-      }
-
-      lines.push(
-        `Endereco: ${customer.value.address || 'Nao informado'}`,
-        `Bairro: ${customer.value.neighborhood || 'Nao informado'}`,
-        `Cidade: ${customer.value.city || 'Nao informado'}`
-      )
-    }
-
-    if (customer.value.notes.trim()) {
-      lines.push(`Observacoes: ${customer.value.notes.trim()}`)
-    }
-
-    return lines.join('\n')
-  }
-
   return {
     items,
     customer,
@@ -237,6 +197,5 @@ export function useCart() {
     updateCustomer,
     resetCustomer,
     getProductQuantity,
-    buildOrderSummary,
   }
 }

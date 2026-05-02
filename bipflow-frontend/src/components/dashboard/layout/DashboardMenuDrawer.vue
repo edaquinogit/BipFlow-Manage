@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
@@ -7,6 +7,7 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
+  PhoneIcon,
   PlusIcon,
   ShoppingBagIcon,
   TrashIcon,
@@ -16,9 +17,10 @@ import {
 import type { Product } from '@/schemas/product.schema'
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery'
 import type { SaleOrder } from '@/types/sales'
+import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings'
 import { formatBRL } from '@/utils/formatters'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
   recentSales: SaleOrder[]
   isSalesLoading: boolean
@@ -28,6 +30,10 @@ defineProps<{
   deliveryRegionsError: string | null
   isSavingDeliveryRegion: boolean
   deletingDeliveryRegionId: number | null
+  storeSettings: StoreSettings | null
+  isStoreSettingsLoading: boolean
+  storeSettingsError: string | null
+  isSavingStoreSettings: boolean
   outOfStockProducts: Product[]
   lowStockProducts: Product[]
 }>()
@@ -40,9 +46,10 @@ const emit = defineEmits<{
   openStore: []
   saveDeliveryRegion: [payload: DeliveryRegionPayload, id?: number]
   deleteDeliveryRegion: [id: number]
+  saveStoreSettings: [payload: StoreSettingsPayload]
 }>()
 
-const activeView = ref<'overview' | 'delivery'>('overview')
+const activeView = ref<'overview' | 'delivery' | 'store'>('overview')
 const editingRegionId = ref<number | null>(null)
 const regionDraft = ref<DeliveryRegionPayload>({
   name: '',
@@ -51,6 +58,42 @@ const regionDraft = ref<DeliveryRegionPayload>({
   delivery_fee: '',
   is_active: true,
 })
+const storeSettingsDraft = ref<StoreSettingsPayload>({
+  whatsapp_phone: '',
+})
+
+const storeWhatsappDigits = computed(() => normalizePhone(storeSettingsDraft.value.whatsapp_phone))
+const storeWhatsappValidationMessage = computed(() => {
+  if (!storeSettingsDraft.value.whatsapp_phone.trim()) {
+    return ''
+  }
+
+  if (storeWhatsappDigits.value.length < 10 || storeWhatsappDigits.value.length > 15) {
+    return 'Use codigo do pais e DDD. Ex.: 5571999999999'
+  }
+
+  return ''
+})
+const storeWhatsappTestUrl = computed(() => (
+  props.storeSettings?.whatsapp_phone_digits
+    ? `https://wa.me/${props.storeSettings.whatsapp_phone_digits}`
+    : ''
+))
+const canSaveStoreSettings = computed(() => (
+  !props.isSavingStoreSettings
+  && !props.isStoreSettingsLoading
+  && !storeWhatsappValidationMessage.value
+))
+
+watch(
+  () => props.storeSettings?.whatsapp_phone,
+  (phone) => {
+    storeSettingsDraft.value = {
+      whatsapp_phone: phone ?? '',
+    }
+  },
+  { immediate: true }
+)
 
 function resetRegionDraft(): void {
   editingRegionId.value = null
@@ -65,6 +108,11 @@ function resetRegionDraft(): void {
 
 function openDeliveryPricing(): void {
   activeView.value = 'delivery'
+}
+
+function openStoreSettings(): void {
+  activeView.value = 'store'
+  resetRegionDraft()
 }
 
 function openOverview(): void {
@@ -103,6 +151,20 @@ function submitDeliveryRegion(): void {
     editingRegionId.value ?? undefined
   )
   resetRegionDraft()
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '')
+}
+
+function submitStoreSettings(): void {
+  if (!canSaveStoreSettings.value) {
+    return
+  }
+
+  emit('saveStoreSettings', {
+    whatsapp_phone: storeWhatsappDigits.value,
+  })
 }
 
 function getStockValue(product: Product): number {
@@ -204,6 +266,17 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
               <TruckIcon class="h-5 w-5 text-indigo-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 Frete
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-emerald-400/40 hover:bg-emerald-500/10"
+              @click="openStoreSettings"
+            >
+              <PhoneIcon class="h-5 w-5 text-emerald-300" />
+              <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
+                WhatsApp
               </span>
             </button>
 
@@ -333,7 +406,7 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
           </section>
           </template>
 
-          <section v-else class="mt-8">
+          <section v-else-if="activeView === 'delivery'" class="mt-8">
             <div class="flex items-start justify-between gap-4">
               <div>
                 <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
@@ -476,6 +549,82 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
                 </article>
               </template>
             </div>
+          </section>
+
+          <section v-else class="mt-8">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
+                  Loja
+                </p>
+                <h3 class="mt-1 text-sm font-black uppercase tracking-widest text-white">
+                  WhatsApp de pedidos
+                </h3>
+              </div>
+              <button
+                type="button"
+                class="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:text-white"
+                @click="openOverview"
+              >
+                Voltar
+              </button>
+            </div>
+
+            <div v-if="isStoreSettingsLoading" class="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              <div class="h-4 w-44 animate-pulse rounded bg-zinc-800" />
+              <div class="mt-3 h-3 w-64 animate-pulse rounded bg-zinc-800" />
+            </div>
+
+            <div v-else-if="storeSettingsError" class="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+              {{ storeSettingsError }}
+            </div>
+
+            <form class="mt-4 space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitStoreSettings">
+              <label class="block">
+                <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Numero da loja</span>
+                <input
+                  v-model="storeSettingsDraft.whatsapp_phone"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                  placeholder="+55 71 99999-9999"
+                />
+              </label>
+
+              <p v-if="storeWhatsappValidationMessage" class="text-xs font-semibold text-amber-200">
+                {{ storeWhatsappValidationMessage }}
+              </p>
+
+              <div class="rounded-lg border border-white/10 bg-zinc-950 p-3">
+                <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                  Destino atual
+                </p>
+                <div class="mt-2 flex items-center justify-between gap-3">
+                  <p class="min-w-0 truncate text-sm font-bold text-white">
+                    {{ storeSettings?.is_whatsapp_configured ? storeSettings.whatsapp_phone_digits : 'Nao configurado' }}
+                  </p>
+                  <a
+                    v-if="storeWhatsappTestUrl"
+                    :href="storeWhatsappTestUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-200 transition hover:bg-emerald-400/15"
+                    aria-label="Abrir WhatsApp configurado"
+                  >
+                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                :disabled="!canSaveStoreSettings"
+                class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+              >
+                {{ isSavingStoreSettings ? 'Salvando...' : 'Salvar WhatsApp' }}
+              </button>
+            </form>
           </section>
         </div>
 

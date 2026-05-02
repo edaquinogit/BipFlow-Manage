@@ -3,11 +3,13 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import productService from '@/services/product.service'
 import { categoryService } from '@/services/category.service'
+import { useToast } from '@/composables/useToast'
 import { Logger } from '@/services/logger'
 import { isAxiosError, buildErrorContext, type ApplicationError } from '@/types/errors'
 import type { Category } from '@/schemas/category.schema'
 
 const router = useRouter()
+const toast = useToast()
 const isLoading = ref(false)
 const errorMessage = ref('')
 const categories = ref<Category[]>([])
@@ -45,9 +47,11 @@ const handleSubmit = async (): Promise<void> => {
 
     await productService.create(formData)
     Logger.info('Product created successfully from form')
+    toast.success('Produto criado com sucesso.')
     router.push({ name: 'dashboard.products' })
   } catch (error: unknown) {
     Logger.error('Product form submission failed', buildErrorContext(error as ApplicationError))
+    toast.error('Nao foi possivel criar o produto. Verifique os dados e tente novamente.')
 
     if (isAxiosError(error)) {
       const apiError = error.response?.data as Record<string, unknown> | undefined
@@ -56,10 +60,10 @@ const handleSubmit = async (): Promise<void> => {
       } else if (apiError?.detail) {
         errorMessage.value = `Error: ${String(apiError.detail)}`
       } else {
-        errorMessage.value = 'Failed to create product. Please check your data and try again.'
+        errorMessage.value = 'Nao foi possivel criar o produto. Verifique os dados e tente novamente.'
       }
     } else {
-      errorMessage.value = 'An unexpected error occurred. Please try again.'
+      errorMessage.value = 'Ocorreu um erro inesperado. Tente novamente.'
     }
   } finally {
     isLoading.value = false

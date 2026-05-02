@@ -83,7 +83,7 @@ const CartDrawerStub = defineComponent({
     deliveryFee: { type: Number, required: true },
     total: { type: Number, required: true },
   },
-  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer', 'copy-order'],
+  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer'],
   template: '<div class="cart-drawer-stub"></div>',
 })
 
@@ -159,7 +159,6 @@ describe('ProductsView', () => {
     clearCart: vi.fn(),
     updateCustomer: vi.fn(),
     getProductQuantity: vi.fn(() => 0),
-    buildOrderSummary: vi.fn(() => 'Pedido BipFlow'),
   }
 
   const toastMock = {

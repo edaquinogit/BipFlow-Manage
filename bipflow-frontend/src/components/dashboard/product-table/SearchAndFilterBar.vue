@@ -188,13 +188,13 @@ async function createNewCategory(): Promise<void> {
     newCategoryName.value = '';
     showNewCategoryModal.value = false;
     emitFilters({ categoryId: newCategory.id });
-    toast.success(`Category "${newCategory.name}" created successfully.`);
+    toast.success(`Categoria "${newCategory.name}" criada com sucesso.`);
   } catch (error) {
     Logger.error('Failed to create category from filter bar', {
       error,
       categoryName,
     });
-    toast.error('Failed to create category. Please try again.');
+    toast.error('Nao foi possivel criar a categoria. Tente novamente.');
   } finally {
     isCreatingCategory.value = false;
   }

@@ -26,6 +26,7 @@ db.sqlite3
 
 # Runtime artifacts
 **/*.log
+.codex-tmp/
 bipdelivery/media/
 bipdelivery/staticfiles/
 **/staticfiles/

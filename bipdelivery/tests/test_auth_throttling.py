@@ -7,7 +7,6 @@ cases.
 """
 
 import os
-from copy import deepcopy
 from typing import Any
 
 import django
@@ -26,15 +25,9 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
+from bipdelivery.tests.throttle_utils import rest_framework_with_rates  # noqa: E402
+
 pytestmark = pytest.mark.django_db
-
-
-def rest_framework_with_rates(**rates: str) -> dict[str, Any]:
-    rest_framework_settings = deepcopy(settings.REST_FRAMEWORK)
-    default_rates = rest_framework_settings.get("DEFAULT_THROTTLE_RATES", {}).copy()
-    default_rates.update(rates)
-    rest_framework_settings["DEFAULT_THROTTLE_RATES"] = default_rates
-    return rest_framework_settings
 
 
 AUTH_THROTTLE_TEST_REST_FRAMEWORK = rest_framework_with_rates(

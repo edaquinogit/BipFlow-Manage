@@ -292,19 +292,10 @@
               </div>
             </div>
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <div class="mt-5">
               <button
                 type="button"
-                class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="items.length === 0 || isSubmitting"
-                @click="$emit('copyOrder')"
-              >
-                Copiar resumo
-              </button>
-
-              <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                class="inline-flex w-full items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
                 :disabled="items.length === 0 || isSubmitting"
                 @click="$emit('submitOrder')"
               >
@@ -349,7 +340,6 @@ const emit = defineEmits<{
   removeItem: [productId: number]
   updateQuantity: [productId: number, quantity: number]
   updateCustomer: [patch: Partial<CartCustomer>]
-  copyOrder: []
   submitOrder: []
 }>()
 

@@ -137,6 +137,8 @@ Quando o limite e excedido, a API retorna `429 Too Many Requests`.
 - Produtos, categorias e regioes de entrega: leitura publica, escrita apenas
   para `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
 - Regioes de entrega para usuario anonimo: somente regioes ativas.
+- Configuracoes da loja: leitura para papeis de dashboard; escrita apenas para
+  `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
 - Checkout WhatsApp: publico.
 - Historico de vendas: read-only para `is_staff`, `is_superuser` ou usuarios
   nos grupos `admin`/`manager`/`viewer`.
@@ -282,6 +284,38 @@ Notas:
   remove regioes;
 - o carrinho publico usa `/active/` para calcular frete.
 
+## Configuracoes Da Loja
+
+```http
+GET /api/v1/store-settings/
+PATCH /api/v1/store-settings/
+```
+
+Payload de escrita:
+
+```json
+{
+  "whatsapp_phone": "+55 71 99999-9999"
+}
+```
+
+Campos:
+
+- `id`
+- `whatsapp_phone`
+- `whatsapp_phone_digits`
+- `is_whatsapp_configured`
+- `created_at`
+- `updated_at`
+
+Notas:
+
+- o backend aceita numero formatado, mas persiste somente digitos;
+- o WhatsApp deve incluir codigo do pais e DDD;
+- o checkout usa este numero para montar `whatsapp_url`;
+- `WHATSAPP_ORDER_PHONE` fica como fallback quando o dashboard ainda nao tem
+  WhatsApp cadastrado.
+
 ## Checkout Via WhatsApp
 
 ```http
@@ -323,6 +357,7 @@ Regras:
 - retirada usa taxa `0.00`;
 - o pedido e persistido em `SaleOrder` com itens em `SaleOrderItem`;
 - `order_reference` segue o prefixo `BPF`.
+- `whatsapp_url` aponta para o WhatsApp da loja configurado no dashboard.
 
 Resposta:
 
