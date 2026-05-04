@@ -9,6 +9,7 @@
   "scripts": {
     "// --- CORE ---": "",
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort --force --open",
+    "dev:ci": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "server": "npm run dev",
     "frontend:dev": "npm run dev",
     "start": "npm run dev",
@@ -26,10 +27,10 @@
     "test:unit:run": "vitest run",
     "coverage": "vitest run --coverage",
     "// --- CYPRESS ENGINE ---": "",
-    "cypress:open": "cypress open",
-    "cypress:run": "cypress run",
-    "test:e2e": "start-server-and-test dev http://127.0.0.1:5173 cypress:open",
-    "test:e2e:run": "start-server-and-test dev http://127.0.0.1:5173 cypress:run"
+    "cypress:open": "cypress open --project ..",
+    "cypress:run": "cypress run --project ..",
+    "test:e2e": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:open",
+    "test:e2e:run": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:run"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",

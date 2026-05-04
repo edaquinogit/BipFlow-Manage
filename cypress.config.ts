@@ -9,7 +9,7 @@ export default defineConfig({
     specPattern: "bipflow-frontend/cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
 
     // 🎯 CRITICAL ADJUSTMENT: Maps assets folder for upload
-    fixturesFolder: "bipflow-frontend/cypress/fixtures",
+    fixturesFolder: "cypress/fixtures",
 
     // 🔌 SUPPORT CONFIGURATION
     supportFile: "bipflow-frontend/cypress/support/e2e.ts",
