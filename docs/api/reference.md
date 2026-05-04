@@ -327,6 +327,9 @@ Endpoint publico para a primeira fatia do bot guiado por regras. Ele nao chama
 IA, nao conversa com provedor WhatsApp externo e nao persiste conversa nesta
 fase.
 
+Documento de feature:
+[docs/features/catalog-bot.md](../features/catalog-bot.md).
+
 Payload:
 
 ```json
@@ -354,6 +357,8 @@ Regras:
 - entrega retorna apenas regioes ativas;
 - checkout orienta o cliente a finalizar pelo carrinho, mantendo preco, estoque,
   frete e total sob responsabilidade do backend.
+- novas intents devem atualizar backend, serializers, types do frontend, testes
+  e esta referencia no mesmo ciclo da mudanca.
 
 ## Checkout Via WhatsApp
 

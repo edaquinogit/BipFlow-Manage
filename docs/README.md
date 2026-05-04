@@ -14,6 +14,8 @@ no codigo e suficiente para operar o estado atual do repositorio.
   qualidade e manutencao.
 - [Referencia da API Django](api/reference.md): endpoints implementados em
   `bipdelivery/api/`.
+- [Bot do catalogo](features/catalog-bot.md): comportamento, contrato,
+  responsabilidades e manutencao do bot publico guiado por regras.
 - [README frontend](../bipflow-frontend/README.md): detalhes da aplicacao Vue.
 
 ## Codigo Arquivado
@@ -32,7 +34,8 @@ no codigo e suficiente para operar o estado atual do repositorio.
 1. [README principal](../README.md)
 2. [Arquitetura](architecture/system-overview.md)
 3. [Guia de desenvolvimento](development-guide.md)
-4. [Referencia da API Django](api/reference.md)
+4. [Bot do catalogo](features/catalog-bot.md)
+5. [Referencia da API Django](api/reference.md)
 
 ## Regra De Manutencao
 
