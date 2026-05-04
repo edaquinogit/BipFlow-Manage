@@ -186,6 +186,8 @@
       @open-cart="isCartOpen = true"
     />
 
+    <CatalogBotWidget @open-product="handleOpenBotProduct" />
+
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
@@ -211,6 +213,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryValue } from 'vue-router'
 import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
+import CatalogBotWidget from './CatalogBotWidget.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
@@ -533,6 +536,13 @@ function handleOpenDetails(product: Product): void {
   void router.push({
     name: PublicRoutes.ProductDetails,
     params: { slug: product.slug },
+  })
+}
+
+function handleOpenBotProduct(slug: string): void {
+  void router.push({
+    name: PublicRoutes.ProductDetails,
+    params: { slug },
   })
 }
 

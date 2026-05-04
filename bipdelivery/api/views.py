@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from .bot_engine import build_bot_reply
 from .errors import business_logic_error, not_found_error, validation_error
 from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem, StoreSettings
 from .pagination import ProductListPagination, StandardPagination
@@ -26,6 +27,8 @@ from .permissions import (
     has_dashboard_read_access,
 )
 from .serializers import (
+    BotMessageRequestSerializer,
+    BotMessageResponseSerializer,
     CategorySerializer,
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
@@ -40,6 +43,7 @@ from .serializers import (
 )
 from .throttling import (
     AuthIpThrottle,
+    BotMessageIpThrottle,
     CheckoutIpThrottle,
     CheckoutPhoneThrottle,
     LoginIdentityThrottle,
@@ -380,6 +384,24 @@ class StoreSettingsView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BotMessageView(APIView):
+    """Handle the public rule-based bot MVP without external AI services."""
+
+    permission_classes = []
+    authentication_classes = []
+    throttle_classes = [BotMessageIpThrottle]
+
+    def post(self, request, *args, **kwargs):
+        input_serializer = BotMessageRequestSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+
+        bot_reply = build_bot_reply(input_serializer.validated_data["message"])
+        output_serializer = BotMessageResponseSerializer(data=bot_reply.as_dict())
+        output_serializer.is_valid(raise_exception=True)
+
+        return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 
 class CheckoutWhatsAppView(APIView):

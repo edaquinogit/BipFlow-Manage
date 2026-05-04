@@ -102,6 +102,14 @@ class CheckoutIpThrottle(AnonRateThrottle):
     scope = "checkout_ip"
 
 
+class BotMessageIpThrottle(AnonRateThrottle):
+    """
+    Limit public rule-based bot messages by client IP.
+    """
+
+    scope = "bot_message_ip"
+
+
 class SubmittedFieldThrottle(SimpleRateThrottle):
     """
     Base throttle that keys the rate limit by submitted sensitive fields.

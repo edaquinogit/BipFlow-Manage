@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    BotMessageView,
     CategoryViewSet,
     CheckoutWhatsAppView,
     DeliveryRegionViewSet,
@@ -19,6 +20,7 @@ router.register(r"sales-orders", SaleOrderViewSet, basename="sales-order")
 
 urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador
+    path("bot/messages/", BotMessageView.as_view(), name="bot-message"),
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
     path("store-settings/", StoreSettingsView.as_view(), name="store-settings"),
     path("", include(router.urls)),
