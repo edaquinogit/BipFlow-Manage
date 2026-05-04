@@ -3,6 +3,7 @@ import sys
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -37,6 +38,25 @@ def get_env_value(key: str, default: str) -> str:
     return value.strip() or default
 
 
+def get_env_list(key: str, default: list[str] | None = None) -> list[str]:
+    value = os.environ.get(key)
+    if value is None:
+        return list(default or [])
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def get_int_env(key: str, default: int) -> int:
+    value = os.environ.get(key)
+    if value is None:
+        return default
+
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ImproperlyConfigured(f"{key} must be an integer.") from exc
+
+
 def is_test_mode() -> bool:
     return bool(os.environ.get("PYTEST_CURRENT_TEST") or any("pytest" in arg for arg in sys.argv))
 
@@ -67,8 +87,7 @@ SECRET_KEY = get_env_or_raise("DJANGO_SECRET_KEY")
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
 
-allowed_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS", "")
-ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(",") if host.strip()]
+ALLOWED_HOSTS = get_env_list("DJANGO_ALLOWED_HOSTS")
 
 if not ALLOWED_HOSTS:
     if not IS_PRODUCTION:
@@ -143,12 +162,43 @@ TEMPLATES = [
 # ------------------------------------------------------------------------------
 # ðŸ“Š DATABASE & AUTHENTICATION
 # ------------------------------------------------------------------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+
+
+def build_database_config() -> dict:
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+
+    if not database_url:
+        return {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
+
+    parsed_url = urlparse(database_url)
+    scheme = parsed_url.scheme.lower()
+
+    if scheme not in {"postgres", "postgresql"}:
+        raise ImproperlyConfigured("DATABASE_URL must use postgres:// or postgresql://.")
+
+    database_name = unquote(parsed_url.path.lstrip("/"))
+    if not database_name:
+        raise ImproperlyConfigured("DATABASE_URL must include a database name.")
+
+    return {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": database_name,
+            "USER": unquote(parsed_url.username or ""),
+            "PASSWORD": unquote(parsed_url.password or ""),
+            "HOST": parsed_url.hostname or "localhost",
+            "PORT": str(parsed_url.port or 5432),
+            "CONN_MAX_AGE": get_int_env("DATABASE_CONN_MAX_AGE", 60),
+        }
     }
-}
+
+
+DATABASES = build_database_config()
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -183,7 +233,6 @@ for path in [STATIC_ROOT, MEDIA_ROOT, LOGS_ROOT]:
 # ðŸ”’ CORS & DRF SECURITY
 # ------------------------------------------------------------------------------
 # Parse CORS allowed origins from environment or use sensible defaults
-cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
 if DEBUG:
     # In development, allow localhost and common dev ports
     CORS_ALLOWED_ORIGINS = [
@@ -194,14 +243,13 @@ if DEBUG:
         "http://localhost:8000",  # Django dev server
         "http://127.0.0.1:8000",
     ]
-elif cors_origins:
-    # In production, use environment variable (comma-separated)
-    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 else:
-    # Fallback for production without env var - no CORS
-    CORS_ALLOWED_ORIGINS = []
+    CORS_ALLOWED_ORIGINS = get_env_list("CORS_ALLOWED_ORIGINS")
+
+CSRF_TRUSTED_ORIGINS = get_env_list("CSRF_TRUSTED_ORIGINS")
 
 CORS_ALLOW_CREDENTIALS = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -279,16 +327,30 @@ ORDER_DELIVERY_FEE = Decimal(os.environ.get("ORDER_DELIVERY_FEE", "12.00"))
 # ─────────────────────────────────────────────────────────────────────────
 # 🕐 CACHE CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "bipflow-cache",
-        "TIMEOUT": 300,
-        "OPTIONS": {
-            "MAX_ENTRIES": 10000,
-        },
+CACHE_URL = os.environ.get("CACHE_URL", "").strip()
+
+if CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": CACHE_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+            "TIMEOUT": 300,
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "bipflow-cache",
+            "TIMEOUT": 300,
+            "OPTIONS": {
+                "MAX_ENTRIES": 10000,
+            },
+        }
+    }
 
 # ------------------------------------------------------------------------------
 # 📝 LOGGING CONFIGURATION
