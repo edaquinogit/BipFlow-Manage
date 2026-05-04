@@ -194,6 +194,18 @@ npm run frontend:test:unit
 npm run frontend:test:e2e
 ```
 
+Pipeline de frontend:
+
+- `.github/workflows/frontend-tests.yml` roda em `push`, `pull_request` e
+  execucao manual.
+- O job rapido executa typecheck, lint, Vitest e build de producao.
+- O job E2E prepara o Django, cria o usuario `admin@example.com`/`admin123` e
+  roda Cypress.
+- Testes unitarios novos entram automaticamente seguindo
+  `bipflow-frontend/src/**/*.spec.{ts,tsx,vue}`.
+- Testes E2E novos entram automaticamente seguindo
+  `bipflow-frontend/cypress/e2e/**/*.cy.{js,jsx,ts,tsx}`.
+
 Para Cypress, o usuario usado por `cy.loginViaApi()` deve existir no backend e
 ter `is_staff=True` ou grupo `admin`/`manager`. Os defaults locais sao
 `admin@example.com` e `admin123`, mas podem ser sobrescritos por
