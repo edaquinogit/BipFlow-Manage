@@ -45,6 +45,50 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 - Papel atual: pacote isolado/test harness historico ligado ao motor Node.
 - Observacao: nao deve ser tratado como backend principal do produto.
 
+## Setup Com Docker Compose
+
+O runtime containerizado representa o fluxo principal do produto:
+
+- `frontend`: Nginx servindo o build Vue e roteando requisicoes para o backend.
+- `backend`: Django em Gunicorn.
+- `postgres`: banco relacional persistido em volume Docker.
+- `redis`: cache compartilhado para Django e throttling do DRF.
+
+Na raiz:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+URLs:
+
+- Aplicacao: `http://localhost:8080/`
+- API: `http://localhost:8080/api/`
+- Admin: `http://localhost:8080/admin/`
+
+O backend executa migrations, `collectstatic` e seed dos grupos RBAC no
+entrypoint. Para criar um usuario admin de demonstracao no boot, configure no
+`.env`:
+
+```env
+DJANGO_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+DJANGO_BOOTSTRAP_ADMIN_PASSWORD=troque-esta-senha
+DJANGO_BOOTSTRAP_ADMIN_ROLE=admin
+```
+
+Se `localhost:8080` retornar conexao recusada, o Nginx do container frontend
+nao esta rodando. Verifique:
+
+```powershell
+docker compose ps
+docker compose logs frontend backend
+```
+
+Esse modo e separado do desenvolvimento com Vite. Para dev local sem Docker,
+rode o frontend em `http://127.0.0.1:5173/` e o Django em
+`http://127.0.0.1:8000/`.
+
 ## Setup Do Backend Django
 
 Na raiz do repositorio:

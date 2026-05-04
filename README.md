@@ -155,6 +155,50 @@ BipFlow-Manage/
 
 ## Setup Rápido
 
+### Docker Compose
+
+O fluxo containerizado sobe o produto principal com frontend Vue, backend
+Django, PostgreSQL e Redis:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Aplicação local: `http://localhost:8080/`
+API pelo proxy do frontend: `http://localhost:8080/api/`
+Admin Django pelo proxy: `http://localhost:8080/admin/`
+
+Serviços:
+
+- `frontend`: Nginx servindo o build Vue e fazendo proxy de `/api/`, `/admin/`,
+  `/static/` e `/media/`.
+- `backend`: Django em Gunicorn, com migrations, `collectstatic` e seed de
+  grupos RBAC no entrypoint.
+- `postgres`: banco relacional do runtime containerizado.
+- `redis`: cache compartilhado usado também pelos throttles do DRF.
+
+Para criar um usuário administrativo de demonstração no primeiro boot, defina
+no `.env`:
+
+```env
+DJANGO_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+DJANGO_BOOTSTRAP_ADMIN_PASSWORD=troque-esta-senha
+DJANGO_BOOTSTRAP_ADMIN_ROLE=admin
+```
+
+Se `localhost:8080` recusar conexão, o container `frontend` não está em
+execução ou a porta está ocupada. Confira com:
+
+```powershell
+docker compose ps
+docker compose logs frontend backend
+```
+
+No modo de desenvolvimento sem Docker, use o frontend em
+`http://127.0.0.1:5173/` e suba o Django separadamente em
+`http://127.0.0.1:8000/`.
+
 ### Backend Django
 
 ```powershell
