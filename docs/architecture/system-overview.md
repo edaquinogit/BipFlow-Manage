@@ -113,6 +113,8 @@ Bot MVP:
 - classifica mensagens por regras para saudacao, catalogo, busca de produto,
   entrega, checkout, atendimento humano e fallback;
 - consulta produtos disponiveis e regioes ativas sem duplicar regra de negocio.
+- documentacao da feature:
+  [docs/features/catalog-bot.md](../features/catalog-bot.md).
 
 Checkout:
 
@@ -138,5 +140,7 @@ Vendas:
 - O frontend nao grava tokens fora de `token-store.ts`.
 - O frontend nao deve espalhar chamadas `axios` fora de `src/services/`.
 - O dashboard consome historico de vendas persistido pelo checkout publico.
+- O bot do catalogo deve continuar fino no frontend: UI chama service, service
+  chama API, backend classifica e consulta dados reais.
 - Documentacao deve representar o codigo atual e ser removida quando virar
   placeholder, relatorio historico ou plano nao implementado.

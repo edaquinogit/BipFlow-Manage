@@ -12,6 +12,8 @@ catalogo publico de produtos.
 - Configuracao do WhatsApp da loja para receber pedidos da vitrine.
 - Catalogo publico em `/produtos` e `/products`.
 - Detalhe publico por slug.
+- Bot publico no catalogo com atalhos, sugestoes de produtos e regioes de
+  entrega retornadas pelo Django.
 - Carrinho local com frete por regiao ativa.
 - Checkout via endpoint Django `/api/v1/checkout/whatsapp/`.
 
@@ -97,6 +99,22 @@ npm run test:e2e:run
 - `src/services/sales.service.ts`: historico recente de vendas.
 - `src/services/store-settings.service.ts`: configuracoes operacionais da loja.
 - `src/services/order.service.ts`: checkout via WhatsApp.
+- `src/services/bot.service.ts`: mensagens do bot publico do catalogo.
+
+## Contrato Do Bot Do Catalogo
+
+O bot publico fica em `src/views/products/CatalogBotWidget.vue` e chama
+`src/services/bot.service.ts`. O service envia `POST v1/bot/messages/` com a
+mensagem trimada e `channel` padrao `web`.
+
+Regras de manutencao:
+
+- a UI renderiza `reply`, `options`, `products` e `delivery_regions`;
+- produtos sugeridos com `slug` navegam para o detalhe publico;
+- intents e payloads vivem em `src/types/bot.ts`;
+- regras de classificacao, disponibilidade, estoque e entrega ficam no backend;
+- mudancas de contrato devem atualizar
+  `../docs/features/catalog-bot.md` e `../docs/api/reference.md`.
 
 ## Contrato Do Fluxo De Produto
 
@@ -153,4 +171,6 @@ Uso recomendado:
 - Usuarios sem `can_access_dashboard` devem ser enviados para `/403`.
 - Nao persistir pedido no frontend; o checkout e validado e persistido no
   backend Django.
+- Nao duplicar regra do bot no frontend; renderize o contrato retornado pela
+  API.
 - Usar `Logger` em vez de logs permanentes no console.

@@ -17,7 +17,8 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 - Stack: Django 6, Django REST Framework, Simple JWT e SQLite local.
 - Responsabilidades: autenticacao, perfil autenticado, produtos, categorias,
   regioes de entrega, checkout via WhatsApp, pedidos persistidos, historico de
-  vendas, RBAC de dashboard e media em desenvolvimento.
+  vendas, bot publico guiado por regras, RBAC de dashboard e media em
+  desenvolvimento.
 
 ### Frontend principal
 
@@ -25,7 +26,8 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 - Stack: Vue 3, TypeScript, Vite, Vue Router, Axios e Tailwind.
 - Responsabilidades: dashboard autenticado, saudacao do usuario, menu
   operacional, gestao de produtos, gestao de frete, alertas de estoque,
-  historico recente de vendas, catalogo publico, carrinho e checkout.
+  historico recente de vendas, catalogo publico, bot de atendimento do
+  catalogo, carrinho e checkout.
 - Contrato de auth: tokens JWT persistidos somente por
   `src/services/token-store.ts`.
 - Contrato de produtos: mutacoes passam por `ProductFormSchema`,
@@ -221,6 +223,7 @@ Backend:
 - CRUD de categorias e produtos;
 - filtros, galeria de imagens e busca por slug;
 - regioes de entrega;
+- bot publico do catalogo sem IA externa;
 - checkout via WhatsApp com persistencia de `SaleOrder`;
 - historico de vendas restrito a papel de dashboard;
 - servico local de media.
@@ -230,6 +233,7 @@ Frontend:
 - services de produtos e categorias;
 - composables de busca, produtos e carrinho;
 - views publicas de produtos;
+- widget de bot integrado ao catalogo publico;
 - botao flutuante do carrinho;
 - formulario administrativo de produto com validacao de categoria obrigatoria,
   coercao numerica de preco/estoque e payload multipart com categoria;
@@ -254,6 +258,12 @@ Resultado: typecheck, 37 testes unitarios e build de producao passaram.
 - Centralize HTTP em `src/services/`.
 - Mantenha `token-store.ts` como unica fonte de verdade de tokens.
 - Atualize `types`, `schemas` e `services` juntos quando o contrato mudar.
+- Para o bot, mantenha classificacao e regras no backend; o frontend deve
+  renderizar respostas estruturadas sem duplicar regra de negocio.
+- Ao adicionar intent do bot, atualize `bot_engine.py`, serializers, types,
+  testes e `docs/features/catalog-bot.md`.
+- Evite hierarquias de heranca para intents do bot; prefira funcoes pequenas,
+  nomeadas e cobertas por teste enquanto o fluxo for deterministico.
 - Em backend, mantenha leitura publica e escrita restrita a papel
   administrativo quando alterar recursos do catalogo.
 - Use migrations para mudancas estruturais de banco.

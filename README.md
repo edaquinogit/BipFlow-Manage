@@ -32,16 +32,43 @@ Acesse os materiais pelo perfil:
 ## Para Recrutadores
 
 Este repositório também funciona como evidência prática do meu perfil em
-desenvolvimento full-stack junior. Para uma avaliação rápida:
+desenvolvimento full-stack junior. Para leitura de carreira:
 
 - [Currículo ATS em DOCX](docs/career/Ednaldo_Aquino_Curriculo_ATS.docx):
   versão adequada para envio em processos seletivos e leitura por sistemas ATS.
 - [Currículo em Markdown](docs/career/Ednaldo_Aquino_Curriculo_ATS.md):
   versão aberta, revisável e alinhada ao projeto.
-- O estudo de caso STAR abaixo resume contexto, responsabilidade técnica,
-  ações implementadas e resultado entregue.
-- A seção de qualidade lista os comandos usados para validar backend, frontend,
-  testes, lint, typecheck e build.
+
+## Como Avaliar Em 3 Minutos
+
+Use este roteiro para entender o projeto sem precisar abrir todos os arquivos:
+
+- **0:00 - 0:30 | Valor entregue:** leia a [Visão Rápida](#visão-rápida) e
+  [Por Que Este Projeto Existe](#por-que-este-projeto-existe) para entender o
+  problema, o público e o fluxo de venda resolvido.
+- **0:30 - 1:10 | Arquitetura real:** abra
+  [docs/architecture/system-overview.md](docs/architecture/system-overview.md)
+  para confirmar os limites entre Django REST, Vue 3 e o motor Node isolado.
+- **1:10 - 2:00 | Fluxo crítico no código:** confira
+  `bipdelivery/api/models.py`, `bipdelivery/api/serializers.py`,
+  `bipdelivery/api/views.py`, `bipflow-frontend/src/services/order.service.ts`
+  e `bipflow-frontend/src/views/products/`. Esses arquivos mostram catálogo,
+  frete, carrinho, checkout via WhatsApp, pedido persistido e bot MVP.
+- **2:00 - 2:35 | Qualidade verificável:** leia a seção
+  [Qualidade](#qualidade) e os testes em `bipdelivery/tests/`, especialmente
+  checkout, permissões, filtros de produto e bot guiado por regras.
+- **2:35 - 3:00 | Evidência de comunicação:** assista à demonstração, veja o
+  carrossel técnico e leia o [Estudo De Caso STAR](#estudo-de-caso-star) para
+  avaliar clareza, tomada de decisão e capacidade de explicar trade-offs.
+
+Sinais técnicos para observar durante a triagem:
+
+- Backend como fonte de verdade para preço, estoque, frete, total e pedido.
+- RBAC, JWT, throttling e leitura pública separados de escrita administrativa.
+- Frontend organizado por services, composables, schemas, types e views.
+- Checkout público persistindo `SaleOrder` para o dashboard administrativo.
+- Bot MVP sem IA externa, testável e integrado ao catálogo e regiões ativas.
+- Documentação curta, versionada e conectada ao código implementado.
 
 ## Por Que Este Projeto Existe
 
@@ -108,6 +135,8 @@ isolado ligado ao motor Node. Ele não faz parte do fluxo web principal.
   qualidade e manutenção.
 - [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
   Django.
+- [docs/features/catalog-bot.md](docs/features/catalog-bot.md): documentação do
+  bot público integrado ao catálogo.
 - [bipflow-frontend/README.md](bipflow-frontend/README.md): guia específico do
   frontend.
 
