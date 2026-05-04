@@ -316,6 +316,44 @@ Notas:
 - `WHATSAPP_ORDER_PHONE` fica como fallback quando o dashboard ainda nao tem
   WhatsApp cadastrado.
 
+## Bot MVP Sem IA
+
+```http
+POST /api/v1/bot/messages/
+```
+
+Endpoint publico para a primeira fatia do bot guiado por regras. Ele nao chama
+IA, nao conversa com provedor WhatsApp externo e nao persiste conversa nesta
+fase.
+
+Payload:
+
+```json
+{
+  "message": "Quero ver o catalogo",
+  "channel": "web"
+}
+```
+
+`channel` e opcional e aceita `web` ou `whatsapp`.
+
+Resposta:
+
+- `intent`: `greeting`, `catalog`, `product_search`, `delivery`, `checkout`,
+  `human_support` ou `fallback`;
+- `reply`: texto curto para exibir ao cliente;
+- `options`: atalhos guiados que o frontend pode renderizar;
+- `products`: sugestoes compactas de produtos disponiveis;
+- `delivery_regions`: regioes ativas de entrega.
+
+Regras:
+
+- mensagens vazias sao rejeitadas;
+- catalogo e busca retornam apenas produtos disponiveis e com estoque;
+- entrega retorna apenas regioes ativas;
+- checkout orienta o cliente a finalizar pelo carrinho, mantendo preco, estoque,
+  frete e total sob responsabilidade do backend.
+
 ## Checkout Via WhatsApp
 
 ```http

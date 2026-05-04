@@ -439,6 +439,63 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
         return bool(settings_instance.whatsapp_phone_digits)
 
 
+class BotMessageRequestSerializer(serializers.Serializer):
+    """Incoming public message handled by the rule-based bot MVP."""
+
+    message = serializers.CharField(max_length=500, trim_whitespace=True)
+    channel = serializers.ChoiceField(
+        choices=["web", "whatsapp"],
+        default="web",
+        required=False,
+    )
+
+
+class BotOptionSerializer(serializers.Serializer):
+    """Small command option that a frontend widget can render as a quick reply."""
+
+    label = serializers.CharField()
+    value = serializers.CharField()
+
+
+class BotProductSuggestionSerializer(serializers.Serializer):
+    """Compact product payload for bot replies."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    slug = serializers.CharField(allow_blank=True, allow_null=True)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    stock_quantity = serializers.IntegerField()
+
+
+class BotDeliveryRegionSuggestionSerializer(serializers.Serializer):
+    """Compact active delivery region payload for bot replies."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    city = serializers.CharField(allow_blank=True)
+    delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class BotMessageResponseSerializer(serializers.Serializer):
+    """Structured response from the rule-based bot MVP."""
+
+    intent = serializers.ChoiceField(
+        choices=[
+            "greeting",
+            "catalog",
+            "product_search",
+            "delivery",
+            "checkout",
+            "human_support",
+            "fallback",
+        ]
+    )
+    reply = serializers.CharField()
+    options = BotOptionSerializer(many=True)
+    products = BotProductSuggestionSerializer(many=True)
+    delivery_regions = BotDeliveryRegionSuggestionSerializer(many=True)
+
+
 class CheckoutItemInputSerializer(serializers.Serializer):
     """Serializer for each cart item sent during checkout."""
 

@@ -64,6 +64,7 @@ Responsabilidades:
 - aplicar throttling em endpoints sensiveis de auth;
 - manter produtos, categorias e galerias de imagens;
 - manter regioes de entrega e taxa por regiao;
+- responder mensagens do bot MVP sem IA por regras deterministicas;
 - validar checkout no servidor;
 - persistir pedidos como `SaleOrder` e `SaleOrderItem`;
 - expor historico de vendas para usuarios com papel de dashboard.
@@ -71,6 +72,7 @@ Responsabilidades:
 Arquivos principais:
 
 - `bipdelivery/api/models.py`
+- `bipdelivery/api/bot_engine.py`
 - `bipdelivery/api/serializers.py`
 - `bipdelivery/api/views.py`
 - `bipdelivery/api/v1_urls.py`
@@ -102,6 +104,15 @@ Regioes de entrega:
 - usuarios com papel de dashboard veem todas;
 - `staff`, `superuser`, `admin` e `manager` gerenciam;
 - `/api/v1/delivery-regions/active/` alimenta o carrinho publico.
+
+Bot MVP:
+
+- `/api/v1/bot/messages/`
+- publico;
+- sem IA e sem provedor externo nesta fase;
+- classifica mensagens por regras para saudacao, catalogo, busca de produto,
+  entrega, checkout, atendimento humano e fallback;
+- consulta produtos disponiveis e regioes ativas sem duplicar regra de negocio.
 
 Checkout:
 
