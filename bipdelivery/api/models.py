@@ -5,6 +5,11 @@ from django.db import models
 from django.utils.text import slugify
 
 
+def generate_bot_session_id() -> str:
+    """Return an opaque public identifier for bot conversation continuity."""
+    return uuid.uuid4().hex
+
+
 class Category(models.Model):
     """Product category model for organizational purposes."""
 
@@ -203,6 +208,87 @@ class StoreSettings(models.Model):
             return dashboard_phone
 
         return cls.normalize_phone(getattr(settings, "WHATSAPP_ORDER_PHONE", ""))
+
+
+class BotConversation(models.Model):
+    """Conversation state for the public rule-based bot."""
+
+    CHANNEL_WEB = "web"
+    CHANNEL_WHATSAPP = "whatsapp"
+    CHANNEL_CHOICES = [
+        (CHANNEL_WEB, "Web"),
+        (CHANNEL_WHATSAPP, "WhatsApp"),
+    ]
+
+    STATUS_OPEN = "open"
+    STATUS_WAITING_CUSTOMER = "waiting_customer"
+    STATUS_WAITING_HUMAN = "waiting_human"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Open"),
+        (STATUS_WAITING_CUSTOMER, "Waiting customer"),
+        (STATUS_WAITING_HUMAN, "Waiting human"),
+        (STATUS_CLOSED, "Closed"),
+    ]
+
+    session_id = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        default=generate_bot_session_id,
+        help_text="Public opaque identifier used by clients to continue the conversation.",
+    )
+    channel = models.CharField(max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_WEB)
+    customer_phone = models.CharField(max_length=32, blank=True)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    last_intent = models.CharField(max_length=32, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["channel", "status"]),
+            models.Index(fields=["last_intent"]),
+        ]
+
+    def __str__(self) -> str:
+        """Return a compact conversation identifier."""
+        return f"{self.channel}:{self.session_id}"
+
+
+class BotMessage(models.Model):
+    """Persisted message exchanged inside a bot conversation."""
+
+    ROLE_USER = "user"
+    ROLE_BOT = "bot"
+    ROLE_CHOICES = [
+        (ROLE_USER, "User"),
+        (ROLE_BOT, "Bot"),
+    ]
+
+    conversation = models.ForeignKey(
+        BotConversation,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role = models.CharField(max_length=16, choices=ROLE_CHOICES)
+    content = models.TextField()
+    intent = models.CharField(max_length=32, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"]),
+            models.Index(fields=["role"]),
+        ]
+
+    def __str__(self) -> str:
+        """Return a compact message summary."""
+        return f"{self.role} message in {self.conversation_id}"
 
 
 class SaleOrder(models.Model):

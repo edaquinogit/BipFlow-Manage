@@ -503,6 +503,28 @@ class StoreSettingsAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_public_store_settings_exposes_only_catalog_contact(self) -> None:
+        """Public catalog should read the configured WhatsApp without private metadata."""
+        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+
+        response: Any = self.client.get("/api/v1/store-settings/public/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5571999999999")
+        self.assertTrue(response.data["is_whatsapp_configured"])
+        self.assertNotIn("id", response.data)
+        self.assertNotIn("created_at", response.data)
+        self.assertNotIn("updated_at", response.data)
+
+    def test_public_store_settings_does_not_create_empty_settings_row(self) -> None:
+        """Anonymous catalog reads should not mutate settings storage."""
+        response: Any = self.client.get("/api/v1/store-settings/public/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "")
+        self.assertFalse(response.data["is_whatsapp_configured"])
+        self.assertEqual(StoreSettings.objects.count(), 0)
+
     def test_dashboard_user_can_update_store_whatsapp(self) -> None:
         """Dashboard writers should be able to persist the store WhatsApp number."""
         self.client.force_authenticate(user=self.user)

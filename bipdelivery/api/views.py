@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -18,7 +18,16 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .bot_engine import build_bot_reply
 from .errors import business_logic_error, not_found_error, validation_error
-from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem, StoreSettings
+from .models import (
+    BotConversation,
+    BotMessage,
+    Category,
+    DeliveryRegion,
+    Product,
+    SaleOrder,
+    SaleOrderItem,
+    StoreSettings,
+)
 from .pagination import ProductListPagination, StandardPagination
 from .permissions import (
     AllowAnyReadDashboardWrite,
@@ -27,6 +36,8 @@ from .permissions import (
     has_dashboard_read_access,
 )
 from .serializers import (
+    BotConversationDetailSerializer,
+    BotConversationSummarySerializer,
     BotMessageRequestSerializer,
     BotMessageResponseSerializer,
     CategorySerializer,
@@ -37,6 +48,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProductSerializer,
+    PublicStoreSettingsSerializer,
     RegisterUserSerializer,
     SaleOrderSerializer,
     StoreSettingsSerializer,
@@ -364,6 +376,49 @@ class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
+class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only bot conversation history for authenticated dashboard users."""
+
+    permission_classes = [IsAuthenticated, IsDashboardReadRole]
+    pagination_class = StandardPagination
+
+    def get_serializer_class(self):
+        """Use compact payloads for lists and full message history for details."""
+        if self.action == "retrieve":
+            return BotConversationDetailSerializer
+
+        return BotConversationSummarySerializer
+
+    def get_queryset(self):
+        """Return bot conversations with optional dashboard filters."""
+        queryset = BotConversation.objects.annotate(message_count=Count("messages"))
+
+        if self.action == "retrieve":
+            queryset = queryset.prefetch_related("messages")
+
+        status_filter = self.request.query_params.get("status", "").strip()
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        channel_filter = self.request.query_params.get("channel", "").strip()
+        if channel_filter:
+            queryset = queryset.filter(channel=channel_filter)
+
+        intent_filter = self.request.query_params.get("intent", "").strip()
+        if intent_filter:
+            queryset = queryset.filter(last_intent=intent_filter)
+
+        search_term = self.request.query_params.get("search", "").strip()
+        if search_term:
+            queryset = queryset.filter(
+                Q(session_id__icontains=search_term)
+                | Q(customer_phone__icontains=search_term)
+                | Q(messages__content__icontains=search_term)
+            ).distinct()
+
+        return queryset.order_by("-updated_at", "-id")
+
+
 class StoreSettingsView(APIView):
     """Read and update singleton store settings from the dashboard."""
 
@@ -386,6 +441,18 @@ class StoreSettingsView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class PublicStoreSettingsView(APIView):
+    """Expose safe store contact settings to the public catalog."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        settings_instance = StoreSettings.objects.filter(singleton_key=1).first() or StoreSettings()
+        serializer = PublicStoreSettingsSerializer(settings_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class BotMessageView(APIView):
     """Handle the public rule-based bot MVP without external AI services."""
 
@@ -393,12 +460,99 @@ class BotMessageView(APIView):
     authentication_classes = []
     throttle_classes = [BotMessageIpThrottle]
 
+    @staticmethod
+    def _json_safe_payload(value):
+        if isinstance(value, Decimal):
+            return f"{value:.2f}"
+
+        if isinstance(value, list):
+            return [BotMessageView._json_safe_payload(item) for item in value]
+
+        if isinstance(value, dict):
+            return {
+                key: BotMessageView._json_safe_payload(item)
+                for key, item in value.items()
+            }
+
+        return value
+
+    @staticmethod
+    def _resolve_conversation(validated_data) -> BotConversation:
+        conversation_id = validated_data.get("conversation_id")
+        session_id = validated_data.get("session_id", "").strip()
+        channel = validated_data["channel"]
+        customer_phone = validated_data.get("customer_phone", "").strip()
+
+        conversation = None
+
+        if conversation_id:
+            conversation = BotConversation.objects.filter(id=conversation_id).first()
+
+        if conversation is None and session_id:
+            conversation = BotConversation.objects.filter(session_id=session_id).first()
+
+        if conversation is None:
+            conversation = BotConversation.objects.create(
+                channel=channel,
+                customer_phone=customer_phone,
+            )
+        else:
+            update_fields = []
+
+            if conversation.channel != channel:
+                conversation.channel = channel
+                update_fields.append("channel")
+
+            if customer_phone and conversation.customer_phone != customer_phone:
+                conversation.customer_phone = customer_phone
+                update_fields.append("customer_phone")
+
+            if update_fields:
+                conversation.save(update_fields=[*update_fields, "updated_at"])
+
+        return conversation
+
     def post(self, request, *args, **kwargs):
         input_serializer = BotMessageRequestSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
 
-        bot_reply = build_bot_reply(input_serializer.validated_data["message"])
-        output_serializer = BotMessageResponseSerializer(data=bot_reply.as_dict())
+        validated_data = input_serializer.validated_data
+        user_message = validated_data["message"]
+        conversation = self._resolve_conversation(validated_data)
+        bot_reply = build_bot_reply(user_message)
+
+        next_status = (
+            BotConversation.STATUS_WAITING_HUMAN
+            if bot_reply.intent == "human_support"
+            else BotConversation.STATUS_WAITING_CUSTOMER
+        )
+        bot_payload = bot_reply.as_dict()
+
+        with transaction.atomic():
+            BotMessage.objects.create(
+                conversation=conversation,
+                role=BotMessage.ROLE_USER,
+                content=user_message,
+            )
+            BotMessage.objects.create(
+                conversation=conversation,
+                role=BotMessage.ROLE_BOT,
+                content=bot_reply.reply,
+                intent=bot_reply.intent,
+                metadata=self._json_safe_payload(bot_payload),
+            )
+
+            conversation.status = next_status
+            conversation.last_intent = bot_reply.intent
+            conversation.save(update_fields=["status", "last_intent", "updated_at"])
+
+        response_payload = {
+            **bot_payload,
+            "conversation_id": conversation.id,
+            "session_id": conversation.session_id,
+            "conversation_status": conversation.status,
+        }
+        output_serializer = BotMessageResponseSerializer(data=response_payload)
         output_serializer.is_valid(raise_exception=True)
 
         return Response(output_serializer.data, status=status.HTTP_200_OK)

@@ -12,6 +12,16 @@ export type BotIntent =
 export interface BotMessagePayload {
   message: string
   channel?: BotChannel
+  conversation_id?: number
+  session_id?: string
+  customer_phone?: string
+}
+
+export interface BotMessageContext {
+  channel?: BotChannel
+  conversationId?: number | null
+  sessionId?: string | null
+  customerPhone?: string
 }
 
 export interface BotOption {
@@ -35,6 +45,9 @@ export interface BotDeliveryRegionSuggestion {
 }
 
 export interface BotMessageResponse {
+  conversation_id: number
+  session_id: string
+  conversation_status: string
   intent: BotIntent
   reply: string
   options: BotOption[]

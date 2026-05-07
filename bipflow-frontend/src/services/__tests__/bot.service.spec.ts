@@ -20,6 +20,9 @@ describe('BotService', () => {
   it('sends trimmed public bot messages to the API', async () => {
     vi.mocked(api.post).mockResolvedValue({
       data: {
+        conversation_id: 1,
+        session_id: 'session-1',
+        conversation_status: 'waiting_customer',
         intent: 'greeting',
         reply: 'Ola!',
         options: [],
@@ -35,5 +38,34 @@ describe('BotService', () => {
       channel: 'web',
     })
     expect(response.intent).toBe('greeting')
+  })
+
+  it('sends conversation context when continuing a bot session', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        conversation_id: 7,
+        session_id: 'session-7',
+        conversation_status: 'waiting_customer',
+        intent: 'delivery',
+        reply: 'Regioes ativas',
+        options: [],
+        products: [],
+        delivery_regions: [],
+      },
+    } as never)
+
+    await botService.sendMessage('entrega', {
+      conversationId: 7,
+      sessionId: 'session-7',
+      customerPhone: ' 5571999999999 ',
+    })
+
+    expect(api.post).toHaveBeenCalledWith('v1/bot/messages/', {
+      message: 'entrega',
+      channel: 'web',
+      conversation_id: 7,
+      session_id: 'session-7',
+      customer_phone: '5571999999999',
+    })
   })
 })

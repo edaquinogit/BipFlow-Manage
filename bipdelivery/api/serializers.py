@@ -12,6 +12,8 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
 
 from .models import (
+    BotConversation,
+    BotMessage,
     Category,
     DeliveryRegion,
     Product,
@@ -390,14 +392,33 @@ class DeliveryRegionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class StoreSettingsSerializer(serializers.ModelSerializer):
-    """Dashboard-owned store settings used by the public checkout."""
+PUBLIC_STORE_SETTINGS_FIELDS = ("whatsapp_phone_digits", "is_whatsapp_configured")
+
+
+class PublicStoreSettingsSerializer(serializers.ModelSerializer):
+    """Safe public store contact settings exposed to the catalog."""
 
     whatsapp_phone_digits = serializers.SerializerMethodField()
     is_whatsapp_configured = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreSettings
+        fields = PUBLIC_STORE_SETTINGS_FIELDS
+        read_only_fields = PUBLIC_STORE_SETTINGS_FIELDS
+
+    def get_whatsapp_phone_digits(self, settings_instance: StoreSettings) -> str:
+        """Return normalized phone digits used by checkout redirects."""
+        return settings_instance.whatsapp_phone_digits
+
+    def get_is_whatsapp_configured(self, settings_instance: StoreSettings) -> bool:
+        """Expose whether checkout can generate a direct WhatsApp URL."""
+        return bool(settings_instance.whatsapp_phone_digits)
+
+
+class StoreSettingsSerializer(PublicStoreSettingsSerializer):
+    """Dashboard-owned store settings used by the public checkout."""
+
+    class Meta(PublicStoreSettingsSerializer.Meta):
         fields = [
             "id",
             "whatsapp_phone",
@@ -408,8 +429,7 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "whatsapp_phone_digits",
-            "is_whatsapp_configured",
+            *PUBLIC_STORE_SETTINGS_FIELDS,
             "created_at",
             "updated_at",
         ]
@@ -430,19 +450,14 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
 
         return phone_digits
 
-    def get_whatsapp_phone_digits(self, settings_instance: StoreSettings) -> str:
-        """Return normalized phone digits used by checkout redirects."""
-        return settings_instance.whatsapp_phone_digits
-
-    def get_is_whatsapp_configured(self, settings_instance: StoreSettings) -> bool:
-        """Expose whether checkout can generate a direct WhatsApp URL."""
-        return bool(settings_instance.whatsapp_phone_digits)
-
 
 class BotMessageRequestSerializer(serializers.Serializer):
     """Incoming public message handled by the rule-based bot MVP."""
 
     message = serializers.CharField(max_length=500, trim_whitespace=True)
+    conversation_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    session_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    customer_phone = serializers.CharField(required=False, allow_blank=True, max_length=32)
     channel = serializers.ChoiceField(
         choices=["web", "whatsapp"],
         default="web",
@@ -479,6 +494,9 @@ class BotDeliveryRegionSuggestionSerializer(serializers.Serializer):
 class BotMessageResponseSerializer(serializers.Serializer):
     """Structured response from the rule-based bot MVP."""
 
+    conversation_id = serializers.IntegerField()
+    session_id = serializers.CharField()
+    conversation_status = serializers.CharField()
     intent = serializers.ChoiceField(
         choices=[
             "greeting",
@@ -494,6 +512,73 @@ class BotMessageResponseSerializer(serializers.Serializer):
     options = BotOptionSerializer(many=True)
     products = BotProductSuggestionSerializer(many=True)
     delivery_regions = BotDeliveryRegionSuggestionSerializer(many=True)
+
+
+class BotConversationMessageSerializer(serializers.ModelSerializer):
+    """Read-only persisted bot message for dashboard review."""
+
+    class Meta:
+        model = BotMessage
+        fields = [
+            "id",
+            "role",
+            "content",
+            "intent",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class BotConversationSummarySerializer(serializers.ModelSerializer):
+    """Compact bot conversation payload for dashboard lists."""
+
+    message_count = serializers.SerializerMethodField()
+    last_message_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BotConversation
+        fields = [
+            "id",
+            "session_id",
+            "channel",
+            "customer_phone",
+            "status",
+            "last_intent",
+            "message_count",
+            "last_message_preview",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_message_count(self, conversation: BotConversation) -> int:
+        """Return the number of persisted messages in the conversation."""
+        annotated_count = getattr(conversation, "message_count", None)
+        if annotated_count is not None:
+            return annotated_count
+
+        return conversation.messages.count()
+
+    def get_last_message_preview(self, conversation: BotConversation) -> str:
+        """Return a short preview of the latest message for list scanning."""
+        latest_message = conversation.messages.order_by("-created_at", "-id").first()
+        if latest_message is None:
+            return ""
+
+        return latest_message.content[:120]
+
+
+class BotConversationDetailSerializer(BotConversationSummarySerializer):
+    """Detailed bot conversation payload including persisted messages."""
+
+    messages = BotConversationMessageSerializer(many=True, read_only=True)
+
+    class Meta(BotConversationSummarySerializer.Meta):
+        fields = [
+            *BotConversationSummarySerializer.Meta.fields,
+            "messages",
+        ]
 
 
 class CheckoutItemInputSerializer(serializers.Serializer):

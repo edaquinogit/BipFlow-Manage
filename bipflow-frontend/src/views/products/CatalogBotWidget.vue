@@ -170,7 +170,33 @@ const emit = defineEmits<{
   openProduct: [slug: string]
 }>()
 
+const BOT_SESSION_STORAGE_KEY = 'bipflow.catalogBot.sessionId'
+
+function readStoredSessionId(): string {
+  try {
+    return sessionStorage.getItem(BOT_SESSION_STORAGE_KEY) ?? ''
+  } catch (error) {
+    Logger.debug('Catalog bot session storage is unavailable', {
+      error: error instanceof Error ? error.message : 'unknown_error',
+    })
+    return ''
+  }
+}
+
+function storeSessionId(nextSessionId: string): void {
+  try {
+    sessionStorage.setItem(BOT_SESSION_STORAGE_KEY, nextSessionId)
+  } catch (error) {
+    Logger.debug('Failed to store catalog bot session id', {
+      error: error instanceof Error ? error.message : 'unknown_error',
+    })
+  }
+}
+
 const welcomeResponse: BotMessageResponse = {
+  conversation_id: 0,
+  session_id: '',
+  conversation_status: 'open',
   intent: 'greeting',
   reply: 'Ola! Posso ajudar voce a ver produtos, consultar entrega ou finalizar um pedido.',
   options: [
@@ -187,6 +213,8 @@ const isSending = ref(false)
 const draftMessage = ref('')
 const errorMessage = ref('')
 const messageList = ref<HTMLElement | null>(null)
+const conversationId = ref<number | null>(null)
+const sessionId = ref(readStoredSessionId())
 const entries = ref<ConversationEntry[]>([
   {
     id: 1,
@@ -237,7 +265,13 @@ async function sendMessage(message: string): Promise<void> {
   await scrollToLatestMessage()
 
   try {
-    const response = await botService.sendMessage(trimmedMessage)
+    const response = await botService.sendMessage(trimmedMessage, {
+      conversationId: conversationId.value,
+      sessionId: sessionId.value || null,
+    })
+    conversationId.value = response.conversation_id
+    sessionId.value = response.session_id
+    storeSessionId(response.session_id)
     appendEntry({
       role: 'bot',
       text: response.reply,
