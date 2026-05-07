@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🔧 Bootstrap Environment",
+      "label": "Bootstrap Environment",
       "type": "shell",
       "command": ".\\bootstrap-env.ps1",
       "problemMatcher": [],
@@ -19,7 +19,21 @@
       }
     },
     {
-      "label": "🚀 Django: Start Server",
+      "label": "Bootstrap Environment (Recreate venv)",
+      "type": "shell",
+      "command": ".\\bootstrap-env.ps1 -Force",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Django: Start Server",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py runserver",
       "problemMatcher": ["$python"],
@@ -34,7 +48,7 @@
       }
     },
     {
-      "label": "🗄️ Django: Run Migrations",
+      "label": "Django: Run Migrations",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py migrate",
       "problemMatcher": ["$python"],
@@ -44,7 +58,7 @@
       }
     },
     {
-      "label": "🧑‍💻 Django: Create Superuser",
+      "label": "Django: Create Superuser",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe manage.py createsuperuser",
       "problemMatcher": [],
@@ -54,7 +68,7 @@
       }
     },
     {
-      "label": "🧪 Run All Tests",
+      "label": "Run All Tests",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe -m pytest -v --tb=short",
       "problemMatcher": ["$python"],
@@ -68,7 +82,7 @@
       }
     },
     {
-      "label": "✨ Lint & Format Code",
+      "label": "Lint & Format Code",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe -m ruff check . --fix && venv\\Scripts\\python.exe -m black . --line-length=100",
       "problemMatcher": [],
@@ -78,7 +92,7 @@
       }
     },
     {
-      "label": "📊 Check Code Quality",
+      "label": "Check Code Quality",
       "type": "shell",
       "command": "cd bipdelivery; venv\\Scripts\\python.exe -m ruff check . --statistics",
       "problemMatcher": ["$python"],
@@ -88,7 +102,7 @@
       }
     },
     {
-      "label": "🧹 Clean Python Cache",
+      "label": "Clean Python Cache",
       "type": "shell",
       "command": "Get-ChildItem -Recurse -Include __pycache__,.pytest_cache,.ruff_cache,*.pyc | Remove-Item -Recurse -Force",
       "problemMatcher": [],

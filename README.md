@@ -146,7 +146,7 @@ de verdade.
 
 ## Stack
 
-- Python 3.12+ para Django 6.
+- Python 3.12.x para Django 6, alinhado ao `python:3.12-slim` do Dockerfile.
 - Django 6, Django REST Framework e Simple JWT.
 - SQLite em desenvolvimento local.
 - Node.js 18+ e npm.
@@ -231,14 +231,12 @@ No modo de desenvolvimento sem Docker, use o frontend em
 ### Backend Django
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\bootstrap-env.ps1
 Copy-Item .env.example .env
 cd bipdelivery
-python manage.py migrate
-python manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
-python manage.py runserver
+.\venv\Scripts\python.exe manage.py migrate
+.\venv\Scripts\python.exe manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
+.\venv\Scripts\python.exe manage.py runserver
 ```
 
 API local: `http://127.0.0.1:8000/api/`

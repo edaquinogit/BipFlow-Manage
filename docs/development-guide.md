@@ -4,7 +4,8 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 
 ## Pre-Requisitos
 
-- Python 3.12+.
+- Python 3.12.x. O backend em Docker usa `python:3.12-slim`; mantenha o
+  ambiente local na mesma versao minor.
 - Node.js 18+.
 - npm 9+.
 - Git.
@@ -96,8 +97,21 @@ rode o frontend em `http://127.0.0.1:5173/` e o Django em
 Na raiz do repositorio:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+.\bootstrap-env.ps1
+```
+
+Se ja existir um `bipdelivery\venv` criado com outra versao de Python, recrie o
+ambiente:
+
+```powershell
+.\bootstrap-env.ps1 -Force
+```
+
+Setup manual equivalente:
+
+```powershell
+py -3.12 -m venv bipdelivery\venv
+bipdelivery\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
@@ -106,9 +120,9 @@ Depois:
 
 ```powershell
 cd bipdelivery
-python manage.py migrate
-python manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
-python manage.py runserver
+.\venv\Scripts\python.exe manage.py migrate
+.\venv\Scripts\python.exe manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
+.\venv\Scripts\python.exe manage.py runserver
 ```
 
 URLs locais:
