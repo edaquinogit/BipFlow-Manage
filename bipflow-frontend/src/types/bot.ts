@@ -1,5 +1,9 @@
 export type BotChannel = 'web' | 'whatsapp'
 
+export type BotConversationStatus = 'open' | 'waiting_customer' | 'waiting_human' | 'closed'
+
+export type BotMessageRole = 'user' | 'bot'
+
 export type BotIntent =
   | 'greeting'
   | 'catalog'
@@ -53,4 +57,47 @@ export interface BotMessageResponse {
   options: BotOption[]
   products: BotProductSuggestion[]
   delivery_regions: BotDeliveryRegionSuggestion[]
+}
+
+export interface BotConversationMessage {
+  id: number
+  role: BotMessageRole
+  content: string
+  intent: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface BotConversationSummary {
+  id: number
+  session_id: string
+  channel: BotChannel
+  customer_phone: string
+  status: BotConversationStatus
+  last_intent: string
+  created_at: string
+  updated_at: string
+  message_count: number
+  last_message_preview: string
+}
+
+export interface BotConversationDetail extends BotConversationSummary {
+  messages: BotConversationMessage[]
+}
+
+export interface BotConversationFilters {
+  status?: BotConversationStatus
+  channel?: BotChannel
+  intent?: string
+  search?: string
+  pageSize?: number
+}
+
+export interface PaginatedBotConversationsResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  page_size: number
+  total_pages: number
+  results: BotConversationSummary[]
 }

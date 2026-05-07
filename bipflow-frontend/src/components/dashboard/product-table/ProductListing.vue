@@ -2,7 +2,7 @@
 import ProductTable from '@/components/dashboard/product-table/ProductTableRoot.vue';
 import SearchAndFilterBar from '@/components/dashboard/product-table/SearchAndFilterBar.vue';
 import BulkActionBar from '@/components/dashboard/product-table/ui/BulkActionBar.vue';
-import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
+import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import type { Category } from '@/schemas/category.schema';
 import type { FilterState } from '@/types/filters';
@@ -49,17 +49,18 @@ defineEmits<{
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-indigo-500 pl-6">
       <div>
         <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter leading-none">
-          Active Assets
+          Produtos ativos
         </h3>
-        <p class="text-[10px] text-zinc-500 font-bold uppercase mt-2 tracking-[0.2em]">Real-time Registry Control</p>
+        <p class="text-[10px] text-zinc-500 font-bold uppercase mt-2 tracking-[0.2em]">Controle da vitrine em tempo real</p>
       </div>
 
       <button
         data-cy="btn-add-product"
         @click="$emit('open-panel')"
-        class="bg-white text-black px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-zinc-200 transition-all active:scale-95 shadow-xl shadow-white/5"
+        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-black shadow-xl shadow-white/5 transition-all hover:bg-zinc-200 active:scale-[0.98]"
       >
-        + Provision New Asset
+        <PlusIcon class="h-4 w-4 stroke-2" />
+        Novo produto
       </button>
     </div>
 

@@ -4,6 +4,7 @@ import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   ChartBarIcon,
+  ChatBubbleLeftRightIcon,
   ClockIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
@@ -43,6 +44,7 @@ const emit = defineEmits<{
   logout: []
   createProduct: []
   focusProducts: []
+  focusBot: []
   openStore: []
   saveDeliveryRegion: [payload: DeliveryRegionPayload, id?: number]
   deleteDeliveryRegion: [id: number]
@@ -244,6 +246,17 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
               <ShoppingBagIcon class="h-5 w-5 text-zinc-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 Produtos
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
+              @click="$emit('focusBot')"
+            >
+              <ChatBubbleLeftRightIcon class="h-5 w-5 text-rose-300" />
+              <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
+                Bot
               </span>
             </button>
 

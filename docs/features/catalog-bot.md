@@ -1,25 +1,35 @@
 # Bot Do Catalogo
 
-Este documento descreve o bot integrado ao catalogo publico do BipFlow. O foco
-e deixar claro o comportamento entregue, os limites da solucao e os pontos de
-manutencao para proximas evolucoes.
+Este documento descreve o chatbot publico do catalogo e a vitrine de
+atendimento do dashboard. Ele deve ser lido como referencia de produto,
+arquitetura e manutencao para qualquer alteracao no fluxo de atendimento.
 
-## Objetivo
+## Proposito
 
-O bot ajuda o cliente a navegar pelo catalogo sem tirar a autoridade do
-backend. Ele responde perguntas simples sobre produtos, entrega e checkout,
-usando dados reais de produtos disponiveis e regioes ativas.
+O bot reduz atrito na jornada publica de compra. Ele ajuda o cliente a encontrar
+produtos, consultar entrega e entender como finalizar o pedido, sem tirar do
+backend a responsabilidade por preco, estoque, frete e total.
 
-Esta primeira versao e propositalmente deterministica:
+O atendimento fica dividido em duas superficies:
+
+- `CatalogBotWidget.vue`: experiencia do cliente no catalogo publico.
+- `BotConversationPanel.vue`: vitrine administrativa, aberta sob demanda no
+  dashboard para leitura de conversas, status e handoff humano.
+
+## Escopo Atual
+
+O bot e propositalmente deterministico nesta fase:
 
 - nao usa IA externa;
-- nao conversa com provedor oficial de WhatsApp;
-- persiste conversas e mensagens em entidades proprias para acompanhamento no
-  dashboard;
-- nao calcula preco, frete ou estoque no frontend;
-- nao substitui o carrinho nem o checkout validado pelo backend.
+- nao integra diretamente com provedor oficial de WhatsApp;
+- nao calcula preco, frete, estoque ou total no frontend;
+- nao substitui carrinho, checkout ou validacao do backend;
+- persiste conversas e mensagens para auditoria operacional no dashboard.
 
-## Fluxo Integrado
+Essa decisao mantem o fluxo previsivel, testavel e adequado para um MVP com
+baixo acoplamento.
+
+## Fluxo De Atendimento
 
 ```text
 Cliente no catalogo publico
@@ -41,49 +51,66 @@ BotConversation + BotMessage
   |
   v
 Produtos disponiveis + regioes ativas
+  |
+  v
+Dashboard: BotConversationPanel.vue
 ```
 
-O frontend renderiza a conversa, atalhos, produtos sugeridos e regioes de
-entrega. O backend classifica a mensagem, persiste o par cliente/bot e retorna
-uma resposta estruturada para a interface.
+O frontend envia a mensagem e o contexto da conversa. O backend classifica a
+intencao, consulta dados reais quando necessario, persiste a mensagem do cliente
+e a resposta do bot, e devolve um payload estruturado para renderizacao.
 
 ## Responsabilidades
 
-Frontend:
+Frontend publico:
 
-- `bipflow-frontend/src/views/products/CatalogBotWidget.vue`: controla abertura
-  do painel, estado local da conversa, envio da mensagem e renderizacao de
-  produtos, regioes e atalhos. Tambem reaproveita `session_id` em
-  `sessionStorage` para continuar a conversa no mesmo navegador.
-- `bipflow-frontend/src/services/bot.service.ts`: centraliza a chamada HTTP do
-  bot, envia mensagens com `channel` padrao `web` e anexa contexto de conversa
-  quando disponivel.
-- `bipflow-frontend/src/types/bot.ts`: define o contrato TypeScript consumido
-  pela UI.
-- `bipflow-frontend/src/views/products/ProductsView.vue`: integra o widget ao
-  catalogo e navega para o produto sugerido quando existe `slug`.
+- `bipflow-frontend/src/views/products/CatalogBotWidget.vue`
+  - controla abertura, estado local e envio de mensagens;
+  - renderiza atalhos, produtos sugeridos e regioes de entrega;
+  - reaproveita `session_id` via `sessionStorage` para continuidade no mesmo
+    navegador;
+  - emite `openProduct` quando uma sugestao possui `slug`.
+
+Frontend dashboard:
+
+- `bipflow-frontend/src/components/dashboard/bot/BotConversationPanel.vue`
+  - abre a vitrine do chatbot sob demanda;
+  - carrega conversas de forma lazy para nao poluir nem bloquear o dashboard;
+  - permite buscar por sessao, telefone ou conteudo;
+  - permite filtrar por status operacional;
+  - mostra cards de volume, handoff humano e mensagens da pagina;
+  - exibe detalhe read-only da conversa selecionada.
+
+Camada de servico e tipos:
+
+- `bipflow-frontend/src/services/bot.service.ts`
+  - centraliza as chamadas HTTP;
+  - trimma mensagens antes de enviar;
+  - normaliza filtros da vitrine administrativa.
+- `bipflow-frontend/src/types/bot.ts`
+  - define os contratos TypeScript consumidos pelo catalogo e dashboard.
 
 Backend:
 
-- `bipdelivery/api/bot_engine.py`: concentra as regras deterministicas de
-  classificacao e montagem da resposta.
-- `bipdelivery/api/models.py`: modela `BotConversation` e `BotMessage`.
-- `bipdelivery/api/serializers.py`: valida entrada e saida do contrato publico.
-- `bipdelivery/api/views.py`: expoe o endpoint publico com throttle por IP e o
-  historico read-only para papeis de dashboard.
-- `bipdelivery/api/v1_urls.py`: registra `POST /api/v1/bot/messages/` e
-  `GET /api/v1/bot-conversations/`.
-- `bipdelivery/api/throttling.py`: limita volume de mensagens anonimas.
+- `bipdelivery/api/bot_engine.py`
+  - concentra classificacao de intent e montagem da resposta;
+  - consulta produtos disponiveis e regioes ativas por regras explicitas.
+- `bipdelivery/api/models.py`
+  - modela `BotConversation` e `BotMessage`;
+  - mantem estado, canal, telefone, ultima intent e historico.
+- `bipdelivery/api/serializers.py`
+  - valida entrada publica e saida estruturada;
+  - protege o contrato contra payloads ambiguos.
+- `bipdelivery/api/views.py`
+  - expoe o endpoint publico do bot com throttle;
+  - expoe historico read-only para papeis de dashboard.
+- `bipdelivery/api/v1_urls.py`
+  - registra `POST /api/v1/bot/messages/`;
+  - registra `GET /api/v1/bot-conversations/`.
+- `bipdelivery/api/throttling.py`
+  - limita mensagens publicas por IP.
 
-Testes:
-
-- `bipdelivery/tests/test_bot_mvp.py`: cobre mensagem vazia, saudacao,
-  catalogo, busca de produto, entrega, continuidade de conversa e listagem
-  administrativa.
-- `bipflow-frontend/src/services/__tests__/bot.service.spec.ts`: garante que o
-  service trimma a mensagem e usa o contrato esperado.
-
-## Contrato Da API
+## Contrato Publico
 
 Endpoint:
 
@@ -103,59 +130,109 @@ Payload:
 }
 ```
 
-`channel`, `session_id`, `conversation_id` e `customer_phone` sao opcionais.
-Quando nenhum identificador e enviado, o backend cria uma conversa nova.
+Campos opcionais:
+
+- `channel`: `web` ou `whatsapp`, com padrao `web`;
+- `session_id`: identificador publico opaco para continuidade;
+- `conversation_id`: identificador interno quando o cliente ja possui conversa;
+- `customer_phone`: telefone do cliente quando disponivel.
 
 Resposta:
 
-- `conversation_id`: identificador interno da conversa persistida.
-- `session_id`: identificador publico opaco para continuidade no cliente.
-- `conversation_status`: estado operacional da conversa.
-- `intent`: `greeting`, `catalog`, `product_search`, `delivery`, `checkout`,
-  `human_support` ou `fallback`.
-- `reply`: texto curto para exibir ao cliente.
-- `options`: atalhos guiados que o frontend pode renderizar como botoes.
-- `products`: sugestoes compactas de produtos disponiveis.
-- `delivery_regions`: regioes de entrega ativas.
+- `conversation_id`: ID interno da conversa;
+- `session_id`: ID publico opaco;
+- `conversation_status`: estado operacional;
+- `intent`: intent classificada;
+- `reply`: texto curto para interface;
+- `options`: atalhos guiados;
+- `products`: sugestoes compactas de produtos disponiveis;
+- `delivery_regions`: regioes ativas de entrega.
+
+Intents aceitas:
+
+- `greeting`
+- `catalog`
+- `product_search`
+- `delivery`
+- `checkout`
+- `human_support`
+- `fallback`
+
+## Contrato Do Dashboard
+
+Endpoints:
+
+```http
+GET /api/v1/bot-conversations/
+GET /api/v1/bot-conversations/{id}/
+```
+
+Caracteristicas:
+
+- read-only;
+- exige papel de dashboard;
+- suporta filtro por `status`, `channel`, `intent` e `search`;
+- listagem retorna resumo operacional;
+- detalhe retorna mensagens persistidas.
+
+A vitrine do dashboard deve continuar leve: ela abre por acao do usuario, busca
+dados sob demanda e evita competir visualmente com o fluxo principal de
+produtos.
 
 ## Regras De Negocio
 
 - Mensagens vazias sao rejeitadas pelo serializer.
-- Saudacoes retornam opcoes guiadas para produtos, entrega e pedido.
+- Saudacoes retornam atalhos para produtos, entrega e pedido.
 - Catalogo lista apenas produtos com `is_available=True` e estoque maior que
   zero.
-- Busca usa nome, SKU e descricao do produto.
+- Busca considera nome, SKU e descricao do produto.
 - Entrega lista apenas regioes ativas.
 - Checkout orienta o cliente a finalizar pelo carrinho.
-- Cada mensagem aceita salva uma entrada `user` e uma entrada `bot`.
-- Pedidos de atendimento humano mudam a conversa para `waiting_human`.
-- Preco, estoque, frete e total continuam validados no backend pelo fluxo de
-  checkout.
+- Pedido de atendimento humano altera a conversa para `waiting_human`.
+- Cada mensagem aceita persiste uma entrada `user` e uma entrada `bot`.
+- Preco, estoque, frete e total permanecem sob validacao do checkout no
+  backend.
 
-## Padroes De Manutencao
+## Padroes De Clean Code
 
-- Mantenha a classificacao no backend; o frontend nao deve duplicar regra de
-  negocio.
-- Ao criar uma nova intencao, atualize `bot_engine.py`, serializers, types do
-  frontend, testes backend, teste do service e a referencia da API.
-- Use respostas curtas e estruturadas. Evite mensagens longas que misturem
-  varias responsabilidades.
-- Prefira regras pequenas, nomeadas e testaveis antes de adicionar provider
-  externo ou IA.
-- Prefira composicao e funcoes explicitas para novas regras. Nao crie
-  hierarquias de heranca para intents enquanto o fluxo ainda for simples e
-  deterministico.
-- Nao reaproveite `SaleOrder` para conversa. `BotConversation` guarda estado e
-  `BotMessage` guarda mensagens do bot.
-- Se houver integracao com WhatsApp real, trate como adaptador separado do
-  motor de regras.
+- Mantenha classificacao e regras de negocio no backend.
+- Nao duplique logica de preco, estoque, frete ou disponibilidade no frontend.
+- Prefira funcoes pequenas, nomeadas e testaveis para novas intents.
+- Evite heranca para intents enquanto o fluxo for deterministico.
+- Retorne payloads estruturados em vez de strings com dados misturados.
+- Mantenha textos do bot curtos e acionaveis.
+- Trate integracao futura com WhatsApp ou IA como adaptador separado.
+- Nao reaproveite `SaleOrder` para conversa; conversa pertence a
+  `BotConversation` e mensagens pertencem a `BotMessage`.
+- Ao alterar contrato, atualize backend, frontend, testes e documentacao no
+  mesmo ciclo.
+
+## Evolucao Segura
+
+Antes de adicionar uma nova intent:
+
+1. Defina a regra de negocio em linguagem simples.
+2. Implemente a classificacao em `bot_engine.py`.
+3. Atualize serializers e tipos TypeScript.
+4. Atualize `bot.service.ts` se houver novo filtro ou payload.
+5. Cubra backend e frontend com testes.
+6. Atualize este documento e `docs/api/reference.md`.
+
+Antes de integrar IA externa:
+
+- isole o provider atras de uma interface/adaptador;
+- mantenha fallback deterministico;
+- registre limites de contexto, timeout e custo;
+- preserve auditoria de mensagens em `BotMessage`;
+- nunca permita que a IA defina preco, estoque, frete ou total.
 
 ## Criterios De Aceite
 
-Antes de considerar uma mudanca no bot pronta:
+Uma mudanca no bot so deve ser considerada pronta quando:
 
-- `python -m pytest bipdelivery/tests/test_bot_mvp.py`
-- `npm run frontend:test:unit`
-- contrato atualizado em `docs/api/reference.md`
-- comportamento documentado neste arquivo quando mudar regra, payload ou
-  resposta
+- `python -m pytest bipdelivery/tests/test_bot_mvp.py` passar;
+- `npm run frontend:test:unit` passar quando contratos frontend mudarem;
+- `npm run frontend:typecheck` passar;
+- `docs/api/reference.md` estiver alinhado quando payload, resposta ou filtros
+  mudarem;
+- este documento refletir novas intents, regras ou superficies de UI.

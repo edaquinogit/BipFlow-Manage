@@ -1,14 +1,8 @@
 <script setup lang="ts">
-/**
- * 🛰️ BIPFLOW REGISTRY HUB - IDENTITY SECTION
- * Padrão de Engenharia: Vue 3.4+ Atomic Synchronization
- */
+import { computed, ref } from 'vue';
+import { CheckIcon, ChevronDownIcon } from '@heroicons/vue/24/outline';
 import FormInput from '@/components/common/FormInput.vue';
 
-/**
- * 🔄 TWO-WAY BINDING (Vue 3.4+)
- * Sincroniza automaticamente com o v-model do componente pai (ProductFormRoot).
- */
 const name = defineModel<string>('name', { default: '' });
 const sku = defineModel<string>('sku', { default: '' });
 const description = defineModel<string>('description', { default: '' });
@@ -19,83 +13,146 @@ interface Props {
   errors: Record<string, string[]>;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const isCategoryMenuOpen = ref(false);
+
+const selectedCategoryName = computed(() => {
+  const selectedCategory = props.categories.find((item) => item.id === Number(category.value));
+  return selectedCategory?.name ?? 'Selecionar categoria';
+});
+
+const isSelectedCategory = (categoryId: number) => Number(category.value) === categoryId;
+
+const toggleCategoryMenu = () => {
+  if (!props.categories.length) {
+    return;
+  }
+
+  isCategoryMenuOpen.value = !isCategoryMenuOpen.value;
+};
+
+const selectCategory = (categoryId: number) => {
+  category.value = categoryId;
+  isCategoryMenuOpen.value = false;
+};
+
+const handleCategoryFocusOut = (event: FocusEvent) => {
+  const wrapper = event.currentTarget as HTMLElement;
+
+  requestAnimationFrame(() => {
+    if (!wrapper.contains(document.activeElement)) {
+      isCategoryMenuOpen.value = false;
+    }
+  });
+};
 </script>
 
 <template>
-  <section class="space-y-8 pb-10 border-b border-zinc-800/50">
+  <section class="space-y-8 border-b border-zinc-800/50 pb-10" @click="isCategoryMenuOpen = false">
     <header>
-      <h3 class="text-[10px] font-black uppercase text-indigo-500 tracking-[0.3em] mb-1">
-        Identity & Registry
+      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">
+        Identidade do produto
       </h3>
-      <p class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
-        Asset classification and global naming
+      <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+        Dados que aparecem na vitrine publica
       </p>
     </header>
-    
-    <FormInput 
-      label="Asset Name" 
-      v-model="name" 
+
+    <FormInput
+      v-model="name"
+      label="Nome do produto"
       name="name"
       data-cy="input-product-name"
-      placeholder="e.g. Premium Hub Gear" 
-      :error="errors.name?.[0]" 
+      placeholder="Ex.: Combo artesanal"
+      :error="errors.name?.[0]"
     />
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <FormInput 
-        label="Global SKU" 
-        v-model="sku" 
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <FormInput
+        v-model="sku"
+        label="SKU"
         name="sku"
         data-cy="input-product-sku"
-        placeholder="NYC-100-BPF" 
+        placeholder="BPF-001"
         :error="errors.sku?.[0]"
       />
 
-      <div class="flex flex-col group">
-        <label class="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 group-focus-within:text-indigo-400 transition-colors">
-          Classification
+      <div class="group flex flex-col">
+        <label class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+          Categoria
         </label>
-        
-        <div class="relative">
-          <select 
-            v-model="category"
-            name="category"
+
+        <div class="relative" @click.stop @focusout="handleCategoryFocusOut">
+          <input type="hidden" name="category" :value="category ?? ''" />
+          <button
+            type="button"
             data-cy="select-category"
-            class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer hover:bg-zinc-900 shadow-inner"
+            :aria-expanded="isCategoryMenuOpen"
+            aria-haspopup="listbox"
+            aria-controls="product-category-menu"
+            class="flex h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 text-left text-sm transition-all"
+            :class="[
+              errors.category
+                ? 'border-red-500/50 bg-red-500/5 text-red-100'
+                : 'border-white/10 bg-zinc-950/90 text-zinc-100 hover:border-white/20 hover:bg-zinc-900/90',
+              isCategoryMenuOpen ? 'border-indigo-500/70 ring-2 ring-indigo-500/10' : ''
+            ]"
+            @click="toggleCategoryMenu"
           >
-            <option :value="null" disabled>Select Hub Taxonomy...</option>
-            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-              {{ cat.name }}
-            </option>
-          </select>
-          
-          <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-zinc-600 group-focus-within:text-indigo-500 transition-colors">
-             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-               <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-             </svg>
-          </div>
+            <span class="truncate" :class="{ 'text-zinc-500': !category }">
+              {{ categories.length ? selectedCategoryName : 'Nenhuma categoria cadastrada' }}
+            </span>
+            <ChevronDownIcon
+              class="h-4 w-4 shrink-0 text-zinc-500 transition-transform"
+              :class="{ 'rotate-180 text-indigo-400': isCategoryMenuOpen }"
+            />
+          </button>
+
+          <Transition name="category-popover">
+            <div
+              v-if="isCategoryMenuOpen"
+              id="product-category-menu"
+              role="listbox"
+              class="category-menu-scroll absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 p-1 shadow-2xl shadow-black/40 backdrop-blur-xl"
+            >
+              <button
+                v-for="item in categories"
+                :key="item.id"
+                type="button"
+                role="option"
+                :aria-selected="isSelectedCategory(item.id)"
+                :data-cy="`category-option-${item.id}`"
+                class="flex h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-xs font-semibold text-zinc-200 transition hover:bg-white/5 hover:text-white"
+                :class="{ 'bg-indigo-500/15 text-white': isSelectedCategory(item.id) }"
+                @click="selectCategory(item.id)"
+              >
+                <span class="truncate">{{ item.name }}</span>
+                <CheckIcon v-if="isSelectedCategory(item.id)" class="h-4 w-4 shrink-0 text-indigo-300" />
+              </button>
+            </div>
+          </Transition>
         </div>
 
-        <p v-if="errors.category" class="text-[9px] text-red-500 font-black uppercase mt-2 tracking-widest animate-pulse">
+        <p v-if="errors.category" class="mt-2 text-[9px] font-black uppercase tracking-widest text-red-500">
           {{ errors.category[0] }}
         </p>
       </div>
     </div>
 
-    <div class="flex flex-col gap-2 group">
-      <label class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-indigo-400 transition-colors">
-        Public Description
+    <div class="group flex flex-col gap-2">
+      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+        Descricao publica
       </label>
       <textarea
         v-model="description"
         name="description"
         data-cy="input-product-description"
         rows="4"
-        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm text-zinc-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all outline-none placeholder:text-zinc-700 shadow-inner resize-none"
-        placeholder="Describe the product for the public storefront: ingredients, materials, diferencials or usage details."
+        class="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 shadow-inner outline-none transition-all placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+        placeholder="Descreva o produto para a vitrine: ingredientes, materiais, diferenciais ou forma de uso."
       />
-      <p v-if="errors.description" class="text-[9px] text-red-500 font-black uppercase tracking-widest animate-pulse">
+      <p v-if="errors.description" class="text-[9px] font-black uppercase tracking-widest text-red-500">
         {{ errors.description[0] }}
       </p>
     </div>
@@ -103,14 +160,23 @@ defineProps<Props>();
 </template>
 
 <style scoped>
-/* Estilização focada em UX para o estado de erro do select */
-select:invalid {
-  color: #52525b;
+.category-popover-enter-active,
+.category-popover-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
-/* Garante que o dropdown acompanhe o estilo do app em sistemas modernos */
-option {
-  background-color: #09090b;
-  color: #fafafa;
+.category-popover-enter-from,
+.category-popover-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.category-menu-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.category-menu-scroll::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 999px;
 }
 </style>
