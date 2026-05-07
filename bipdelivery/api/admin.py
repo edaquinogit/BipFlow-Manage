@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import Category, DeliveryRegion, Product, SaleOrder, SaleOrderItem, StoreSettings
+from .models import (
+    BotConversation,
+    BotMessage,
+    Category,
+    DeliveryRegion,
+    Product,
+    SaleOrder,
+    SaleOrderItem,
+    StoreSettings,
+)
 
 
 @admin.register(Category)
@@ -25,6 +34,22 @@ class DeliveryRegionAdmin(admin.ModelAdmin):
 class StoreSettingsAdmin(admin.ModelAdmin):
     list_display = ("id", "whatsapp_phone", "updated_at")
     readonly_fields = ("created_at", "updated_at")
+
+
+class BotMessageInline(admin.TabularInline):
+    model = BotMessage
+    extra = 0
+    readonly_fields = ("role", "content", "intent", "metadata", "created_at")
+    can_delete = False
+
+
+@admin.register(BotConversation)
+class BotConversationAdmin(admin.ModelAdmin):
+    list_display = ("session_id", "channel", "status", "last_intent", "updated_at")
+    list_filter = ("channel", "status", "last_intent", "created_at")
+    search_fields = ("session_id", "customer_phone", "messages__content")
+    readonly_fields = ("session_id", "created_at", "updated_at")
+    inlines = [BotMessageInline]
 
 
 class SaleOrderItemInline(admin.TabularInline):

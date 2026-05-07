@@ -1,11 +1,26 @@
 import api from './api'
-import type { BotChannel, BotMessagePayload, BotMessageResponse } from '@/types/bot'
+import type { BotMessageContext, BotMessagePayload, BotMessageResponse } from '@/types/bot'
 
 export const botService = {
-  async sendMessage(message: string, channel: BotChannel = 'web'): Promise<BotMessageResponse> {
+  async sendMessage(
+    message: string,
+    context: BotMessageContext = {}
+  ): Promise<BotMessageResponse> {
     const payload: BotMessagePayload = {
       message: message.trim(),
-      channel,
+      channel: context.channel ?? 'web',
+    }
+
+    if (context.conversationId) {
+      payload.conversation_id = context.conversationId
+    }
+
+    if (context.sessionId) {
+      payload.session_id = context.sessionId
+    }
+
+    if (context.customerPhone?.trim()) {
+      payload.customer_phone = context.customerPhone.trim()
     }
 
     const response = await api.post<BotMessageResponse>('v1/bot/messages/', payload)
