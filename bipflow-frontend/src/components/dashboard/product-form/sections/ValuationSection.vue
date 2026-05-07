@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * 🛰️ BIPFLOW REGISTRY HUB - VALUATION SECTION
- * Padrão de Engenharia: Vue 3.4+ Atomic Synchronization
- * Foco: Métricas de Inventário e Integridade de Custos.
- */
-
-// Sincronização direta com o Estado Global do Formulário (ProductFormRoot)
 const normalizeNumberModel = (value: unknown): number => {
   if (value === '' || value === null || value === undefined) {
     return 0;
@@ -37,72 +30,71 @@ defineProps<Props>();
 </script>
 
 <template>
-  <section class="space-y-8 pb-10 border-b border-zinc-800/50">
+  <section class="space-y-8 border-b border-zinc-800/50 pb-10">
     <header>
-      <h3 class="text-[10px] font-black uppercase text-indigo-500 tracking-[0.3em] mb-1">
-        Valuation & Inventory Metrics
+      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">
+        Preco e estoque
       </h3>
-      <p class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
-        Asset pricing and physical availability control
+      <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+        Valores usados no catalogo e no checkout
       </p>
     </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-      
-      <div class="flex flex-col gap-2 group">
-        <label class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-emerald-400 transition-colors">
-          List Price (USD)
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div class="group flex flex-col gap-2">
+        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-emerald-400">
+          Preco de venda
         </label>
         <div class="relative">
-          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-sm pointer-events-none">$</span>
-          <input 
-            type="number" 
+          <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-sm text-zinc-500">$</span>
+          <input
             v-model.number="price"
+            type="number"
             name="price"
             data-cy="input-product-price"
             step="0.01"
             min="0"
-            class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 pl-8 pr-4 text-sm font-mono text-emerald-400 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all outline-none shadow-inner"
+            class="w-full rounded-xl border border-zinc-800 bg-zinc-950 py-3 pl-8 pr-4 font-mono text-sm text-emerald-400 shadow-inner outline-none transition-all focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
             placeholder="0.00"
           />
         </div>
-        <p v-if="errors.price" class="text-[9px] text-red-500 font-black uppercase tracking-widest animate-pulse">
+        <p v-if="errors.price" class="text-[9px] font-black uppercase tracking-widest text-red-500">
           {{ errors.price[0] }}
         </p>
       </div>
 
-      <div class="flex flex-col gap-2 group">
-        <label class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-indigo-400 transition-colors">
-          Stock Units
+      <div class="group flex flex-col gap-2">
+        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+          Estoque
         </label>
-        <input 
-          type="number" 
+        <input
           v-model.number="stock"
+          type="number"
           name="stock_quantity"
           data-cy="input-product-stock"
           min="0"
-          class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm font-mono text-zinc-100 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all outline-none shadow-inner"
+          class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-sm text-zinc-100 shadow-inner outline-none transition-all focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20"
           placeholder="0"
         />
-        <p v-if="errors.stock_quantity" class="text-[9px] text-red-500 font-black uppercase tracking-widest animate-pulse">
+        <p v-if="errors.stock_quantity" class="text-[9px] font-black uppercase tracking-widest text-red-500">
           {{ errors.stock_quantity[0] }}
         </p>
       </div>
     </div>
 
-    <div class="flex flex-col gap-2 group">
-      <label class="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-indigo-400 transition-colors">
-        Dimension / Size
+    <div class="group flex flex-col gap-2">
+      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+        Tamanho ou unidade
       </label>
-      <input 
-        type="text" 
-        v-model="size" 
+      <input
+        v-model="size"
+        type="text"
         name="size"
         data-cy="input-product-size"
-        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-sm font-bold text-zinc-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition-all outline-none placeholder:text-zinc-700 shadow-inner"
-        placeholder="e.g. XL, 42, 750ml, 1TB"
+        class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-bold text-zinc-100 shadow-inner outline-none transition-all placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10"
+        placeholder="Ex.: 500ml, P, unidade"
       />
-      <p v-if="errors.size" class="text-[9px] text-red-500 font-black uppercase tracking-widest">
+      <p v-if="errors.size" class="text-[9px] font-black uppercase tracking-widest text-red-500">
         {{ errors.size[0] }}
       </p>
     </div>
@@ -110,19 +102,12 @@ defineProps<Props>();
 </template>
 
 <style scoped>
-/* 🚫 ANTI-SPIN: Remove as setas de incremento dos campos numéricos.
-  Usamos aspas no seletor para garantir compatibilidade com todos os parsers.
-*/
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Compatibilidade Firefox: 
-  Usamos 'appearance' padrão e apenas o prefixo se necessário, 
-  envolto em uma sintaxe que o linter não rejeite.
-*/
 input[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;

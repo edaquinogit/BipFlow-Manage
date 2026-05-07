@@ -69,6 +69,16 @@ describe('Product Image Upload Flow', () => {
     toastError: '[data-cy="toast-error"]',
   };
 
+  const selectCategory = (categoryId: string | number) => {
+    cy.get(SELECTORS.categorySelect)
+      .should('be.visible')
+      .click();
+
+    cy.get(`[data-cy="category-option-${categoryId}"]`)
+      .should('be.visible')
+      .click();
+  };
+
   beforeEach(() => {
     // 1. Authenticate user (bypass login flow)
     cy.loginViaApi().then((tokens: AuthTokens) => {
@@ -125,9 +135,7 @@ describe('Product Image Upload Flow', () => {
       .should('be.visible')
       .type('10');
 
-    cy.get(SELECTORS.categorySelect)
-      .should('be.visible')
-      .select(String(Cypress.env('e2eCategoryId')));
+    selectCategory(Cypress.env('e2eCategoryId'));
 
     // Step 4: Upload image file
     cy.get(SELECTORS.productImageInput)
@@ -251,8 +259,7 @@ describe('Product Image Upload Flow', () => {
     cy.get(SELECTORS.productStockInput)
       .type('10');
 
-    cy.get(SELECTORS.categorySelect)
-      .select(String(Cypress.env('e2eCategoryId')));
+    selectCategory(Cypress.env('e2eCategoryId'));
 
     cy.get(SELECTORS.productImageInput)
       .selectFile(TEST_IMAGE, { force: true });

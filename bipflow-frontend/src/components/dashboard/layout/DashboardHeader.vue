@@ -2,8 +2,8 @@
 import { computed } from 'vue';
 import { 
   Bars3Icon,
-  CpuChipIcon, 
-  GlobeAmericasIcon 
+  ChatBubbleLeftRightIcon,
+  ShoppingBagIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps<{
@@ -30,8 +30,8 @@ const welcomeMessage = computed(() => (
             <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 relative"></div>
           </div>
           <div class="flex flex-col">
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-white italic leading-tight">NYC Station</span>
-            <span class="text-[8px] font-bold uppercase tracking-widest text-emerald-500/80">System Live</span>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-white italic leading-tight">BipFlow Operacao</span>
+            <span class="text-[8px] font-bold uppercase tracking-widest text-emerald-500/80">Dashboard ativo</span>
           </div>
         </div>
 
@@ -39,12 +39,12 @@ const welcomeMessage = computed(() => (
 
         <div class="hidden lg:flex items-center gap-4 text-zinc-500">
           <div class="flex items-center gap-1.5">
-            <CpuChipIcon class="w-3.5 h-3.5" />
-            <span class="text-[9px] font-bold uppercase tracking-tighter">BipFlow v3.0</span>
+            <ShoppingBagIcon class="w-3.5 h-3.5" />
+            <span class="text-[9px] font-bold uppercase tracking-tighter">Vitrine</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <GlobeAmericasIcon class="w-3.5 h-3.5" />
-            <span class="text-[9px] font-bold uppercase tracking-tighter">Lat: 24ms</span>
+            <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+            <span class="text-[9px] font-bold uppercase tracking-tighter">Atendimento</span>
           </div>
         </div>
       </div>

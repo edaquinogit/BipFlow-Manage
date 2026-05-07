@@ -18,6 +18,7 @@ import { storeSettingsService } from '@/services/store-settings.service';
 // Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
 import DashboardMenuDrawer from '@/components/dashboard/layout/DashboardMenuDrawer.vue';
+import BotConversationPanel from '@/components/dashboard/bot/BotConversationPanel.vue';
 import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
@@ -31,6 +32,7 @@ import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productP
 const isPanelOpen = ref(false);
 const isDeleteModalOpen = ref(false);
 const isDashboardMenuOpen = ref(false);
+const botPanelRef = ref<InstanceType<typeof BotConversationPanel> | null>(null);
 
 /**
  * 💾 DATA CONTEXT
@@ -191,6 +193,18 @@ const handleFocusProducts = (): void => {
 
   requestAnimationFrame(() => {
     document.getElementById('dashboard-products')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  });
+};
+
+const handleFocusBot = (): void => {
+  isDashboardMenuOpen.value = false;
+  botPanelRef.value?.openPanel();
+
+  requestAnimationFrame(() => {
+    document.getElementById('dashboard-bot')?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });
@@ -400,6 +414,8 @@ onMounted(async () => {
         :is-loading="productsLoading"
       />
 
+      <BotConversationPanel ref="botPanelRef" />
+
       <section id="dashboard-products">
         <ProductListing
           :products="products"
@@ -446,6 +462,7 @@ onMounted(async () => {
       @logout="handleLogout"
       @create-product="handleCreateProductFromMenu"
       @focus-products="handleFocusProducts"
+      @focus-bot="handleFocusBot"
       @open-store="handleOpenStore"
       @save-delivery-region="handleSaveDeliveryRegion"
       @delete-delivery-region="handleDeleteDeliveryRegion"

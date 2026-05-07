@@ -29,14 +29,14 @@ defineProps<{
     
     <template v-else>
       <StatCard 
-        label="In Stock Units" 
+        label="Itens em estoque"
         :value="stats?.totalItems ?? 0" 
         :icon="(ShoppingBagIcon as any)" 
         color="indigo" 
       />
 
       <StatCard 
-        label="Critical Alerts" 
+        label="Alertas criticos"
         :value="stats?.lowStockCount ?? 0" 
         :icon="(ExclamationTriangleIcon as any)" 
         color="orange"

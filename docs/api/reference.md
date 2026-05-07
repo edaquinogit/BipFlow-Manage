@@ -350,13 +350,15 @@ Payload:
   "message": "Quero ver o catalogo",
   "channel": "web",
   "session_id": "opcional-para-continuar-conversa",
-  "conversation_id": 1
+  "conversation_id": 1,
+  "customer_phone": "5571999999999"
 }
 ```
 
-`channel`, `session_id` e `conversation_id` sao opcionais. `channel` aceita
-`web` ou `whatsapp`. Quando nenhum identificador de conversa e enviado, o
-backend cria uma conversa nova e devolve `conversation_id` e `session_id`.
+`channel`, `session_id`, `conversation_id` e `customer_phone` sao opcionais.
+`channel` aceita `web` ou `whatsapp`. Quando nenhum identificador de conversa e
+enviado, o backend cria uma conversa nova e devolve `conversation_id` e
+`session_id`.
 
 Resposta:
 
@@ -393,6 +395,9 @@ GET /api/v1/bot-conversations/{id}/
 
 Endpoint read-only para usuarios com papel de dashboard. A listagem retorna um
 resumo das conversas persistidas; o detalhe inclui as mensagens.
+
+O dashboard consome este contrato na vitrine do chatbot. Essa UI abre sob
+demanda, carrega dados de forma lazy e nao cria ou altera conversas.
 
 Filtros:
 
