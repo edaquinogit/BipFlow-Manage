@@ -10,3 +10,8 @@ export interface StoreSettings {
 export interface StoreSettingsPayload {
   whatsapp_phone: string
 }
+
+export interface PublicStoreSettings {
+  whatsapp_phone_digits: string
+  is_whatsapp_configured: boolean
+}
