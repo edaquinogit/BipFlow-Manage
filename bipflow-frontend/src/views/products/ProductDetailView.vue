@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="border-b border-slate-200 bg-white/92 backdrop-blur">
-      <div class="mx-auto flex max-w-5xl px-4 py-4 sm:px-6 lg:px-8">
+      <div class="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
           type="button"
           class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
@@ -12,6 +12,11 @@
           </svg>
           Voltar ao catalogo
         </button>
+
+        <StoreContactPill
+          :phone-digits="storeWhatsappDigits"
+          @open-contact-options="isStoreContactOptionsOpen = true"
+        />
       </div>
     </header>
 
@@ -240,6 +245,13 @@
       @open-cart="isCartOpen = true"
     />
 
+    <StoreContactOptionsModal
+      :is-open="isStoreContactOptionsOpen"
+      :phone-digits="storeWhatsappDigits"
+      :context-label="product?.name || ''"
+      @close="isStoreContactOptionsOpen = false"
+    />
+
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
@@ -265,7 +277,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
+import StoreContactOptionsModal from './StoreContactOptionsModal.vue'
+import StoreContactPill from './StoreContactPill.vue'
 import { useCart } from '@/composables/useCart'
+import { usePublicStoreSettings } from '@/composables/usePublicStoreSettings'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
 import { deliveryRegionService } from '@/services/delivery-region.service'
@@ -297,6 +312,7 @@ const deliveryRegions = ref<DeliveryRegion[]>([])
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
+const isStoreContactOptionsOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const errorMessage = ref('')
 const quantity = ref(1)
@@ -322,6 +338,11 @@ const {
   resetCustomer,
   getProductQuantity,
 } = useCart()
+
+const {
+  storeWhatsappDigits,
+  fetchPublicStoreSettings,
+} = usePublicStoreSettings('product_detail_view')
 
 const productDescription = computed(() => (
   product.value?.description?.trim()
@@ -548,7 +569,10 @@ async function loadDeliveryRegions(): Promise<void> {
 }
 
 onMounted(() => {
-  void loadDeliveryRegions()
+  void Promise.allSettled([
+    loadDeliveryRegions(),
+    fetchPublicStoreSettings(),
+  ])
 })
 
 watch(productImages, () => {

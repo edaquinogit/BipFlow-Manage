@@ -32,6 +32,31 @@ export const formatBRL = (price: string | number): string => {
 }
 
 /**
+ * Format WhatsApp digits for compact Brazilian catalog display.
+ */
+export const formatWhatsAppPhone = (phoneDigits: string): string => {
+  const digits = phoneDigits.replace(/\D/g, '')
+
+  if (digits.length === 13 && digits.startsWith('55')) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`
+  }
+
+  if (digits.length === 12 && digits.startsWith('55')) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`
+  }
+
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  }
+
+  return phoneDigits
+}
+
+/**
  * Format date to Brazilian format
  *
  * @param dateString - ISO date string
