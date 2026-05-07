@@ -137,8 +137,10 @@ Quando o limite e excedido, a API retorna `429 Too Many Requests`.
 - Produtos, categorias e regioes de entrega: leitura publica, escrita apenas
   para `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
 - Regioes de entrega para usuario anonimo: somente regioes ativas.
-- Configuracoes da loja: leitura para papeis de dashboard; escrita apenas para
-  `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
+- Configuracoes da loja: leitura administrativa para papeis de dashboard;
+  escrita apenas para `is_staff`, `is_superuser` ou usuarios nos grupos
+  `admin`/`manager`. O catalogo publico consome somente o endpoint seguro
+  `/api/v1/store-settings/public/`.
 - Checkout WhatsApp: publico.
 - Historico de vendas: read-only para `is_staff`, `is_superuser` ou usuarios
   nos grupos `admin`/`manager`/`viewer`.
@@ -289,6 +291,7 @@ Notas:
 ```http
 GET /api/v1/store-settings/
 PATCH /api/v1/store-settings/
+GET /api/v1/store-settings/public/
 ```
 
 Payload de escrita:
@@ -308,10 +311,21 @@ Campos:
 - `created_at`
 - `updated_at`
 
+Resposta publica:
+
+```json
+{
+  "whatsapp_phone_digits": "5571999999999",
+  "is_whatsapp_configured": true
+}
+```
+
 Notas:
 
 - o backend aceita numero formatado, mas persiste somente digitos;
 - o WhatsApp deve incluir codigo do pais e DDD;
+- o catalogo publico usa apenas `whatsapp_phone_digits` para exibir o contato
+  e montar atalhos de duvidas frequentes;
 - o checkout usa este numero para montar `whatsapp_url`;
 - `WHATSAPP_ORDER_PHONE` fica como fallback quando o dashboard ainda nao tem
   WhatsApp cadastrado.
@@ -323,8 +337,8 @@ POST /api/v1/bot/messages/
 ```
 
 Endpoint publico para a primeira fatia do bot guiado por regras. Ele nao chama
-IA, nao conversa com provedor WhatsApp externo e nao persiste conversa nesta
-fase.
+IA nem conversa com provedor WhatsApp externo, mas persiste conversas e
+mensagens em `BotConversation` e `BotMessage`.
 
 Documento de feature:
 [docs/features/catalog-bot.md](../features/catalog-bot.md).
@@ -334,16 +348,23 @@ Payload:
 ```json
 {
   "message": "Quero ver o catalogo",
-  "channel": "web"
+  "channel": "web",
+  "session_id": "opcional-para-continuar-conversa",
+  "conversation_id": 1
 }
 ```
 
-`channel` e opcional e aceita `web` ou `whatsapp`.
+`channel`, `session_id` e `conversation_id` sao opcionais. `channel` aceita
+`web` ou `whatsapp`. Quando nenhum identificador de conversa e enviado, o
+backend cria uma conversa nova e devolve `conversation_id` e `session_id`.
 
 Resposta:
 
 - `intent`: `greeting`, `catalog`, `product_search`, `delivery`, `checkout`,
   `human_support` ou `fallback`;
+- `conversation_id`: identificador interno da conversa persistida;
+- `session_id`: identificador publico opaco para continuidade no cliente;
+- `conversation_status`: `waiting_customer` ou `waiting_human` nesta fase;
 - `reply`: texto curto para exibir ao cliente;
 - `options`: atalhos guiados que o frontend pode renderizar;
 - `products`: sugestoes compactas de produtos disponiveis;
@@ -354,10 +375,48 @@ Regras:
 - mensagens vazias sao rejeitadas;
 - catalogo e busca retornam apenas produtos disponiveis e com estoque;
 - entrega retorna apenas regioes ativas;
+- cada mensagem util salva uma mensagem `user` e uma mensagem `bot`;
+- mensagens seguintes com `conversation_id` ou `session_id` reutilizam a mesma
+  conversa;
+- pedidos de atendimento humano mudam a conversa para `waiting_human`;
 - checkout orienta o cliente a finalizar pelo carrinho, mantendo preco, estoque,
   frete e total sob responsabilidade do backend.
 - novas intents devem atualizar backend, serializers, types do frontend, testes
   e esta referencia no mesmo ciclo da mudanca.
+
+## Conversas Do Bot
+
+```http
+GET /api/v1/bot-conversations/
+GET /api/v1/bot-conversations/{id}/
+```
+
+Endpoint read-only para usuarios com papel de dashboard. A listagem retorna um
+resumo das conversas persistidas; o detalhe inclui as mensagens.
+
+Filtros:
+
+- `status`: `open`, `waiting_customer`, `waiting_human` ou `closed`;
+- `channel`: `web` ou `whatsapp`;
+- `intent`: ultima intent registrada, como `human_support` ou `delivery`;
+- `search`: busca por `session_id`, telefone do cliente ou conteudo das
+  mensagens.
+
+Campos da listagem:
+
+- `id`
+- `session_id`
+- `channel`
+- `customer_phone`
+- `status`
+- `last_intent`
+- `message_count`
+- `last_message_preview`
+- `created_at`
+- `updated_at`
+
+O detalhe adiciona `messages`, com `role`, `content`, `intent`, `metadata` e
+`created_at`.
 
 ## Checkout Via WhatsApp
 

@@ -40,9 +40,11 @@ Responsabilidades:
 - exibir saudacao com o usuario retornado por `GET /api/auth/me/`;
 - listar e gerenciar produtos no dashboard;
 - abrir menu operacional com historico de vendas, alertas de estoque, atalhos e
-  gestao de regioes de entrega;
+  gestao de regioes de entrega e WhatsApp da loja;
 - expor catalogo publico em `/produtos`;
 - carregar regioes ativas de entrega no carrinho;
+- exibir o WhatsApp publico da loja e abrir duvidas frequentes com mensagem
+  pronta para `api.whatsapp.com/send`;
 - enviar checkout para a API Django e abrir o fluxo de WhatsApp.
 
 Camadas relevantes:
@@ -64,7 +66,9 @@ Responsabilidades:
 - aplicar throttling em endpoints sensiveis de auth;
 - manter produtos, categorias e galerias de imagens;
 - manter regioes de entrega e taxa por regiao;
+- manter configuracoes operacionais da loja, incluindo WhatsApp de atendimento;
 - responder mensagens do bot MVP sem IA por regras deterministicas;
+- persistir conversas e mensagens do bot em `BotConversation` e `BotMessage`;
 - validar checkout no servidor;
 - persistir pedidos como `SaleOrder` e `SaleOrderItem`;
 - expor historico de vendas para usuarios com papel de dashboard.
@@ -105,13 +109,25 @@ Regioes de entrega:
 - `staff`, `superuser`, `admin` e `manager` gerenciam;
 - `/api/v1/delivery-regions/active/` alimenta o carrinho publico.
 
+Configuracoes da loja:
+
+- `/api/v1/store-settings/` e privado para papeis de dashboard;
+- `/api/v1/store-settings/public/` expoe somente `whatsapp_phone_digits` e
+  `is_whatsapp_configured`;
+- o catalogo usa esse contrato minimo para mostrar o contato e montar mensagens
+  pre-preenchidas de duvidas frequentes;
+- o checkout prioriza o numero salvo no dashboard e usa `WHATSAPP_ORDER_PHONE`
+  apenas como fallback.
+
 Bot MVP:
 
-- `/api/v1/bot/messages/`
-- publico;
+- `/api/v1/bot/messages/` recebe mensagens publicas;
+- `/api/v1/bot-conversations/` expoe historico apenas para papel de dashboard;
 - sem IA e sem provedor externo nesta fase;
 - classifica mensagens por regras para saudacao, catalogo, busca de produto,
   entrega, checkout, atendimento humano e fallback;
+- persiste mensagens do cliente e respostas do bot;
+- retorna `conversation_id` e `session_id` para continuidade da conversa;
 - consulta produtos disponiveis e regioes ativas sem duplicar regra de negocio.
 - documentacao da feature:
   [docs/features/catalog-bot.md](../features/catalog-bot.md).
@@ -123,7 +139,8 @@ Checkout:
 - recalcula totais no backend;
 - usa taxa da regiao de entrega quando enviada;
 - persiste pedido e itens;
-- retorna mensagem e URL `wa.me` quando `WHATSAPP_ORDER_PHONE` esta configurado.
+- retorna mensagem e URL `wa.me` quando houver WhatsApp configurado no
+  dashboard ou fallback em `WHATSAPP_ORDER_PHONE`.
 
 Vendas:
 

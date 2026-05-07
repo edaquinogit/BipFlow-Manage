@@ -14,7 +14,8 @@ Esta primeira versao e propositalmente deterministica:
 
 - nao usa IA externa;
 - nao conversa com provedor oficial de WhatsApp;
-- nao persiste historico de conversa;
+- persiste conversas e mensagens em entidades proprias para acompanhamento no
+  dashboard;
 - nao calcula preco, frete ou estoque no frontend;
 - nao substitui o carrinho nem o checkout validado pelo backend.
 
@@ -36,12 +37,15 @@ POST /api/v1/bot/messages/
 build_bot_reply()
   |
   v
+BotConversation + BotMessage
+  |
+  v
 Produtos disponiveis + regioes ativas
 ```
 
 O frontend renderiza a conversa, atalhos, produtos sugeridos e regioes de
-entrega. O backend classifica a mensagem e retorna uma resposta estruturada para
-a interface.
+entrega. O backend classifica a mensagem, persiste o par cliente/bot e retorna
+uma resposta estruturada para a interface.
 
 ## Responsabilidades
 
@@ -49,9 +53,11 @@ Frontend:
 
 - `bipflow-frontend/src/views/products/CatalogBotWidget.vue`: controla abertura
   do painel, estado local da conversa, envio da mensagem e renderizacao de
-  produtos, regioes e atalhos.
+  produtos, regioes e atalhos. Tambem reaproveita `session_id` em
+  `sessionStorage` para continuar a conversa no mesmo navegador.
 - `bipflow-frontend/src/services/bot.service.ts`: centraliza a chamada HTTP do
-  bot e envia mensagens com `channel` padrao `web`.
+  bot, envia mensagens com `channel` padrao `web` e anexa contexto de conversa
+  quando disponivel.
 - `bipflow-frontend/src/types/bot.ts`: define o contrato TypeScript consumido
   pela UI.
 - `bipflow-frontend/src/views/products/ProductsView.vue`: integra o widget ao
@@ -61,15 +67,19 @@ Backend:
 
 - `bipdelivery/api/bot_engine.py`: concentra as regras deterministicas de
   classificacao e montagem da resposta.
+- `bipdelivery/api/models.py`: modela `BotConversation` e `BotMessage`.
 - `bipdelivery/api/serializers.py`: valida entrada e saida do contrato publico.
-- `bipdelivery/api/views.py`: expoe o endpoint publico com throttle por IP.
-- `bipdelivery/api/v1_urls.py`: registra `POST /api/v1/bot/messages/`.
+- `bipdelivery/api/views.py`: expoe o endpoint publico com throttle por IP e o
+  historico read-only para papeis de dashboard.
+- `bipdelivery/api/v1_urls.py`: registra `POST /api/v1/bot/messages/` e
+  `GET /api/v1/bot-conversations/`.
 - `bipdelivery/api/throttling.py`: limita volume de mensagens anonimas.
 
 Testes:
 
 - `bipdelivery/tests/test_bot_mvp.py`: cobre mensagem vazia, saudacao,
-  catalogo, busca de produto e entrega.
+  catalogo, busca de produto, entrega, continuidade de conversa e listagem
+  administrativa.
 - `bipflow-frontend/src/services/__tests__/bot.service.spec.ts`: garante que o
   service trimma a mensagem e usa o contrato esperado.
 
@@ -86,12 +96,21 @@ Payload:
 ```json
 {
   "message": "Quero ver o catalogo",
-  "channel": "web"
+  "channel": "web",
+  "session_id": "opcional-para-continuar-conversa",
+  "conversation_id": 1,
+  "customer_phone": "5571999999999"
 }
 ```
 
+`channel`, `session_id`, `conversation_id` e `customer_phone` sao opcionais.
+Quando nenhum identificador e enviado, o backend cria uma conversa nova.
+
 Resposta:
 
+- `conversation_id`: identificador interno da conversa persistida.
+- `session_id`: identificador publico opaco para continuidade no cliente.
+- `conversation_status`: estado operacional da conversa.
 - `intent`: `greeting`, `catalog`, `product_search`, `delivery`, `checkout`,
   `human_support` ou `fallback`.
 - `reply`: texto curto para exibir ao cliente.
@@ -108,6 +127,8 @@ Resposta:
 - Busca usa nome, SKU e descricao do produto.
 - Entrega lista apenas regioes ativas.
 - Checkout orienta o cliente a finalizar pelo carrinho.
+- Cada mensagem aceita salva uma entrada `user` e uma entrada `bot`.
+- Pedidos de atendimento humano mudam a conversa para `waiting_human`.
 - Preco, estoque, frete e total continuam validados no backend pelo fluxo de
   checkout.
 
@@ -124,8 +145,8 @@ Resposta:
 - Prefira composicao e funcoes explicitas para novas regras. Nao crie
   hierarquias de heranca para intents enquanto o fluxo ainda for simples e
   deterministico.
-- Se o bot passar a persistir conversas, modele uma entidade propria em vez de
-  reaproveitar `SaleOrder`.
+- Nao reaproveite `SaleOrder` para conversa. `BotConversation` guarda estado e
+  `BotMessage` guarda mensagens do bot.
 - Se houver integracao com WhatsApp real, trate como adaptador separado do
   motor de regras.
 
