@@ -34,6 +34,9 @@ Acesse os materiais pelo perfil:
 Este repositório também funciona como evidência prática do meu perfil em
 desenvolvimento full-stack junior. Para leitura de carreira:
 
+- [Entrega técnica para avaliação](docs/technical-delivery.md): resumo
+  profissional para tech lead, avaliador técnico ou recrutador técnico, com
+  escopo, decisões, evidências, comandos e limites conhecidos.
 - [Currículo ATS em DOCX](docs/career/Ednaldo_Aquino_Curriculo_ATS.docx):
   versão adequada para envio em processos seletivos e leitura por sistemas ATS.
 - [Currículo em Markdown](docs/career/Ednaldo_Aquino_Curriculo_ATS.md):
@@ -49,15 +52,18 @@ Use este roteiro para entender o projeto sem precisar abrir todos os arquivos:
 - **0:30 - 1:10 | Arquitetura real:** abra
   [docs/architecture/system-overview.md](docs/architecture/system-overview.md)
   para confirmar os limites entre Django REST, Vue 3 e o motor Node isolado.
-- **1:10 - 2:00 | Fluxo crítico no código:** confira
+- **1:10 - 1:30 | Entrega técnica:** leia
+  [docs/technical-delivery.md](docs/technical-delivery.md) para ver escopo,
+  evidências, comandos e riscos conhecidos em formato de avaliação.
+- **1:30 - 2:10 | Fluxo crítico no código:** confira
   `bipdelivery/api/models.py`, `bipdelivery/api/serializers.py`,
   `bipdelivery/api/views.py`, `bipflow-frontend/src/services/order.service.ts`
   e `bipflow-frontend/src/views/products/`. Esses arquivos mostram catálogo,
   frete, carrinho, checkout via WhatsApp, pedido persistido e bot MVP.
-- **2:00 - 2:35 | Qualidade verificável:** leia a seção
+- **2:10 - 2:40 | Qualidade verificável:** leia a seção
   [Qualidade](#qualidade) e os testes em `bipdelivery/tests/`, especialmente
   checkout, permissões, filtros de produto e bot guiado por regras.
-- **2:35 - 3:00 | Evidência de comunicação:** assista à demonstração, veja o
+- **2:40 - 3:00 | Evidência de comunicação:** assista à demonstração, veja o
   carrossel técnico e leia o [Estudo De Caso STAR](#estudo-de-caso-star) para
   avaliar clareza, tomada de decisão e capacidade de explicar trade-offs.
 
@@ -134,6 +140,8 @@ suportar várias lojas está em
 ## Documentação Oficial
 
 - [docs/README.md](docs/README.md): índice da documentação viva.
+- [docs/technical-delivery.md](docs/technical-delivery.md): entrega técnica para
+  avaliação profissional.
 - [docs/architecture/system-overview.md](docs/architecture/system-overview.md):
   arquitetura real do projeto.
 - [docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md):
@@ -280,6 +288,8 @@ npm run frontend:lint
 npm run frontend:lint:fix
 npm run frontend:test:unit
 npm run frontend:test:e2e
+npm run docs:check
+npm test
 ```
 
 ## Qualidade

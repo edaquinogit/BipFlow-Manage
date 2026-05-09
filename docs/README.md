@@ -6,6 +6,8 @@ no codigo e suficiente para operar o estado atual do repositorio.
 ## Documentos Mantidos
 
 - [README principal](../README.md): visao geral, stack e setup rapido.
+- [Entrega tecnica para avaliacao](technical-delivery.md): resumo profissional
+  para tech lead, avaliador tecnico ou recrutador tecnico.
 - [Arquitetura](architecture/system-overview.md): responsabilidades de cada
   aplicacao e limites entre Django e Vue.
 - [Evolucao multi-loja](architecture/multi-tenant-evolution.md): estrategia para
@@ -32,10 +34,11 @@ no codigo e suficiente para operar o estado atual do repositorio.
 ## Ordem De Leitura
 
 1. [README principal](../README.md)
-2. [Arquitetura](architecture/system-overview.md)
-3. [Guia de desenvolvimento](development-guide.md)
-4. [Bot do catalogo](features/catalog-bot.md)
-5. [Referencia da API Django](api/reference.md)
+2. [Entrega tecnica para avaliacao](technical-delivery.md)
+3. [Arquitetura](architecture/system-overview.md)
+4. [Guia de desenvolvimento](development-guide.md)
+5. [Bot do catalogo](features/catalog-bot.md)
+6. [Referencia da API Django](api/reference.md)
 
 ## Regra De Manutencao
 

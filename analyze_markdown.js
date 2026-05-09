@@ -1,19 +1,13 @@
 const fs = require('fs');
-const path = require('path');
 
 const FILES = [
   'README.md',
-  'AI_CONTEXT.md',
-  'RESOLUTION_SUMMARY.md',
-  'COMMIT_MESSAGES.md',
-  'INTEGRATION.md',
-  'FINAL_VALIDATION_COMMANDS.md',
-  'TEST_INTEGRATION_GUIDE.md',
-  'CHANGELOG.md',
-  'PRE_FLIGHT_REPORT.md',
-  'ATOMIC_EXECUTION_COMPLETE.md',
   'docs/README.md',
+  'docs/technical-delivery.md',
   'docs/architecture/system-overview.md',
+  'docs/development-guide.md',
+  'docs/api/reference.md',
+  'docs/features/catalog-bot.md',
   'bipflow-frontend/README.md',
 ];
 
@@ -77,11 +71,22 @@ function checkMarkdown(filePath) {
     }
   }
 
-  // MD040: Fenced code blocks should have language specifier
+  // MD040: Fenced code block openings should have language specifier
+  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === '```') {
-      issues.push({ file: filePath, line: i + 1, code: 'MD040', desc: 'Code block should have language specifier' });
+    const trimmed = lines[i].trim();
+
+    if (!trimmed.startsWith('```')) {
+      continue;
+    }
+
+    if (!inFence) {
+      if (trimmed === '```') {
+        issues.push({ file: filePath, line: i + 1, code: 'MD040', desc: 'Code block should have language specifier' });
+      }
+      inFence = true;
+    } else {
+      inFence = false;
     }
   }
 
@@ -136,7 +141,7 @@ if (totalIssues > 0) {
   });
 
   Object.keys(byFile).sort().forEach(file => {
-    console.log(`📄 ${file}: ${byFile[file].length}issue(s)`);
+    console.log(`${file}: ${byFile[file].length} issue(s)`);
     byFile[file].forEach(issue => {
       console.log(`   Line ${issue.line}: [${issue.code}] ${issue.desc}`);
     });

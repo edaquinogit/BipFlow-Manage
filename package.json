@@ -4,6 +4,8 @@
   "private": true,
   "description": "Monorepo orchestration for BipFlow Manage. Canonical runtime is the Django REST backend (bipdelivery/) plus the Vue 3 frontend (bipflow-frontend/).",
   "scripts": {
+    "test": "npm run frontend:test:unit",
+    "docs:check": "node analyze_markdown.js",
     "frontend:dev": "npm --prefix bipflow-frontend run dev",
     "frontend:build": "npm --prefix bipflow-frontend run build",
     "frontend:typecheck": "npm --prefix bipflow-frontend run typecheck",

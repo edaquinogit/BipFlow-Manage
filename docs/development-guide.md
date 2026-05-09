@@ -207,6 +207,12 @@ npm run frontend:test:unit
 npm run frontend:test:e2e
 ```
 
+Documentacao:
+
+```powershell
+npm run docs:check
+```
+
 Pipeline de frontend:
 
 - `.github/workflows/frontend-tests.yml` roda em `push`, `pull_request` e
@@ -262,9 +268,33 @@ Frontend:
 
 ## Verificacao Local Atual
 
-Ultima verificacao registrada nesta documentacao: 2026-04-26.
+Ultima verificacao registrada nesta documentacao: 2026-05-09.
 
-Frontend:
+Documentacao:
+
+```powershell
+npm run docs:check
+```
+
+Resultado: checagem Markdown sem issues.
+
+Backend:
+
+```powershell
+.\.venv\Scripts\python.exe bipdelivery\manage.py check
+```
+
+Resultado: system check sem issues.
+
+Frontend unitario:
+
+```powershell
+npm test
+```
+
+Resultado: 11 arquivos e 48 testes unitarios passaram.
+
+Frontend completo registrado anteriormente:
 
 ```powershell
 npm run typecheck
