@@ -200,6 +200,12 @@ python -m pytest bipdelivery/tests
 ruff check bipdelivery/api bipdelivery/tests
 ```
 
+Go-live:
+
+```powershell
+python bipdelivery\manage.py check_go_live_readiness --strict
+```
+
 Frontend:
 
 ```powershell

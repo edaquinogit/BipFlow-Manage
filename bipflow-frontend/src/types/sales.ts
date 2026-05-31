@@ -8,10 +8,12 @@ export interface SaleOrderItem {
   line_total: string
 }
 
+export type SaleOrderStatus = 'prepared' | 'sent' | 'cancelled'
+
 export interface SaleOrder {
   id: number
   order_reference: string
-  status: 'prepared' | 'sent' | 'cancelled'
+  status: SaleOrderStatus
   customer_name: string
   customer_phone: string
   customer_email: string

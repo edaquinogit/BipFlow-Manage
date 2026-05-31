@@ -17,7 +17,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { Product } from '@/schemas/product.schema'
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery'
-import type { SaleOrder } from '@/types/sales'
+import type { SaleOrder, SaleOrderStatus } from '@/types/sales'
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings'
 import { formatBRL } from '@/utils/formatters'
 
@@ -26,6 +26,7 @@ const props = defineProps<{
   recentSales: SaleOrder[]
   isSalesLoading: boolean
   salesError: string | null
+  updatingSaleOrderId: number | null
   deliveryRegions: DeliveryRegion[]
   isDeliveryRegionsLoading: boolean
   deliveryRegionsError: string | null
@@ -49,6 +50,7 @@ const emit = defineEmits<{
   saveDeliveryRegion: [payload: DeliveryRegionPayload, id?: number]
   deleteDeliveryRegion: [id: number]
   saveStoreSettings: [payload: StoreSettingsPayload]
+  updateSaleStatus: [id: number, status: SaleOrderStatus]
 }>()
 
 const activeView = ref<'overview' | 'delivery' | 'store'>('overview')
@@ -63,6 +65,11 @@ const regionDraft = ref<DeliveryRegionPayload>({
 const storeSettingsDraft = ref<StoreSettingsPayload>({
   whatsapp_phone: '',
 })
+const saleStatusOptions: { value: SaleOrderStatus; label: string }[] = [
+  { value: 'prepared', label: 'Novo' },
+  { value: 'sent', label: 'Enviado' },
+  { value: 'cancelled', label: 'Cancelado' },
+]
 
 const storeWhatsappDigits = computed(() => normalizePhone(storeSettingsDraft.value.whatsapp_phone))
 const storeWhatsappValidationMessage = computed(() => {
@@ -196,6 +203,30 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
   }
 
   return labels[paymentMethod]
+}
+
+function getSaleStatusLabel(status: SaleOrderStatus): string {
+  return saleStatusOptions.find((option) => option.value === status)?.label ?? status
+}
+
+function getSaleStatusClass(status: SaleOrderStatus): string {
+  const classes: Record<SaleOrderStatus, string> = {
+    prepared: 'border-amber-400/20 bg-amber-400/10 text-amber-100',
+    sent: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100',
+    cancelled: 'border-rose-400/20 bg-rose-400/10 text-rose-100',
+  }
+
+  return classes[status]
+}
+
+function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
+  const status = (event.target as HTMLSelectElement).value as SaleOrderStatus
+
+  if (status === sale.status) {
+    return
+  }
+
+  emit('updateSaleStatus', sale.id, status)
 }
 </script>
 
@@ -358,6 +389,31 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
                   <p class="mt-3 text-xs text-zinc-500">
                     {{ sale.item_count }} item<span v-if="sale.item_count !== 1">s</span> - {{ sale.order_reference }}
                   </p>
+                  <div class="mt-4 flex items-center justify-between gap-3">
+                    <span
+                      class="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest"
+                      :class="getSaleStatusClass(sale.status)"
+                    >
+                      {{ getSaleStatusLabel(sale.status) }}
+                    </span>
+                    <label class="min-w-[148px]">
+                      <span class="sr-only">Atualizar status do pedido {{ sale.order_reference }}</span>
+                      <select
+                        :value="sale.status"
+                        :disabled="updatingSaleOrderId === sale.id"
+                        class="h-9 w-full rounded-lg border border-white/10 bg-zinc-950 px-2 text-xs font-bold text-zinc-100 outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        @change="handleSaleStatusChange(sale, $event)"
+                      >
+                        <option
+                          v-for="option in saleStatusOptions"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ option.label }}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
                 </article>
               </template>
             </div>

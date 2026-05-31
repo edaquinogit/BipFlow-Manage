@@ -29,7 +29,8 @@ limites conhecidos.
 - Catalogo publico com busca, filtros, detalhe por slug, carrinho e checkout.
 - Checkout via WhatsApp com validacao server-side e persistencia de
   `SaleOrder` e `SaleOrderItem`.
-- Historico de vendas read-only para usuarios com papel de dashboard.
+- Historico de vendas para usuarios com papel de dashboard e atualizacao de
+  status por operadores com permissao de escrita.
 - Bot publico deterministico, sem IA externa, integrado a produtos e regioes
   ativas.
 - Vitrine administrativa read-only para conversas do bot.

@@ -148,6 +148,8 @@ suportar várias lojas está em
   estratégia e roadmap para suporte a múltiplas lojas.
 - [docs/development-guide.md](docs/development-guide.md): setup, comandos,
   qualidade e manutenção.
+- [docs/production-go-live.md](docs/production-go-live.md): checklist
+  operacional para receber pedidos reais.
 - [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
   Django.
 - [docs/features/catalog-bot.md](docs/features/catalog-bot.md): documentação do

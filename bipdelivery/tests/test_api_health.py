@@ -27,7 +27,7 @@ import pytest
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import call_command, CommandError
 from django.test import TestCase
 from django.test.utils import override_settings
 from PIL import Image
@@ -556,6 +556,58 @@ class StoreSettingsAPITest(TestCase):
         self.assertEqual(StoreSettings.objects.count(), 0)
 
 
+class GoLiveReadinessCommandTest(TestCase):
+    """Validate the executable production readiness checklist."""
+
+    go_live_settings = {
+        "DEBUG": False,
+        "ALLOWED_HOSTS": ["shop.example.com"],
+        "CSRF_TRUSTED_ORIGINS": ["https://shop.example.com"],
+        "CORS_ALLOWED_ORIGINS": ["https://shop.example.com"],
+        "IS_PRODUCTION": False,
+    }
+
+    @override_settings(**go_live_settings)
+    def test_go_live_readiness_passes_with_operational_setup(self) -> None:
+        """Readiness command should pass when the storefront can receive orders."""
+        User.objects.create_user(
+            username="operator@example.com",
+            email="operator@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        category = Category.objects.create(name="Prontos", slug="prontos")
+        Product.objects.create(
+            name="Produto pronto",
+            sku="READY-001",
+            price=Decimal("19.90"),
+            stock_quantity=5,
+            category=category,
+        )
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("12.00"),
+        )
+        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+        output = StringIO()
+
+        call_command("check_go_live_readiness", stdout=output)
+
+        self.assertIn("Go-live readiness checks passed.", output.getvalue())
+
+    @override_settings(**go_live_settings)
+    def test_go_live_readiness_fails_without_catalog_and_operator(self) -> None:
+        """Readiness command should fail closed when operational data is missing."""
+        output = StringIO()
+
+        with self.assertRaises(CommandError):
+            call_command("check_go_live_readiness", stdout=output)
+
+        self.assertIn("dashboard_operator", output.getvalue())
+        self.assertIn("catalog", output.getvalue())
+
+
 class CheckoutWhatsAppAPITest(TestCase):
     """Test the public checkout preparation endpoint."""
 
@@ -905,6 +957,92 @@ class CheckoutWhatsAppAPITest(TestCase):
             checkout_response.data["order_reference"],
         )
         self.assertEqual(response.data["results"][0]["item_count"], 1)
+
+    def test_dashboard_writer_can_update_sale_order_status(self) -> None:
+        """Dashboard operators should move orders through operational states."""
+        user = User.objects.create_user(
+            username="saleswriter",
+            password="testpass123",
+            is_staff=True,
+        )
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("42.50"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("42.50"),
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.patch(
+            f"/api/v1/sales-orders/{order.id}/status/",
+            {"status": "sent"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "sent")
+        order.refresh_from_db()
+        self.assertEqual(order.status, "sent")
+
+    def test_dashboard_reader_cannot_update_sale_order_status(self) -> None:
+        """Read-only dashboard users can inspect orders but cannot mutate them."""
+        viewer_group, _ = Group.objects.get_or_create(name="viewer")
+        user = User.objects.create_user(username="salesviewer", password="testpass123")
+        user.groups.add(viewer_group)
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("42.50"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("42.50"),
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.patch(
+            f"/api/v1/sales-orders/{order.id}/status/",
+            {"status": "cancelled"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        order.refresh_from_db()
+        self.assertEqual(order.status, SaleOrder.STATUS_PREPARED)
+
+    def test_sale_order_status_update_rejects_invalid_status(self) -> None:
+        """Status updates should stay inside the explicit order workflow."""
+        user = User.objects.create_user(
+            username="salesinvalid",
+            password="testpass123",
+            is_staff=True,
+        )
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("42.50"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("42.50"),
+        )
+
+        self.client.force_authenticate(user=user)
+        response: Any = self.client.patch(
+            f"/api/v1/sales-orders/{order.id}/status/",
+            {"status": "shipped"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        order.refresh_from_db()
+        self.assertEqual(order.status, SaleOrder.STATUS_PREPARED)
 
     def test_checkout_requires_delivery_address_for_delivery_orders(self) -> None:
         """Delivery orders should require address fields."""

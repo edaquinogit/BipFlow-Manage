@@ -10,7 +10,7 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,6 +34,7 @@ from .permissions import (
     DashboardReadWritePermission,
     IsDashboardReadRole,
     has_dashboard_read_access,
+    has_dashboard_write_access,
 )
 from .serializers import (
     BotConversationDetailSerializer,
@@ -50,6 +51,7 @@ from .serializers import (
     ProductSerializer,
     PublicStoreSettingsSerializer,
     RegisterUserSerializer,
+    SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
     StoreSettingsSerializer,
 )
@@ -350,7 +352,7 @@ class DeliveryRegionViewSet(viewsets.ModelViewSet):
 
 
 class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only sales history for authenticated dashboard users."""
+    """Sales history for authenticated dashboard users."""
 
     serializer_class = SaleOrderSerializer
     permission_classes = [IsAuthenticated, IsDashboardReadRole]
@@ -374,6 +376,23 @@ class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
             ).distinct()
 
         return queryset
+
+    @action(detail=True, methods=["patch"], url_path="status")
+    def update_status(self, request, pk=None):
+        """Allow dashboard operators to update the operational order status."""
+        if not has_dashboard_write_access(request.user):
+            raise PermissionDenied("Voce nao possui permissao para alterar pedidos.")
+
+        order = self.get_object()
+        serializer = SaleOrderStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        next_status = serializer.validated_data["status"]
+        if order.status != next_status:
+            order.status = next_status
+            order.save(update_fields=["status", "updated_at"])
+
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
 
 class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):

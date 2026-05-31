@@ -143,8 +143,9 @@ Quando o limite e excedido, a API retorna `429 Too Many Requests`.
   `admin`/`manager`. O catalogo publico consome somente o endpoint seguro
   `/api/v1/store-settings/public/`.
 - Checkout WhatsApp: publico.
-- Historico de vendas: read-only para `is_staff`, `is_superuser` ou usuarios
-  nos grupos `admin`/`manager`/`viewer`.
+- Historico de vendas: leitura para `is_staff`, `is_superuser` ou usuarios
+  nos grupos `admin`/`manager`/`viewer`; atualizacao de status para
+  `is_staff`, `is_superuser`, `admin` ou `manager`.
 
 ## Paginacao
 
@@ -483,9 +484,11 @@ Resposta:
 ```http
 GET /api/v1/sales-orders/
 GET /api/v1/sales-orders/{id}/
+PATCH /api/v1/sales-orders/{id}/status/
 ```
 
-Somente usuarios com papel de dashboard. O viewset e read-only.
+Listagem e detalhe exigem papel de dashboard. Atualizacao de status exige papel
+de escrita (`staff`, `superuser`, `admin` ou `manager`).
 
 Query params:
 
@@ -511,3 +514,17 @@ Campos principais:
 - `created_at`
 - `item_count`
 - `items`
+
+Atualizacao de status:
+
+```json
+{
+  "status": "sent"
+}
+```
+
+Valores aceitos:
+
+- `prepared`
+- `sent`
+- `cancelled`

@@ -750,6 +750,14 @@ class SaleOrderSerializer(serializers.ModelSerializer):
         return sum(item.quantity for item in order.items.all())
 
 
+class SaleOrderStatusUpdateSerializer(serializers.Serializer):
+    """Validate dashboard sale status transitions."""
+
+    status = serializers.ChoiceField(
+        choices=[choice[0] for choice in SaleOrder.STATUS_CHOICES],
+    )
+
+
 class RegisterUserSerializer(serializers.Serializer):
     """Register a new active user account with password validation."""
 

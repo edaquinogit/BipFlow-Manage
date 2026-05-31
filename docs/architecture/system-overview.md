@@ -152,7 +152,8 @@ Vendas:
 
 - `/api/v1/sales-orders/`
 - somente papel de dashboard;
-- read-only;
+- listagem e detalhe para papeis de dashboard;
+- atualizacao de status para papeis com escrita operacional;
 - suporta filtros `status` e `search`.
 
 ## Decisoes Arquiteturais

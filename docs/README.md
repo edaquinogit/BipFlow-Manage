@@ -14,6 +14,8 @@ no codigo e suficiente para operar o estado atual do repositorio.
   suportar varias lojas (multi-tenant) e roadmap por fases.
 - [Guia de desenvolvimento](development-guide.md): ambiente local, comandos,
   qualidade e manutencao.
+- [Go-live de producao](production-go-live.md): checklist executavel e smoke
+  manual para receber pedidos reais.
 - [Referencia da API Django](api/reference.md): endpoints implementados em
   `bipdelivery/api/`.
 - [Bot do catalogo](features/catalog-bot.md): comportamento, contrato,
@@ -37,8 +39,9 @@ no codigo e suficiente para operar o estado atual do repositorio.
 2. [Entrega tecnica para avaliacao](technical-delivery.md)
 3. [Arquitetura](architecture/system-overview.md)
 4. [Guia de desenvolvimento](development-guide.md)
-5. [Bot do catalogo](features/catalog-bot.md)
-6. [Referencia da API Django](api/reference.md)
+5. [Go-live de producao](production-go-live.md)
+6. [Bot do catalogo](features/catalog-bot.md)
+7. [Referencia da API Django](api/reference.md)
 
 ## Regra De Manutencao
 

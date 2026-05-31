@@ -7,7 +7,7 @@ import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import type { FilterState } from '@/types/filters';
-import type { SaleOrder } from '@/types/sales';
+import type { SaleOrder, SaleOrderStatus } from '@/types/sales';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { authService } from '@/services/auth.service';
 import { deliveryRegionService } from '@/services/delivery-region.service';
@@ -54,6 +54,7 @@ const isDeletingAction = ref(false);
 const isBulkUpdating = ref(false);
 const isSalesLoading = ref(false);
 const salesError = ref<string | null>(null);
+const updatingSaleOrderId = ref<number | null>(null);
 const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
 const isSavingDeliveryRegion = ref(false);
@@ -275,6 +276,26 @@ const handleSaveStoreSettings = async (payload: StoreSettingsPayload): Promise<v
   }
 };
 
+const handleUpdateSaleStatus = async (
+  orderId: number,
+  nextStatus: SaleOrderStatus
+): Promise<void> => {
+  updatingSaleOrderId.value = orderId;
+
+  try {
+    const updatedOrder = await salesService.updateStatus(orderId, nextStatus);
+    recentSales.value = recentSales.value.map((sale) => (
+      sale.id === updatedOrder.id ? updatedOrder : sale
+    ));
+    success('Status do pedido atualizado.');
+  } catch (error: unknown) {
+    Logger.error('Sale order status update failed', { error, orderId, nextStatus });
+    toastError('Nao foi possivel atualizar o pedido.');
+  } finally {
+    updatingSaleOrderId.value = null;
+  }
+};
+
 const handleEditRequest = (product: Product) => {
   // Deep clone to prevent memory reference issues
   selectedProduct.value = { ...product };
@@ -447,6 +468,7 @@ onMounted(async () => {
       :recent-sales="recentSales"
       :is-sales-loading="isSalesLoading"
       :sales-error="salesError"
+      :updating-sale-order-id="updatingSaleOrderId"
       :delivery-regions="deliveryRegions"
       :is-delivery-regions-loading="isDeliveryRegionsLoading"
       :delivery-regions-error="deliveryRegionsError"
@@ -467,6 +489,7 @@ onMounted(async () => {
       @save-delivery-region="handleSaveDeliveryRegion"
       @delete-delivery-region="handleDeleteDeliveryRegion"
       @save-store-settings="handleSaveStoreSettings"
+      @update-sale-status="handleUpdateSaleStatus"
     />
 
     <ProductForm
