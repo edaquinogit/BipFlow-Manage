@@ -7,7 +7,6 @@ import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
-import { storeSettingsService } from '@/services/store-settings.service'
 import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
@@ -31,12 +30,6 @@ vi.mock('@/services/category.service', () => ({
 vi.mock('@/services/delivery-region.service', () => ({
   deliveryRegionService: {
     getActive: vi.fn(),
-  },
-}))
-
-vi.mock('@/services/store-settings.service', () => ({
-  storeSettingsService: {
-    getPublic: vi.fn(),
   },
 }))
 
@@ -208,11 +201,6 @@ describe('ProductsView', () => {
       { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
     ] as any)
     vi.mocked(deliveryRegionService.getActive).mockResolvedValue([])
-    vi.mocked(storeSettingsService.getPublic).mockResolvedValue({
-      whatsapp_phone_digits: '5571999999999',
-      is_whatsapp_configured: true,
-    })
-
     wrapper = mountView()
     await flushPromises()
     await nextTick()
@@ -238,41 +226,6 @@ describe('ProductsView', () => {
     expect(wrapper.find('h1').text()).toContain('Catalogo pronto para pedidos')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
-  })
-
-  it('renders configured store WhatsApp in the catalog header', async () => {
-    await flushPromises()
-    await nextTick()
-
-    expect(wrapper.text()).toContain('WhatsApp da loja')
-    expect(wrapper.text()).toContain('+55 (71) 99999-9999')
-  })
-
-  it('opens WhatsApp with a selected frequent question message', async () => {
-    await wrapper.find('[aria-label^="Abrir duvidas frequentes"]').trigger('click')
-    await nextTick()
-
-    expect(document.body.textContent).toContain('Escolha sua duvida')
-
-    const deliveryOption = Array.from(document.body.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Entrega e retirada'))
-
-    expect(deliveryOption).toBeDefined()
-
-    deliveryOption!.click()
-    await nextTick()
-
-    expect(windowOpen).toHaveBeenCalledWith(
-      expect.stringContaining('https://api.whatsapp.com/send?phone=5571999999999&text='),
-      '_blank',
-      'noopener,noreferrer'
-    )
-    const openedUrl = windowOpen.mock.calls[0]?.[0]
-
-    expect(typeof openedUrl).toBe('string')
-    expect(decodeURIComponent(String(openedUrl))).toContain(
-      'quero saber mais sobre entrega ou retirada'
-    )
   })
 
   it('renders category shortcuts and cart drawer components', () => {

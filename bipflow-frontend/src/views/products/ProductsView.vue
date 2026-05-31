@@ -36,21 +36,16 @@
               <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <ChatBubbleLeftRightIcon class="h-5 w-5 text-sky-600" aria-hidden="true" />
                 <p class="mt-2 text-lg font-semibold text-slate-900">
-                  {{ storeWhatsappDigits ? 'Ativo' : 'Pendente' }}
+                  Ativo
                 </p>
                 <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                  WhatsApp
+                  Atendimento
                 </p>
               </div>
             </div>
           </div>
 
           <div class="flex w-full flex-col gap-3 sm:max-w-xs">
-            <StoreContactPill
-              :phone-digits="storeWhatsappDigits"
-              @open-contact-options="isStoreContactOptionsOpen = true"
-            />
-
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
@@ -248,12 +243,6 @@
 
     <CatalogBotWidget @open-product="handleOpenBotProduct" />
 
-    <StoreContactOptionsModal
-      :is-open="isStoreContactOptionsOpen"
-      :phone-digits="storeWhatsappDigits"
-      @close="isStoreContactOptionsOpen = false"
-    />
-
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
@@ -283,15 +272,12 @@ import CatalogBotWidget from './CatalogBotWidget.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
-import StoreContactOptionsModal from './StoreContactOptionsModal.vue'
-import StoreContactPill from './StoreContactPill.vue'
 import {
   ChatBubbleLeftRightIcon,
   ShoppingBagIcon,
   TruckIcon,
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
-import { usePublicStoreSettings } from '@/composables/usePublicStoreSettings'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
@@ -338,7 +324,6 @@ const loadMoreTrigger = ref<HTMLDivElement | null>(null)
 const categories = ref<Category[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const isCartOpen = ref(false)
-const isStoreContactOptionsOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
 
@@ -383,11 +368,6 @@ const {
   resetCustomer,
   getProductQuantity,
 } = useCart()
-
-const {
-  storeWhatsappDigits,
-  fetchPublicStoreSettings,
-} = usePublicStoreSettings('products_view')
 
 let loadMoreObserver: IntersectionObserver | null = null
 let isSyncingRouteState = false
@@ -579,7 +559,6 @@ onMounted(async () => {
   await Promise.allSettled([
     loadCategories(),
     loadDeliveryRegions(),
-    fetchPublicStoreSettings(),
   ])
   await nextTick()
   connectLoadMoreObserver()

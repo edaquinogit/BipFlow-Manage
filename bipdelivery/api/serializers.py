@@ -470,6 +470,13 @@ class BotOptionSerializer(serializers.Serializer):
 
     label = serializers.CharField()
     value = serializers.CharField()
+    kind = serializers.ChoiceField(
+        choices=["quick_reply", "whatsapp_link"],
+        default="quick_reply",
+        required=False,
+    )
+    description = serializers.CharField(required=False, allow_blank=True)
+    url = serializers.CharField(required=False, allow_blank=True)
 
 
 class BotProductSuggestionSerializer(serializers.Serializer):

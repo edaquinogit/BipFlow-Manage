@@ -31,6 +31,9 @@ export interface BotMessageContext {
 export interface BotOption {
   label: string
   value: string
+  kind?: 'quick_reply' | 'whatsapp_link'
+  description?: string
+  url?: string
 }
 
 export interface BotProductSuggestion {

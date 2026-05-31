@@ -13,10 +13,6 @@
           Voltar ao catalogo
         </button>
 
-        <StoreContactPill
-          :phone-digits="storeWhatsappDigits"
-          @open-contact-options="isStoreContactOptionsOpen = true"
-        />
       </div>
     </header>
 
@@ -245,12 +241,7 @@
       @open-cart="isCartOpen = true"
     />
 
-    <StoreContactOptionsModal
-      :is-open="isStoreContactOptionsOpen"
-      :phone-digits="storeWhatsappDigits"
-      :context-label="product?.name || ''"
-      @close="isStoreContactOptionsOpen = false"
-    />
+    <CatalogBotWidget @open-product="handleOpenBotProduct" />
 
     <CartDrawer
       :is-open="isCartOpen"
@@ -276,11 +267,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
+import CatalogBotWidget from './CatalogBotWidget.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
-import StoreContactOptionsModal from './StoreContactOptionsModal.vue'
-import StoreContactPill from './StoreContactPill.vue'
 import { useCart } from '@/composables/useCart'
-import { usePublicStoreSettings } from '@/composables/usePublicStoreSettings'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
 import { deliveryRegionService } from '@/services/delivery-region.service'
@@ -312,7 +301,6 @@ const deliveryRegions = ref<DeliveryRegion[]>([])
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
-const isStoreContactOptionsOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const errorMessage = ref('')
 const quantity = ref(1)
@@ -338,11 +326,6 @@ const {
   resetCustomer,
   getProductQuantity,
 } = useCart()
-
-const {
-  storeWhatsappDigits,
-  fetchPublicStoreSettings,
-} = usePublicStoreSettings('product_detail_view')
 
 const productDescription = computed(() => (
   product.value?.description?.trim()
@@ -571,7 +554,6 @@ async function loadDeliveryRegions(): Promise<void> {
 onMounted(() => {
   void Promise.allSettled([
     loadDeliveryRegions(),
-    fetchPublicStoreSettings(),
   ])
 })
 
@@ -619,6 +601,13 @@ function handleAddToCart(): void {
 
 function goBackToCatalog(): void {
   void router.push({ name: PublicRoutes.Products })
+}
+
+function handleOpenBotProduct(slug: string): void {
+  void router.push({
+    name: PublicRoutes.ProductDetails,
+    params: { slug },
+  })
 }
 
 function validateCheckoutData(): boolean {

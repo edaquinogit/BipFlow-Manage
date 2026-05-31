@@ -8,7 +8,14 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import BotConversation, BotMessage, Category, DeliveryRegion, Product
+from bipdelivery.api.models import (
+    BotConversation,
+    BotMessage,
+    Category,
+    DeliveryRegion,
+    Product,
+    StoreSettings,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -132,6 +139,33 @@ class BotMessageMVPTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["intent"], "human_support")
         self.assertEqual(conversation.status, BotConversation.STATUS_WAITING_HUMAN)
+
+    def test_bot_exposes_whatsapp_handoff_options_when_store_phone_exists(self) -> None:
+        """The bot API should own WhatsApp handoff actions when the store is configured."""
+        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+
+        response: Any = self.client.post(
+            "/api/v1/bot/messages/",
+            {"message": "Quero falar com atendente"},
+            format="json",
+        )
+
+        whatsapp_options = [
+            option for option in response.data["options"]
+            if option["kind"] == "whatsapp_link"
+        ]
+        option_values = {option["value"] for option in whatsapp_options}
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["intent"], "human_support")
+        self.assertIn("whatsapp:products", option_values)
+        self.assertIn("whatsapp:delivery", option_values)
+        self.assertIn("whatsapp:payment", option_values)
+        self.assertIn("whatsapp:order", option_values)
+        self.assertIn("whatsapp:human", option_values)
+        self.assertTrue(
+            all(option["url"].startswith("https://wa.me/5571999999999?text=") for option in whatsapp_options)
+        )
 
     def test_bot_catalog_lists_only_available_products(self) -> None:
         """Catalog replies should respect stock and availability from the backend."""
