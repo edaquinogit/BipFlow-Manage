@@ -8,11 +8,41 @@
               Catalogo BipFlow
             </p>
             <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Produtos para escolher rapido e comprar sem atrito
+              Catalogo pronto para pedidos pelo WhatsApp
             </h1>
             <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-              Uma vitrine mais leve, com foco no essencial: nome, preco e compra direta.
+              Produtos, frete e atendimento conectados em uma jornada simples para comprar sem atrito.
             </p>
+
+            <div class="mt-5 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <ShoppingBagIcon class="h-5 w-5 text-rose-600" aria-hidden="true" />
+                <p class="mt-2 text-lg font-semibold text-slate-900">{{ products.length }}</p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                  Produtos
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <TruckIcon class="h-5 w-5 text-emerald-600" aria-hidden="true" />
+                <p class="mt-2 text-lg font-semibold text-slate-900">
+                  {{ deliveryRegions.length || 'Padrao' }}
+                </p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                  Entrega
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <ChatBubbleLeftRightIcon class="h-5 w-5 text-sky-600" aria-hidden="true" />
+                <p class="mt-2 text-lg font-semibold text-slate-900">
+                  {{ storeWhatsappDigits ? 'Ativo' : 'Pendente' }}
+                </p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                  WhatsApp
+                </p>
+              </div>
+            </div>
           </div>
 
           <div class="flex w-full flex-col gap-3 sm:max-w-xs">
@@ -20,6 +50,31 @@
               :phone-digits="storeWhatsappDigits"
               @open-contact-options="isStoreContactOptionsOpen = true"
             />
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Pedido atual
+                  </p>
+                  <p class="mt-1 text-sm font-semibold text-slate-900">
+                    {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
+                  </p>
+                </div>
+                <p class="shrink-0 text-base font-semibold text-slate-900">
+                  {{ formatBRL(total) }}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                class="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                :disabled="itemCount === 0"
+                @click="isCartOpen = true"
+              >
+                Revisar pedido
+              </button>
+            </div>
 
             <label class="block">
               <span class="mb-2 block text-sm font-medium text-slate-700">Ordenacao</span>
@@ -230,6 +285,11 @@ import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import StoreContactOptionsModal from './StoreContactOptionsModal.vue'
 import StoreContactPill from './StoreContactPill.vue'
+import {
+  ChatBubbleLeftRightIcon,
+  ShoppingBagIcon,
+  TruckIcon,
+} from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
 import { usePublicStoreSettings } from '@/composables/usePublicStoreSettings'
 import { useProductSearch } from '@/composables/useProductSearch'
@@ -241,6 +301,7 @@ import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
+import { formatBRL } from '@/utils/formatters'
 
 function parseNumberParam(
   value: LocationQueryValue | LocationQueryValue[] | undefined

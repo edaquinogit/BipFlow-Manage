@@ -34,6 +34,26 @@
               </svg>
             </button>
           </div>
+
+          <div class="mt-5 grid grid-cols-4 gap-2" aria-label="Progresso do pedido">
+            <div
+              v-for="(step, index) in checkoutSteps"
+              :key="step.key"
+              class="rounded-2xl border px-2 py-2 text-center transition"
+              :class="getCheckoutStepClass(index, step.complete)"
+            >
+              <span
+                class="mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                :class="step.complete ? 'bg-emerald-500 text-white' : 'bg-white text-slate-500 ring-1 ring-slate-200'"
+              >
+                <CheckIcon v-if="step.complete" class="h-4 w-4" aria-hidden="true" />
+                <span v-else>{{ index + 1 }}</span>
+              </span>
+              <span class="mt-1 block truncate text-[11px] font-semibold">
+                {{ step.label }}
+              </span>
+            </div>
+          </div>
         </header>
 
         <div class="flex-1 overflow-y-auto">
@@ -178,30 +198,52 @@
                 />
               </label>
 
-              <label>
+              <div>
                 <span class="mb-2 block text-sm font-medium text-slate-700">Entrega</span>
-                <select
-                  :value="customer.deliveryMethod"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
-                  @change="handleDeliveryMethodChange"
-                >
-                  <option value="delivery">Delivery</option>
-                  <option value="pickup">Retirada</option>
-                </select>
-              </label>
+                <div class="grid grid-cols-2 rounded-2xl border border-slate-300 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    class="rounded-xl px-3 py-2 text-sm font-semibold transition"
+                    :class="customer.deliveryMethod === 'delivery'
+                      ? 'bg-white text-rose-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'"
+                    :aria-pressed="customer.deliveryMethod === 'delivery'"
+                    @click="selectDeliveryMethod('delivery')"
+                  >
+                    Delivery
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-xl px-3 py-2 text-sm font-semibold transition"
+                    :class="customer.deliveryMethod === 'pickup'
+                      ? 'bg-white text-rose-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'"
+                    :aria-pressed="customer.deliveryMethod === 'pickup'"
+                    @click="selectDeliveryMethod('pickup')"
+                  >
+                    Retirada
+                  </button>
+                </div>
+              </div>
 
-              <label>
+              <div>
                 <span class="mb-2 block text-sm font-medium text-slate-700">Pagamento</span>
-                <select
-                  :value="customer.paymentMethod"
-                  class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
-                  @change="handlePaymentMethodChange"
-                >
-                  <option value="pix">Pix</option>
-                  <option value="card">Cartao</option>
-                  <option value="cash">Dinheiro</option>
-                </select>
-              </label>
+                <div class="grid grid-cols-3 rounded-2xl border border-slate-300 bg-slate-50 p-1">
+                  <button
+                    v-for="option in paymentOptions"
+                    :key="option.value"
+                    type="button"
+                    class="rounded-xl px-2 py-2 text-sm font-semibold transition"
+                    :class="customer.paymentMethod === option.value
+                      ? 'bg-white text-rose-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'"
+                    :aria-pressed="customer.paymentMethod === option.value"
+                    @click="selectPaymentMethod(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
 
               <template v-if="customer.deliveryMethod === 'delivery'">
                 <label class="sm:col-span-2">
@@ -277,6 +319,23 @@
 
         <footer class="border-t border-slate-200 bg-slate-50 px-6 py-5">
           <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div
+              class="mb-4 rounded-2xl border px-4 py-3"
+              :class="canSubmitOrder
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                  :class="canSubmitOrder ? 'bg-emerald-500' : 'bg-amber-500'"
+                />
+                <p class="text-sm font-semibold leading-5">
+                  {{ checkoutBlockerMessage }}
+                </p>
+              </div>
+            </div>
+
             <div class="space-y-3 text-sm">
               <div class="flex items-center justify-between text-slate-600">
                 <span>Subtotal</span>
@@ -296,10 +355,10 @@
               <button
                 type="button"
                 class="inline-flex w-full items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-                :disabled="items.length === 0 || isSubmitting"
+                :disabled="!canSubmitOrder || isSubmitting"
                 @click="$emit('submitOrder')"
               >
-                {{ isSubmitting ? 'Emitindo nota...' : 'Finalizar pedido no WhatsApp' }}
+                {{ isSubmitting ? 'Gerando WhatsApp...' : 'Finalizar pedido no WhatsApp' }}
               </button>
             </div>
           </div>
@@ -310,6 +369,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { CheckIcon } from '@heroicons/vue/24/outline'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
@@ -343,6 +404,63 @@ const emit = defineEmits<{
   submitOrder: []
 }>()
 
+const paymentOptions: { value: CartCustomer['paymentMethod']; label: string }[] = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'card', label: 'Cartao' },
+  { value: 'cash', label: 'Dinheiro' },
+]
+
+const hasCartItems = computed(() => props.items.length > 0)
+const hasCustomerIdentity = computed(() => (
+  Boolean(props.customer.fullName.trim()) && Boolean(props.customer.phone.trim())
+))
+const hasDeliveryRegion = computed(() => (
+  props.customer.deliveryMethod !== 'delivery'
+  || props.deliveryRegions.length === 0
+  || Boolean(props.customer.deliveryRegionId)
+))
+const hasDeliveryAddress = computed(() => (
+  props.customer.deliveryMethod !== 'delivery'
+  || (
+    Boolean(props.customer.address.trim())
+    && Boolean(props.customer.neighborhood.trim())
+    && Boolean(props.customer.city.trim())
+  )
+))
+const hasDeliveryDetails = computed(() => hasDeliveryRegion.value && hasDeliveryAddress.value)
+const canSubmitOrder = computed(() => (
+  hasCartItems.value && hasCustomerIdentity.value && hasDeliveryDetails.value
+))
+const checkoutSteps = computed(() => [
+  { key: 'items', label: 'Itens', complete: hasCartItems.value },
+  { key: 'customer', label: 'Cliente', complete: hasCustomerIdentity.value },
+  { key: 'delivery', label: 'Entrega', complete: hasDeliveryDetails.value },
+  { key: 'send', label: 'WhatsApp', complete: canSubmitOrder.value },
+])
+const activeCheckoutStepIndex = computed(() => {
+  const firstIncompleteIndex = checkoutSteps.value.findIndex((step) => !step.complete)
+  return firstIncompleteIndex >= 0 ? firstIncompleteIndex : checkoutSteps.value.length - 1
+})
+const checkoutBlockerMessage = computed(() => {
+  if (!hasCartItems.value) {
+    return 'Adicione ao menos um produto para iniciar o pedido.'
+  }
+
+  if (!hasCustomerIdentity.value) {
+    return 'Informe nome e WhatsApp do cliente antes de finalizar.'
+  }
+
+  if (!hasDeliveryRegion.value) {
+    return 'Selecione a regiao de entrega para calcular o frete.'
+  }
+
+  if (!hasDeliveryAddress.value) {
+    return 'Complete endereco, bairro e cidade para delivery.'
+  }
+
+  return 'Pedido pronto para abrir no WhatsApp.'
+})
+
 function updateField<K extends keyof CartCustomer>(field: K, value: CartCustomer[K]): void {
   emit('updateCustomer', { [field]: value } as Partial<CartCustomer>)
 }
@@ -352,10 +470,7 @@ function handleTextInput<K extends keyof CartCustomer>(field: K, event: Event): 
   updateField(field, target.value as CartCustomer[K])
 }
 
-function handleDeliveryMethodChange(event: Event): void {
-  const target = event.target as HTMLSelectElement
-  const deliveryMethod = target.value as CartCustomer['deliveryMethod']
-
+function selectDeliveryMethod(deliveryMethod: CartCustomer['deliveryMethod']): void {
   emit('updateCustomer', {
     deliveryMethod,
     ...(deliveryMethod === 'pickup'
@@ -368,9 +483,8 @@ function handleDeliveryMethodChange(event: Event): void {
   })
 }
 
-function handlePaymentMethodChange(event: Event): void {
-  const target = event.target as HTMLSelectElement
-  updateField('paymentMethod', target.value as CartCustomer['paymentMethod'])
+function selectPaymentMethod(paymentMethod: CartCustomer['paymentMethod']): void {
+  updateField('paymentMethod', paymentMethod)
 }
 
 function handleDeliveryRegionChange(event: Event): void {
@@ -393,6 +507,18 @@ function handleDeliveryRegionChange(event: Event): void {
     deliveryRegionFee: Number(selectedRegion.delivery_fee),
     city: selectedRegion.city || props.customer.city,
   })
+}
+
+function getCheckoutStepClass(index: number, isComplete: boolean): string {
+  if (isComplete) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  }
+
+  if (index === activeCheckoutStepIndex.value) {
+    return 'border-rose-200 bg-rose-50 text-rose-800'
+  }
+
+  return 'border-slate-200 bg-slate-50 text-slate-500'
 }
 </script>
 

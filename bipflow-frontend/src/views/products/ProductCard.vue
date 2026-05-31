@@ -110,26 +110,16 @@
 
           <button
             type="button"
-            class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-rose-200"
+            class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-rose-200 sm:min-w-[7.5rem]"
             :class="product.is_available
               ? 'bg-rose-600 text-white hover:bg-rose-700'
               : 'cursor-not-allowed bg-slate-200 text-slate-500'"
             :disabled="!product.is_available"
             @click.stop="handleAddToCart"
           >
-            <svg
-              class="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.9"
-              aria-hidden="true"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 .98-.8L20 7H7" />
-              <circle cx="10" cy="19" r="1.4" />
-              <circle cx="17" cy="19" r="1.4" />
-            </svg>
-            <span class="sr-only">{{ addToCartLabel }}</span>
+            <ShoppingCartIcon class="h-4 w-4" aria-hidden="true" />
+            <span class="hidden sm:inline">{{ addToCartLabel }}</span>
+            <span class="sr-only sm:hidden">{{ addToCartLabel }}</span>
           </button>
         </div>
       </div>
@@ -139,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ShoppingCartIcon } from '@heroicons/vue/24/outline'
 import type { Product } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 

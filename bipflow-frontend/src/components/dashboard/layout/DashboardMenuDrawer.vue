@@ -70,6 +70,10 @@ const saleStatusOptions: { value: SaleOrderStatus; label: string }[] = [
   { value: 'sent', label: 'Enviado' },
   { value: 'cancelled', label: 'Cancelado' },
 ]
+const saleTimelineSteps: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: string }[] = [
+  { value: 'prepared', label: 'Novo' },
+  { value: 'sent', label: 'Enviado' },
+]
 
 const storeWhatsappDigits = computed(() => normalizePhone(storeSettingsDraft.value.whatsapp_phone))
 const storeWhatsappValidationMessage = computed(() => {
@@ -205,6 +209,10 @@ function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
   return labels[paymentMethod]
 }
 
+function getDeliveryMethodLabel(deliveryMethod: SaleOrder['delivery_method']): string {
+  return deliveryMethod === 'delivery' ? 'Delivery' : 'Retirada'
+}
+
 function getSaleStatusLabel(status: SaleOrderStatus): string {
   return saleStatusOptions.find((option) => option.value === status)?.label ?? status
 }
@@ -217,6 +225,21 @@ function getSaleStatusClass(status: SaleOrderStatus): string {
   }
 
   return classes[status]
+}
+
+function getSaleTimelineStepClass(
+  currentStatus: SaleOrderStatus,
+  stepStatus: Exclude<SaleOrderStatus, 'cancelled'>
+): string {
+  if (currentStatus === 'sent') {
+    return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100'
+  }
+
+  if (currentStatus === stepStatus) {
+    return 'border-amber-400/20 bg-amber-400/10 text-amber-100'
+  }
+
+  return 'border-white/10 bg-zinc-950 text-zinc-500'
 }
 
 function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
@@ -389,6 +412,44 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
                   <p class="mt-3 text-xs text-zinc-500">
                     {{ sale.item_count }} item<span v-if="sale.item_count !== 1">s</span> - {{ sale.order_reference }}
                   </p>
+
+                  <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-zinc-400">
+                    <span class="rounded-full border border-white/10 bg-zinc-950 px-2.5 py-1">
+                      {{ getDeliveryMethodLabel(sale.delivery_method) }}
+                    </span>
+                    <span
+                      v-if="sale.delivery_region_name"
+                      class="max-w-full truncate rounded-full border border-white/10 bg-zinc-950 px-2.5 py-1"
+                    >
+                      {{ sale.delivery_region_name }}
+                    </span>
+                  </div>
+
+                  <div class="mt-4 rounded-lg border border-white/10 bg-zinc-950/70 p-3">
+                    <div
+                      v-if="sale.status === 'cancelled'"
+                      class="flex items-center gap-2 rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-rose-100"
+                    >
+                      <span class="h-2 w-2 rounded-full bg-rose-300" />
+                      Pedido cancelado
+                    </div>
+
+                    <div v-else class="grid grid-cols-2 gap-2">
+                      <div
+                        v-for="step in saleTimelineSteps"
+                        :key="step.value"
+                        class="flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase tracking-widest"
+                        :class="getSaleTimelineStepClass(sale.status, step.value)"
+                      >
+                        <span
+                          class="h-2 w-2 rounded-full"
+                          :class="sale.status === 'sent' || sale.status === step.value ? 'bg-current' : 'bg-zinc-700'"
+                        />
+                        {{ step.label }}
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="mt-4 flex items-center justify-between gap-3">
                     <span
                       class="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest"

@@ -235,7 +235,7 @@ describe('ProductsView', () => {
   })
 
   it('renders catalog header and products', () => {
-    expect(wrapper.find('h1').text()).toContain('Produtos para escolher rapido')
+    expect(wrapper.find('h1').text()).toContain('Catalogo pronto para pedidos')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })
