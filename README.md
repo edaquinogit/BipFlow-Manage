@@ -208,6 +208,7 @@ Django, PostgreSQL e Redis:
 
 ```powershell
 Copy-Item .env.example .env
+python scripts\generate-secrets.py --env
 docker compose up --build
 ```
 
@@ -253,6 +254,7 @@ No modo de desenvolvimento sem Docker, use o frontend em
 ```powershell
 .\bootstrap-env.ps1
 Copy-Item .env.example .env
+python scripts\generate-secrets.py --env
 cd bipdelivery
 .\venv\Scripts\python.exe manage.py migrate
 .\venv\Scripts\python.exe manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin

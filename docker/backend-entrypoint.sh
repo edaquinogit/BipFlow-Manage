@@ -1,8 +1,35 @@
 #!/bin/sh
-set -e
+set -eu
 
 APP_USER="${APP_USER:-appuser}"
 MANAGE_PY="bipdelivery/manage.py"
+MIN_SECRET_LENGTH=32
+
+require_secret() {
+    name="$1"
+    eval "value=\${$name:-}"
+
+    if [ -z "$value" ]; then
+        echo "ERROR: $name is required but not set." >&2
+        echo "Generate local values with: python scripts/generate-secrets.py" >&2
+        exit 1
+    fi
+
+    case "$value" in
+        *change?me*|*placeholder*|*bipflow?password*|*django?insecure*|*TO?O*|admin???|password|password???|secret|123456|test)
+            echo "ERROR: $name contains an unsafe placeholder or weak value." >&2
+            echo "Generate local values with: python scripts/generate-secrets.py" >&2
+            exit 1
+            ;;
+    esac
+
+    value_length=${#value}
+    if [ "$value_length" -lt "$MIN_SECRET_LENGTH" ]; then
+        echo "ERROR: $name must be at least $MIN_SECRET_LENGTH characters." >&2
+        echo "Generate local values with: python scripts/generate-secrets.py" >&2
+        exit 1
+    fi
+}
 
 run_as_app() {
     if [ "$(id -u)" = "0" ]; then
@@ -20,15 +47,20 @@ prepare_runtime_dirs() {
     fi
 }
 
+validate_secrets() {
+    require_secret "DJANGO_SECRET_KEY"
+    require_secret "POSTGRES_PASSWORD"
+    require_secret "REDIS_PASSWORD"
+    require_secret "DATABASE_URL"
+    require_secret "CACHE_URL"
+}
+
 seed_admin_user() {
     if [ -z "${DJANGO_BOOTSTRAP_ADMIN_EMAIL:-}" ]; then
         return
     fi
 
-    if [ -z "${DJANGO_BOOTSTRAP_ADMIN_PASSWORD:-}" ]; then
-        echo "DJANGO_BOOTSTRAP_ADMIN_PASSWORD is required when DJANGO_BOOTSTRAP_ADMIN_EMAIL is set." >&2
-        exit 1
-    fi
+    require_secret "DJANGO_BOOTSTRAP_ADMIN_PASSWORD"
 
     run_as_app python "$MANAGE_PY" seed_dashboard_roles \
         --email "$DJANGO_BOOTSTRAP_ADMIN_EMAIL" \
@@ -37,6 +69,7 @@ seed_admin_user() {
         --staff
 }
 
+validate_secrets
 prepare_runtime_dirs
 run_as_app python "$MANAGE_PY" migrate --noinput
 run_as_app python "$MANAGE_PY" collectstatic --noinput

@@ -62,6 +62,7 @@ Na raiz:
 
 ```powershell
 Copy-Item .env.example .env
+python scripts\generate-secrets.py --env
 docker compose up --build
 ```
 
@@ -115,6 +116,7 @@ py -3.12 -m venv bipdelivery\venv
 bipdelivery\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
+python scripts\generate-secrets.py --env
 ```
 
 Depois:

@@ -1,37 +1,67 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Root-level pre-commit hook for BipFlow monorepo
-# This hook runs checks across both frontend and backend
-# Individual subdirectories have their own hooks
+set -e
+
+echo "[pre-commit] Checking secrets hygiene..."
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+blocked_env_files="$(printf "%s\n" "$staged_files" | grep -E '(^|/)\.env($|[.][^/]+$)' | grep -Ev '(^|/)\.env\.example$' || true)"
+if [ -n "$blocked_env_files" ]; then
+  echo "[pre-commit] ERROR: refusing to commit environment files:" >&2
+  printf "%s\n" "$blocked_env_files" >&2
+  echo "[pre-commit] Keep secrets in local env, Vault, or CI secret stores." >&2
+  exit 1
+fi
+
+unsafe_patterns="$(printf '%s\n' \
+  'bipflow[_-]password' \
+  'change[-_]me' \
+  'django[-_]insecure' \
+  "TODO.*secre"t \
+  "FIXME.*passwor"d \
+  "admin"123 \
+  "password"123
+)"
+
+for pattern in $unsafe_patterns; do
+  if git diff --cached -U0 | grep -E "^\+.*(${pattern})" >/dev/null; then
+    echo "[pre-commit] ERROR: staged changes contain unsafe secret pattern: $pattern" >&2
+    echo "[pre-commit] Generate local values with: python scripts/generate-secrets.py" >&2
+    exit 1
+  fi
+done
+
+if printf "%s\n" "$staged_files" | grep -q '^docker-compose\.yml$'; then
+  echo "[pre-commit] Checking docker-compose.yml secret interpolation..."
+
+  if grep -nE 'bipflow[_-]password|change[-_]me|POSTGRES_PASSWORD:.*\$\{POSTGRES_PASSWORD:-|DJANGO_SECRET_KEY:.*\$\{DJANGO_SECRET_KEY:-|REDIS_PASSWORD:.*\$\{REDIS_PASSWORD:-' docker-compose.yml; then
+    echo "[pre-commit] ERROR: docker-compose.yml contains unsafe secret defaults." >&2
+    exit 1
+  fi
+
+  for key in DJANGO_SECRET_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
+    if ! grep -F "\${$key:?" docker-compose.yml >/dev/null; then
+      echo "[pre-commit] ERROR: docker-compose.yml must fail fast for $key with \${$key:?message}." >&2
+      exit 1
+    fi
+  done
+fi
 
 echo "[pre-commit] Running root validation checks..."
 
-# 1. Frontend TypeScript checks
 echo "[pre-commit] Checking frontend TypeScript..."
-cd bipflow-frontend && npm run typecheck --no-git
-if [ $? -ne 0 ]; then
-  echo "[pre-commit] ❌ Frontend TypeScript check failed"
-  exit 1
-fi
+cd bipflow-frontend
+npm run typecheck --no-git
 cd ..
 
-# 2. Python linting (if black/flake8 available)
 echo "[pre-commit] Checking Python syntax..."
-python -m py_compile bipdelivery/api/models.py bipdelivery/api/serializers.py bipdelivery/api/views.py 2>/dev/null
-if [ $? -ne 0 ]; then
-  echo "[pre-commit] ❌ Python syntax check failed"
-  exit 1
-fi
+python -m py_compile bipdelivery/api/models.py bipdelivery/api/serializers.py bipdelivery/api/views.py
 
-# 3. Markdown validation (optional - if markdownlint available)
-if command -v markdownlint &> /dev/null; then
+if command -v markdownlint >/dev/null 2>&1; then
   echo "[pre-commit] Checking Markdown formatting..."
-  markdownlint -f "docs/**/*.md" "README.md" 2>/dev/null
-  if [ $? -ne 0 ]; then
-    echo "[pre-commit] ⚠️  Markdown formatting issues (warnings only)"
-  fi
+  markdownlint -f "docs/**/*.md" "README.md" || true
 fi
 
-echo "[pre-commit] ✅ All checks passed"
-exit 0
+echo "[pre-commit] All checks passed"
