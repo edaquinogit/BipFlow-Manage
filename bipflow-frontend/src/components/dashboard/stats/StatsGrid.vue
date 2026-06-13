@@ -32,7 +32,7 @@ defineProps<{
         label="Itens em estoque"
         :value="stats?.totalItems ?? 0" 
         :icon="(ShoppingBagIcon as any)" 
-        color="indigo" 
+        color="rose"
       />
 
       <StatCard 

@@ -74,6 +74,7 @@ const saleTimelineSteps: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: 
   { value: 'prepared', label: 'Novo' },
   { value: 'sent', label: 'Enviado' },
 ]
+const BRAND_LOGO_URL = '/brand-logo.png'
 
 const storeWhatsappDigits = computed(() => normalizePhone(storeSettingsDraft.value.whatsapp_phone))
 const storeWhatsappValidationMessage = computed(() => {
@@ -258,20 +259,29 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
     <div v-if="isOpen" class="fixed inset-0 z-[90]">
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="$emit('close')" />
 
-      <aside class="absolute inset-y-0 right-0 flex w-full max-w-[440px] flex-col border-l border-white/10 bg-zinc-950 shadow-2xl">
-        <header class="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
-          <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.24em] text-indigo-300">
-              Centro de operacao
-            </p>
-            <h2 class="mt-2 text-xl font-black tracking-tight text-white">
-              Menu BipFlow
-            </h2>
+      <aside class="absolute inset-y-0 right-0 flex w-full max-w-[440px] flex-col border-l border-rose-500/15 bg-[#05050A] shadow-2xl">
+        <header class="flex items-start justify-between gap-4 border-b border-rose-500/15 px-6 py-5">
+          <div class="flex items-center gap-3">
+            <div class="flex h-14 w-36 shrink-0 items-center justify-center overflow-hidden">
+              <img
+                :src="BRAND_LOGO_URL"
+                alt="KN Boutique Fitness"
+                class="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-[0.24em] text-rose-300">
+                Centro de operacao
+              </p>
+              <h2 class="brand-wordmark brand-wordmark-premium-dark mt-2 text-2xl">
+                KN Boutique Fitness
+              </h2>
+            </div>
           </div>
 
           <button
             type="button"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-zinc-400 transition hover:border-white/20 hover:text-white"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-500/20 bg-white/[0.03] text-zinc-400 transition hover:border-rose-400/60 hover:text-white"
             aria-label="Fechar menu do dashboard"
             @click="$emit('close')"
           >
@@ -283,10 +293,10 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
           <section class="grid grid-cols-2 gap-3">
             <button
               type="button"
-              class="rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-4 text-left transition hover:border-indigo-400/40 hover:bg-indigo-500/15"
+              class="rounded-lg border border-rose-500/25 bg-rose-500/10 p-4 text-left transition hover:border-rose-400/50 hover:bg-rose-500/15"
               @click="$emit('createProduct')"
             >
-              <PlusIcon class="h-5 w-5 text-indigo-300" />
+              <PlusIcon class="h-5 w-5 text-rose-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 Novo produto
               </span>
@@ -327,10 +337,10 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
 
             <button
               type="button"
-              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-indigo-400/40 hover:bg-indigo-500/10"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
               @click="openDeliveryPricing"
             >
-              <TruckIcon class="h-5 w-5 text-indigo-300" />
+              <TruckIcon class="h-5 w-5 text-rose-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 Frete
               </span>
@@ -338,10 +348,10 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
 
             <button
               type="button"
-              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-emerald-400/40 hover:bg-emerald-500/10"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
               @click="openStoreSettings"
             >
-              <PhoneIcon class="h-5 w-5 text-emerald-300" />
+              <PhoneIcon class="h-5 w-5 text-rose-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 WhatsApp
               </span>

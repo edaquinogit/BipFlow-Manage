@@ -9,8 +9,8 @@ defineProps<{
 <template>
   <div class="revenue-card-root">
     <div class="relative z-10">
-      <p class="text-[10px] font-black text-indigo-100 uppercase tracking-[0.3em] mb-1 opacity-80">
-        Inventory Valuation
+      <p class="text-[10px] font-black text-rose-100 uppercase tracking-[0.3em] mb-1 opacity-80">
+        Valor da vitrine
       </p>
       <h3 class="text-4xl font-black text-white italic tracking-tighter transition-all duration-700">
         {{ value }}
@@ -34,9 +34,9 @@ defineProps<{
   overflow: hidden;
   padding: 2rem;
   border-radius: 2.5rem;
-  background-color: #4f46e5; /* Indigo-600 */
+  background: linear-gradient(135deg, #05050a 0%, #5f1235 48%, #d81b60 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(30, 27, 75, 0.4);
+  box-shadow: 0 25px 50px -12px rgba(216, 27, 96, 0.32);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: default;
 }

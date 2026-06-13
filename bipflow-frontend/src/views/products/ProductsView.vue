@@ -1,81 +1,92 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
-    <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-        <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-          <div class="max-w-3xl">
-            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-rose-600">
-              Catalogo BipFlow
-            </p>
-            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Catalogo pronto para pedidos pelo WhatsApp
-            </h1>
-            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-              Produtos, frete e atendimento conectados em uma jornada simples para comprar sem atrito.
-            </p>
-
-            <div class="mt-5 grid max-w-2xl gap-3 sm:grid-cols-3">
-              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <ShoppingBagIcon class="h-5 w-5 text-rose-600" aria-hidden="true" />
-                <p class="mt-2 text-lg font-semibold text-slate-900">{{ products.length }}</p>
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                  Produtos
-                </p>
-              </div>
-
-              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <TruckIcon class="h-5 w-5 text-emerald-600" aria-hidden="true" />
-                <p class="mt-2 text-lg font-semibold text-slate-900">
-                  {{ deliveryRegions.length || 'Padrao' }}
-                </p>
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                  Entrega
-                </p>
-              </div>
-
-              <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <ChatBubbleLeftRightIcon class="h-5 w-5 text-sky-600" aria-hidden="true" />
-                <p class="mt-2 text-lg font-semibold text-slate-900">
-                  Ativo
-                </p>
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                  Atendimento
-                </p>
-              </div>
+  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A]">
+    <header class="border-b border-[#E5E7EB] bg-[#FAFAFA]">
+      <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+              <img
+                :src="BRAND_LOGO_URL"
+                alt="KN Boutique Fitness"
+                class="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <p class="brand-wordmark brand-wordmark-premium text-xl">KN Boutique Fitness</p>
+              <p class="text-sm text-[#6B7280]">Fitness, praia e movimento</p>
             </div>
           </div>
 
-          <div class="flex w-full flex-col gap-3 sm:max-w-xs">
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div class="flex items-start justify-between gap-4">
-                <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Pedido atual
-                  </p>
-                  <p class="mt-1 text-sm font-semibold text-slate-900">
-                    {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
-                  </p>
-                </div>
-                <p class="shrink-0 text-base font-semibold text-slate-900">
-                  {{ formatBRL(total) }}
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              :class="itemCount > 0
+                ? 'border-[#05050A] bg-[#05050A] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] hover:bg-[#D81B60] hover:border-[#D81B60]'
+                : 'border-[#D1D5DB] bg-white text-[#05050A] hover:border-[#D81B60]'"
+              @click="isCartOpen = true"
+            >
+              <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
+              <span>Pedido</span>
+              <span :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'">
+                {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
+              </span>
+              <span class="font-semibold">{{ formatBRL(subtotal) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <section class="mt-5 rounded-xl border border-[#E5E7EB] bg-white px-4 py-5 sm:px-6">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-2xl">
+              <div class="flex items-center gap-3">
+                <span class="h-px w-10 bg-[#D81B60]" aria-hidden="true" />
+                <p class="brand-wordmark brand-wordmark-premium text-xl sm:text-2xl">
+                  KN Boutique Fitness
                 </p>
               </div>
-
-              <button
-                type="button"
-                class="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                :disabled="itemCount === 0"
-                @click="isCartOpen = true"
-              >
-                Revisar pedido
-              </button>
+              <h1 class="hero-display-title mt-3 max-w-2xl text-3xl font-semibold text-[#05050A] sm:text-4xl">
+                Escolha seu look fitness
+              </h1>
+              <p class="premium-copy mt-3 max-w-xl text-base leading-7 text-[#6B7280]">
+                Pecas selecionadas para treinar, caminhar e viver com conforto, estilo e presenca.
+              </p>
             </div>
 
+            <button
+              type="button"
+              class="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-[#05050A] px-4 text-sm font-semibold text-white transition hover:bg-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              @click="isCartOpen = true"
+            >
+              <ChatBubbleBottomCenterTextIcon class="h-4 w-4" aria-hidden="true" />
+              Monte seu pedido e finalize pelo WhatsApp
+            </button>
+          </div>
+        </section>
+
+        <div class="mt-4 rounded-xl border border-[#E5E7EB] bg-white p-3">
+          <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+            <label class="relative min-w-0 flex-1">
+              <span class="sr-only">Buscar produtos</span>
+              <MagnifyingGlassIcon
+                class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9CA3AF]"
+                aria-hidden="true"
+              />
+              <input
+                :value="filters.search"
+                type="search"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                placeholder="Buscar produto"
+                aria-label="Buscar produtos por nome"
+                @input="handleSearchInput"
+              />
+            </label>
+
             <label class="block">
-              <span class="mb-2 block text-sm font-medium text-slate-700">Ordenacao</span>
+              <span class="sr-only">Ordenacao</span>
               <select
                 v-model="sortBy"
-                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               >
                 <option value="featured">Mais relevantes</option>
                 <option value="price-asc">Menor preco</option>
@@ -85,64 +96,76 @@
               </select>
             </label>
           </div>
-        </div>
 
-        <div class="overflow-x-auto pb-1">
-          <div class="flex min-w-max gap-2">
-            <button
-              type="button"
-              class="rounded-full px-4 py-2 text-sm font-medium transition"
-              :class="!filters.categoryId
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'border border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'"
-              @click="handleQuickCategory(undefined)"
-            >
-              Todas as categorias
-            </button>
+          <div class="no-scrollbar mt-3 overflow-x-auto">
+            <div class="flex min-w-max gap-2">
+              <button
+                type="button"
+                class="rounded-full border px-4 py-2 text-sm font-medium transition"
+                :class="!filters.categoryId
+                  ? 'border-[#05050A] bg-[#05050A] text-white'
+                  : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D81B60] hover:text-[#05050A]'"
+                @click="handleQuickCategory(undefined)"
+              >
+                Todas as categorias
+              </button>
 
-            <button
-              v-for="category in categories"
-              :key="category.id"
-              type="button"
-              class="rounded-full px-4 py-2 text-sm font-medium transition"
-              :class="filters.categoryId === category.id
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'border border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'"
-              @click="handleQuickCategory(category.id)"
-            >
-              {{ category.name }}
-            </button>
+              <button
+                v-for="category in categories"
+                :key="category.id"
+                type="button"
+                class="rounded-full border px-4 py-2 text-sm font-medium transition"
+                :class="filters.categoryId === category.id
+                  ? 'border-[#05050A] bg-[#05050A] text-white'
+                  : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D81B60] hover:text-[#05050A]'"
+                @click="handleQuickCategory(category.id)"
+              >
+                {{ category.name }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </header>
 
     <main
-      class="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 lg:px-8"
+      class="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8"
       :aria-busy="isLoading ? 'true' : 'false'"
     >
       <p class="sr-only" aria-live="polite">{{ liveRegionMessage }}</p>
 
-      <div v-if="isInitialLoading && products.length === 0" class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+      <div class="mb-6 flex items-center justify-between gap-4 text-sm text-[#6B7280]">
+        <p>{{ showingRange }}</p>
+        <button
+          v-if="filters.search || filters.categoryId"
+          type="button"
+          class="font-medium text-[#05050A] underline-offset-4 hover:text-[#D81B60] hover:underline"
+          @click="handleClearFilters"
+        >
+          Limpar filtros
+        </button>
+      </div>
+
+      <div v-if="isInitialLoading && products.length === 0" class="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:gap-x-5 xl:grid-cols-4">
         <div
           v-for="n in 8"
           :key="n"
-          class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm animate-pulse"
+          class="animate-pulse"
         >
-          <div class="aspect-square bg-slate-200" />
-          <div class="space-y-3 p-4">
+          <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
+          <div class="space-y-3 pt-4">
             <div class="h-4 w-2/3 rounded bg-slate-200" />
             <div class="h-7 w-1/2 rounded bg-slate-200" />
-            <div class="h-12 rounded-[20px] bg-slate-200" />
+            <div class="h-10 rounded-lg bg-slate-200" />
           </div>
         </div>
       </div>
 
       <div
         v-else-if="error && products.length === 0"
-        class="rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-sm"
+        class="mx-auto max-w-xl py-24 text-center"
       >
-        <div class="mb-4 text-rose-600">
+        <div class="mb-4 text-red-600">
           <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -152,12 +175,12 @@
             />
           </svg>
         </div>
-        <h2 class="mb-2 text-lg font-medium text-slate-900">Erro ao carregar produtos</h2>
-        <p class="mb-6 text-slate-600">{{ error }}</p>
+        <h2 class="mb-2 text-lg font-medium text-[#05050A]">Erro ao carregar produtos</h2>
+        <p class="mb-6 text-[#6B7280]">{{ error }}</p>
         <button
           type="button"
           aria-label="Tentar novamente"
-          class="inline-flex items-center rounded-full bg-rose-600 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+          class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
           @click="retryFetch"
         >
           Tentar novamente
@@ -166,7 +189,7 @@
 
       <div
         v-else-if="displayedProducts.length > 0"
-        class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4"
+        class="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4"
       >
         <ProductCard
           v-for="product in displayedProducts"
@@ -180,7 +203,7 @@
 
       <div
         v-else
-        class="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm"
+        class="mx-auto max-w-xl py-24 text-center"
       >
         <div class="mb-4 text-slate-400">
           <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,14 +215,14 @@
             />
           </svg>
         </div>
-        <h2 class="mb-2 text-lg font-medium text-slate-900">Nenhum produto encontrado</h2>
-        <p class="mb-6 text-slate-600">
+        <h2 class="mb-2 text-lg font-medium text-[#05050A]">Nenhum produto encontrado</h2>
+        <p class="mb-6 text-[#6B7280]">
           Escolha outra categoria para continuar explorando.
         </p>
         <button
           type="button"
           aria-label="Limpar filtros"
-          class="inline-flex items-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+          class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#05050A] transition-colors hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
           @click="handleClearFilters"
         >
           Limpar filtros
@@ -208,10 +231,10 @@
 
       <div
         v-if="products.length > 0 && isLoadingMore"
-        class="mt-6 flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm"
+        class="mt-10 flex items-center justify-center gap-3 text-sm text-[#6B7280]"
         aria-live="polite"
       >
-        <span class="h-4 w-4 animate-spin rounded-full border-2 border-rose-200 border-t-rose-600" />
+        <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#D81B60]" />
         Carregando mais produtos...
       </div>
 
@@ -241,23 +264,17 @@
       @open-cart="isCartOpen = true"
     />
 
-    <CatalogBotWidget @open-product="handleOpenBotProduct" />
-
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
-      :customer="customer"
-      :delivery-regions="deliveryRegions"
       :item-count="itemCount"
       :subtotal="subtotal"
-      :delivery-fee="deliveryFee"
-      :total="total"
       :is-submitting="isSubmittingOrder"
+      :is-whats-app-configured="isWhatsAppConfigured"
       @close="isCartOpen = false"
       @clear-cart="clearCart"
       @remove-item="removeItem"
       @update-quantity="updateQuantity"
-      @update-customer="updateCustomer"
       @submit-order="handleSubmitOrder"
     />
   </div>
@@ -268,24 +285,22 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryValue } from 'vue-router'
 import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
-import CatalogBotWidget from './CatalogBotWidget.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import {
-  ChatBubbleLeftRightIcon,
+  ChatBubbleBottomCenterTextIcon,
+  MagnifyingGlassIcon,
   ShoppingBagIcon,
-  TruckIcon,
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
 import { categoryService } from '@/services/category.service'
-import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
-import type { DeliveryRegion } from '@/types/delivery'
+import { storeSettingsService } from '@/services/store-settings.service'
 import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
@@ -317,12 +332,14 @@ function parsePageFromQuery(query: LocationQuery): number {
   return parsedPage && parsedPage >= 1 ? parsedPage : 1
 }
 
+const BRAND_LOGO_URL = '/brand-logo.png'
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const loadMoreTrigger = ref<HTMLDivElement | null>(null)
 const categories = ref<Category[]>([])
-const deliveryRegions = ref<DeliveryRegion[]>([])
+const storeWhatsAppPhone = ref('')
 const isCartOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
@@ -355,17 +372,12 @@ const {
 
 const {
   items,
-  customer,
   itemCount,
   subtotal,
-  deliveryFee,
-  total,
   addItem,
   removeItem,
   updateQuantity,
   clearCart,
-  updateCustomer,
-  resetCustomer,
   getProductQuantity,
 } = useCart()
 
@@ -390,6 +402,8 @@ const displayedProducts = computed(() => {
       return nextProducts
   }
 })
+
+const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
 
 const liveRegionMessage = computed(() => {
   if (isInitialLoading.value) {
@@ -466,12 +480,13 @@ async function loadCategories(): Promise<void> {
   }
 }
 
-async function loadDeliveryRegions(): Promise<void> {
+async function loadStoreSettings(): Promise<void> {
   try {
-    deliveryRegions.value = await deliveryRegionService.getActive()
+    const settings = await storeSettingsService.getPublic()
+    storeWhatsAppPhone.value = settings.whatsapp_phone_digits
   } catch (err) {
-    deliveryRegions.value = []
-    Logger.warn('Failed to load delivery regions', {
+    storeWhatsAppPhone.value = ''
+    Logger.warn('Failed to load public store settings', {
       error: err instanceof Error ? err.message : 'unknown_error',
     })
   }
@@ -558,7 +573,7 @@ watch(loadMoreTrigger, async () => {
 onMounted(async () => {
   await Promise.allSettled([
     loadCategories(),
-    loadDeliveryRegions(),
+    loadStoreSettings(),
   ])
   await nextTick()
   connectLoadMoreObserver()
@@ -570,6 +585,11 @@ onBeforeUnmount(() => {
 
 function handleQuickCategory(categoryId: number | undefined): void {
   updateFilters({ categoryId })
+}
+
+function handleSearchInput(event: Event): void {
+  const target = event.target as HTMLInputElement
+  updateFilters({ search: target.value })
 }
 
 function handleClearFilters(): void {
@@ -586,7 +606,7 @@ function retryFetch(): void {
 
 function handleAddToCart(product: Product, quantity: number): void {
   addItem(product, quantity)
-  toast.success(`${quantity} unidade(s) de ${product.name} adicionada(s) ao carrinho.`)
+  toast.success(`${quantity} unidade(s) de ${product.name} adicionada(s) ao pedido.`)
 }
 
 function handleOpenDetails(product: Product): void {
@@ -600,82 +620,45 @@ function handleOpenDetails(product: Product): void {
   })
 }
 
-function handleOpenBotProduct(slug: string): void {
-  void router.push({
-    name: PublicRoutes.ProductDetails,
-    params: { slug },
-  })
-}
-
-function validateCheckoutData(): boolean {
+function canOpenWhatsAppCheckout(): boolean {
   if (items.value.length === 0) {
-    toast.info('Adicione produtos ao carrinho antes de finalizar o pedido.')
+    toast.info('Adicione produtos ao pedido antes de finalizar pelo WhatsApp.')
     return false
   }
 
-  if (!customer.value.fullName.trim()) {
-    toast.info('Preencha o nome do cliente para emitir a nota do pedido.')
+  if (!isWhatsAppConfigured.value) {
+    toast.info('WhatsApp da loja ainda nao esta configurado.')
     isCartOpen.value = true
     return false
-  }
-
-  if (!customer.value.phone.trim()) {
-    toast.info('Preencha o WhatsApp do cliente para concluir o atendimento.')
-    isCartOpen.value = true
-    return false
-  }
-
-  if (customer.value.deliveryMethod === 'delivery') {
-    if (deliveryRegions.value.length > 0 && !customer.value.deliveryRegionId) {
-      toast.info('Selecione a regiao de entrega para calcular o frete.')
-      isCartOpen.value = true
-      return false
-    }
-
-    const hasAddress =
-      customer.value.address.trim() &&
-      customer.value.neighborhood.trim() &&
-      customer.value.city.trim()
-
-    if (!hasAddress) {
-      toast.info('Complete o endereco de entrega para finalizar o pedido.')
-      isCartOpen.value = true
-      return false
-    }
   }
 
   return true
 }
 
-async function handleSubmitOrder(): Promise<void> {
-  if (!validateCheckoutData() || isSubmittingOrder.value) {
+function handleSubmitOrder(): void {
+  if (!canOpenWhatsAppCheckout() || isSubmittingOrder.value) {
     return
   }
 
   isSubmittingOrder.value = true
 
   try {
-    const response = await orderService.checkoutViaWhatsApp(items.value, customer.value)
+    const whatsappUrl = orderService.buildWhatsAppHandoffUrl(
+      storeWhatsAppPhone.value,
+      items.value,
+      subtotal.value
+    )
 
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(response.message)
-    }
-
-    if (response.whatsapp_url) {
-      window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer')
-      toast.success(`Pedido ${response.order_reference} emitido com sucesso e pronto para envio no WhatsApp.`)
-    } else {
-      toast.success(`Pedido ${response.order_reference} emitido. Resumo copiado para compartilhamento manual.`)
-    }
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+    toast.success('Abrimos o WhatsApp com o pedido pronto para atendimento.')
 
     clearCart()
-    resetCustomer()
     isCartOpen.value = false
   } catch (error) {
-    Logger.warn('Failed to finalize order via WhatsApp', {
+    Logger.warn('Failed to open WhatsApp checkout handoff', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    toast.error('Nao foi possivel finalizar o pedido agora. Revise os dados e tente novamente.')
+    toast.error('Nao foi possivel abrir o WhatsApp agora. Tente novamente.')
   } finally {
     isSubmittingOrder.value = false
   }

@@ -46,7 +46,7 @@ defineEmits<{
 <template>
   <section class="relative isolate space-y-8 overflow-visible" data-cy="product-listing-section">
 
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-indigo-500 pl-6">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-rose-500 pl-6">
       <div>
         <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter leading-none">
           Produtos ativos
@@ -57,7 +57,7 @@ defineEmits<{
       <button
         data-cy="btn-add-product"
         @click="$emit('open-panel')"
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-black shadow-xl shadow-white/5 transition-all hover:bg-zinc-200 active:scale-[0.98]"
+        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white shadow-xl shadow-rose-950/20 transition-all hover:bg-rose-500 active:scale-[0.98]"
       >
         <PlusIcon class="h-4 w-4 stroke-2" />
         Novo produto

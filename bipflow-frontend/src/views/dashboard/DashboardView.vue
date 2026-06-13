@@ -422,7 +422,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-950 text-zinc-200 selection:bg-indigo-500/30 font-sans antialiased" data-cy="dashboard-view">
+  <div class="min-h-screen bg-[#05050A] text-zinc-200 selection:bg-rose-500/30 font-sans antialiased" data-cy="dashboard-view">
     <DashboardHeader
       :user-name="currentUserName"
       @open-menu="handleOpenDashboardMenu"

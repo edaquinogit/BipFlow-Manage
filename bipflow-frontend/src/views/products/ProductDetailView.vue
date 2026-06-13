@@ -1,28 +1,39 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
-    <header class="border-b border-slate-200 bg-white/92 backdrop-blur">
-      <div class="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A]">
+    <header class="border-b border-[#E5E7EB] bg-[#FAFAFA]">
+      <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
           type="button"
-          class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+          class="inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
           @click="goBackToCatalog"
         >
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.56l3.22 3.22a.75.75 0 11-1.06 1.06l-4.5-4.5a.75.75 0 010-1.06l4.5-4.5a.75.75 0 111.06 1.06L5.56 9.25h10.69A.75.75 0 0117 10z" clip-rule="evenodd" />
-          </svg>
+          <ArrowLeftIcon class="h-4 w-4" aria-hidden="true" />
           Voltar ao catalogo
         </button>
 
+        <div class="flex items-center gap-3">
+          <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+            <img
+              :src="BRAND_LOGO_URL"
+              alt="KN Boutique Fitness"
+              class="h-full w-full object-contain"
+            />
+          </div>
+          <div>
+            <p class="brand-wordmark brand-wordmark-premium text-lg">KN Boutique Fitness</p>
+            <p class="text-xs text-[#6B7280]">Detalhe da peca</p>
+          </div>
+        </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 lg:px-8">
-      <div v-if="isLoading" class="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(360px,440px)] lg:items-start lg:justify-center">
-        <div class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm animate-pulse">
-          <div class="aspect-[4/3] bg-slate-200 lg:aspect-square" />
+    <main class="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 lg:px-8">
+      <div v-if="isLoading" class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+        <div class="animate-pulse">
+          <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
         </div>
 
-        <div class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm animate-pulse">
+        <div class="animate-pulse">
           <div class="h-4 w-32 rounded bg-slate-200" />
           <div class="mt-4 h-8 rounded bg-slate-200" />
           <div class="mt-5 h-10 w-40 rounded bg-slate-200" />
@@ -33,28 +44,28 @@
 
       <div
         v-else-if="errorMessage || !product"
-        class="rounded-[32px] border border-rose-200 bg-white p-10 text-center shadow-sm"
+        class="mx-auto max-w-xl py-24 text-center"
       >
-        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
           <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zm8.25-.75a8.25 8.25 0 10-16.5 0 8.25 8.25 0 0016.5 0z" />
           </svg>
         </div>
-        <h2 class="mt-5 text-2xl font-semibold text-slate-900">Nao foi possivel abrir este produto</h2>
-        <p class="mt-3 text-base text-slate-600">
+        <h2 class="mt-5 text-2xl font-semibold text-[#05050A]">Nao foi possivel abrir este produto</h2>
+        <p class="mt-3 text-base text-[#6B7280]">
           {{ errorMessage || 'O produto pode ter sido removido ou esta temporariamente indisponivel.' }}
         </p>
         <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+            class="inline-flex items-center justify-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
             @click="loadProduct"
           >
             Tentar novamente
           </button>
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+            class="inline-flex items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
             @click="goBackToCatalog"
           >
             Voltar ao catalogo
@@ -62,15 +73,15 @@
         </div>
       </div>
 
-      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(360px,440px)] lg:items-start lg:justify-center">
+      <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
         <section class="min-w-0 space-y-4">
           <div
-            class="w-full overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+            class="w-full overflow-hidden rounded-lg bg-[#F4F1F3]"
             @mouseenter="pauseCarousel"
             @mouseleave="resumeCarousel"
           >
             <div
-              class="relative aspect-[4/3] overflow-hidden bg-white touch-pan-y lg:aspect-square"
+              class="relative aspect-[4/5] overflow-hidden bg-[#F4F1F3] touch-pan-y"
               @pointerdown="handlePointerDown"
               @pointermove="handlePointerMove"
               @pointerup="handlePointerUp"
@@ -97,7 +108,7 @@
                   v-for="(imageUrl, index) in productImages"
                   :key="`${imageUrl}-${index}`"
                   class="h-1.5 rounded-full transition-all duration-300"
-                  :class="imageUrl === activeImageSource ? 'w-8 bg-white shadow-sm' : 'w-2.5 bg-white/55'"
+                  :class="imageUrl === activeImageSource ? 'w-8 bg-white' : 'w-2.5 bg-white/55'"
                 />
               </div>
             </div>
@@ -108,10 +119,10 @@
               v-for="imageUrl in productImages"
               :key="imageUrl"
               type="button"
-              class="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-white transition sm:h-24 sm:w-24"
+                class="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-white transition sm:h-24 sm:w-24"
               :class="imageUrl === activeImageSource
-                ? 'border-rose-300 shadow-sm'
-                : 'border-slate-200 hover:border-slate-300'"
+                ? 'border-[#D81B60]'
+                : 'border-[#E5E7EB] hover:border-[#D81B60]'"
               :aria-label="`Selecionar imagem do produto ${product.name}`"
               @click="handleSelectImage(imageUrl)"
             >
@@ -127,24 +138,24 @@
         </section>
 
         <aside class="min-w-0 lg:sticky lg:top-6 lg:self-start">
-          <section class="w-full max-w-full rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <section class="w-full max-w-full">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
+              <p class="text-sm font-semibold text-[#D81B60]">
                 {{ product.category.name }}
               </p>
               <span
                 class="rounded-full px-3 py-1 text-xs font-semibold"
-                :class="product.is_available ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'"
+                :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
               >
                 {{ availabilityLabel }}
               </span>
             </div>
 
-            <h1 class="mt-3 text-2xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-3xl">
+            <h1 class="mt-3 text-3xl font-semibold leading-tight text-[#05050A] sm:text-4xl">
               {{ product.name }}
             </h1>
 
-            <p class="mt-5 text-3xl font-semibold tracking-tight text-slate-900">
+            <p class="mt-5 text-3xl font-semibold text-[#05050A]">
               {{ formatBRL(product.price) }}
             </p>
 
@@ -152,14 +163,14 @@
               {{ productDescription }}
             </p>
 
-            <dl class="mt-6 divide-y divide-slate-200 border-y border-slate-200 text-sm text-slate-600">
+            <dl class="mt-6 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-sm text-[#6B7280]">
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Tamanho</dt>
-                <dd class="text-right font-semibold text-slate-900">{{ product.size || 'Sob consulta' }}</dd>
+                <dd class="text-right font-semibold text-[#05050A]">{{ product.size || 'Sob consulta' }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>SKU</dt>
-                <dd class="text-right font-semibold text-slate-900">{{ product.sku || 'Nao informado' }}</dd>
+                <dd class="text-right font-semibold text-[#05050A]">{{ product.sku || 'Nao informado' }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Estoque</dt>
@@ -169,64 +180,53 @@
               </div>
             </dl>
 
-            <div class="mt-6 border-t border-slate-200 pt-5">
+            <div class="mt-6 border-t border-[#E5E7EB] pt-5">
               <div class="flex flex-col gap-4">
                 <div class="flex items-center justify-between gap-4">
                   <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <p class="text-sm font-semibold text-[#05050A]">
                       Quantidade
                     </p>
                     <p class="mt-1 text-sm text-slate-600">
-                      {{ cartQuantity > 0 ? `${cartQuantity} ja no carrinho` : 'Selecione e confirme em um toque.' }}
+                      {{ cartQuantity > 0 ? `${cartQuantity} ja no pedido` : 'Selecione e confirme em um toque.' }}
                     </p>
                   </div>
 
-                  <div class="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+                  <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
                     <button
                       type="button"
-                      class="h-10 w-10 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      class="inline-flex h-10 w-10 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
                       :disabled="!product.is_available || quantity <= 1"
                       aria-label="Diminuir quantidade"
                       @click="decrementQuantity"
                     >
-                      -
+                      <MinusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
-                    <span class="min-w-10 text-center text-sm font-semibold text-slate-900">
+                    <span class="min-w-10 text-center text-sm font-semibold text-[#05050A]">
                       {{ quantity }}
                     </span>
                     <button
                       type="button"
-                      class="h-10 w-10 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      class="inline-flex h-10 w-10 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
                       :disabled="!product.is_available || quantity >= product.stock_quantity"
                       aria-label="Aumentar quantidade"
                       @click="incrementQuantity"
                     >
-                      +
+                      <PlusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-rose-200"
+                  class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
                   :class="product.is_available
-                    ? 'bg-rose-600 text-white hover:bg-rose-700'
+                    ? 'bg-[#05050A] text-white hover:bg-[#D81B60]'
                     : 'cursor-not-allowed bg-slate-200 text-slate-500'"
                   :disabled="!product.is_available"
                   @click="handleAddToCart"
                 >
-                  <svg
-                    class="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.9"
-                    aria-hidden="true"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 .98-.8L20 7H7" />
-                    <circle cx="10" cy="19" r="1.4" />
-                    <circle cx="17" cy="19" r="1.4" />
-                  </svg>
+                  <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
                   {{ addToCartLabel }}
                 </button>
               </div>
@@ -241,23 +241,17 @@
       @open-cart="isCartOpen = true"
     />
 
-    <CatalogBotWidget @open-product="handleOpenBotProduct" />
-
     <CartDrawer
       :is-open="isCartOpen"
       :items="items"
-      :customer="customer"
-      :delivery-regions="deliveryRegions"
       :item-count="itemCount"
       :subtotal="subtotal"
-      :delivery-fee="deliveryFee"
-      :total="total"
       :is-submitting="isSubmittingOrder"
+      :is-whats-app-configured="isWhatsAppConfigured"
       @close="isCartOpen = false"
       @clear-cart="clearCart"
       @remove-item="removeItem"
       @update-quantity="updateQuantity"
-      @update-customer="updateCustomer"
       @submit-order="handleSubmitOrder"
     />
   </div>
@@ -265,18 +259,22 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  ArrowLeftIcon,
+  MinusIcon,
+  PlusIcon,
+  ShoppingBagIcon,
+} from '@heroicons/vue/24/outline'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
-import CatalogBotWidget from './CatalogBotWidget.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
-import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
 import productService from '@/services/product.service'
-import type { DeliveryRegion } from '@/types/delivery'
+import { storeSettingsService } from '@/services/store-settings.service'
 import type { ProductDetail } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
@@ -285,19 +283,19 @@ const router = useRouter()
 const toast = useToast()
 
 const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
-    <rect width="720" height="720" fill="#f3f4f6" />
-    <rect x="90" y="90" width="540" height="540" rx="40" fill="#e5e7eb" />
-    <circle cx="275" cy="290" r="58" fill="#cbd5e1" />
-    <path d="M175 500l125-132c13-14 36-14 49 0l66 70 47-50c14-15 37-15 51 0l92 98v70H175z" fill="#94a3b8" />
-    <text x="360" y="610" text-anchor="middle" fill="#6b7280" font-family="Arial, sans-serif" font-size="34" font-weight="700">
-      Imagem indisponivel
-    </text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
+    <rect width="640" height="800" fill="#FAFAFA"/>
+    <rect x="96" y="128" width="448" height="544" rx="36" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+    <path d="M222 330h196c18 0 32 14 32 32v118c0 18-14 32-32 32H222c-18 0-32-14-32-32V362c0-18 14-32 32-32z" fill="#F4F1F3"/>
+    <path d="M236 462l52-54c10-10 26-10 36 0l34 35 18-19c10-11 28-11 38 0l58 60v28H236z" fill="#E9A8C0"/>
+    <circle cx="276" cy="382" r="22" fill="#D81B60" opacity=".22"/>
+    <text x="320" y="592" text-anchor="middle" fill="#6B7280" font-family="Arial, sans-serif" font-size="26" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`
+const BRAND_LOGO_URL = '/brand-logo.png'
 
 const product = ref<ProductDetail | null>(null)
-const deliveryRegions = ref<DeliveryRegion[]>([])
+const storeWhatsAppPhone = ref('')
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
@@ -313,23 +311,18 @@ let carouselInterval: ReturnType<typeof setInterval> | null = null
 
 const {
   items,
-  customer,
   itemCount,
   subtotal,
-  deliveryFee,
-  total,
   addItem,
   removeItem,
   updateQuantity,
   clearCart,
-  updateCustomer,
-  resetCustomer,
   getProductQuantity,
 } = useCart()
 
 const productDescription = computed(() => (
   product.value?.description?.trim()
-    || 'Este produto foi preparado para uma experiencia de compra mais clara, com informacoes essenciais reunidas em uma unica tela.'
+    || 'Peca selecionada para uma compra simples, com informacoes essenciais reunidas em uma unica tela.'
 ))
 
 const productImages = computed(() => {
@@ -485,6 +478,8 @@ const cartQuantity = computed(() => (
   product.value ? getProductQuantity(product.value.id) : 0
 ))
 
+const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
+
 const availabilityLabel = computed(() => {
   if (!product.value?.is_available) {
     return 'Indisponivel'
@@ -494,7 +489,7 @@ const availabilityLabel = computed(() => {
 })
 
 const availabilityToneClass = computed(() => (
-  product.value?.is_available ? 'text-rose-700' : 'text-slate-600'
+  product.value?.is_available ? 'text-[#D81B60]' : 'text-slate-600'
 ))
 
 const addToCartLabel = computed(() => {
@@ -506,7 +501,7 @@ const addToCartLabel = computed(() => {
     return `Adicionar ${quantity.value}`
   }
 
-  return 'Adicionar ao carrinho'
+  return 'Adicionar ao pedido'
 })
 
 async function loadProduct(): Promise<void> {
@@ -540,12 +535,13 @@ async function loadProduct(): Promise<void> {
   }
 }
 
-async function loadDeliveryRegions(): Promise<void> {
+async function loadStoreSettings(): Promise<void> {
   try {
-    deliveryRegions.value = await deliveryRegionService.getActive()
+    const settings = await storeSettingsService.getPublic()
+    storeWhatsAppPhone.value = settings.whatsapp_phone_digits
   } catch (error) {
-    deliveryRegions.value = []
-    Logger.warn('Failed to load delivery regions from product detail', {
+    storeWhatsAppPhone.value = ''
+    Logger.warn('Failed to load public store settings from product detail', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
   }
@@ -553,7 +549,7 @@ async function loadDeliveryRegions(): Promise<void> {
 
 onMounted(() => {
   void Promise.allSettled([
-    loadDeliveryRegions(),
+    loadStoreSettings(),
   ])
 })
 
@@ -595,7 +591,7 @@ function handleAddToCart(): void {
   }
 
   addItem(product.value, quantity.value)
-  toast.success(`${quantity.value} unidade(s) de ${product.value.name} adicionada(s) ao carrinho.`)
+  toast.success(`${quantity.value} unidade(s) de ${product.value.name} adicionada(s) ao pedido.`)
   quantity.value = 1
 }
 
@@ -603,82 +599,45 @@ function goBackToCatalog(): void {
   void router.push({ name: PublicRoutes.Products })
 }
 
-function handleOpenBotProduct(slug: string): void {
-  void router.push({
-    name: PublicRoutes.ProductDetails,
-    params: { slug },
-  })
-}
-
-function validateCheckoutData(): boolean {
+function canOpenWhatsAppCheckout(): boolean {
   if (items.value.length === 0) {
-    toast.info('Adicione produtos ao carrinho antes de finalizar o pedido.')
+    toast.info('Adicione produtos ao pedido antes de finalizar pelo WhatsApp.')
     return false
   }
 
-  if (!customer.value.fullName.trim()) {
-    toast.info('Preencha o nome do cliente para emitir a nota do pedido.')
+  if (!isWhatsAppConfigured.value) {
+    toast.info('WhatsApp da loja ainda nao esta configurado.')
     isCartOpen.value = true
     return false
-  }
-
-  if (!customer.value.phone.trim()) {
-    toast.info('Preencha o WhatsApp do cliente para concluir o atendimento.')
-    isCartOpen.value = true
-    return false
-  }
-
-  if (customer.value.deliveryMethod === 'delivery') {
-    if (deliveryRegions.value.length > 0 && !customer.value.deliveryRegionId) {
-      toast.info('Selecione a regiao de entrega para calcular o frete.')
-      isCartOpen.value = true
-      return false
-    }
-
-    const hasAddress =
-      customer.value.address.trim() &&
-      customer.value.neighborhood.trim() &&
-      customer.value.city.trim()
-
-    if (!hasAddress) {
-      toast.info('Complete o endereco de entrega para finalizar o pedido.')
-      isCartOpen.value = true
-      return false
-    }
   }
 
   return true
 }
 
-async function handleSubmitOrder(): Promise<void> {
-  if (!validateCheckoutData() || isSubmittingOrder.value) {
+function handleSubmitOrder(): void {
+  if (!canOpenWhatsAppCheckout() || isSubmittingOrder.value) {
     return
   }
 
   isSubmittingOrder.value = true
 
   try {
-    const response = await orderService.checkoutViaWhatsApp(items.value, customer.value)
+    const whatsappUrl = orderService.buildWhatsAppHandoffUrl(
+      storeWhatsAppPhone.value,
+      items.value,
+      subtotal.value
+    )
 
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(response.message)
-    }
-
-    if (response.whatsapp_url) {
-      window.open(response.whatsapp_url, '_blank', 'noopener,noreferrer')
-      toast.success(`Pedido ${response.order_reference} emitido com sucesso e pronto para envio no WhatsApp.`)
-    } else {
-      toast.success(`Pedido ${response.order_reference} emitido. Resumo copiado para compartilhamento manual.`)
-    }
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+    toast.success('Abrimos o WhatsApp com o pedido pronto para atendimento.')
 
     clearCart()
-    resetCustomer()
     isCartOpen.value = false
   } catch (error) {
-    Logger.warn('Failed to finalize order via WhatsApp from product detail', {
+    Logger.warn('Failed to open WhatsApp checkout handoff from product detail', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    toast.error('Nao foi possivel finalizar o pedido agora. Revise os dados e tente novamente.')
+    toast.error('Nao foi possivel abrir o WhatsApp agora. Tente novamente.')
   } finally {
     isSubmittingOrder.value = false
   }

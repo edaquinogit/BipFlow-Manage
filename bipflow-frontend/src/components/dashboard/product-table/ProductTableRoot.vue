@@ -51,8 +51,8 @@ const onDelete = (id: number) => {
   class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/60 backdrop-blur-sm transition-all"
 >
         <div class="flex flex-col items-center gap-4">
-          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent"></div>
-          <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white italic">Syncing Registry...</span>
+          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-rose-500 border-t-transparent"></div>
+          <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white italic">Atualizando vitrine...</span>
         </div>
       </div>
     </Transition>
@@ -64,10 +64,10 @@ const onDelete = (id: number) => {
             <th class="px-6 py-5">
               <button
                 @click="emit('select-all')"
-                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500/50 hover:border-indigo-400"
+                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500/50 hover:border-rose-400"
                 :class="[
                   props.isAllSelected || props.isIndeterminate
-                    ? 'bg-indigo-500 border-indigo-500'
+                    ? 'bg-rose-500 border-rose-500'
                     : 'border-zinc-600 bg-zinc-800/50'
                 ]"
                 title="Select All Assets"
@@ -130,7 +130,7 @@ const onDelete = (id: number) => {
         Total Assets: {{ props.products.length }}
       </span>
       <span class="text-[9px] text-zinc-600 font-medium italic">
-        BipFlow Inventory Hub v2.0
+        KN Boutique Fitness
       </span>
     </footer>
   </div>

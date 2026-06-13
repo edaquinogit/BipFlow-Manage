@@ -6,7 +6,7 @@ import { useProductSearch } from '@/composables/useProductSearch'
 import { useCart } from '@/composables/useCart'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
-import { deliveryRegionService } from '@/services/delivery-region.service'
+import { storeSettingsService } from '@/services/store-settings.service'
 import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
@@ -27,9 +27,9 @@ vi.mock('@/services/category.service', () => ({
   },
 }))
 
-vi.mock('@/services/delivery-region.service', () => ({
-  deliveryRegionService: {
-    getActive: vi.fn(),
+vi.mock('@/services/store-settings.service', () => ({
+  storeSettingsService: {
+    getPublic: vi.fn(),
   },
 }))
 
@@ -46,16 +46,6 @@ const ProductCardStub = defineComponent({
   },
   emits: ['add-to-cart', 'open-details'],
   template: '<div class="product-card-stub">{{ product.name }}</div>',
-})
-
-const ProductFiltersStub = defineComponent({
-  name: 'ProductFilters',
-  props: {
-    filters: { type: Object, required: true },
-    categories: { type: Array, required: true },
-  },
-  emits: ['update-filters', 'clear-filters'],
-  template: '<div class="product-filters-stub"></div>',
 })
 
 const ProductPaginationStub = defineComponent({
@@ -76,14 +66,12 @@ const CartDrawerStub = defineComponent({
   props: {
     isOpen: { type: Boolean, required: true },
     items: { type: Array, required: true },
-    customer: { type: Object, required: true },
-    deliveryRegions: { type: Array, required: true },
     itemCount: { type: Number, required: true },
     subtotal: { type: Number, required: true },
-    deliveryFee: { type: Number, required: true },
-    total: { type: Number, required: true },
+    isSubmitting: { type: Boolean, default: false },
+    isWhatsAppConfigured: { type: Boolean, required: true },
   },
-  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer'],
+  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'submit-order'],
   template: '<div class="cart-drawer-stub"></div>',
 })
 
@@ -135,30 +123,13 @@ describe('ProductsView', () => {
 
   const cartState = {
     items: ref([]),
-    customer: ref({
-      fullName: '',
-      phone: '',
-      email: '',
-      deliveryMethod: 'delivery',
-      paymentMethod: 'pix',
-      deliveryRegionId: null,
-      deliveryRegionName: '',
-      deliveryRegionFee: 12,
-      address: '',
-      neighborhood: '',
-      city: '',
-      notes: '',
-    }),
     itemCount: ref(0),
     uniqueItemCount: ref(0),
     subtotal: ref(0),
-    deliveryFee: ref(12),
-    total: ref(12),
     addItem: vi.fn(),
     removeItem: vi.fn(),
     updateQuantity: vi.fn(),
     clearCart: vi.fn(),
-    updateCustomer: vi.fn(),
     getProductQuantity: vi.fn(() => 0),
   }
 
@@ -173,7 +144,6 @@ describe('ProductsView', () => {
       global: {
         stubs: {
           ProductCard: ProductCardStub,
-          ProductFilters: ProductFiltersStub,
           ProductPagination: ProductPaginationStub,
           CartDrawer: CartDrawerStub,
         },
@@ -200,7 +170,10 @@ describe('ProductsView', () => {
     vi.mocked(categoryService.getAll).mockResolvedValue([
       { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
     ] as any)
-    vi.mocked(deliveryRegionService.getActive).mockResolvedValue([])
+    vi.mocked(storeSettingsService.getPublic).mockResolvedValue({
+      whatsapp_phone_digits: '5579999999999',
+      is_whatsapp_configured: true,
+    })
     wrapper = mountView()
     await flushPromises()
     await nextTick()
@@ -223,7 +196,7 @@ describe('ProductsView', () => {
   })
 
   it('renders catalog header and products', () => {
-    expect(wrapper.find('h1').text()).toContain('Catalogo pronto para pedidos')
+    expect(wrapper.find('h1').text()).toContain('Escolha seu look fitness')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })

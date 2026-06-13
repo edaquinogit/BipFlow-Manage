@@ -3,11 +3,15 @@
     <button
       v-if="itemCount > 0"
       type="button"
-      class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_18px_35px_-18px_rgba(15,23,42,0.7)] ring-1 ring-white/70 transition duration-200 hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-200 active:translate-y-0 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] sm:right-6 sm:h-16 sm:w-16"
+      class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-[#05050A] px-4 pr-5 text-white shadow-[0_18px_35px_-18px_rgba(5,5,10,0.8)] ring-2 ring-white transition duration-200 hover:-translate-y-0.5 hover:bg-[#D81B60] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FCE7F3] active:translate-y-0 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] sm:right-6"
       :aria-label="cartAriaLabel"
       @click="$emit('openCart')"
     >
-      <ShoppingCartIcon class="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+      <ShoppingCartIcon class="h-5 w-5" aria-hidden="true" />
+      <span class="text-sm font-semibold">Ver pedido</span>
+      <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-bold leading-none text-[#05050A]">
+        {{ visibleItemCount }}
+      </span>
     </button>
   </Transition>
 </template>
@@ -29,6 +33,8 @@ const cartAriaLabel = computed(() => {
 
   return `Abrir carrinho com ${props.itemCount} ${itemLabel}`
 })
+
+const visibleItemCount = computed(() => (props.itemCount > 99 ? '99+' : String(props.itemCount)))
 </script>
 
 <style scoped>

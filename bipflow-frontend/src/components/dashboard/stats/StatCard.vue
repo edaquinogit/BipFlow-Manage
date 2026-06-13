@@ -15,9 +15,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Mapeamento de cores para manter o CSS limpo no template
 const colorMap = {
-  indigo: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+  indigo: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   orange: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
-  emerald: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+  emerald: 'text-rose-300 bg-rose-500/10 border-rose-500/20',
   rose: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
 };
 </script>
@@ -32,8 +32,8 @@ const colorMap = {
         <component :is="icon" class="w-6 h-6" />
       </div>
       
-      <span class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-950 border border-white/5">
-        <span class="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-950 border border-rose-500/10">
+        <span class="w-1 h-1 rounded-full bg-rose-400 animate-pulse"></span>
         <span class="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Live</span>
       </span>
     </div>

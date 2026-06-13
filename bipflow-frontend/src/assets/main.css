@@ -1,12 +1,56 @@
 @import "tailwindcss";
 
-/* Isso diz ao Tailwind v4 para escanear seus componentes Vue */
+/* Tailwind v4 scans the Vue and TypeScript source files from here. */
 @source "../**/*.{vue,ts}";
 
 @theme {
-  /* Se quiser personalizar cores aqui, é o lugar certo */
+  --color-bip-black: #05050a;
+  --color-bip-soft: #fafafa;
+  --color-bip-line: #e5e7eb;
+  --color-bip-rose: #d81b60;
+  --color-bip-blush: #fce7f3;
 }
 
 body {
-  @apply bg-gray-900 text-white antialiased;
+  @apply bg-[#FAFAFA] text-[#05050A] antialiased;
+}
+
+.brand-wordmark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.brand-wordmark-premium {
+  background: linear-gradient(90deg, #05050a 0%, #5b5b66 52%, #d81b60 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-wordmark-premium-dark {
+  background: linear-gradient(90deg, #ffffff 0%, #a1a1aa 48%, #ff3d8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-display-title {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0;
+  line-height: 0.98;
+}
+
+.premium-copy {
+  text-wrap: pretty;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

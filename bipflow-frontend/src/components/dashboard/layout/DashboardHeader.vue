@@ -17,27 +17,32 @@ defineEmits<{
 const welcomeMessage = computed(() => (
   props.userName ? `Bem-vindo, ${props.userName}` : 'Bem-vindo'
 ));
+
+const BRAND_LOGO_URL = '/brand-logo.png';
 </script>
 
 <template>
-  <header class="border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-50">
+  <header class="sticky top-0 z-50 border-b border-rose-500/10 bg-[#05050A]/90 backdrop-blur-xl">
     <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
       
       <div class="flex items-center gap-6">
         <div class="flex items-center gap-3">
-          <div class="relative flex items-center justify-center">
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping absolute opacity-75"></div>
-            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 relative"></div>
+          <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+            <img
+              :src="BRAND_LOGO_URL"
+              alt="KN Boutique Fitness"
+              class="h-full w-full object-contain"
+            />
           </div>
           <div class="flex flex-col">
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-white italic leading-tight">BipFlow Operacao</span>
-            <span class="text-[8px] font-bold uppercase tracking-widest text-emerald-500/80">Dashboard ativo</span>
+            <span class="brand-wordmark brand-wordmark-premium-dark text-lg">KN Boutique Fitness</span>
+            <span class="text-[8px] font-bold uppercase tracking-widest text-rose-400/90">Dashboard da vitrine</span>
           </div>
         </div>
 
-        <div class="hidden md:block h-8 border-l border-white/10 mx-2"></div>
+        <div class="hidden md:block h-8 border-l border-rose-500/15 mx-2"></div>
 
-        <div class="hidden lg:flex items-center gap-4 text-zinc-500">
+        <div class="hidden lg:flex items-center gap-4 text-zinc-400">
           <div class="flex items-center gap-1.5">
             <ShoppingBagIcon class="w-3.5 h-3.5" />
             <span class="text-[9px] font-bold uppercase tracking-tighter">Vitrine</span>
@@ -61,7 +66,7 @@ const welcomeMessage = computed(() => (
 
         <button 
           type="button"
-          class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-zinc-900/60 text-zinc-400 transition-all duration-300 hover:border-indigo-400/40 hover:bg-indigo-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-500/20 bg-white/[0.03] text-zinc-300 transition-all duration-300 hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
           aria-label="Abrir menu do dashboard"
           @click="$emit('openMenu')"
         >
