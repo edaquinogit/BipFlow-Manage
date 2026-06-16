@@ -71,3 +71,23 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  docker-build:
+    name: Docker build (Django image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: bipflow-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
