@@ -7,17 +7,19 @@ no codigo e suficiente para operar o estado atual do repositorio.
 
 - [README principal](../README.md): visao geral, stack e setup rapido.
 - [Arquitetura](architecture/system-overview.md): responsabilidades de cada
-  aplicacao e limites entre Django, Vue e motor Node.
+  aplicacao e limites entre Django e Vue.
+- [Evolucao multi-loja](architecture/multi-tenant-evolution.md): estrategia para
+  suportar varias lojas (multi-tenant) e roadmap por fases.
 - [Guia de desenvolvimento](development-guide.md): ambiente local, comandos,
   qualidade e manutencao.
 - [Referencia da API Django](api/reference.md): endpoints implementados em
   `bipdelivery/api/`.
 - [README frontend](../bipflow-frontend/README.md): detalhes da aplicacao Vue.
 
-## Arquivos De Apoio
+## Codigo Arquivado
 
-- `docs/swagger.js` e usado pelo motor Node da raiz para servir `/api-docs`.
-  Ele nao e a referencia da API Django.
+- `legacy/node-engine/`: motor Node/Express independente, arquivado na Fase 0 da
+  evolucao multi-loja. Nao participa do runtime canonico. Ver `legacy/README.md`.
 
 ## Removidos Como Fonte De Verdade
 

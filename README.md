@@ -85,25 +85,32 @@ qualidade para validar backend e frontend.
 
 ## Estado Atual
 
-O repositório tem três superfícies de código:
+O runtime canônico tem duas superfícies de código:
 
-- `bipdelivery/`: backend principal em Django REST. Mantém autenticação JWT,
+- `bipdelivery/`: backend canônico em Django REST. Mantém autenticação JWT,
   RBAC, produtos, categorias, regiões de entrega, checkout, pedidos persistidos
   e histórico de vendas.
 - `bipflow-frontend/`: aplicação Vue 3 + TypeScript. Entrega o dashboard
   autenticado, o menu operacional, o catálogo público, o carrinho e o checkout.
-- `index.js` + `src/` + `docs/swagger.js`: motor Node independente de
-  integração de pedidos em `/api/v1/orders`. Ele não participa do runtime
-  normal Django + Vue.
 
-`api-order-validation/` permanece no repositório como pacote/test harness
-isolado ligado ao motor Node. Ele não faz parte do fluxo web principal.
+Código não-canônico fica isolado e não participa do fluxo principal:
+
+- `legacy/node-engine/`: motor Node/Express independente de integração de
+  pedidos, **arquivado**. Ver `legacy/README.md`.
+- `api-order-validation/`: pacote/test harness isolado (avaliação Jitterbit),
+  mantido como artefato independente.
+
+O sistema é **single-tenant** (uma loja por instância). A estratégia para
+suportar várias lojas está em
+[docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md).
 
 ## Documentação Oficial
 
 - [docs/README.md](docs/README.md): índice da documentação viva.
 - [docs/architecture/system-overview.md](docs/architecture/system-overview.md):
   arquitetura real do projeto.
+- [docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md):
+  estratégia e roadmap para suporte a múltiplas lojas.
 - [docs/development-guide.md](docs/development-guide.md): setup, comandos,
   qualidade e manutenção.
 - [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
@@ -139,16 +146,18 @@ de verdade.
 
 ```text
 BipFlow-Manage/
-|-- bipdelivery/              # Backend Django REST
+|-- bipdelivery/              # Backend canônico Django REST
 |-- bipflow-frontend/         # Frontend Vue 3
-|-- api-order-validation/     # Pacote isolado/test harness do motor Node
+|-- api-order-validation/     # Pacote isolado (avaliação Jitterbit)
+|-- legacy/
+|   `-- node-engine/          # Motor Node arquivado (não-canônico)
 |-- docs/
 |   |-- api/
-|   |-- architecture/
+|   |-- architecture/         # inclui multi-tenant-evolution.md
 |   `-- career/
-|-- src/                      # Suporte do motor Node da raiz
-|-- index.js                  # Motor Node de integração de pedidos
-|-- package.json              # Scripts da raiz e motor Node
+|-- .github/workflows/        # CI (pytest + checks do frontend)
+|-- Dockerfile                # Imagem do backend Django
+|-- package.json              # Orquestração do monorepo (frontend + husky)
 |-- requirements.txt
 `-- .env.example
 ```
@@ -181,15 +190,11 @@ npm run dev
 
 Aplicação local: `http://127.0.0.1:5173/`
 
-### Motor Node Da Raiz
+### Motor Node Arquivado (opcional)
 
-```powershell
-npm install
-npm run dev
-```
-
-Motor local: `http://localhost:3000/`
-Swagger local do motor Node: `http://localhost:3000/api-docs`
+O motor Node não faz parte do runtime e é mantido apenas como referência em
+`legacy/node-engine/`. Para executá-lo isoladamente, consulte
+[`legacy/README.md`](legacy/README.md).
 
 ## Atalhos Na Raiz
 

@@ -1,0 +1,73 @@
+name: CI
+
+# Safety net for the current behaviour. This pipeline must stay green before
+# and during the multi-tenant evolution (see
+# docs/architecture/multi-tenant-evolution.md). It exercises the canonical
+# runtime only: the Django REST backend and the Vue 3 frontend.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Django / pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system check
+        run: python bipdelivery/manage.py check
+
+      - name: Run test suite
+        run: python -m pytest
+
+  frontend:
+    name: Frontend (Vue / typecheck / lint / unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bipflow-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: bipflow-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit:run
+
+      - name: Build
+        run: npm run build

@@ -32,18 +32,19 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
   `sanitizePayloadForDjango`, `useProducts` e `product.service` antes de chegar
   ao Django.
 
-### Motor Node da raiz
+### Motor Node arquivado
 
-- Local: `index.js`, `src/`, `services/` e `docs/swagger.js`.
+- Local: `legacy/node-engine/` (`index.js`, `src/`, `services/`, `database/`,
+  `docs/swagger.js`).
 - Stack: Express, Better SQLite3, Pino, Zod e Swagger.
-- Responsabilidades: endpoint independente `POST /api/v1/orders`, health check
-  `/health` e documentacao Swagger em `/api-docs`.
-- Observacao: nao faz parte do runtime normal Django + Vue.
+- Status: **arquivado** na Fase 0 da evolucao multi-loja. Nao faz parte do
+  runtime canonico Django + Vue. Ver `legacy/README.md`.
 
 ### Pacote `api-order-validation/`
 
-- Papel atual: pacote isolado/test harness historico ligado ao motor Node.
-- Observacao: nao deve ser tratado como backend principal do produto.
+- Papel atual: pacote/test harness isolado (avaliacao Jitterbit), independente
+  do produto.
+- Observacao: nao e o backend principal e nao integra o runtime canonico.
 
 ## Setup Do Backend Django
 
@@ -114,20 +115,18 @@ Rotas atuais:
 - `/products` e `/products/:slug`: aliases em ingles.
 - `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao.
 
-## Setup Do Motor Node
+## Motor Node Arquivado (opcional)
 
-```powershell
+O motor Node nao integra o runtime canonico. Para executa-lo isoladamente:
+
+```bash
+cd legacy/node-engine
 npm install
 npm run dev
 ```
 
-URLs locais:
-
-- `GET /health`
-- `POST /api/v1/orders`
-- `GET /api-docs`
-
-O banco `db.sqlite3` gerado pelo motor Node e local e ignorado pelo Git.
+URLs locais: `GET /health`, `POST /api/v1/orders`, `GET /api-docs`. O banco
+local gerado por ele e ignorado pelo Git. Ver `legacy/README.md`.
 
 ## Qualidade E Testes
 
@@ -159,11 +158,7 @@ Se estiver com um banco limpo, rode antes:
 python bipdelivery\manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
 ```
 
-Motor Node da raiz:
-
-```powershell
-npm run dev
-```
+Motor Node arquivado (`legacy/node-engine/`): opcional, fora do runtime.
 
 `api-order-validation/` possui pacote proprio. Rode comandos dentro da pasta
 apenas quando estiver trabalhando nesse pacote.

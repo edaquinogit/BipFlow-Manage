@@ -16,8 +16,9 @@ API versionada:
 /api/v1/
 ```
 
-Esta referencia nao descreve o motor Node da raiz. A documentacao Swagger desse
-motor fica em `/api-docs` quando `npm run dev` esta ativo.
+Esta referencia descreve apenas a API canonica Django. O motor Node arquivado em
+`legacy/node-engine/` (Swagger em `/api-docs`) nao faz parte do runtime e nao e
+coberto aqui.
 
 ## Autenticacao
 

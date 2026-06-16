@@ -24,13 +24,19 @@ carrinho, frete por regiao, checkout e historico de vendas.
 
 ## Sistemas Separados
 
-Tambem existem componentes Node no repositorio:
+O runtime canonico e exclusivamente Django (backend) + Vue (frontend). Codigo
+nao-canonico fica isolado e nao participa do fluxo principal:
 
-- `index.js`, `src/`, `services/` e `docs/swagger.js`: motor Node independente
-  para integracao de pedidos.
-- `api-order-validation/`: pacote/test harness isolado ligado ao motor Node.
+- `legacy/node-engine/`: motor Node/Express independente de integracao de
+  pedidos, **arquivado** na Fase 0 da evolucao multi-loja. Ver
+  `legacy/README.md`.
+- `api-order-validation/`: pacote/test harness isolado (avaliacao Jitterbit),
+  mantido como artefato independente.
 
-Esses componentes nao participam do runtime normal Django + Vue.
+## Evolucao Planejada
+
+- `architecture/multi-tenant-evolution.md`: estrategia para suportar varias
+  lojas (multi-tenant). O sistema e single-tenant hoje.
 
 ## Frontend Vue
 

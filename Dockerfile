@@ -1,10 +1,26 @@
-FROM node:20-slim
+# Canonical runtime image: Django REST backend (bipdelivery/).
+# The frontend (bipflow-frontend/) builds and deploys separately.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 WORKDIR /usr/src/app
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
-RUN npm install
+
+# Build deps for Pillow / native wheels; removed after install to keep image slim.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-RUN mkdir -p database
-RUN node database/setup.js
-EXPOSE 3000
-CMD [ "node", "index.js" ]
+
+WORKDIR /usr/src/app/bipdelivery
+
+EXPOSE 8000
+
+# Development-oriented entrypoint. For production, front this with a WSGI/ASGI
+# server (e.g. gunicorn) and run `python manage.py migrate` on release.
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

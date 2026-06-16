@@ -1,5 +1,16 @@
 .git
 node_modules
+**/node_modules
 .venv
 venv
 *.sqlite3
+__pycache__
+**/__pycache__
+.pytest_cache
+htmlcov
+.coverage
+bipflow-frontend
+legacy
+cypress
+docs
+*.md
