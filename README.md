@@ -166,6 +166,9 @@ BipFlow-Manage/
 
 ### Backend Django
 
+> **Requisito:** Python **3.12 ou superior**. Django 6 não roda em Python 3.11
+> ou inferior (a instalação falha por incompatibilidade de versão).
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
