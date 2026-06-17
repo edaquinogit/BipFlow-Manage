@@ -48,3 +48,7 @@ bipdelivery/staticfiles/
 # Java
 target/
 *.class
+
+# Local workspace artifacts (unrelated projects or manual uploads)
+everton-prata-film/
+bipflow-frontend/imagem/
