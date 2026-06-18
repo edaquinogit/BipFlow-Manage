@@ -9,8 +9,10 @@
  */
 
 const ASSET_SELECTORS = {
+  // data-cy anchor instead of copy text: "ACTIVE ASSETS" no longer exists in
+  // ProductListing.vue (current heading is "Produtos ativos"); selecting by
+  // data-cy survives future copy changes the way text content does not.
   inventoryTable: '[data-cy="product-table"]',
-  activeAssetsHeader: 'ACTIVE ASSETS',
 };
 
 describe('Product Image Synchronization & Integrity', () => {
@@ -21,18 +23,25 @@ describe('Product Image Synchronization & Integrity', () => {
     // Authenticate via API to bypass login flow
     cy.loginViaApi();
 
+    // Intercepting + waiting on the actual products fetch (not inferring
+    // completion from "loading-skeleton not.exist") avoids a race where
+    // that assertion can resolve true at t=0, before Vue has even started
+    // loading and mounted the skeleton in the first place.
+    cy.intercept('GET', '**/api/v1/products*').as('getProducts');
+
     // Navigate to dashboard
     cy.visitWithAuth(INVENTORY_ROUTE);
+    cy.wait('@getProducts', { timeout: 15000 });
   });
 
   it('should verify absolute URLs for product images in the inventory table', () => {
-    // Wait for table to populate
-    cy.contains(ASSET_SELECTORS.activeAssetsHeader, { timeout: 15000, matchCase: false })
-      .should('be.visible');
-
-    // Check each image in table
-    cy.get(ASSET_SELECTORS.inventoryTable, { timeout: 5000 })
-      .should('exist')
+    // Check each image in table. No intermediate `.should('exist')` here:
+    // that resolves to a specific DOM node, and if the table re-renders
+    // right after becoming visible (Vue swaps the node on a reactive
+    // update), the subsequent .find('img') runs against a detached
+    // snapshot. Chaining .find() directly off cy.get() lets Cypress retry
+    // the whole "get table -> find images" pipeline together until stable.
+    cy.get(ASSET_SELECTORS.inventoryTable, { timeout: 15000 })
       .find('img')
       .then(($images) => {
         if (!$images.length) {

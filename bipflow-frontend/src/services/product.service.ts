@@ -284,10 +284,19 @@ class ProductService {
    */
   async create(payload: FormData): Promise<AdminProduct> {
     try {
+      // Content-Type must be unset (not omitted): the shared `api` axios
+      // instance defaults to "application/json" for every request, and
+      // that default wins unless explicitly cleared here. With it left as
+      // JSON, Django never recognizes the body as multipart at all
+      // ("submitted data is not a file"). Setting the bare string
+      // "multipart/form-data" (no boundary) is just as wrong -- it
+      // overrides axios's own boundary-aware header and corrupts the file
+      // part while text fields still parse "close enough" by luck. Setting
+      // it to `undefined` removes the JSON default and lets axios generate
+      // the correct "multipart/form-data; boundary=..." header for the
+      // FormData body.
       const { data } = await api.post<unknown>(this.endpoint, payload, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": undefined },
       });
 
       return ProductSchema.parse(this.normalizeProductRecord(data));
@@ -315,14 +324,16 @@ class ProductService {
     try {
       const isFormData = productData instanceof FormData;
 
+      // Same reasoning as create(): the shared `api` instance defaults to
+      // "application/json", which must be explicitly unset (not just
+      // omitted) for FormData so axios can generate its own boundary-aware
+      // Content-Type header instead.
       const { data } = await api.patch<unknown>(
         `${this.endpoint}${id}/`,
         productData,
         {
           headers: {
-            "Content-Type": isFormData
-              ? "multipart/form-data"
-              : "application/json",
+            "Content-Type": isFormData ? undefined : "application/json",
           },
         }
       );
