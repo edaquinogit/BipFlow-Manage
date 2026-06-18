@@ -38,7 +38,7 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
-from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder, StoreSettings  # noqa: E402
+from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder, Store, StoreSettings  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
@@ -540,6 +540,7 @@ class StoreSettingsAPITest(TestCase):
         self.assertEqual(response.data["whatsapp_phone_digits"], "5571999999999")
         self.assertTrue(response.data["is_whatsapp_configured"])
         self.assertEqual(StoreSettings.get_solo().whatsapp_phone, "5571999999999")
+        self.assertEqual(Store.get_default().whatsapp_phone, "5571999999999")
 
     def test_regular_user_cannot_update_store_settings(self) -> None:
         """Regular authenticated users should not mutate operational settings."""

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Product } from '@/schemas/product.schema';
+import type { Store } from '@/types/store';
 import TableEmptyState from './ui/TableEmptyState.vue';
 import TableRow from '@/components/dashboard/product-table/TableRow.vue';
 
@@ -11,12 +12,14 @@ import TableRow from '@/components/dashboard/product-table/TableRow.vue';
 const props = withDefaults(defineProps<{
   products: Product[];
   isLoading?: boolean;
+  activeStore?: Store | null;
   selectedAssetIds?: Set<number>;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
 }>(), {
   products: () => [],
   isLoading: false,
+  activeStore: null,
   selectedAssetIds: () => new Set(),
   isAllSelected: false,
   isIndeterminate: false
@@ -34,6 +37,7 @@ const emit = defineEmits<{
  * Verifica se a lista de produtos é válida para exibição.
  */
 const hasProducts = computed(() => props.products && props.products.length > 0);
+const activeStoreName = computed(() => props.activeStore?.name || 'BipFlow');
 
 // Proxy de eventos para manter o Root limpo
 const onEdit = (product: Product) => emit('edit', product);
@@ -130,7 +134,7 @@ const onDelete = (id: number) => {
         Total Assets: {{ props.products.length }}
       </span>
       <span class="text-[9px] text-zinc-600 font-medium italic">
-        KN Boutique Fitness
+        {{ activeStoreName }}
       </span>
     </footer>
   </div>

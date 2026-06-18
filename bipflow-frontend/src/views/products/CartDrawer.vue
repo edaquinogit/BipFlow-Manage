@@ -120,6 +120,172 @@
               </article>
             </div>
           </div>
+
+          <section v-if="items.length > 0" class="mt-6 border-t border-[#E5E7EB] pt-6">
+            <div class="mb-4">
+              <h3 class="text-sm font-semibold text-[#05050A]">Dados para finalizar</h3>
+            </div>
+
+            <div class="grid gap-4">
+              <label class="block">
+                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  Nome
+                </span>
+                <input
+                  :value="customer.fullName"
+                  type="text"
+                  autocomplete="name"
+                  class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                  placeholder="Seu nome"
+                  @input="handleTextField('fullName', $event)"
+                />
+              </label>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    WhatsApp
+                  </span>
+                  <input
+                    :value="customer.phone"
+                    type="tel"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="+55 71 99999-9999"
+                    @input="handleTextField('phone', $event)"
+                  />
+                </label>
+
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    Email
+                  </span>
+                  <input
+                    :value="customer.email"
+                    type="email"
+                    autocomplete="email"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="Opcional"
+                    @input="handleTextField('email', $event)"
+                  />
+                </label>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    Entrega
+                  </span>
+                  <select
+                    :value="customer.deliveryMethod"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    @change="handleDeliveryMethodChange"
+                  >
+                    <option value="delivery">Receber em casa</option>
+                    <option value="pickup">Retirar na loja</option>
+                  </select>
+                </label>
+
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    Pagamento
+                  </span>
+                  <select
+                    :value="customer.paymentMethod"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    @change="handlePaymentMethodChange"
+                  >
+                    <option value="pix">Pix</option>
+                    <option value="card">Cartao</option>
+                    <option value="cash">Dinheiro</option>
+                  </select>
+                </label>
+              </div>
+
+              <template v-if="customer.deliveryMethod === 'delivery'">
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    Regiao de entrega
+                  </span>
+                  <select
+                    :value="customer.deliveryRegionId ?? ''"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    :disabled="isDeliveryRegionsLoading || deliveryRegions.length === 0"
+                    @change="handleDeliveryRegionChange"
+                  >
+                    <option value="">
+                      {{ deliveryRegionPlaceholder }}
+                    </option>
+                    <option
+                      v-for="region in deliveryRegions"
+                      :key="region.id"
+                      :value="region.id"
+                    >
+                      {{ region.name }} - {{ formatBRL(region.delivery_fee) }}
+                    </option>
+                  </select>
+                </label>
+
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    Endereco
+                  </span>
+                  <input
+                    :value="customer.address"
+                    type="text"
+                    autocomplete="street-address"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="Rua, numero e complemento"
+                    @input="handleTextField('address', $event)"
+                  />
+                </label>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      Bairro
+                    </span>
+                    <input
+                      :value="customer.neighborhood"
+                      type="text"
+                      autocomplete="address-level3"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Bairro"
+                      @input="handleTextField('neighborhood', $event)"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      Cidade
+                    </span>
+                    <input
+                      :value="customer.city"
+                      type="text"
+                      autocomplete="address-level2"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Cidade"
+                      @input="handleTextField('city', $event)"
+                    />
+                  </label>
+                </div>
+              </template>
+
+              <label class="block">
+                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  Observacoes
+                </span>
+                <textarea
+                  :value="customer.notes"
+                  rows="3"
+                  class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                  placeholder="Tamanho, referencia ou combinados do pedido"
+                  @input="handleTextField('notes', $event)"
+                />
+              </label>
+            </div>
+          </section>
         </div>
 
         <footer class="border-t border-[#E5E7EB] bg-white px-6 py-5">
@@ -128,22 +294,39 @@
               <span>Subtotal dos produtos</span>
               <span class="font-semibold text-[#05050A]">{{ formatBRL(subtotal) }}</span>
             </div>
+            <div
+              v-if="customer.deliveryMethod === 'delivery' && deliveryFee > 0"
+              class="flex items-center justify-between text-[#6B7280]"
+            >
+              <span>Frete</span>
+              <span class="font-semibold text-[#05050A]">{{ formatBRL(deliveryFee) }}</span>
+            </div>
+            <div class="flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[#05050A]">
+              <span class="font-semibold">Total estimado</span>
+              <span class="text-lg font-semibold">{{ formatBRL(total) }}</span>
+            </div>
             <p class="text-xs leading-5 text-[#6B7280]">
-              Frete, prazo e forma de pagamento serao definidos no atendimento da loja.
+              O total final sera confirmado na mensagem gerada pela loja.
             </p>
             <p v-if="!isWhatsAppConfigured" class="border-l-4 border-amber-500 px-3 py-2 text-sm font-semibold text-amber-800">
               WhatsApp da loja ainda nao configurado.
+            </p>
+            <p
+              v-if="checkoutValidationMessage"
+              class="border-l-4 border-[#D81B60] px-3 py-2 text-sm font-semibold text-[#7A143D]"
+            >
+              {{ checkoutValidationMessage }}
             </p>
           </div>
 
           <button
             type="button"
             class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#05050A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
-            :disabled="itemCount === 0 || !isWhatsAppConfigured || isSubmitting"
+            :disabled="!canSubmitCheckout"
             @click="$emit('submitOrder')"
           >
             <ChatBubbleBottomCenterTextIcon class="h-5 w-5" aria-hidden="true" />
-            {{ isSubmitting ? 'Abrindo WhatsApp...' : 'Finalizar pelo WhatsApp' }}
+            {{ submitButtonLabel }}
           </button>
         </footer>
       </aside>
@@ -152,6 +335,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   ChatBubbleBottomCenterTextIcon,
   MinusIcon,
@@ -160,7 +344,8 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import type { CartItem } from '@/types/product'
+import type { DeliveryRegion } from '@/types/delivery'
+import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
 const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -173,22 +358,145 @@ const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   </svg>
 `)}`
 
-defineProps<{
+const props = withDefaults(defineProps<{
   isOpen: boolean
   items: CartItem[]
   itemCount: number
   subtotal: number
+  deliveryFee: number
+  total: number
+  customer: CartCustomer
+  deliveryRegions: DeliveryRegion[]
+  isDeliveryRegionsLoading?: boolean
   isSubmitting?: boolean
   isWhatsAppConfigured: boolean
-}>()
+}>(), {
+  isDeliveryRegionsLoading: false,
+  isSubmitting: false,
+})
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
   clearCart: []
   removeItem: [productId: number]
   updateQuantity: [productId: number, quantity: number]
+  updateCustomer: [patch: Partial<CartCustomer>]
   submitOrder: []
 }>()
+
+type TextCustomerField =
+  | 'fullName'
+  | 'phone'
+  | 'email'
+  | 'address'
+  | 'neighborhood'
+  | 'city'
+  | 'notes'
+
+const deliveryRegionPlaceholder = computed(() => {
+  if (props.isDeliveryRegionsLoading) {
+    return 'Carregando regioes...'
+  }
+
+  return props.deliveryRegions.length > 0
+    ? 'Selecione uma regiao'
+    : 'Combinar entrega com a loja'
+})
+
+const normalizedPhone = computed(() => props.customer.phone.replace(/\D/g, ''))
+
+const checkoutValidationMessage = computed(() => {
+  if (props.itemCount === 0) {
+    return 'Adicione ao menos um item ao pedido.'
+  }
+
+  if (!props.customer.fullName.trim()) {
+    return 'Informe seu nome para registrar o pedido.'
+  }
+
+  if (normalizedPhone.value.length < 10) {
+    return 'Informe um WhatsApp com DDD.'
+  }
+
+  if (props.customer.deliveryMethod === 'delivery') {
+    if (props.deliveryRegions.length > 0 && !props.customer.deliveryRegionId) {
+      return 'Selecione a regiao de entrega.'
+    }
+
+    if (!props.customer.address.trim()) {
+      return 'Informe o endereco de entrega.'
+    }
+
+    if (!props.customer.neighborhood.trim()) {
+      return 'Informe o bairro de entrega.'
+    }
+
+    if (!props.customer.city.trim()) {
+      return 'Informe a cidade de entrega.'
+    }
+  }
+
+  return ''
+})
+
+const canSubmitCheckout = computed(() => (
+  props.itemCount > 0
+  && !props.isSubmitting
+  && !checkoutValidationMessage.value
+))
+
+const submitButtonLabel = computed(() => {
+  if (props.isSubmitting) {
+    return 'Registrando pedido...'
+  }
+
+  return props.isWhatsAppConfigured ? 'Registrar e abrir WhatsApp' : 'Registrar pedido'
+})
+
+function getInputValue(event: Event): string {
+  return (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value
+}
+
+function handleTextField(field: TextCustomerField, event: Event): void {
+  emit('updateCustomer', {
+    [field]: getInputValue(event),
+  })
+}
+
+function handleDeliveryMethodChange(event: Event): void {
+  const deliveryMethod = getInputValue(event) as CartCustomer['deliveryMethod']
+
+  emit('updateCustomer', {
+    deliveryMethod,
+    ...(deliveryMethod === 'pickup'
+      ? {
+          deliveryRegionId: null,
+          deliveryRegionName: '',
+          deliveryRegionFee: 0,
+          address: '',
+          neighborhood: '',
+          city: '',
+        }
+      : {}),
+  })
+}
+
+function handlePaymentMethodChange(event: Event): void {
+  emit('updateCustomer', {
+    paymentMethod: getInputValue(event) as CartCustomer['paymentMethod'],
+  })
+}
+
+function handleDeliveryRegionChange(event: Event): void {
+  const regionId = Number(getInputValue(event))
+  const region = props.deliveryRegions.find((item) => item.id === regionId)
+
+  emit('updateCustomer', {
+    deliveryRegionId: region?.id ?? null,
+    deliveryRegionName: region?.name ?? '',
+    deliveryRegionFee: region ? Number(region.delivery_fee) : 0,
+  })
+}
 </script>
 
 <style scoped>

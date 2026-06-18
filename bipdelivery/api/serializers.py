@@ -20,6 +20,7 @@ from .models import (
     ProductGalleryImage,
     SaleOrder,
     SaleOrderItem,
+    Store,
     StoreSettings,
 )
 from .permissions import (
@@ -393,6 +394,30 @@ class DeliveryRegionSerializer(serializers.ModelSerializer):
 
 
 PUBLIC_STORE_SETTINGS_FIELDS = ("whatsapp_phone_digits", "is_whatsapp_configured")
+
+
+class StoreSerializer(serializers.ModelSerializer):
+    """Resolved tenant identity. Etapa 1: always the single default store."""
+
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Store
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "logo_url",
+            "tagline",
+            "whatsapp_phone",
+            "theme",
+            "is_active",
+            "status",
+        ]
+        read_only_fields = fields
+
+    def get_status(self, store: Store) -> str:
+        return "active" if store.is_active else "inactive"
 
 
 class PublicStoreSettingsSerializer(serializers.ModelSerializer):

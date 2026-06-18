@@ -26,6 +26,7 @@ from .models import (
     Product,
     SaleOrder,
     SaleOrderItem,
+    Store,
     StoreSettings,
 )
 from .pagination import ProductListPagination, StandardPagination
@@ -53,6 +54,7 @@ from .serializers import (
     RegisterUserSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
+    StoreSerializer,
     StoreSettingsSerializer,
 )
 from .throttling import (
@@ -456,7 +458,10 @@ class StoreSettingsView(APIView):
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        settings_instance = serializer.save()
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone=settings_instance.whatsapp_phone
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -469,6 +474,23 @@ class PublicStoreSettingsView(APIView):
     def get(self, request, *args, **kwargs):
         settings_instance = StoreSettings.objects.filter(singleton_key=1).first() or StoreSettings()
         serializer = PublicStoreSettingsSerializer(settings_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CurrentStoreView(APIView):
+    """Resolve the tenant for this request.
+
+    Etapa 1 of the multi-tenant evolution: always resolves to the single
+    default store. Request-based resolution (slug/JWT claim) lands in
+    Etapa 3 once business tables carry store_id.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        store = Store.get_default()
+        serializer = StoreSerializer(store)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

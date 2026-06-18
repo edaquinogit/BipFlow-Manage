@@ -80,30 +80,71 @@ escopo pela FK do pai).
 | `DeliveryRegion.name` (unique) | `unique_together=("store", "name")` |
 | `StoreSettings` (singleton) | **descontinuado** — absorvido por `Store` |
 
-## 4. Plano de evolução por fases
+## 4. Plano de evolução por etapas verticais
 
-### Fase 0 — Saneamento e rede de segurança ✅ (este passo)
+O plano original organizava o trabalho em **fases horizontais** (backend
+completo, depois frontend completo). Para um projeto solo isso é arriscado:
+semanas sem nada visível/testável de ponta a ponta, e uma integração grande de
+uma vez quando o frontend finalmente entra — exatamente o tipo de mudança
+grande e especulativa que este projeto evita.
+
+Por isso a evolução é organizada em **etapas verticais**: cada etapa entrega
+backend **e** frontend juntos, na mesma janela de trabalho, fica em produção e
+mantém o comportamento single-tenant idêntico ao atual (1 loja só) até a
+última etapa. É o padrão *strangler fig / dark launch*: a estrutura
+multi-tenant é construída por baixo do sistema atual sem alterar o que o
+usuário final vê, até o momento controlado de "ligar" multi-loja.
+
+### Etapa 0 — Saneamento e rede de segurança ✅ (concluída)
 
 - Consolidar o Django como backend canônico.
 - Arquivar o motor Node legado em `legacy/node-engine/`.
 - Atualizar README e `docs/architecture/system-overview.md` para a arquitetura real.
 - Garantir testes do fluxo atual verdes antes de qualquer mudança estrutural
-  (97 testes pytest) e adicionar CI (`.github/workflows/ci.yml`) como rede de
+  (97+ testes pytest) e adicionar CI (`.github/workflows/ci.yml`) como rede de
   segurança durável.
 - **Não** implementar `Store`, `StoreMembership` nem migrations multi-tenant
   ainda.
 
-### Fase 1 — Fundação de dados (backend)
+### Etapa 1 — Fundação de contrato
+
+Backend:
 
 - Criar `Store` e `StoreMembership`.
 - **Data migration**: criar uma "loja default", apontar todos os registros
   existentes para ela e migrar `StoreSettings.whatsapp_phone` →
   `Store.whatsapp_phone`. Sem perda de dados.
-- Adicionar `store_id` nas tabelas de negócio (nullable → backfill → not null).
-- Trocar as constraints `unique` globais por `unique_together` com `store`.
-- (Pré-requisito) migrar para PostgreSQL.
+- Adicionar endpoint `GET /api/v1/store/current/`, que por enquanto sempre
+  resolve para a loja default.
 
-### Fase 2 — Isolamento na API (ponto mais sensível)
+Frontend:
+
+- Composable `useCurrentStore()` consumindo o endpoint acima.
+- Tipos TypeScript `Store` / `StoreMembership`.
+
+**Visível para o usuário final:** não. **Risco:** baixo.
+
+### Etapa 2 — `store_id` invisível
+
+Backend:
+
+- Adicionar `store_id` nas tabelas de negócio (`Category`, `Product`,
+  `DeliveryRegion`, `SaleOrder`) como nullable → backfill para a loja default
+  → not null.
+- Trocar as constraints `unique` globais por `unique_together` com `store`.
+- Criar índices por `store_id`.
+- (Pré-requisito antes da Etapa 3) migrar dev/prod para PostgreSQL.
+
+Frontend:
+
+- Nenhuma mudança — o contrato de API não muda nesta etapa.
+
+**Visível para o usuário final:** não. **Risco:** baixo (é schema + backfill,
+sem mudar nenhuma query ainda).
+
+### Etapa 3 — Isolamento ativo (ponto mais sensível)
+
+Backend:
 
 - Resolver a loja por request:
   - **Público/catálogo:** por `slug` na URL (ex.: `/api/v1/<store_slug>/...`)
@@ -118,52 +159,71 @@ escopo pela FK do pai).
 - Atualizar `permissions.py`: papéis passam a ser **por loja** (via
   `StoreMembership`), não mais globais.
 
-### Fase 3 — Frontend (Vue)
+Frontend:
 
-- Escopo de loja na rota pública: `/l/:storeSlug/produtos`, `/l/:storeSlug/produtos/:slug`.
-- Carrinho em `localStorage` por loja: `bipflow_cart_<storeSlug>` (hoje é global
-  e colidiria entre lojas).
-- Dashboard: ler a(s) loja(s) do usuário do `CurrentUser`/JWT; se houver mais de
-  uma, adicionar um **seletor de loja** (store switcher).
-- `api.ts`: injetar o escopo da loja (slug na URL ou header) nas chamadas.
-- Tela de configurações passa a editar dados da **loja atual** (nome, slug, WhatsApp).
+- `api.ts` passa a enviar o escopo da loja (vem do JWT/contexto, de forma
+  transparente para o usuário).
+- Carrinho migra de `bipflow_public_cart_items` para `bipflow_cart_<storeSlug>`,
+  com migração on-read do carrinho antigo na primeira visita.
+- Rotas preparadas para `/l/:storeSlug/produtos`, mas com redirect automático
+  para a loja default em `/produtos` — não forçar troca de URL para quem já
+  tem link salvo.
 
-### Fase 4 — Onboarding e operação
+**Visível para o usuário final:** não (1 loja = comportamento idêntico).
+**Risco:** alto — é onde vazamento entre lojas pode acontecer. Teste de
+isolamento ("usuário da loja A não acessa pedido da loja B") é obrigatório
+antes de qualquer outra coisa nesta etapa.
+
+### Etapa 4 — Multi-loja real
+
+Backend:
 
 - Fluxo de cadastro de loja (cria `Store` + `StoreMembership` owner no registro).
 - Convite de membros para uma loja.
 - Upload de imagens isolado por loja (`products/<store_id>/%Y/%m/`).
 - Django admin filtrando por loja.
 
+Frontend:
+
+- Seletor de loja (store switcher) quando o usuário pertence a mais de uma.
+- Tela de criação/configuração de loja (nome, slug, WhatsApp).
+
+**Visível para o usuário final:** sim — aqui a feature aparece de fato.
+**Risco:** médio.
+
 ## 5. Riscos e pontos de atenção
 
-1. **Vazamento entre tenants** — risco nº 1. Qualquer query sem `store_id` expõe
-   dados de outra loja. Mitigação: queryset base obrigatório + testes de
-   isolamento ("usuário da loja A não acessa pedido da loja B").
-2. **Constraints `unique` globais** — a migração falha se houver SKUs/slugs
-   duplicados ao consolidar. Tratar no backfill.
-3. **SQLite + concorrência** — lock global no checkout; daí o pré-requisito do
-   PostgreSQL.
-4. **Throttling de checkout** — hoje por IP/telefone global; revisar se deve ser
-   por loja.
-5. **Mídia/imagens** — isolar paths e considerar storage externo (ex.: S3)
-   quando crescer.
+| Risco | Onde aparece | Mitigação |
+| --- | --- | --- |
+| Vazamento de dados entre lojas (risco nº 1) | Etapa 3 | Queryset base obrigatório (`.filter(store=request.store)` em toda viewset) + teste de isolamento ("usuário da loja A não acessa pedido da loja B") antes de qualquer outra coisa na etapa |
+| Constraints `unique` globais quebram no backfill | Etapa 2 | Auditar SKUs/slugs duplicados antes de criar `unique_together` |
+| SQLite + concorrência (lock global no checkout via `select_for_update()`) | Antes da Etapa 3 | Migrar para PostgreSQL antes de habilitar escrita concorrente real entre lojas |
+| Token JWT antigo sem `store_id` | Etapa 3 | Tokens emitidos antes da etapa expiram naturalmente (refresh de 1 dia) — não precisa migração de sessão |
+| Rota pública atual (`/produtos`) quebrar | Etapa 3 | Manter `/produtos` funcionando via redirect implícito para `/l/<default>/produtos` |
+| Carrinho de cliente existente no localStorage | Etapa 3 | Migração on-read de `bipflow_public_cart_items` para `bipflow_cart_<default>` na primeira visita pós-deploy |
+| Throttling de checkout (hoje por IP/telefone global) | Etapa 3/4 | Revisar se deve ser também por loja |
+| Mídia/imagens compartilhadas | Etapa 4 | Isolar paths por `store_id`; considerar storage externo (S3) quando crescer |
 
 ## 6. Esforço estimado (ordem de grandeza)
 
-| Fase | Complexidade | Esforço aprox. |
-| --- | --- | --- |
-| 0 — Saneamento + CI | Média | 2–4 dias |
-| 1 — `Store` + migrations + PostgreSQL | Média | 3–5 dias |
-| 2 — Isolamento na API + JWT | **Alta** | 5–8 dias |
-| 3 — Frontend com escopo | Média-alta | 4–6 dias |
-| 4 — Onboarding/membros | Média | 3–5 dias |
+| Etapa | Backend | Frontend | Total aprox. |
+| --- | --- | --- | --- |
+| 0 — Saneamento + CI | — | — | ✅ concluída |
+| 1 — Fundação de contrato | 1–2 dias | 0.5–1 dia | 2–3 dias |
+| 2 — `store_id` invisível | 2–3 dias | — | 2–3 dias |
+| PostgreSQL (antes da Etapa 3) | 1–2 dias | — | 1–2 dias |
+| 3 — Isolamento ativo | 4–6 dias | 2–3 dias | **6–9 dias** (a mais sensível) |
+| 4 — Multi-loja real | 2–3 dias | 3–4 dias | 5–7 dias |
 
-## 7. Definição de pronto da Fase 0
+Total aproximado: 3–4 semanas de trabalho solo. Span de calendário maior se
+intercalado com manutenção do produto atual — saudável para um projeto solo,
+não é uma corrida.
+
+## 7. Definição de pronto da Etapa 0
 
 - [x] Backend canônico = Django; motor Node arquivado em `legacy/`.
 - [x] README e visão geral refletem a arquitetura real.
 - [x] Este documento criado.
 - [x] Testes do fluxo atual verdes (pytest) e CI configurado como rede de
       segurança.
-- [ ] (Próxima fase) `Store` / `StoreMembership` — **não** implementados nesta etapa.
+- [ ] (Próxima etapa) `Store` / `StoreMembership` — **não** implementados nesta etapa.

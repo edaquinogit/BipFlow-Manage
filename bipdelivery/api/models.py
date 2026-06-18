@@ -162,6 +162,89 @@ class DeliveryRegion(models.Model):
         return self.name
 
 
+class Store(models.Model):
+    """Tenant root entity. Etapa 1 of the multi-tenant evolution: a single
+    default row exists today, but business tables do not reference it yet
+    (that lands in Etapa 2). See docs/architecture/multi-tenant-evolution.md.
+    """
+
+    DEFAULT_SLUG = "default"
+
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(unique=True)
+    logo_url = models.URLField(max_length=500, blank=True)
+    tagline = models.CharField(max_length=160, blank=True)
+    whatsapp_phone = models.CharField(max_length=32, blank=True)
+    theme = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+    # Nullable: data migrations run before any user exists in a fresh
+    # database (seed_dashboard_roles runs after migrate), so a NOT NULL FK
+    # would break `manage.py migrate` on first deploy. Etapa 4 (onboarding)
+    # assigns a real owner when stores are created through the product flow.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="owned_stores",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        """Return the store name for admin/debug purposes."""
+        return self.name
+
+    @classmethod
+    def get_default(cls) -> "Store":
+        """Return the single-tenant store, creating it when needed."""
+        store, _created = cls.objects.get_or_create(
+            slug=cls.DEFAULT_SLUG,
+            defaults={
+                "name": "Loja Principal",
+                "tagline": "Catalogo online",
+            },
+        )
+        return store
+
+
+class StoreMembership(models.Model):
+    """Links a user to a store with a store-scoped role.
+
+    Etapa 1 only creates this table and backfills it from the existing
+    global RBAC groups; permissions still read global groups until Etapa 3.
+    """
+
+    ROLE_OWNER = "owner"
+    ROLE_MANAGER = "manager"
+    ROLE_VIEWER = "viewer"
+    ROLE_CHOICES = [
+        (ROLE_OWNER, "Owner"),
+        (ROLE_MANAGER, "Manager"),
+        (ROLE_VIEWER, "Viewer"),
+    ]
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="store_memberships",
+    )
+    role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=ROLE_VIEWER)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("store", "user")
+        ordering = ["store_id", "role"]
+
+    def __str__(self) -> str:
+        """Return a compact membership identifier for admin/debug purposes."""
+        return f"{self.user_id} @ {self.store_id} ({self.role})"
+
+
 class StoreSettings(models.Model):
     """Singleton operational settings controlled from the dashboard."""
 

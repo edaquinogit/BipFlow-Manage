@@ -1,10 +1,10 @@
 <template>
-  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A]">
-    <header class="border-b border-[#E5E7EB] bg-[#FAFAFA]">
+  <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
+    <header class="storefront-header border-b">
       <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
           type="button"
-          class="inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+          class="storefront-outline-button inline-flex h-10 w-fit items-center gap-2 rounded-lg border bg-white px-4 text-sm font-semibold transition"
           @click="goBackToCatalog"
         >
           <ArrowLeftIcon class="h-4 w-4" aria-hidden="true" />
@@ -14,14 +14,14 @@
         <div class="flex items-center gap-3">
           <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
             <img
-              :src="BRAND_LOGO_URL"
-              alt="KN Boutique Fitness"
+              :src="storeBranding.logoUrl"
+              :alt="storeBranding.name"
               class="h-full w-full object-contain"
             />
           </div>
           <div>
-            <p class="brand-wordmark brand-wordmark-premium text-lg">KN Boutique Fitness</p>
-            <p class="text-xs text-[#6B7280]">Detalhe da peca</p>
+            <p class="brand-wordmark brand-wordmark-premium text-lg">{{ storeBranding.name }}</p>
+            <p class="storefront-muted text-xs">{{ storeBranding.tagline }}</p>
           </div>
         </div>
       </div>
@@ -246,12 +246,18 @@
       :items="items"
       :item-count="itemCount"
       :subtotal="subtotal"
+      :delivery-fee="deliveryFee"
+      :total="total"
+      :customer="customer"
+      :delivery-regions="deliveryRegions"
+      :is-delivery-regions-loading="isDeliveryRegionsLoading"
       :is-submitting="isSubmittingOrder"
       :is-whats-app-configured="isWhatsAppConfigured"
       @close="isCartOpen = false"
       @clear-cart="clearCart"
       @remove-item="removeItem"
       @update-quantity="updateQuantity"
+      @update-customer="updateCustomer"
       @submit-order="handleSubmitOrder"
     />
   </div>
@@ -269,18 +275,29 @@ import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
+import { useCurrentStore } from '@/composables/useCurrentStore'
+import { useStoreBranding } from '@/composables/useStoreBranding'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
+import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { orderService } from '@/services/order.service'
 import productService from '@/services/product.service'
+import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
+import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
+const routeStoreSlug = typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+if (routeStoreSlug) {
+  setSelectedStoreSlug(routeStoreSlug)
+}
 const toast = useToast()
+const { selectedStore, fetchCurrentStore } = useCurrentStore()
+const storeBranding = useStoreBranding(selectedStore)
 
 const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
@@ -292,14 +309,14 @@ const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
     <text x="320" y="592" text-anchor="middle" fill="#6B7280" font-family="Arial, sans-serif" font-size="26" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`
-const BRAND_LOGO_URL = '/brand-logo.png'
-
 const product = ref<ProductDetail | null>(null)
+const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
 const isSubmittingOrder = ref(false)
+const isDeliveryRegionsLoading = ref(false)
 const errorMessage = ref('')
 const quantity = ref(1)
 const slideTransitionName = ref('carousel-slide-next')
@@ -311,12 +328,17 @@ let carouselInterval: ReturnType<typeof setInterval> | null = null
 
 const {
   items,
+  customer,
   itemCount,
   subtotal,
+  deliveryFee,
+  total,
   addItem,
   removeItem,
   updateQuantity,
   clearCart,
+  updateCustomer,
+  resetCustomer,
   getProductQuantity,
 } = useCart()
 
@@ -547,8 +569,54 @@ async function loadStoreSettings(): Promise<void> {
   }
 }
 
+async function loadDeliveryRegions(): Promise<void> {
+  isDeliveryRegionsLoading.value = true
+
+  try {
+    deliveryRegions.value = await deliveryRegionService.getActive()
+
+    const selectedRegion = deliveryRegions.value.find(
+      (region) => region.id === customer.value.deliveryRegionId
+    )
+
+    if (customer.value.deliveryRegionId && !selectedRegion) {
+      updateCustomer({
+        deliveryRegionId: null,
+        deliveryRegionName: '',
+        deliveryRegionFee: 0,
+      })
+    }
+
+    if (
+      customer.value.deliveryMethod === 'delivery'
+      && !customer.value.deliveryRegionId
+      && deliveryRegions.value.length === 1
+    ) {
+      const [region] = deliveryRegions.value
+      if (!region) {
+        return
+      }
+
+      updateCustomer({
+        deliveryRegionId: region.id,
+        deliveryRegionName: region.name,
+        deliveryRegionFee: Number(region.delivery_fee),
+      })
+    }
+  } catch (error) {
+    deliveryRegions.value = []
+    Logger.warn('Failed to load public delivery regions from product detail', {
+      error: error instanceof Error ? error.message : 'unknown_error',
+    })
+  } finally {
+    isDeliveryRegionsLoading.value = false
+  }
+}
+
 onMounted(() => {
   void Promise.allSettled([
+    fetchCurrentStore(),
+    loadDeliveryRegions(),
     loadStoreSettings(),
   ])
 })
@@ -563,6 +631,21 @@ watch(
     void loadProduct()
   },
   { immediate: true }
+)
+
+watch(
+  () => route.params?.storeSlug,
+  (storeSlug) => {
+    if (typeof storeSlug === 'string' && storeSlug.trim()) {
+      setSelectedStoreSlug(storeSlug)
+      void Promise.allSettled([
+        fetchCurrentStore(true),
+        loadDeliveryRegions(),
+        loadStoreSettings(),
+        loadProduct(),
+      ])
+    }
+  }
 )
 
 function handleImageError(event: Event): void {
@@ -596,7 +679,13 @@ function handleAddToCart(): void {
 }
 
 function goBackToCatalog(): void {
-  void router.push({ name: PublicRoutes.Products })
+  const storeSlug = typeof route.params.storeSlug === 'string' ? route.params.storeSlug : ''
+
+  void router.push(
+    storeSlug
+      ? { name: PublicRoutes.StoreProducts, params: { storeSlug } }
+      : { name: PublicRoutes.Products }
+  )
 }
 
 function canOpenWhatsAppCheckout(): boolean {
@@ -605,16 +694,10 @@ function canOpenWhatsAppCheckout(): boolean {
     return false
   }
 
-  if (!isWhatsAppConfigured.value) {
-    toast.info('WhatsApp da loja ainda nao esta configurado.')
-    isCartOpen.value = true
-    return false
-  }
-
   return true
 }
 
-function handleSubmitOrder(): void {
+async function handleSubmitOrder(): Promise<void> {
   if (!canOpenWhatsAppCheckout() || isSubmittingOrder.value) {
     return
   }
@@ -622,22 +705,27 @@ function handleSubmitOrder(): void {
   isSubmittingOrder.value = true
 
   try {
-    const whatsappUrl = orderService.buildWhatsAppHandoffUrl(
-      storeWhatsAppPhone.value,
-      items.value,
-      subtotal.value
-    )
+    const checkout = await orderService.checkoutViaWhatsApp(items.value, customer.value)
 
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
-    toast.success('Abrimos o WhatsApp com o pedido pronto para atendimento.')
+    if (checkout.whatsapp_url) {
+      const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
+      if (!openedWindow) {
+        window.location.href = checkout.whatsapp_url
+      }
+      toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
+    } else {
+      toast.error('Pedido registrado, mas o WhatsApp da loja nao esta configurado.')
+    }
 
     clearCart()
+    resetCustomer()
     isCartOpen.value = false
+    await loadProduct()
   } catch (error) {
-    Logger.warn('Failed to open WhatsApp checkout handoff from product detail', {
+    Logger.warn('Failed to register WhatsApp checkout from product detail', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    toast.error('Nao foi possivel abrir o WhatsApp agora. Tente novamente.')
+    toast.error('Nao foi possivel registrar o pedido agora. Revise os dados e tente novamente.')
   } finally {
     isSubmittingOrder.value = false
   }
@@ -649,6 +737,30 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.storefront-shell {
+  background: var(--store-background);
+  color: var(--store-text);
+}
+
+.storefront-header {
+  background: var(--store-background);
+  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
+}
+
+.storefront-muted {
+  color: var(--store-muted);
+}
+
+.storefront-outline-button {
+  border-color: color-mix(in srgb, var(--store-muted) 42%, transparent);
+  color: var(--store-text);
+}
+
+.storefront-outline-button:hover {
+  border-color: var(--store-accent);
+  color: var(--store-accent);
+}
+
 .carousel-slide-next-enter-active,
 .carousel-slide-next-leave-active,
 .carousel-slide-prev-enter-active,

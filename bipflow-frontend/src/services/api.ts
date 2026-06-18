@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { Logger } from "./logger";
+import { getSelectedStoreSlug } from "./store-scope";
 import { tokenStore, type TokenRefreshPayload } from "./token-store";
 
 /**
@@ -67,6 +68,20 @@ api.interceptors.request.use(
     const token = tokenStore.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    const selectedStoreSlug = getSelectedStoreSlug();
+    if (selectedStoreSlug && config.headers) {
+      const headers = config.headers as typeof config.headers & {
+        set?: (name: string, value: string) => void;
+      };
+
+      if (typeof headers.set === "function") {
+        headers.set("X-Store-Slug", selectedStoreSlug);
+      } else {
+        (config.headers as unknown as Record<string, string>)["X-Store-Slug"] =
+          selectedStoreSlug;
+      }
     }
 
     // 🛑 Track request for potential cancellation

@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
+import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
@@ -88,6 +89,16 @@ const {
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
+const {
+  stores,
+  selectedStore,
+  branding: storeBranding,
+  storefrontPath,
+  loading: isCurrentStoreLoading,
+  error: currentStoreError,
+  fetchCurrentStore,
+  selectStore,
+} = useCurrentStore();
 const { success, error: toastError } = useToast();
 const router = useRouter();
 
@@ -108,6 +119,16 @@ const lowStockProducts = computed(() => (
     .sort((left, right) => getProductStockValue(left) - getProductStockValue(right))
     .slice(0, 5)
 ));
+
+const activeStoreBadgeLabel = computed(() => (
+  selectedStore.value ? storeBranding.value.name : 'Carregando loja'
+));
+
+const activeStoreSlug = computed(() => (
+  storeBranding.value.slug ? `/${storeBranding.value.slug}` : ''
+));
+
+const activeStoreStatusLabel = computed(() => storeBranding.value.statusLabel);
 
 /**
  * 🧠 EVENT HANDLERS (View Controllers)
@@ -214,7 +235,33 @@ const handleFocusBot = (): void => {
 
 const handleOpenStore = (): void => {
   isDashboardMenuOpen.value = false;
-  window.open('/produtos', '_blank', 'noopener,noreferrer');
+  window.open(storefrontPath.value, '_blank', 'noopener,noreferrer');
+};
+
+const refreshStoreScopedData = async (): Promise<void> => {
+  clearSelection();
+
+  await Promise.allSettled([
+    fetchData(),
+    fetchCategories(true),
+    fetchSalesHistory(),
+    fetchDeliveryRegions(),
+    fetchStoreSettings()
+  ]);
+};
+
+const handleSelectStore = async (storeSlug: string): Promise<void> => {
+  if (storeSlug === selectedStore.value?.slug) {
+    return;
+  }
+
+  selectStore(storeSlug);
+  selectedProduct.value = null;
+  isPanelOpen.value = false;
+  isDashboardMenuOpen.value = false;
+
+  await refreshStoreScopedData();
+  success('Loja ativa atualizada.');
 };
 
 const handleLogout = async (): Promise<void> => {
@@ -411,13 +458,8 @@ onMounted(async () => {
     return;
   }
 
-  await Promise.allSettled([
-    fetchData(),
-    fetchCategories(),
-    fetchSalesHistory(),
-    fetchDeliveryRegions(),
-    fetchStoreSettings()
-  ]);
+  await fetchCurrentStore();
+  await refreshStoreScopedData();
 });
 </script>
 
@@ -425,8 +467,34 @@ onMounted(async () => {
   <div class="min-h-screen bg-[#05050A] text-zinc-200 selection:bg-rose-500/30 font-sans antialiased" data-cy="dashboard-view">
     <DashboardHeader
       :user-name="currentUserName"
+      :stores="stores"
+      :selected-store="selectedStore"
+      :is-store-loading="isCurrentStoreLoading"
+      :storefront-path="storefrontPath"
       @open-menu="handleOpenDashboardMenu"
+      @select-store="handleSelectStore"
+      @open-store="handleOpenStore"
     />
+
+    <div class="fixed bottom-5 left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-rose-500/20 bg-[#05050A]/90 px-4 py-3 text-xs shadow-2xl shadow-black/30 backdrop-blur-xl sm:flex">
+      <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]" />
+      <div class="min-w-0">
+        <p class="font-black uppercase tracking-[0.18em] text-zinc-500">Loja {{ activeStoreStatusLabel.toLowerCase() }}</p>
+        <p class="mt-1 truncate font-semibold text-white">
+          {{ activeStoreBadgeLabel }}
+          <span class="font-normal text-zinc-500">{{ activeStoreSlug }}</span>
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="currentStoreError"
+      class="mx-auto mt-6 max-w-7xl px-6"
+    >
+      <div class="rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
+        {{ currentStoreError }}
+      </div>
+    </div>
 
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
       <StatsGrid
@@ -443,6 +511,7 @@ onMounted(async () => {
           :is-loading="productsLoading"
           :error="error"
           :filters="filters"
+          :active-store="selectedStore"
           :is-searching="isSearching"
           :categories="categories"
           :selected-asset-ids="selectedAssetIds"
@@ -465,6 +534,7 @@ onMounted(async () => {
 
     <DashboardMenuDrawer
       :is-open="isDashboardMenuOpen"
+      :active-store="selectedStore"
       :recent-sales="recentSales"
       :is-sales-loading="isSalesLoading"
       :sales-error="salesError"

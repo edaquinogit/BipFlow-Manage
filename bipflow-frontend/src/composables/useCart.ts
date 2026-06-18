@@ -12,7 +12,7 @@ const defaultCustomer: CartCustomer = {
   paymentMethod: 'pix',
   deliveryRegionId: null,
   deliveryRegionName: '',
-  deliveryRegionFee: 12,
+  deliveryRegionFee: 0,
   address: '',
   neighborhood: '',
   city: '',
@@ -113,7 +113,7 @@ export function useCart() {
 
   const deliveryFee = computed(() =>
     customer.value.deliveryMethod === 'delivery' && items.value.length > 0
-      ? Number(customer.value.deliveryRegionFee ?? 12)
+      ? Number(customer.value.deliveryRegionFee ?? 0)
       : 0
   )
 

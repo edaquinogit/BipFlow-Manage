@@ -4,8 +4,10 @@ import { defineComponent, nextTick, ref } from 'vue'
 import ProductsView from '../ProductsView.vue'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useCart } from '@/composables/useCart'
+import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
+import { deliveryRegionService } from '@/services/delivery-region.service'
 import { storeSettingsService } from '@/services/store-settings.service'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -17,6 +19,10 @@ vi.mock('@/composables/useCart', () => ({
   useCart: vi.fn()
 }))
 
+vi.mock('@/composables/useCurrentStore', () => ({
+  useCurrentStore: vi.fn()
+}))
+
 vi.mock('@/composables/useToast', () => ({
   useToast: vi.fn()
 }))
@@ -24,6 +30,12 @@ vi.mock('@/composables/useToast', () => ({
 vi.mock('@/services/category.service', () => ({
   categoryService: {
     getAll: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/delivery-region.service', () => ({
+  deliveryRegionService: {
+    getActive: vi.fn(),
   },
 }))
 
@@ -68,10 +80,15 @@ const CartDrawerStub = defineComponent({
     items: { type: Array, required: true },
     itemCount: { type: Number, required: true },
     subtotal: { type: Number, required: true },
+    deliveryFee: { type: Number, required: true },
+    total: { type: Number, required: true },
+    customer: { type: Object, required: true },
+    deliveryRegions: { type: Array, required: true },
+    isDeliveryRegionsLoading: { type: Boolean, default: false },
     isSubmitting: { type: Boolean, default: false },
     isWhatsAppConfigured: { type: Boolean, required: true },
   },
-  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'submit-order'],
+  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer', 'submit-order'],
   template: '<div class="cart-drawer-stub"></div>',
 })
 
@@ -123,13 +140,31 @@ describe('ProductsView', () => {
 
   const cartState = {
     items: ref([]),
+    customer: ref({
+      fullName: '',
+      phone: '',
+      email: '',
+      deliveryMethod: 'delivery',
+      paymentMethod: 'pix',
+      deliveryRegionId: null,
+      deliveryRegionName: '',
+      deliveryRegionFee: 0,
+      address: '',
+      neighborhood: '',
+      city: '',
+      notes: '',
+    }),
     itemCount: ref(0),
     uniqueItemCount: ref(0),
     subtotal: ref(0),
+    deliveryFee: ref(0),
+    total: ref(0),
     addItem: vi.fn(),
     removeItem: vi.fn(),
     updateQuantity: vi.fn(),
     clearCart: vi.fn(),
+    updateCustomer: vi.fn(),
+    resetCustomer: vi.fn(),
     getProductQuantity: vi.fn(() => 0),
   }
 
@@ -137,6 +172,28 @@ describe('ProductsView', () => {
     success: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
+  }
+
+  const currentStoreState = {
+    selectedStore: ref({
+      id: 1,
+      name: 'Loja Principal',
+      slug: 'default',
+      logo_url: 'https://example.com/logo.png',
+      tagline: 'Catalogo premium',
+      whatsapp_phone: '5579999999999',
+      theme: {
+        primary: '#111111',
+        accent: '#D81B60',
+        background: '#FAFAFA',
+        surface: '#FFFFFF',
+        text: '#05050A',
+        muted: '#6B7280',
+      },
+      is_active: true,
+      status: 'active',
+    }),
+    fetchCurrentStore: vi.fn(),
   }
 
   const mountView = () =>
@@ -159,6 +216,7 @@ describe('ProductsView', () => {
 
     vi.mocked(useProductSearch).mockReturnValue(searchState as any)
     vi.mocked(useCart).mockReturnValue(cartState as any)
+    vi.mocked(useCurrentStore).mockReturnValue(currentStoreState as any)
     vi.mocked(useToast).mockReturnValue(toastMock as any)
     vi.mocked(useRoute).mockReturnValue({
       query: {},
@@ -170,6 +228,16 @@ describe('ProductsView', () => {
     vi.mocked(categoryService.getAll).mockResolvedValue([
       { id: 1, name: 'Test Category', slug: 'test-category', description: '' },
     ] as any)
+    vi.mocked(deliveryRegionService.getActive).mockResolvedValue([
+      {
+        id: 1,
+        name: 'Centro',
+        city: 'Salvador',
+        neighborhoods: '',
+        delivery_fee: '12.00',
+        is_active: true,
+      },
+    ])
     vi.mocked(storeSettingsService.getPublic).mockResolvedValue({
       whatsapp_phone_digits: '5579999999999',
       is_whatsapp_configured: true,
@@ -196,7 +264,8 @@ describe('ProductsView', () => {
   })
 
   it('renders catalog header and products', () => {
-    expect(wrapper.find('h1').text()).toContain('Escolha seu look fitness')
+    expect(wrapper.find('h1').text()).toContain('Catalogo premium')
+    expect(wrapper.text()).toContain('Loja Principal')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })

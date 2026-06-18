@@ -16,13 +16,16 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { Product } from '@/schemas/product.schema'
+import { buildStoreBranding } from '@/composables/useStoreBranding'
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery'
 import type { SaleOrder, SaleOrderStatus } from '@/types/sales'
+import type { Store } from '@/types/store'
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings'
 import { formatBRL } from '@/utils/formatters'
 
 const props = defineProps<{
   isOpen: boolean
+  activeStore: Store | null
   recentSales: SaleOrder[]
   isSalesLoading: boolean
   salesError: string | null
@@ -74,7 +77,8 @@ const saleTimelineSteps: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: 
   { value: 'prepared', label: 'Novo' },
   { value: 'sent', label: 'Enviado' },
 ]
-const BRAND_LOGO_URL = '/brand-logo.png'
+const activeBranding = computed(() => buildStoreBranding(props.activeStore))
+const activeStoreSlug = computed(() => activeBranding.value.slug ? `/${activeBranding.value.slug}` : '')
 
 const storeWhatsappDigits = computed(() => normalizePhone(storeSettingsDraft.value.whatsapp_phone))
 const storeWhatsappValidationMessage = computed(() => {
@@ -264,8 +268,8 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
           <div class="flex items-center gap-3">
             <div class="flex h-14 w-36 shrink-0 items-center justify-center overflow-hidden">
               <img
-                :src="BRAND_LOGO_URL"
-                alt="KN Boutique Fitness"
+                :src="activeBranding.logoUrl"
+                :alt="activeBranding.name"
                 class="h-full w-full object-contain"
               />
             </div>
@@ -274,8 +278,11 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
                 Centro de operacao
               </p>
               <h2 class="brand-wordmark brand-wordmark-premium-dark mt-2 text-2xl">
-                KN Boutique Fitness
+                {{ activeBranding.name }}
               </h2>
+              <p class="mt-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                {{ activeBranding.tagline }} - Loja {{ activeBranding.statusLabel.toLowerCase() }} {{ activeStoreSlug }}
+              </p>
             </div>
           </div>
 

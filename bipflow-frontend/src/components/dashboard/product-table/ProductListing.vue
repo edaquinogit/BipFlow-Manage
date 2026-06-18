@@ -6,6 +6,7 @@ import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import type { Category } from '@/schemas/category.schema';
 import type { FilterState } from '@/types/filters';
+import type { Store } from '@/types/store';
 
 /**
  * 🏷️ PROPS BOUNDARY (Strict Typing)
@@ -16,6 +17,7 @@ defineProps<{
   isLoading: boolean;
   error: string | null;
   filters: FilterState;
+  activeStore?: Store | null;
   isSearching?: boolean;
   categories?: Category[];
   selectedAssetIds?: Set<number>;
@@ -92,6 +94,7 @@ defineEmits<{
     <ProductTable
       v-else
       :products="products"
+      :active-store="activeStore"
       :selected-asset-ids="selectedAssetIds"
       :is-all-selected="isAllSelected"
       :is-indeterminate="isIndeterminate"

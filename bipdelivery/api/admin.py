@@ -7,6 +7,8 @@ from .models import (
     Product,
     SaleOrder,
     SaleOrderItem,
+    Store,
+    StoreMembership,
     StoreSettings,
 )
 
@@ -28,6 +30,20 @@ class DeliveryRegionAdmin(admin.ModelAdmin):
     list_display = ("name", "city", "delivery_fee", "is_active")
     list_filter = ("is_active", "city")
     search_fields = ("name", "city", "neighborhoods")
+
+
+@admin.register(Store)
+class StoreAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "slug", "tagline", "is_active", "owner")
+    list_filter = ("is_active",)
+    search_fields = ("name", "slug")
+
+
+@admin.register(StoreMembership)
+class StoreMembershipAdmin(admin.ModelAdmin):
+    list_display = ("id", "store", "user", "role")
+    list_filter = ("role", "store")
+    search_fields = ("user__username", "user__email")
 
 
 @admin.register(StoreSettings)
