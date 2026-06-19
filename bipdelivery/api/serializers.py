@@ -7,9 +7,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import (
     BotConversation,
@@ -21,6 +23,7 @@ from .models import (
     SaleOrder,
     SaleOrderItem,
     Store,
+    StoreMembership,
     StoreSettings,
 )
 from .permissions import (
@@ -79,6 +82,27 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     def get_can_manage_catalog(self, user: User) -> bool:
         """Expose whether the user can mutate catalog and freight resources."""
         return has_dashboard_write_access(user)
+
+
+class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Embed the user's store in the JWT (Etapa 3 of the multi-tenant evolution).
+
+    Resolved once at login from StoreMembership and carried by the refresh
+    token, so it also reaches every access token minted via refresh without
+    extra wiring. Users without a membership (none exist outside the Etapa 1
+    backfill yet) simply get no claim; request-side resolution then falls
+    back to the single default store, identical to today's behaviour.
+    """
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        membership = StoreMembership.objects.filter(user=user).select_related("store").first()
+
+        if membership is not None:
+            token["store_id"] = membership.store.id
+
+        return token
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -791,11 +815,24 @@ class SaleOrderStatusUpdateSerializer(serializers.Serializer):
 
 
 class RegisterUserSerializer(serializers.Serializer):
-    """Register a new active user account with password validation."""
+    """Register a new active user account with password validation.
+
+    Etapa 4 of the multi-tenant evolution: registration also creates the
+    user's first Store and an owner StoreMembership, so a self-registered
+    account can use the dashboard without an operator manually assigning a
+    Django group first.
+    """
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
     confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    store_name = serializers.CharField(max_length=120, trim_whitespace=True)
+
+    def validate_store_name(self, value: str) -> str:
+        normalized_name = value.strip()
+        if not normalized_name:
+            raise serializers.ValidationError("Informe o nome da sua loja.")
+        return normalized_name
 
     def validate_email(self, value: str) -> str:
         normalized_email = value.strip().lower()
@@ -829,12 +866,17 @@ class RegisterUserSerializer(serializers.Serializer):
     def create(self, validated_data):
         email = validated_data["email"]
         password = validated_data["password"]
-        user = User.objects.create_user(
-            username=email,
-            email=email,
-            password=password,
-            is_active=True,
-        )
+        store_name = validated_data["store_name"]
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password,
+                is_active=True,
+            )
+            Store.create_for_owner(name=store_name, owner=user)
+
         return user
 
 

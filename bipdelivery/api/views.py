@@ -54,9 +54,11 @@ from .serializers import (
     RegisterUserSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
+    StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
 )
+from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
     AuthIpThrottle,
     BotMessageIpThrottle,
@@ -73,7 +75,7 @@ from .throttling import (
 User = get_user_model()
 
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for CRUD operations on Product instances.
 
@@ -115,9 +117,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         """
         return super().get_object()
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         """
-        Override get_queryset to apply filtering and optimization.
+        Apply filtering and optimization before the store scope (Etapa 3) is intersected.
 
         Implements server-side filtering for:
         - Text search (name, SKU, description)
@@ -230,9 +232,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         except (ValueError, TypeError):
             return validation_error("new_category_id deve ser um número inteiro válido.")
 
-        # Validate category exists
+        # Validate category exists within the requester's store
         try:
-            new_category = Category.objects.get(id=new_category_id)
+            new_category = Category.objects.get(id=new_category_id, store=self.get_request_store())
         except Category.DoesNotExist:
             return not_found_error(f"Categoria com id {new_category_id} não existe.")
 
@@ -244,9 +246,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         # Use atomic transaction for data integrity
         with transaction.atomic():
-            # Get products that exist and belong to current user (if needed)
-            # Note: Since we're using IsAuthenticated permission, all products are accessible
-            products_to_update = Product.objects.filter(id__in=product_ids)
+            # Scoped to the requester's store: bypassing get_queryset() here
+            # would let a store-B request bulk-edit store-A's products by ID.
+            products_to_update = self.get_queryset().filter(id__in=product_ids)
 
             # Check if all requested products exist
             found_ids = set(products_to_update.values_list("id", flat=True))
@@ -286,7 +288,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return super().get_serializer(*args, **kwargs)
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
     """
     ViewSet for CRUD operations on Category instances.
 
@@ -302,12 +304,16 @@ class CategoryViewSet(viewsets.ModelViewSet):
     Permissions: AllowAnyReadDashboardWrite
     - GET requests: Anyone (authenticated or anonymous)
     - POST, PUT, PATCH, DELETE: staff, superuser, admin or manager role only
+
+    All of the above are scoped to the request's resolved store (Etapa 3).
     """
 
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [AllowAnyReadDashboardWrite]
     pagination_class = StandardPagination
+
+    def get_base_queryset(self):
+        return Category.objects.all()
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -325,14 +331,17 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class DeliveryRegionViewSet(viewsets.ModelViewSet):
-    """Manage delivery pricing by region while exposing active regions publicly."""
+class DeliveryRegionViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
+    """Manage delivery pricing by region while exposing active regions publicly.
+
+    Scoped to the request's resolved store (Etapa 3).
+    """
 
     serializer_class = DeliveryRegionSerializer
     permission_classes = [AllowAnyReadDashboardWrite]
     pagination_class = StandardPagination
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         """Return all regions to dashboard users and only active ones publicly."""
         queryset = DeliveryRegion.objects.all()
 
@@ -347,20 +356,20 @@ class DeliveryRegionViewSet(viewsets.ModelViewSet):
     def active(self, request):
         """Return active delivery regions for the public checkout form."""
         serializer = self.get_serializer(
-            DeliveryRegion.objects.filter(is_active=True),
+            self.get_queryset().filter(is_active=True),
             many=True,
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class SaleOrderViewSet(viewsets.ReadOnlyModelViewSet):
-    """Sales history for authenticated dashboard users."""
+class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """Sales history for authenticated dashboard users, scoped to their store (Etapa 3)."""
 
     serializer_class = SaleOrderSerializer
     permission_classes = [IsAuthenticated, IsDashboardReadRole]
     pagination_class = StandardPagination
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         """Return recent sales with optional search and status filters."""
         queryset = SaleOrder.objects.prefetch_related("items").all()
 
@@ -459,7 +468,9 @@ class StoreSettingsView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         settings_instance = serializer.save()
-        Store.objects.filter(id=Store.get_default().id).update(
+        # Etapa 3: sync to the requester's own store, not always the global
+        # default, so a future store-B admin can't overwrite store-A's number.
+        Store.objects.filter(id=resolve_request_store(request).id).update(
             whatsapp_phone=settings_instance.whatsapp_phone
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -480,18 +491,43 @@ class PublicStoreSettingsView(APIView):
 class CurrentStoreView(APIView):
     """Resolve the tenant for this request.
 
-    Etapa 1 of the multi-tenant evolution: always resolves to the single
-    default store. Request-based resolution (slug/JWT claim) lands in
-    Etapa 3 once business tables carry store_id.
+    Etapa 3 of the multi-tenant evolution: resolves by the `X-Store-Slug`
+    header, falling back to the single default store when absent -- this
+    view runs without authentication, so it always takes that public path
+    even for dashboard callers (see resolve_request_store).
     """
 
     permission_classes = []
     authentication_classes = []
 
     def get(self, request, *args, **kwargs):
-        store = Store.get_default()
+        store = resolve_request_store(request)
         serializer = StoreSerializer(store)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MyStoresView(APIView):
+    """List the authenticated user's stores, or create a new one (Etapa 4).
+
+    Backs the dashboard's store switcher (GET) and its "new store" action
+    (POST) -- the same Store.create_for_owner() registration uses.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        stores = Store.objects.filter(memberships__user=request.user).distinct().order_by("name")
+        serializer = StoreSerializer(stores, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        name = str(request.data.get("name", "")).strip()
+        if not name:
+            return validation_error("name e obrigatorio.")
+
+        store = Store.create_for_owner(name=name, owner=request.user)
+        serializer = StoreSerializer(store)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class BotMessageView(APIView):
@@ -646,12 +682,14 @@ class CheckoutWhatsAppView(APIView):
             }
         )
 
-    def _lock_cart_products(self, quantities_by_product_id: dict[int, int]) -> dict[int, Product]:
+    def _lock_cart_products(
+        self, quantities_by_product_id: dict[int, int], store: Store
+    ) -> dict[int, Product]:
         product_ids = list(quantities_by_product_id)
         products = (
             Product.objects.select_for_update()
             .select_related("category")
-            .filter(id__in=sorted(product_ids))
+            .filter(id__in=sorted(product_ids), store=store)
             .order_by("id")
         )
         products_by_id = {product.id: product for product in products}
@@ -704,9 +742,11 @@ class CheckoutWhatsAppView(APIView):
 
         return normalized_items, subtotal
 
-    def _reserve_cart_stock(self, cart_items) -> tuple[list[dict], Decimal, dict[int, Product]]:
+    def _reserve_cart_stock(
+        self, cart_items, store: Store
+    ) -> tuple[list[dict], Decimal, dict[int, Product]]:
         quantities_by_product_id = self._aggregate_cart_quantities(cart_items)
-        products_by_id = self._lock_cart_products(quantities_by_product_id)
+        products_by_id = self._lock_cart_products(quantities_by_product_id, store)
         normalized_items, subtotal = self._normalize_reserved_items(
             quantities_by_product_id,
             products_by_id,
@@ -727,6 +767,7 @@ class CheckoutWhatsAppView(APIView):
         return normalized_items, subtotal, products_by_id
 
     def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
         serializer = CheckoutRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -740,6 +781,7 @@ class CheckoutWhatsAppView(APIView):
         if customer["delivery_method"] == "delivery" and delivery_region_id:
             delivery_region = DeliveryRegion.objects.filter(
                 id=delivery_region_id,
+                store=store,
                 is_active=True,
             ).first()
 
@@ -755,7 +797,7 @@ class CheckoutWhatsAppView(APIView):
         notes = customer.get("notes", "").strip()
 
         with transaction.atomic():
-            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items)
+            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items, store)
 
             delivery_fee = Decimal("0.00")
             if customer["delivery_method"] == "delivery":
@@ -806,12 +848,13 @@ class CheckoutWhatsAppView(APIView):
                 message_lines.append(f"Observacoes: {notes}")
 
             message = "\n".join(message_lines)
-            whatsapp_phone = StoreSettings.get_configured_whatsapp_phone()
+            whatsapp_phone = store.get_configured_whatsapp_phone()
             whatsapp_url = (
                 f"https://wa.me/{whatsapp_phone}?text={quote(message)}" if whatsapp_phone else ""
             )
 
             sale_order = SaleOrder.objects.create(
+                store=store,
                 order_reference=order_reference,
                 customer_name=customer_name,
                 customer_phone=customer_phone,
@@ -881,6 +924,7 @@ class CheckoutWhatsAppView(APIView):
 class LoginTokenObtainPairView(TokenObtainPairView):
     """JWT login endpoint protected by IP and submitted-identity throttles."""
 
+    serializer_class = StoreScopedTokenObtainPairSerializer
     throttle_classes = [AuthIpThrottle, LoginIdentityThrottle]
 
 

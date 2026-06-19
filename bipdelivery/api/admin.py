@@ -13,22 +13,48 @@ from .models import (
 )
 
 
+class StoreScopedAdminMixin:
+    """Restrict a store-scoped model's admin to the staff member's own stores (Etapa 4).
+
+    Superusers keep full cross-tenant visibility (administrative override,
+    consistent with how permissions.py already treats them); other staff
+    only see rows belonging to a store they hold a StoreMembership in.
+    """
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if request.user.is_superuser:
+            return queryset
+        return queryset.filter(store__memberships__user=request.user).distinct()
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.store_id and not request.user.is_superuser:
+            membership = (
+                StoreMembership.objects.filter(user=request.user).select_related("store").first()
+            )
+            if membership is not None:
+                obj.store = membership.store
+
+        super().save_model(request, obj, form, change)
+
+
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "name")
+class CategoryAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "name", "store")
+    list_filter = ("store",)
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "price", "is_available")
-    list_filter = ("category", "is_available")
+class ProductAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "store", "category", "price", "is_available")
+    list_filter = ("store", "category", "is_available")
     search_fields = ("name", "description")
 
 
 @admin.register(DeliveryRegion)
-class DeliveryRegionAdmin(admin.ModelAdmin):
-    list_display = ("name", "city", "delivery_fee", "is_active")
-    list_filter = ("is_active", "city")
+class DeliveryRegionAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("name", "store", "city", "delivery_fee", "is_active")
+    list_filter = ("store", "is_active", "city")
     search_fields = ("name", "city", "neighborhoods")
 
 
@@ -37,6 +63,12 @@ class StoreAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "slug", "tagline", "is_active", "owner")
     list_filter = ("is_active",)
     search_fields = ("name", "slug")
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if request.user.is_superuser:
+            return queryset
+        return queryset.filter(memberships__user=request.user).distinct()
 
 
 @admin.register(StoreMembership)
@@ -76,9 +108,9 @@ class SaleOrderItemInline(admin.TabularInline):
 
 
 @admin.register(SaleOrder)
-class SaleOrderAdmin(admin.ModelAdmin):
-    list_display = ("order_reference", "customer_name", "total", "status", "created_at")
-    list_filter = ("status", "delivery_method", "payment_method", "created_at")
+class SaleOrderAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("order_reference", "store", "customer_name", "total", "status", "created_at")
+    list_filter = ("store", "status", "delivery_method", "payment_method", "created_at")
     search_fields = ("order_reference", "customer_name", "customer_phone", "items__product_name")
     readonly_fields = ("order_reference", "created_at", "updated_at")
     inlines = [SaleOrderItemInline]

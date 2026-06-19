@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -10,17 +11,53 @@ def generate_bot_session_id() -> str:
     return uuid.uuid4().hex
 
 
+def product_image_upload_to(instance: "Product", filename: str) -> str:
+    """Scope a product's cover image path by its store (Etapa 4)."""
+    return f"products/{instance.store_id}/{timezone.now():%Y/%m}/{filename}"
+
+
+def product_gallery_image_upload_to(instance: "ProductGalleryImage", filename: str) -> str:
+    """Scope a product's gallery image path by its parent product's store (Etapa 4)."""
+    return f"products/{instance.product.store_id}/{timezone.now():%Y/%m}/{filename}"
+
+
+def get_default_store_id() -> int:
+    """Resolve the single-tenant default store's PK as a field default.
+
+    Returns the PK (not the Store instance): Django's SQLite schema editor
+    resolves FK field defaults through `get_db_prep_value()` when backfilling
+    existing rows during a migration, which expects a raw value it can bind
+    directly rather than a model instance to introspect.
+
+    Defined ahead of Store's own class body further below so Category,
+    Product, DeliveryRegion and SaleOrder can reference it without
+    reordering the file: the name only needs to resolve once this module
+    has finished loading, never at class-definition time.
+    """
+    return Store.get_default().id
+
+
 class Category(models.Model):
     """Product category model for organizational purposes."""
 
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(unique=True, blank=True, null=True)
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="categories",
+        default=get_default_store_id,
+        help_text="Tenant that owns this category (Etapa 2 of the multi-tenant evolution).",
+    )
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(blank=True, null=True)
     description = models.TextField(blank=True, null=True, help_text="Optional category description")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["store", "slug"], name="unique_category_slug_per_store"),
+        ]
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -43,6 +80,13 @@ class Product(models.Model):
     """Product model representing items in the inventory system."""
 
     # Relationship
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="products",
+        default=get_default_store_id,
+        help_text="Tenant that owns this product (Etapa 2 of the multi-tenant evolution).",
+    )
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -53,7 +97,6 @@ class Product(models.Model):
     # Unique Identification (Essential for Barcode/Scanner)
     sku = models.CharField(
         max_length=50,
-        unique=True,
         blank=True,
         null=True,
         help_text="Unique product code (SKU/Barcode)",
@@ -75,7 +118,7 @@ class Product(models.Model):
     is_available = models.BooleanField(default=True)
 
     # Media
-    image = models.ImageField(upload_to="products/%Y/%m/", null=True, blank=True)
+    image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
 
     # Audit (Current market standard)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -83,6 +126,10 @@ class Product(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["store", "sku"], name="unique_product_sku_per_store"),
+            models.UniqueConstraint(fields=["store", "slug"], name="unique_product_slug_per_store"),
+        ]
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -131,7 +178,7 @@ class ProductGalleryImage(models.Model):
         on_delete=models.CASCADE,
         related_name="gallery_images",
     )
-    image = models.ImageField(upload_to="products/%Y/%m/")
+    image = models.ImageField(upload_to=product_gallery_image_upload_to)
     position = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -146,7 +193,14 @@ class ProductGalleryImage(models.Model):
 class DeliveryRegion(models.Model):
     """Configurable delivery fee by operating region."""
 
-    name = models.CharField(max_length=120, unique=True)
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="delivery_regions",
+        default=get_default_store_id,
+        help_text="Tenant that owns this delivery region (Etapa 2 of the multi-tenant evolution).",
+    )
+    name = models.CharField(max_length=120)
     city = models.CharField(max_length=120, blank=True)
     neighborhoods = models.TextField(blank=True, help_text="Optional comma-separated neighborhood hints")
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
@@ -156,6 +210,9 @@ class DeliveryRegion(models.Model):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["store", "name"], name="unique_delivery_region_name_per_store"),
+        ]
 
     def __str__(self) -> str:
         """Return the region name for admin/debug purposes."""
@@ -163,9 +220,10 @@ class DeliveryRegion(models.Model):
 
 
 class Store(models.Model):
-    """Tenant root entity. Etapa 1 of the multi-tenant evolution: a single
-    default row exists today, but business tables do not reference it yet
-    (that lands in Etapa 2). See docs/architecture/multi-tenant-evolution.md.
+    """Tenant root entity. Etapa 3 of the multi-tenant evolution: requests now
+    resolve to a specific store (JWT claim for the dashboard, `X-Store-Slug`
+    header for the public catalog) and every business queryset is filtered
+    by it. See docs/architecture/multi-tenant-evolution.md.
     """
 
     DEFAULT_SLUG = "default"
@@ -198,6 +256,23 @@ class Store(models.Model):
         """Return the store name for admin/debug purposes."""
         return self.name
 
+    @property
+    def whatsapp_phone_digits(self) -> str:
+        """Expose this store's normalized WhatsApp phone digits."""
+        return StoreSettings.normalize_phone(self.whatsapp_phone)
+
+    def get_configured_whatsapp_phone(self) -> str:
+        """Return this store's WhatsApp phone, falling back to the environment default.
+
+        Mirrors StoreSettings.get_configured_whatsapp_phone() but scoped to
+        this specific tenant instead of the single global singleton, for
+        CheckoutWhatsAppView once it resolves a request-specific store.
+        """
+        if self.whatsapp_phone_digits:
+            return self.whatsapp_phone_digits
+
+        return StoreSettings.normalize_phone(getattr(settings, "WHATSAPP_ORDER_PHONE", ""))
+
     @classmethod
     def get_default(cls) -> "Store":
         """Return the single-tenant store, creating it when needed."""
@@ -208,6 +283,24 @@ class Store(models.Model):
                 "tagline": "Catalogo online",
             },
         )
+        return store
+
+    @classmethod
+    def create_for_owner(cls, *, name: str, owner) -> "Store":
+        """Create a new store with a unique slug and an owner membership (Etapa 4).
+
+        Shared by registration (a user's first store) and the dashboard's
+        "new store" action (an existing user adding another one).
+        """
+        base_slug = slugify(name) or "loja"
+        slug = base_slug
+        suffix = 1
+        while cls.objects.filter(slug=slug).exists():
+            suffix += 1
+            slug = f"{base_slug}-{suffix}"
+
+        store = cls.objects.create(name=name, slug=slug, owner=owner)
+        StoreMembership.objects.create(store=store, user=owner, role=StoreMembership.ROLE_OWNER)
         return store
 
 
@@ -395,6 +488,13 @@ class SaleOrder(models.Model):
         ("cash", "Cash"),
     ]
 
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="orders",
+        default=get_default_store_id,
+        help_text="Tenant that received this order (Etapa 2 of the multi-tenant evolution).",
+    )
     order_reference = models.CharField(max_length=32, unique=True, db_index=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED)
 

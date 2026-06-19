@@ -685,8 +685,14 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertTrue(self.product.is_available)
 
     def test_checkout_uses_dashboard_whatsapp_before_env_fallback(self) -> None:
-        """Checkout should redirect to the WhatsApp configured in the dashboard."""
-        StoreSettings.objects.create(whatsapp_phone="5588999999999")
+        """Checkout should redirect to the WhatsApp configured for the store.
+
+        Etapa 3: CheckoutWhatsAppView reads `request.store.whatsapp_phone`,
+        not the StoreSettings singleton directly -- this is what
+        StoreSettingsView.patch() keeps in sync today (see
+        test_dashboard_user_can_update_store_whatsapp).
+        """
+        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5588999999999")
         payload = self._build_pickup_payload(
             [
                 {
