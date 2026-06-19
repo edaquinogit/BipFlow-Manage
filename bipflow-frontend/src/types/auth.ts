@@ -13,7 +13,7 @@ export interface CurrentUser {
   can_access_dashboard: boolean;
   can_manage_catalog: boolean;
 }
-export interface RegisterPayload { email: string; password: string; confirm_password: string; }
+export interface RegisterPayload { email: string; password: string; confirm_password: string; store_name: string; }
 export interface RegisterResponse { message: string; email: string; }
 export interface RequestResetPayload { email: string; }
 export interface RequestResetResponse { message: string; email: string; }

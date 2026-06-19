@@ -1,11 +1,13 @@
 import { computed, ref } from "vue";
 import type { Store } from "@/types/store";
+import { authService } from "@/services/auth.service";
 import { storeService } from "@/services/store.service";
 import { getSelectedStoreSlug, setSelectedStoreSlug } from "@/services/store-scope";
 import { buildStoreBranding } from "@/composables/useStoreBranding";
 
-// Singleton compartilhado pelo dashboard. Hoje o backend resolve a loja default;
-// quando a API listar memberships, `stores` vira a lista real sem mudar o header.
+// Singleton compartilhado pelo dashboard e pelo catalogo publico. `getMine()`
+// (Etapa 4: a lista real de lojas do usuario) so e' chamado quando autenticado
+// -- visitantes anonimos do catalogo nunca devem bater nesse endpoint.
 const store = ref<Store | null>(null);
 const stores = ref<Store[]>([]);
 const selectedStoreSlug = ref<string | null>(getSelectedStoreSlug());
@@ -47,6 +49,18 @@ export function useCurrentStore() {
       selectedStoreSlug.value = resolvedStore.slug;
       setSelectedStoreSlug(resolvedStore.slug);
       lastFetched.value = Date.now();
+
+      if (authService.isAuthenticated()) {
+        try {
+          const myStores = await storeService.getMine();
+          if (myStores.length) {
+            stores.value = myStores;
+          }
+        } catch (err) {
+          // Non-fatal: the dashboard still works with just the resolved
+          // store, same as before the switcher existed.
+        }
+      }
     } catch (err) {
       error.value = "Nao foi possivel carregar a loja atual.";
     } finally {

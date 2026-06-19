@@ -1,30 +1,36 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
+  BuildingStorefrontIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   ClockIcon,
   ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
   PencilSquareIcon,
   PhoneIcon,
   PlusIcon,
   ShoppingBagIcon,
+  TagIcon,
   TrashIcon,
   TruckIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import type { Category, CategoryCreatePayload } from '@/schemas/category.schema'
 import type { Product } from '@/schemas/product.schema'
 import { buildStoreBranding } from '@/composables/useStoreBranding'
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery'
-import type { SaleOrder, SaleOrderStatus } from '@/types/sales'
+import type { SaleOrder, SaleOrderFilters, SaleOrderStatus } from '@/types/sales'
 import type { Store } from '@/types/store'
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings'
+import { useDebounceFn } from '@/utils/debounce'
 import { formatBRL } from '@/utils/formatters'
 
 const props = defineProps<{
   isOpen: boolean
+  canManageCatalog: boolean
   activeStore: Store | null
   recentSales: SaleOrder[]
   isSalesLoading: boolean
@@ -39,6 +45,13 @@ const props = defineProps<{
   isStoreSettingsLoading: boolean
   storeSettingsError: string | null
   isSavingStoreSettings: boolean
+  categories: Category[]
+  isCategoriesLoading: boolean
+  categoriesError: string | null
+  isSavingCategory: boolean
+  deletingCategoryId: number | null
+  isCreatingStore: boolean
+  createStoreError: string | null
   outOfStockProducts: Product[]
   lowStockProducts: Product[]
 }>()
@@ -54,9 +67,18 @@ const emit = defineEmits<{
   deleteDeliveryRegion: [id: number]
   saveStoreSettings: [payload: StoreSettingsPayload]
   updateSaleStatus: [id: number, status: SaleOrderStatus]
+  saveCategory: [payload: CategoryCreatePayload]
+  deleteCategory: [id: number]
+  filterSales: [filters: Omit<SaleOrderFilters, 'pageSize'>]
+  createStore: [name: string]
 }>()
 
-const activeView = ref<'overview' | 'delivery' | 'store'>('overview')
+const activeView = ref<'overview' | 'delivery' | 'store' | 'categories' | 'newStore'>('overview')
+const newStoreName = ref('')
+const categoryDraft = ref<CategoryCreatePayload>({
+  name: '',
+  description: '',
+})
 const editingRegionId = ref<number | null>(null)
 const regionDraft = ref<DeliveryRegionPayload>({
   name: '',
@@ -68,6 +90,8 @@ const regionDraft = ref<DeliveryRegionPayload>({
 const storeSettingsDraft = ref<StoreSettingsPayload>({
   whatsapp_phone: '',
 })
+const salesSearchTerm = ref('')
+const salesStatusFilter = ref<'all' | SaleOrderStatus>('all')
 const saleStatusOptions: { value: SaleOrderStatus; label: string }[] = [
   { value: 'prepared', label: 'Novo' },
   { value: 'sent', label: 'Enviado' },
@@ -77,6 +101,9 @@ const saleTimelineSteps: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: 
   { value: 'prepared', label: 'Novo' },
   { value: 'sent', label: 'Enviado' },
 ]
+const hasActiveSalesFilters = computed(() => (
+  salesSearchTerm.value.trim() !== '' || salesStatusFilter.value !== 'all'
+))
 const activeBranding = computed(() => buildStoreBranding(props.activeStore))
 const activeStoreSlug = computed(() => activeBranding.value.slug ? `/${activeBranding.value.slug}` : '')
 
@@ -113,6 +140,45 @@ watch(
   { immediate: true }
 )
 
+function buildSalesFilters(): Omit<SaleOrderFilters, 'pageSize'> {
+  return {
+    search: salesSearchTerm.value.trim() || undefined,
+    status: salesStatusFilter.value === 'all' ? undefined : salesStatusFilter.value,
+  }
+}
+
+const [emitSalesFiltersDebounced, cancelSalesFiltersDebounce] = useDebounceFn(() => {
+  emit('filterSales', buildSalesFilters())
+}, 320)
+
+watch(salesSearchTerm, () => {
+  emitSalesFiltersDebounced()
+})
+
+watch(salesStatusFilter, () => {
+  cancelSalesFiltersDebounce()
+  emit('filterSales', buildSalesFilters())
+})
+
+onBeforeUnmount(() => {
+  cancelSalesFiltersDebounce()
+})
+
+function openNewStore(): void {
+  activeView.value = 'newStore'
+  newStoreName.value = ''
+}
+
+function submitNewStore(): void {
+  const name = newStoreName.value.trim()
+
+  if (name.length < 2) {
+    return
+  }
+
+  emit('createStore', name)
+}
+
 function resetRegionDraft(): void {
   editingRegionId.value = null
   regionDraft.value = {
@@ -131,6 +197,29 @@ function openDeliveryPricing(): void {
 function openStoreSettings(): void {
   activeView.value = 'store'
   resetRegionDraft()
+}
+
+function resetCategoryDraft(): void {
+  categoryDraft.value = { name: '', description: '' }
+}
+
+function openCategories(): void {
+  activeView.value = 'categories'
+  resetRegionDraft()
+}
+
+function submitCategory(): void {
+  const name = categoryDraft.value.name.trim()
+
+  if (name.length < 2) {
+    return
+  }
+
+  emit('saveCategory', {
+    name,
+    description: categoryDraft.value.description?.trim() ?? '',
+  })
+  resetCategoryDraft()
 }
 
 function openOverview(): void {
@@ -299,6 +388,7 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
         <div class="flex-1 overflow-y-auto px-6 py-6">
           <section class="grid grid-cols-2 gap-3">
             <button
+              v-if="canManageCatalog"
               type="button"
               class="rounded-lg border border-rose-500/25 bg-rose-500/10 p-4 text-left transition hover:border-rose-400/50 hover:bg-rose-500/15"
               @click="$emit('createProduct')"
@@ -317,6 +407,17 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
               <ShoppingBagIcon class="h-5 w-5 text-zinc-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
                 Produtos
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
+              @click="openCategories"
+            >
+              <TagIcon class="h-5 w-5 text-rose-300" />
+              <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
+                Categorias
               </span>
             </button>
 
@@ -364,6 +465,17 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
               </span>
             </button>
 
+            <button
+              type="button"
+              class="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
+              @click="openNewStore"
+            >
+              <BuildingStorefrontIcon class="h-5 w-5 text-rose-300" />
+              <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
+                Nova loja
+              </span>
+            </button>
+
             <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4">
               <ExclamationTriangleIcon class="h-5 w-5 text-amber-300" />
               <span class="mt-4 block text-xs font-black uppercase tracking-widest text-white">
@@ -386,6 +498,36 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
               <ChartBarIcon class="h-5 w-5 text-emerald-300" />
             </div>
 
+            <div class="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px]">
+              <label class="relative block">
+                <span class="sr-only">Buscar pedido</span>
+                <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  v-model="salesSearchTerm"
+                  type="search"
+                  class="h-10 w-full rounded-lg border border-zinc-800 bg-zinc-950 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                  placeholder="Cliente, telefone ou referencia"
+                />
+              </label>
+
+              <label class="block">
+                <span class="sr-only">Filtrar por status</span>
+                <select
+                  v-model="salesStatusFilter"
+                  class="h-10 w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-white outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                >
+                  <option value="all">Todos status</option>
+                  <option
+                    v-for="option in saleStatusOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+            </div>
+
             <div class="mt-4 space-y-3">
               <div v-if="isSalesLoading" class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                 <div class="h-4 w-32 animate-pulse rounded bg-zinc-800" />
@@ -398,10 +540,14 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
 
               <div v-else-if="recentSales.length === 0" class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                 <p class="text-sm font-semibold text-white">
-                  Nenhuma venda registrada ainda.
+                  {{ hasActiveSalesFilters ? 'Nenhum pedido encontrado.' : 'Nenhuma venda registrada ainda.' }}
                 </p>
                 <p class="mt-1 text-xs leading-5 text-zinc-500">
-                  Os pedidos finalizados pela vitrine aparecem aqui automaticamente.
+                  {{
+                    hasActiveSalesFilters
+                      ? 'Ajuste a busca ou o filtro de status.'
+                      : 'Os pedidos finalizados pela vitrine aparecem aqui automaticamente.'
+                  }}
                 </p>
               </div>
 
@@ -474,7 +620,7 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
                     >
                       {{ getSaleStatusLabel(sale.status) }}
                     </span>
-                    <label class="min-w-[148px]">
+                    <label v-if="canManageCatalog" class="min-w-[148px]">
                       <span class="sr-only">Atualizar status do pedido {{ sale.order_reference }}</span>
                       <select
                         :value="sale.status"
@@ -572,7 +718,7 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
               </button>
             </div>
 
-            <form class="mt-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitDeliveryRegion">
+            <form v-if="canManageCatalog" class="mt-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitDeliveryRegion">
               <label class="block">
                 <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Regiao</span>
                 <input
@@ -674,7 +820,7 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
                     {{ region.neighborhoods }}
                   </p>
 
-                  <div class="mt-4 flex gap-2">
+                  <div v-if="canManageCatalog" class="mt-4 flex gap-2">
                     <button
                       type="button"
                       class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-300 transition hover:border-white/20 hover:text-white"
@@ -698,7 +844,102 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
             </div>
           </section>
 
-          <section v-else class="mt-8">
+          <section v-else-if="activeView === 'categories'" class="mt-8">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
+                  Catalogo
+                </p>
+                <h3 class="mt-1 text-sm font-black uppercase tracking-widest text-white">
+                  Categorias de produto
+                </h3>
+              </div>
+              <button
+                type="button"
+                class="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:text-white"
+                @click="openOverview"
+              >
+                Voltar
+              </button>
+            </div>
+
+            <form v-if="canManageCatalog" class="mt-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitCategory">
+              <label class="block">
+                <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Nome</span>
+                <input
+                  v-model="categoryDraft.name"
+                  type="text"
+                  class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                  placeholder="Bebidas, Combos, Acessorios..."
+                />
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Descricao (opcional)</span>
+                <textarea
+                  v-model="categoryDraft.description"
+                  rows="2"
+                  class="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                  placeholder="Contexto rapido para a equipe"
+                />
+              </label>
+
+              <button
+                type="submit"
+                :disabled="isSavingCategory || categoryDraft.name.trim().length < 2"
+                class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+              >
+                {{ isSavingCategory ? 'Salvando...' : 'Adicionar categoria' }}
+              </button>
+            </form>
+
+            <div class="mt-5 space-y-3">
+              <div v-if="isCategoriesLoading" class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <div class="h-4 w-40 animate-pulse rounded bg-zinc-800" />
+                <div class="mt-3 h-3 w-56 animate-pulse rounded bg-zinc-800" />
+              </div>
+
+              <div v-else-if="categoriesError" class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                {{ categoriesError }}
+              </div>
+
+              <div v-else-if="categories.length === 0" class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p class="text-sm font-semibold text-white">Nenhuma categoria cadastrada.</p>
+                <p class="mt-1 text-xs leading-5 text-zinc-500">
+                  Cadastre ao menos uma categoria para liberar o formulario de produtos.
+                </p>
+              </div>
+
+              <template v-else>
+                <article
+                  v-for="category in categories"
+                  :key="category.id"
+                  class="rounded-lg border border-white/10 bg-white/[0.03] p-4"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-bold text-white">{{ category.name }}</p>
+                      <p v-if="category.description" class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">
+                        {{ category.description }}
+                      </p>
+                    </div>
+                    <button
+                      v-if="canManageCatalog"
+                      type="button"
+                      class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-200 transition hover:border-rose-400/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="deletingCategoryId === category.id"
+                      @click="$emit('deleteCategory', category.id)"
+                    >
+                      <TrashIcon class="h-4 w-4" />
+                      {{ deletingCategoryId === category.id ? 'Removendo' : 'Remover' }}
+                    </button>
+                  </div>
+                </article>
+              </template>
+            </div>
+          </section>
+
+          <section v-else-if="activeView === 'store'" class="mt-8">
             <div class="flex items-start justify-between gap-4">
               <div>
                 <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
@@ -726,7 +967,28 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
               {{ storeSettingsError }}
             </div>
 
-            <form class="mt-4 space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitStoreSettings">
+            <div class="mt-4 rounded-lg border border-white/10 bg-zinc-950 p-3">
+              <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                Destino atual
+              </p>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <p class="min-w-0 truncate text-sm font-bold text-white">
+                  {{ storeSettings?.is_whatsapp_configured ? storeSettings.whatsapp_phone_digits : 'Nao configurado' }}
+                </p>
+                <a
+                  v-if="storeWhatsappTestUrl"
+                  :href="storeWhatsappTestUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-200 transition hover:bg-emerald-400/15"
+                  aria-label="Abrir WhatsApp configurado"
+                >
+                  <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+
+            <form v-if="canManageCatalog" class="mt-4 space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitStoreSettings">
               <label class="block">
                 <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Numero da loja</span>
                 <input
@@ -743,33 +1005,60 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
                 {{ storeWhatsappValidationMessage }}
               </p>
 
-              <div class="rounded-lg border border-white/10 bg-zinc-950 p-3">
-                <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                  Destino atual
-                </p>
-                <div class="mt-2 flex items-center justify-between gap-3">
-                  <p class="min-w-0 truncate text-sm font-bold text-white">
-                    {{ storeSettings?.is_whatsapp_configured ? storeSettings.whatsapp_phone_digits : 'Nao configurado' }}
-                  </p>
-                  <a
-                    v-if="storeWhatsappTestUrl"
-                    :href="storeWhatsappTestUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-200 transition hover:bg-emerald-400/15"
-                    aria-label="Abrir WhatsApp configurado"
-                  >
-                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
-                  </a>
-                </div>
-              </div>
-
               <button
                 type="submit"
                 :disabled="!canSaveStoreSettings"
                 class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
                 {{ isSavingStoreSettings ? 'Salvando...' : 'Salvar WhatsApp' }}
+              </button>
+            </form>
+          </section>
+
+          <section v-else-if="activeView === 'newStore'" class="mt-8">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">
+                  Multi-loja
+                </p>
+                <h3 class="mt-1 text-sm font-black uppercase tracking-widest text-white">
+                  Nova loja
+                </h3>
+              </div>
+              <button
+                type="button"
+                class="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:text-white"
+                @click="openOverview"
+              >
+                Voltar
+              </button>
+            </div>
+
+            <p class="mt-4 text-xs leading-5 text-zinc-500">
+              Voce passa a ser dona/dono dessa loja e pode trocar entre as suas lojas pelo seletor no topo.
+            </p>
+
+            <form class="mt-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitNewStore">
+              <label class="block">
+                <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Nome da loja</span>
+                <input
+                  v-model="newStoreName"
+                  type="text"
+                  class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                  placeholder="Ex.: Filial Centro"
+                />
+              </label>
+
+              <p v-if="createStoreError" class="text-xs font-semibold text-rose-300">
+                {{ createStoreError }}
+              </p>
+
+              <button
+                type="submit"
+                :disabled="isCreatingStore || newStoreName.trim().length < 2"
+                class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+              >
+                {{ isCreatingStore ? 'Criando...' : 'Criar loja' }}
               </button>
             </form>
           </section>

@@ -13,6 +13,7 @@ import { useProducts } from "../useProducts";
 import ProductService from "../../services/product.service";
 import { useToast } from "../../composables/useToast";
 import { Logger } from "../../services/logger";
+import { formatBRL } from "../../utils/formatters";
 
 // Mock service dependencies
 vi.mock("../../services/product.service");
@@ -158,8 +159,9 @@ describe("useProducts Composable", () => {
         { id: 3, name: "Product C", price: "25.50", stock_quantity: 1 } as any,
       ];
 
-      // Expected: (100 * 2) + (50 * 5) + (25.50 * 1) = 475.50 → "$476" (formatted)
-      expect(totalRevenue.value).toBe("$476");
+      // Expected: (100 * 2) + (50 * 5) + (25.50 * 1) = 475.50, formatted as BRL
+      // (matches storefront pricing locale, not the dashboard's previous USD bug)
+      expect(totalRevenue.value).toBe(formatBRL(475.5));
     });
 
     /**
@@ -172,7 +174,7 @@ describe("useProducts Composable", () => {
 
       products.value = [];
 
-      expect(totalRevenue.value).toBe("$0");
+      expect(totalRevenue.value).toBe(formatBRL(0));
     });
   });
 

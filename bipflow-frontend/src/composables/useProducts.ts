@@ -7,6 +7,7 @@ import {
 import type { Product } from "../schemas/product.schema";
 import ProductService from "../services/product.service";
 import { Logger } from "../services/logger";
+import { formatBRL } from "../utils/formatters";
 import { useToast } from "./useToast";
 import {
   isAxiosError,
@@ -208,11 +209,7 @@ export function useProducts() {
       return acc + price * _getStockValue(product);
     }, 0);
 
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(total);
+    return formatBRL(total);
   });
 
   /**

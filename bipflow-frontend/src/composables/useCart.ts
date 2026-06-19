@@ -1,8 +1,19 @@
 import { computed, ref, watch } from 'vue'
 import type { CartCustomer, CartItem, Product } from '@/types/product'
+import { getSelectedStoreSlug } from '@/services/store-scope'
 
-const CART_ITEMS_STORAGE_KEY = 'bipflow_public_cart_items'
-const CART_CUSTOMER_STORAGE_KEY = 'bipflow_public_cart_customer'
+// Etapa 3 of the multi-tenant evolution: the cart key is scoped per store so
+// a delivery region or item picked while browsing one storefront never
+// bleeds into another's. Pre-Etapa-3 carts lived under these flat keys;
+// migrateLegacyCart() moves that data into the first resolved per-store key
+// on read, once, so existing shoppers do not lose an in-progress cart.
+const LEGACY_ITEMS_STORAGE_KEY = 'bipflow_public_cart_items'
+const LEGACY_CUSTOMER_STORAGE_KEY = 'bipflow_public_cart_customer'
+
+function storeScopedStorageKey(suffix: 'items' | 'customer'): string {
+  const slug = getSelectedStoreSlug() || 'default'
+  return `bipflow_cart_${slug}_${suffix}`
+}
 
 const defaultCustomer: CartCustomer = {
   fullName: '',
@@ -37,14 +48,42 @@ function parsePrice(price: string | number): number {
   return Number.isFinite(numericPrice) ? numericPrice : 0
 }
 
+function migrateLegacyCartOnce(itemsKey: string, customerKey: string): void {
+  const hasLegacyItems = window.localStorage.getItem(LEGACY_ITEMS_STORAGE_KEY) !== null
+  const hasLegacyCustomer = window.localStorage.getItem(LEGACY_CUSTOMER_STORAGE_KEY) !== null
+
+  if (!hasLegacyItems && !hasLegacyCustomer) {
+    return
+  }
+
+  if (hasLegacyItems && window.localStorage.getItem(itemsKey) === null) {
+    window.localStorage.setItem(itemsKey, window.localStorage.getItem(LEGACY_ITEMS_STORAGE_KEY)!)
+  }
+
+  if (hasLegacyCustomer && window.localStorage.getItem(customerKey) === null) {
+    window.localStorage.setItem(
+      customerKey,
+      window.localStorage.getItem(LEGACY_CUSTOMER_STORAGE_KEY)!
+    )
+  }
+
+  window.localStorage.removeItem(LEGACY_ITEMS_STORAGE_KEY)
+  window.localStorage.removeItem(LEGACY_CUSTOMER_STORAGE_KEY)
+}
+
 function loadPersistedState(): void {
   if (!canUseBrowserStorage() || hasHydrated.value) {
     return
   }
 
+  const itemsKey = storeScopedStorageKey('items')
+  const customerKey = storeScopedStorageKey('customer')
+
+  migrateLegacyCartOnce(itemsKey, customerKey)
+
   try {
-    const storedItems = window.localStorage.getItem(CART_ITEMS_STORAGE_KEY)
-    const storedCustomer = window.localStorage.getItem(CART_CUSTOMER_STORAGE_KEY)
+    const storedItems = window.localStorage.getItem(itemsKey)
+    const storedCustomer = window.localStorage.getItem(customerKey)
 
     if (storedItems) {
       const parsedItems = JSON.parse(storedItems) as CartItem[]
@@ -73,7 +112,7 @@ watch(
       return
     }
 
-    window.localStorage.setItem(CART_ITEMS_STORAGE_KEY, JSON.stringify(nextItems))
+    window.localStorage.setItem(storeScopedStorageKey('items'), JSON.stringify(nextItems))
   },
   { deep: true }
 )
@@ -86,7 +125,7 @@ watch(
     }
 
     window.localStorage.setItem(
-      CART_CUSTOMER_STORAGE_KEY,
+      storeScopedStorageKey('customer'),
       JSON.stringify(nextCustomer)
     )
   },

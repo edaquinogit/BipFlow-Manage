@@ -20,6 +20,7 @@ defineProps<{
   activeStore?: Store | null;
   isSearching?: boolean;
   categories?: Category[];
+  canManageCatalog?: boolean;
   selectedAssetIds?: Set<number>;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
@@ -57,6 +58,7 @@ defineEmits<{
       </div>
 
       <button
+        v-if="canManageCatalog"
         data-cy="btn-add-product"
         @click="$emit('open-panel')"
         class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white shadow-xl shadow-rose-950/20 transition-all hover:bg-rose-500 active:scale-[0.98]"
@@ -95,6 +97,7 @@ defineEmits<{
       v-else
       :products="products"
       :active-store="activeStore"
+      :can-manage-catalog="canManageCatalog"
       :selected-asset-ids="selectedAssetIds"
       :is-all-selected="isAllSelected"
       :is-indeterminate="isIndeterminate"

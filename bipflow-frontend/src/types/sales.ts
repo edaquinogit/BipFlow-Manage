@@ -36,3 +36,9 @@ export interface PaginatedSalesOrdersResponse {
   total_pages: number
   results: SaleOrder[]
 }
+
+export interface SaleOrderFilters {
+  status?: SaleOrderStatus
+  search?: string
+  pageSize?: number
+}

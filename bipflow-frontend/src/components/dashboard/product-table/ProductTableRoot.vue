@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
   products: Product[];
   isLoading?: boolean;
   activeStore?: Store | null;
+  canManageCatalog?: boolean;
   selectedAssetIds?: Set<number>;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<{
   products: () => [],
   isLoading: false,
   activeStore: null,
+  canManageCatalog: false,
   selectedAssetIds: () => new Set(),
   isAllSelected: false,
   isIndeterminate: false
@@ -67,6 +69,7 @@ const onDelete = (id: number) => {
           <tr class="bg-zinc-800/50 text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black border-b border-zinc-800">
             <th class="px-6 py-5">
               <button
+                v-if="props.canManageCatalog"
                 @click="emit('select-all')"
                 class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500/50 hover:border-rose-400"
                 :class="[
@@ -120,6 +123,7 @@ const onDelete = (id: number) => {
             v-for="product in props.products"
             :key="product.id || Math.random()"
             :product="product"
+            :can-manage-catalog="props.canManageCatalog"
             :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"
             @edit="onEdit"
             @delete="onDelete"

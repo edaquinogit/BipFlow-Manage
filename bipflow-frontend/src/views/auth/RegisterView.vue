@@ -14,6 +14,7 @@ const form = reactive({
   email: '',
   password: '',
   confirm_password: '',
+  store_name: '',
 })
 
 const passwordRules = computed(() => [
@@ -27,7 +28,9 @@ const passwordRules = computed(() => [
 ])
 
 const isFormReady = computed(() =>
-  Boolean(form.email.trim()) && passwordRules.value.every((rule) => rule.passed)
+  Boolean(form.email.trim())
+  && Boolean(form.store_name.trim())
+  && passwordRules.value.every((rule) => rule.passed)
 )
 
 const extractErrorMessage = (error: unknown) => {
@@ -51,7 +54,7 @@ const extractErrorMessage = (error: unknown) => {
 
 const handleRegister = async () => {
   if (!isFormReady.value) {
-    errorMessage.value = 'Preencha email, senha e confirmacao seguindo os criterios de seguranca.'
+    errorMessage.value = 'Preencha o nome da loja, email, senha e confirmacao seguindo os criterios de seguranca.'
     return
   }
 
@@ -64,6 +67,7 @@ const handleRegister = async () => {
       email: form.email.trim().toLowerCase(),
       password: form.password,
       confirm_password: form.confirm_password,
+      store_name: form.store_name.trim(),
     })
     successMessage.value = response.message
   } catch (error) {
@@ -96,10 +100,10 @@ const handleRegister = async () => {
               Novo acesso
             </p>
             <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Criar conta
+              Criar sua loja
             </h1>
             <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-400">
-              Configure uma credencial administrativa segura para acessar o BipFlow Manage.
+              Configure o nome da sua loja e uma credencial administrativa segura para acessar o BipFlow Manage.
             </p>
           </div>
 
@@ -124,6 +128,20 @@ const handleRegister = async () => {
           </div>
 
           <form v-if="!successMessage" @submit.prevent="handleRegister" class="space-y-5">
+            <div>
+              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Nome da loja
+              </label>
+              <input
+                v-model="form.store_name"
+                type="text"
+                autocomplete="organization"
+                placeholder="Ex.: Pizzaria do Joao"
+                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
+                required
+              />
+            </div>
+
             <div>
               <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Email

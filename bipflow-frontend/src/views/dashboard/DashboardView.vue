@@ -5,15 +5,17 @@ import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useToast } from '@/composables/useToast';
+import type { CategoryCreatePayload } from '@/schemas/category.schema';
 import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import type { FilterState } from '@/types/filters';
-import type { SaleOrder, SaleOrderStatus } from '@/types/sales';
+import type { SaleOrder, SaleOrderFilters, SaleOrderStatus } from '@/types/sales';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { authService } from '@/services/auth.service';
 import { deliveryRegionService } from '@/services/delivery-region.service';
 import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
+import { storeService } from '@/services/store.service';
 import { storeSettingsService } from '@/services/store-settings.service';
 
 // Layout & UI Components
@@ -42,6 +44,7 @@ const botPanelRef = ref<InstanceType<typeof BotConversationPanel> | null>(null);
 const assetIdToPurge = ref<number | null>(null);
 const selectedProduct = ref<Product | null>(null);
 const currentUserName = ref<string | null>(null);
+const canManageCatalog = ref(false);
 const recentSales = ref<SaleOrder[]>([]);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 const storeSettings = ref<StoreSettings | null>(null);
@@ -60,6 +63,8 @@ const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
 const isSavingDeliveryRegion = ref(false);
 const deletingDeliveryRegionId = ref<number | null>(null);
+const isSavingCategory = ref(false);
+const deletingCategoryId = ref<number | null>(null);
 const isStoreSettingsLoading = ref(false);
 const storeSettingsError = ref<string | null>(null);
 const isSavingStoreSettings = ref(false);
@@ -88,7 +93,14 @@ const {
   bulkUpdateCategory,
 } = useProducts();
 
-const { categories, fetchCategories } = useCategories();
+const {
+  categories,
+  loading: isCategoriesLoading,
+  error: categoriesError,
+  fetchCategories,
+  addCategory,
+  deleteCategory,
+} = useCategories();
 const {
   stores,
   selectedStore,
@@ -99,6 +111,8 @@ const {
   fetchCurrentStore,
   selectStore,
 } = useCurrentStore();
+const isCreatingStore = ref(false);
+const createStoreError = ref<string | null>(null);
 const { success, error: toastError } = useToast();
 const router = useRouter();
 
@@ -148,26 +162,33 @@ const fetchCurrentUser = async (): Promise<boolean> => {
     }
 
     currentUserName.value = currentUser.display_name || currentUser.email || currentUser.username;
+    canManageCatalog.value = currentUser.can_manage_catalog;
     return true;
   } catch (error: unknown) {
     Logger.warn('Failed to fetch dashboard user profile', { error });
     currentUserName.value = null;
+    canManageCatalog.value = false;
     return false;
   }
 };
 
-const fetchSalesHistory = async (): Promise<void> => {
+const fetchSalesHistory = async (filters: SaleOrderFilters = {}): Promise<void> => {
   isSalesLoading.value = true;
   salesError.value = null;
 
   try {
-    recentSales.value = await salesService.getRecent(5);
+    const response = await salesService.list({ pageSize: 5, ...filters });
+    recentSales.value = response.results;
   } catch (error: unknown) {
     Logger.warn('Failed to fetch dashboard sales history', { error });
     salesError.value = 'Nao foi possivel carregar o historico agora.';
   } finally {
     isSalesLoading.value = false;
   }
+};
+
+const handleFilterSales = (filters: SaleOrderFilters): void => {
+  void fetchSalesHistory(filters);
 };
 
 const fetchDeliveryRegions = async (): Promise<void> => {
@@ -264,6 +285,28 @@ const handleSelectStore = async (storeSlug: string): Promise<void> => {
   success('Loja ativa atualizada.');
 };
 
+const handleCreateStore = async (name: string): Promise<void> => {
+  isCreatingStore.value = true;
+  createStoreError.value = null;
+
+  try {
+    const newStore = await storeService.create(name);
+    await fetchCurrentStore(true);
+    selectStore(newStore.slug);
+    isDashboardMenuOpen.value = false;
+    selectedProduct.value = null;
+    isPanelOpen.value = false;
+
+    await refreshStoreScopedData();
+    success(`Loja "${newStore.name}" criada com sucesso.`);
+  } catch (error: unknown) {
+    Logger.error('Store creation failed', { error, name });
+    createStoreError.value = 'Nao foi possivel criar a loja. Tente novamente.';
+  } finally {
+    isCreatingStore.value = false;
+  }
+};
+
 const handleLogout = async (): Promise<void> => {
   isDashboardMenuOpen.value = false;
   authService.logout();
@@ -306,6 +349,34 @@ const handleDeleteDeliveryRegion = async (regionId: number): Promise<void> => {
     toastError('Nao foi possivel remover a regiao de frete.');
   } finally {
     deletingDeliveryRegionId.value = null;
+  }
+};
+
+const handleSaveCategory = async (payload: CategoryCreatePayload): Promise<void> => {
+  isSavingCategory.value = true;
+
+  try {
+    await addCategory(payload);
+    success('Categoria criada com sucesso.');
+  } catch (error: unknown) {
+    Logger.error('Category save failed', { error });
+    toastError('Nao foi possivel salvar a categoria.');
+  } finally {
+    isSavingCategory.value = false;
+  }
+};
+
+const handleDeleteCategory = async (categoryId: number): Promise<void> => {
+  deletingCategoryId.value = categoryId;
+
+  try {
+    await deleteCategory(categoryId);
+    success('Categoria removida com sucesso.');
+  } catch (error: unknown) {
+    Logger.error('Category deletion failed', { error, categoryId });
+    toastError('Nao foi possivel remover a categoria. Verifique se ela possui produtos vinculados.');
+  } finally {
+    deletingCategoryId.value = null;
   }
 };
 
@@ -514,6 +585,7 @@ onMounted(async () => {
           :active-store="selectedStore"
           :is-searching="isSearching"
           :categories="categories"
+          :can-manage-catalog="canManageCatalog"
           :selected-asset-ids="selectedAssetIds"
           :is-all-selected="isAllSelected"
           :is-indeterminate="isIndeterminate"
@@ -534,6 +606,7 @@ onMounted(async () => {
 
     <DashboardMenuDrawer
       :is-open="isDashboardMenuOpen"
+      :can-manage-catalog="canManageCatalog"
       :active-store="selectedStore"
       :recent-sales="recentSales"
       :is-sales-loading="isSalesLoading"
@@ -548,6 +621,13 @@ onMounted(async () => {
       :is-store-settings-loading="isStoreSettingsLoading"
       :store-settings-error="storeSettingsError"
       :is-saving-store-settings="isSavingStoreSettings"
+      :categories="categories"
+      :is-categories-loading="isCategoriesLoading"
+      :categories-error="categoriesError"
+      :is-saving-category="isSavingCategory"
+      :deleting-category-id="deletingCategoryId"
+      :is-creating-store="isCreatingStore"
+      :create-store-error="createStoreError"
       :out-of-stock-products="outOfStockProducts"
       :low-stock-products="lowStockProducts"
       @close="isDashboardMenuOpen = false"
@@ -560,6 +640,10 @@ onMounted(async () => {
       @delete-delivery-region="handleDeleteDeliveryRegion"
       @save-store-settings="handleSaveStoreSettings"
       @update-sale-status="handleUpdateSaleStatus"
+      @filter-sales="handleFilterSales"
+      @save-category="handleSaveCategory"
+      @delete-category="handleDeleteCategory"
+      @create-store="handleCreateStore"
     />
 
     <ProductForm

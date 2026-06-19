@@ -6,4 +6,16 @@ export const storeService = {
     const response = await api.get<Store>('v1/store/current/')
     return response.data
   },
+
+  /** Stores the authenticated user belongs to (Etapa 4 store switcher). */
+  async getMine(): Promise<Store[]> {
+    const response = await api.get<Store[]>('v1/store/mine/')
+    return response.data
+  },
+
+  /** Create an additional store owned by the authenticated user. */
+  async create(name: string): Promise<Store> {
+    const response = await api.post<Store>('v1/store/mine/', { name })
+    return response.data
+  },
 }
