@@ -9,7 +9,7 @@ import type { CategoryCreatePayload } from '@/schemas/category.schema';
 import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import type { FilterState } from '@/types/filters';
-import type { SaleOrder, SaleOrderFilters, SaleOrderStatus } from '@/types/sales';
+import type { SaleOrder, SaleOrderFilters, SaleOrderStatus, SaleOrderSummary } from '@/types/sales';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { authService } from '@/services/auth.service';
 import { deliveryRegionService } from '@/services/delivery-region.service';
@@ -17,6 +17,7 @@ import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
 import { storeService } from '@/services/store.service';
 import { storeSettingsService } from '@/services/store-settings.service';
+import { formatBRL } from '@/utils/formatters';
 
 // Layout & UI Components
 import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
@@ -46,6 +47,7 @@ const selectedProduct = ref<Product | null>(null);
 const currentUserName = ref<string | null>(null);
 const canManageCatalog = ref(false);
 const recentSales = ref<SaleOrder[]>([]);
+const salesSummary = ref<SaleOrderSummary | null>(null);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 const storeSettings = ref<StoreSettings | null>(null);
 
@@ -58,6 +60,7 @@ const isDeletingAction = ref(false);
 const isBulkUpdating = ref(false);
 const isSalesLoading = ref(false);
 const salesError = ref<string | null>(null);
+const isSalesSummaryLoading = ref(false);
 const updatingSaleOrderId = ref<number | null>(null);
 const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
@@ -83,7 +86,6 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
-  totalRevenue,
   inventoryStats,
   updateFilters,
   clearFilters,
@@ -133,6 +135,13 @@ const lowStockProducts = computed(() => (
     .sort((left, right) => getProductStockValue(left) - getProductStockValue(right))
     .slice(0, 5)
 ));
+
+const salesRevenueDisplay = computed(() => formatBRL(salesSummary.value?.revenue_total ?? 0));
+
+const salesRevenueComparison = computed(() => {
+  const comparison = salesSummary.value?.comparison_previous_period;
+  return comparison === null || comparison === undefined ? null : Number(comparison);
+});
 
 const activeStoreBadgeLabel = computed(() => (
   selectedStore.value ? storeBranding.value.name : 'Carregando loja'
@@ -189,6 +198,19 @@ const fetchSalesHistory = async (filters: SaleOrderFilters = {}): Promise<void> 
 
 const handleFilterSales = (filters: SaleOrderFilters): void => {
   void fetchSalesHistory(filters);
+};
+
+const fetchSalesSummary = async (): Promise<void> => {
+  isSalesSummaryLoading.value = true;
+
+  try {
+    salesSummary.value = await salesService.summary('30d');
+  } catch (error: unknown) {
+    Logger.warn('Failed to fetch dashboard sales summary', { error });
+    salesSummary.value = null;
+  } finally {
+    isSalesSummaryLoading.value = false;
+  }
 };
 
 const fetchDeliveryRegions = async (): Promise<void> => {
@@ -266,6 +288,7 @@ const refreshStoreScopedData = async (): Promise<void> => {
     fetchData(),
     fetchCategories(true),
     fetchSalesHistory(),
+    fetchSalesSummary(),
     fetchDeliveryRegions(),
     fetchStoreSettings()
   ]);
@@ -570,8 +593,9 @@ onMounted(async () => {
     <main class="max-w-7xl mx-auto px-6 py-12 space-y-16">
       <StatsGrid
         :stats="inventoryStats"
-        :revenue="totalRevenue"
-        :is-loading="productsLoading"
+        :revenue="salesRevenueDisplay"
+        :revenue-comparison="salesRevenueComparison"
+        :is-loading="productsLoading || isSalesSummaryLoading"
       />
 
       <BotConversationPanel ref="botPanelRef" />

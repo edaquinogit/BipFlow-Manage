@@ -1,26 +1,38 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { BanknotesIcon } from '@heroicons/vue/24/outline';
 
-defineProps<{
+const props = defineProps<{
   value: string | number;
+  comparison?: number | null;
 }>();
+
+const hasComparison = computed(() => props.comparison !== null && props.comparison !== undefined);
+const isPositiveComparison = computed(() => (props.comparison ?? 0) >= 0);
 </script>
 
 <template>
   <div class="revenue-card-root">
     <div class="relative z-10">
       <p class="text-[10px] font-black text-rose-100 uppercase tracking-[0.3em] mb-1 opacity-80">
-        Valor da vitrine
+        Receita de vendas (30 dias)
       </p>
       <h3 class="text-4xl font-black text-white italic tracking-tighter transition-all duration-700">
         {{ value }}
       </h3>
+      <p
+        v-if="hasComparison"
+        class="mt-2 text-xs font-bold"
+        :class="isPositiveComparison ? 'text-emerald-300' : 'text-rose-300'"
+      >
+        {{ isPositiveComparison ? '▲' : '▼' }} {{ Math.abs(comparison ?? 0).toFixed(1) }}% vs periodo anterior
+      </p>
     </div>
-    
-    <BanknotesIcon 
-      class="revenue-icon" 
+
+    <BanknotesIcon
+      class="revenue-icon"
     />
-    
+
     <div class="glass-overlay"></div>
   </div>
 </template>

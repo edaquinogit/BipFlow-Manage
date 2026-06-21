@@ -4,6 +4,8 @@ import type {
   SaleOrder,
   SaleOrderFilters,
   SaleOrderStatus,
+  SaleOrderSummary,
+  SaleOrderSummaryPeriod,
 } from '@/types/sales'
 
 export const salesService = {
@@ -27,6 +29,14 @@ export const salesService = {
   async updateStatus(orderId: number, status: SaleOrderStatus): Promise<SaleOrder> {
     const response = await api.patch<SaleOrder>(`v1/sales-orders/${orderId}/status/`, {
       status,
+    })
+
+    return response.data
+  },
+
+  async summary(period: SaleOrderSummaryPeriod = '30d'): Promise<SaleOrderSummary> {
+    const response = await api.get<SaleOrderSummary>('v1/sales-orders/summary/', {
+      params: { period },
     })
 
     return response.data

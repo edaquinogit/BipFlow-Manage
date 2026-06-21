@@ -16,6 +16,7 @@ interface InventoryStats {
 defineProps<{
   stats: InventoryStats | null;
   revenue: string | number;
+  revenueComparison?: number | null;
   isLoading: boolean;
 }>();
 </script>
@@ -42,7 +43,7 @@ defineProps<{
         color="orange"
       />
 
-      <RevenueCard :value="revenue" />
+      <RevenueCard :value="revenue" :comparison="revenueComparison ?? null" />
     </template>
 
   </section>

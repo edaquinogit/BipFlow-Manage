@@ -42,3 +42,13 @@ export interface SaleOrderFilters {
   search?: string
   pageSize?: number
 }
+
+export type SaleOrderSummaryPeriod = 'today' | '7d' | '30d' | 'month'
+
+export interface SaleOrderSummary {
+  period: SaleOrderSummaryPeriod
+  revenue_total: string
+  orders_count: number
+  average_ticket: string
+  comparison_previous_period: string | null
+}
