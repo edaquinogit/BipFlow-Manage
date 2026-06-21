@@ -814,6 +814,18 @@ class SaleOrderStatusUpdateSerializer(serializers.Serializer):
     )
 
 
+class SaleOrderSummarySerializer(serializers.Serializer):
+    """Aggregated real sales revenue for the dashboard's revenue card."""
+
+    period = serializers.CharField()
+    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    orders_count = serializers.IntegerField()
+    average_ticket = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    comparison_previous_period = serializers.DecimalField(
+        max_digits=6, decimal_places=2, allow_null=True
+    )
+
+
 class RegisterUserSerializer(serializers.Serializer):
     """Register a new active user account with password validation.
 

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -5,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -54,6 +55,7 @@ from .serializers import (
     RegisterUserSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
+    SaleOrderSummarySerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
@@ -362,6 +364,27 @@ class DeliveryRegionViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+def _resolve_summary_period(period: str) -> tuple:
+    """Return (start, previous_start) datetimes bounding a dashboard summary period."""
+    now = timezone.now()
+
+    if period == "month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if start.month == 1:
+            previous_start = start.replace(year=start.year - 1, month=12)
+        else:
+            previous_start = start.replace(month=start.month - 1)
+        return start, previous_start
+
+    days = {"today": 1, "7d": 7, "30d": 30}[period]
+    start = (
+        now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if period == "today"
+        else now - timedelta(days=days)
+    )
+    return start, start - timedelta(days=days)
+
+
 class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """Sales history for authenticated dashboard users, scoped to their store (Etapa 3)."""
 
@@ -404,6 +427,45 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             order.save(update_fields=["status", "updated_at"])
 
         return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """Aggregate real sales revenue for the dashboard's revenue card."""
+        period = request.query_params.get("period", "30d")
+        if period not in {"today", "7d", "30d", "month"}:
+            period = "30d"
+        start, previous_start = _resolve_summary_period(period)
+
+        orders = self.get_queryset().exclude(status="cancelled")
+        current = orders.filter(created_at__gte=start).aggregate(
+            revenue_total=Sum("total"), orders_count=Count("id")
+        )
+        revenue_total = current["revenue_total"] or Decimal("0.00")
+        orders_count = current["orders_count"] or 0
+        average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
+
+        previous_revenue = (
+            orders.filter(created_at__gte=previous_start, created_at__lt=start).aggregate(
+                revenue_total=Sum("total")
+            )["revenue_total"]
+            or Decimal("0.00")
+        )
+        comparison_previous_period = None
+        if previous_revenue:
+            comparison_previous_period = (
+                (revenue_total - previous_revenue) / previous_revenue * 100
+            ).quantize(Decimal("0.01"))
+
+        serializer = SaleOrderSummarySerializer(
+            {
+                "period": period,
+                "revenue_total": revenue_total,
+                "orders_count": orders_count,
+                "average_ticket": average_ticket,
+                "comparison_previous_period": comparison_previous_period,
+            }
+        )
+        return Response(serializer.data)
 
 
 class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):

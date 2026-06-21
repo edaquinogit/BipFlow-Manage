@@ -16,6 +16,7 @@ Run tests with:
 """
 
 import os
+from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -30,6 +31,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command, CommandError
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.utils import timezone
 from PIL import Image
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -1076,3 +1078,81 @@ class CheckoutWhatsAppAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("address", response.data.get("customer", {}))
+
+
+class SaleOrderSummaryAPITest(TestCase):
+    """Real sales revenue aggregation backing the dashboard's revenue card."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salessummary", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_order(self, total: Decimal, days_ago: int, order_status: str = "prepared") -> SaleOrder:
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=total,
+            delivery_fee=Decimal("0.00"),
+            total=total,
+            status=order_status,
+        )
+        SaleOrder.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def test_summary_aggregates_revenue_orders_and_average_ticket(self) -> None:
+        """Revenue, order count and average ticket should reflect real sales, not stock."""
+        self._make_order(Decimal("50.00"), days_ago=1)
+        self._make_order(Decimal("30.00"), days_ago=2)
+
+        response: Any = self.client.get("/api/v1/sales-orders/summary/?period=7d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["orders_count"], 2)
+        self.assertEqual(response.data["revenue_total"], "80.00")
+        self.assertEqual(response.data["average_ticket"], "40.00")
+
+    def test_summary_excludes_cancelled_orders(self) -> None:
+        """Cancelled orders never reached the customer and should not count as revenue."""
+        self._make_order(Decimal("50.00"), days_ago=1)
+        self._make_order(Decimal("999.00"), days_ago=1, order_status="cancelled")
+
+        response: Any = self.client.get("/api/v1/sales-orders/summary/?period=7d")
+
+        self.assertEqual(response.data["orders_count"], 1)
+        self.assertEqual(response.data["revenue_total"], "50.00")
+
+    def test_summary_compares_against_previous_period(self) -> None:
+        """The comparison field is a % change against the immediately preceding window."""
+        self._make_order(Decimal("100.00"), days_ago=1)
+        self._make_order(Decimal("50.00"), days_ago=10)
+
+        response: Any = self.client.get("/api/v1/sales-orders/summary/?period=7d")
+
+        self.assertEqual(response.data["revenue_total"], "100.00")
+        self.assertEqual(response.data["comparison_previous_period"], "100.00")
+
+    def test_summary_unknown_period_falls_back_to_30d(self) -> None:
+        """An invalid period query param should not error out the dashboard."""
+        response: Any = self.client.get("/api/v1/sales-orders/summary/?period=invalid")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "30d")
+
+    def test_summary_requires_dashboard_read_role(self) -> None:
+        """Registered users without a dashboard role should not see revenue data."""
+        viewer = User.objects.create_user(username="summaryregular", password="testpass123")
+        client = APIClient()
+        client.force_authenticate(user=viewer)
+
+        response: Any = client.get("/api/v1/sales-orders/summary/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

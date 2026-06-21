@@ -159,6 +159,13 @@ class DashboardSalesIsolationTest(TwoStoreFixtureMixin, TestCase):
         self.order_a.refresh_from_db()
         self.assertEqual(self.order_a.status, "prepared")
 
+    def test_summary_only_aggregates_the_authenticated_users_store(self) -> None:
+        response = self.client.get("/api/v1/sales-orders/summary/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["orders_count"], 1)
+        self.assertEqual(response.data["revenue_total"], "10.00")
+
 
 class DashboardCreateAssignsAuthenticatedStoreTest(TwoStoreFixtureMixin, TestCase):
     def test_creating_a_category_assigns_the_authenticated_users_store(self) -> None:
