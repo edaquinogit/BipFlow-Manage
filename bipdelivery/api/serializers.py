@@ -682,6 +682,7 @@ class CheckoutRequestSerializer(serializers.Serializer):
 
     items = CheckoutItemInputSerializer(many=True)
     customer = CheckoutCustomerInputSerializer()
+    bot_session_id = serializers.CharField(required=False, allow_blank=True, default="")
 
     @staticmethod
     def _submitted_text(data, field_name: str) -> str:
@@ -878,6 +879,17 @@ class SaleOrderBreakdownSerializer(serializers.Serializer):
     by_payment_method = PaymentMethodBreakdownSerializer(many=True)
     by_status = StatusBreakdownSerializer(many=True)
     by_region = RegionBreakdownSerializer(many=True)
+
+
+class SaleOrderCustomerInsightsSerializer(serializers.Serializer):
+    """Bot-to-sale conversion and new-vs-returning customer mix for the dashboard."""
+
+    period = serializers.CharField()
+    new_customers = serializers.IntegerField()
+    returning_customers = serializers.IntegerField()
+    bot_conversations_count = serializers.IntegerField()
+    bot_converted_count = serializers.IntegerField()
+    bot_conversion_rate = serializers.DecimalField(max_digits=6, decimal_places=2, allow_null=True)
 
 
 class RegisterUserSerializer(serializers.Serializer):

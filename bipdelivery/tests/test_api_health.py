@@ -41,6 +41,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
 from bipdelivery.api.models import (  # noqa: E402
+    BotConversation,
     Category,
     DeliveryRegion,
     Product,
@@ -693,6 +694,55 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 6)
         self.assertTrue(self.product.is_available)
+
+    def test_checkout_links_a_bot_conversation_to_the_resulting_order(self) -> None:
+        """A bot_session_id on checkout should mark that conversation as converted."""
+        bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        session_id = bot_response.data["session_id"]
+
+        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+        payload["bot_session_id"] = session_id
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        conversation = BotConversation.objects.get(session_id=session_id)
+        self.assertIsNotNone(conversation.sale_order)
+        self.assertEqual(conversation.sale_order.order_reference, response.data["order_reference"])
+
+    def test_checkout_without_a_bot_session_id_leaves_conversations_unlinked(self) -> None:
+        """Checkout should still work for customers who never used the bot."""
+        bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        session_id = bot_response.data["session_id"]
+
+        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        conversation = BotConversation.objects.get(session_id=session_id)
+        self.assertIsNone(conversation.sale_order)
+
+    def test_checkout_ignores_a_bot_session_id_from_another_store(self) -> None:
+        """A session id from a different tenant must never be linked across stores."""
+        other_store = Store.objects.create(name="Outra loja", slug="outra-loja-checkout")
+        bot_client = APIClient()
+        bot_response: Any = bot_client.post(
+            "/api/v1/bot/messages/",
+            {"message": "Oi"},
+            format="json",
+            HTTP_X_STORE_SLUG=other_store.slug,
+        )
+        session_id = bot_response.data["session_id"]
+
+        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+        payload["bot_session_id"] = session_id
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        conversation = BotConversation.objects.get(session_id=session_id)
+        self.assertIsNone(conversation.sale_order)
 
     def test_checkout_uses_dashboard_whatsapp_before_env_fallback(self) -> None:
         """Checkout should redirect to the WhatsApp configured for the store.
@@ -1508,3 +1558,88 @@ class SaleOrderCustomRangeAPITest(TestCase):
 
         self.assertEqual(first.data["revenue_total"], "40.00")
         self.assertEqual(second.data["revenue_total"], "0.00")
+
+
+class SaleOrderCustomerInsightsAPITest(TestCase):
+    """Bot-to-sale conversion rate and new-vs-returning customer mix."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salescustomers", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_order(self, customer_phone: str, days_ago: int = 0) -> SaleOrder:
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone=customer_phone,
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("10.00"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("10.00"),
+        )
+        SaleOrder.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def _make_conversation(self, days_ago: int = 0, converted: bool = False) -> BotConversation:
+        conversation = BotConversation.objects.create(store=Store.get_default())
+        if converted:
+            conversation.sale_order = self._make_order("71900000000", days_ago=days_ago)
+            conversation.save(update_fields=["sale_order"])
+        BotConversation.objects.filter(pk=conversation.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return conversation
+
+    def test_classifies_new_and_returning_customers_by_phone(self) -> None:
+        """A phone seen before the period started counts as returning, not new."""
+        self._make_order("71999990000", days_ago=40)
+        self._make_order("71999990000", days_ago=5)
+        self._make_order("71988880000", days_ago=3)
+
+        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["new_customers"], 1)
+        self.assertEqual(response.data["returning_customers"], 1)
+
+    def test_normalizes_phone_formatting_before_comparing(self) -> None:
+        """Different formatting of the same number should still match as one customer."""
+        self._make_order("(71) 99999-0000", days_ago=40)
+        self._make_order("71999990000", days_ago=5)
+
+        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.data["returning_customers"], 1)
+        self.assertEqual(response.data["new_customers"], 0)
+
+    def test_computes_bot_conversion_rate(self) -> None:
+        """Conversion rate is converted conversations over total conversations in the period."""
+        self._make_conversation(days_ago=5, converted=True)
+        self._make_conversation(days_ago=5, converted=False)
+
+        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.data["bot_conversations_count"], 2)
+        self.assertEqual(response.data["bot_converted_count"], 1)
+        self.assertEqual(response.data["bot_conversion_rate"], "50.00")
+
+    def test_conversion_rate_is_null_without_any_conversations(self) -> None:
+        """An empty denominator should not be reported as a misleading 0%."""
+        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.data["bot_conversations_count"], 0)
+        self.assertIsNone(response.data["bot_conversion_rate"])
+
+    def test_unknown_period_falls_back_to_30d(self) -> None:
+        """An invalid period query param should not error out the dashboard."""
+        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=invalid")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "30d")

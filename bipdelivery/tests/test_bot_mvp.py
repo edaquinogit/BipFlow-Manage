@@ -14,6 +14,7 @@ from bipdelivery.api.models import (
     Category,
     DeliveryRegion,
     Product,
+    Store,
     StoreSettings,
 )
 
@@ -345,3 +346,67 @@ class BotConversationDashboardAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["id"], first_conversation_id)
+
+
+class BotConversationStoreIsolationTest(TestCase):
+    """Etapa C: bot conversations belong to a tenant like every other business row."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+
+    def test_new_conversation_is_scoped_to_the_default_store_when_no_header_is_sent(self) -> None:
+        client = APIClient()
+        response: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+
+        conversation = BotConversation.objects.get(id=response.data["conversation_id"])
+        self.assertEqual(conversation.store_id, Store.get_default().id)
+
+    def test_new_conversation_is_scoped_to_the_store_named_by_the_header(self) -> None:
+        client = APIClient()
+        response: Any = client.post(
+            "/api/v1/bot/messages/",
+            {"message": "Oi"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        conversation = BotConversation.objects.get(id=response.data["conversation_id"])
+        self.assertEqual(conversation.store_id, self.store_b.id)
+
+    def test_continuing_a_session_from_another_store_starts_a_fresh_conversation(self) -> None:
+        """A session id from store A must never be resumed by a request resolved to store B."""
+        client = APIClient()
+        first: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+
+        second: Any = client.post(
+            "/api/v1/bot/messages/",
+            {"message": "Oi", "session_id": first.data["session_id"]},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        self.assertNotEqual(second.data["conversation_id"], first.data["conversation_id"])
+        self.assertEqual(BotConversation.objects.count(), 2)
+
+    def test_dashboard_user_only_sees_their_own_stores_conversations(self) -> None:
+        """The dashboard conversation list must never leak another store's history."""
+        client = APIClient()
+        client.post(
+            "/api/v1/bot/messages/",
+            {"message": "Oi"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+        own_conversation: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+
+        dashboard_user = User.objects.create_user(
+            username="dashboardbotisolation", password="testpass123", is_staff=True
+        )
+        client.force_authenticate(user=dashboard_user, token={"store_id": Store.get_default().id})
+
+        response: Any = client.get("/api/v1/bot-conversations/")
+
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(own_conversation.data["conversation_id"], ids)
+        self.assertEqual(response.data["count"], 1)

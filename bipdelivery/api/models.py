@@ -407,6 +407,13 @@ class BotConversation(models.Model):
         (STATUS_CLOSED, "Closed"),
     ]
 
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="bot_conversations",
+        default=get_default_store_id,
+        help_text="Tenant this conversation belongs to.",
+    )
     session_id = models.CharField(
         max_length=64,
         unique=True,
@@ -418,6 +425,14 @@ class BotConversation(models.Model):
     customer_phone = models.CharField(max_length=32, blank=True)
     status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_OPEN)
     last_intent = models.CharField(max_length=32, blank=True)
+    sale_order = models.ForeignKey(
+        "SaleOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bot_conversations",
+        help_text="The order this conversation converted into, if any.",
+    )
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)

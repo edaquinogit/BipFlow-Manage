@@ -30,6 +30,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from bipdelivery.api.models import (
+    BotConversation,
     Category,
     DeliveryRegion,
     Product,
@@ -181,6 +182,22 @@ class DashboardSalesIsolationTest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
         self.assertEqual(by_status, {"prepared": 1})
+
+    def test_customers_only_aggregates_the_authenticated_users_store(self) -> None:
+        response = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["new_customers"], 1)
+        self.assertEqual(response.data["returning_customers"], 0)
+
+    def test_customers_bot_conversion_only_counts_the_authenticated_users_store(self) -> None:
+        BotConversation.objects.create(store=self.store_a)
+        BotConversation.objects.create(store=self.store_b)
+
+        response = self.client.get("/api/v1/sales-orders/customers/?period=30d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["bot_conversations_count"], 1)
 
 
 class DashboardCreateAssignsAuthenticatedStoreTest(TwoStoreFixtureMixin, TestCase):

@@ -57,6 +57,7 @@ from .serializers import (
     PublicStoreSettingsSerializer,
     RegisterUserSerializer,
     SaleOrderBreakdownSerializer,
+    SaleOrderCustomerInsightsSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
     SaleOrderSummarySerializer,
@@ -755,8 +756,76 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         data = _cached_dashboard_aggregate("breakdown", store.id, window.cache_key, compute)
         return Response(data)
 
+    @action(detail=False, methods=["get"], url_path="customers")
+    def customers(self, request):
+        """Bot-to-sale conversion rate and new-vs-returning customer mix.
 
-class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):
+        Accepts either `?period=today|7d|30d|90d|month` or an explicit
+        `?start=YYYY-MM-DD&end=YYYY-MM-DD` custom range (the latter wins).
+        """
+        window = _resolve_period_window(request)
+        store = self.get_request_store()
+
+        def compute():
+            base_orders = self.get_queryset().exclude(status="cancelled")
+
+            period_orders = base_orders.filter(created_at__gte=window.start)
+            if window.end is not None:
+                period_orders = period_orders.filter(created_at__lt=window.end)
+
+            period_phones = {
+                normalized
+                for normalized in (
+                    StoreSettings.normalize_phone(phone)
+                    for phone in period_orders.values_list("customer_phone", flat=True)
+                )
+                if normalized
+            }
+            earlier_phones = {
+                normalized
+                for normalized in (
+                    StoreSettings.normalize_phone(phone)
+                    for phone in base_orders.filter(
+                        created_at__lt=window.start
+                    ).values_list("customer_phone", flat=True)
+                )
+                if normalized
+            }
+            returning_customers = len(period_phones & earlier_phones)
+            new_customers = len(period_phones) - returning_customers
+
+            conversations = BotConversation.objects.filter(
+                store=store, created_at__gte=window.start
+            )
+            if window.end is not None:
+                conversations = conversations.filter(created_at__lt=window.end)
+            bot_conversations_count = conversations.count()
+            bot_converted_count = conversations.filter(sale_order__isnull=False).count()
+            bot_conversion_rate = (
+                (Decimal(bot_converted_count) / Decimal(bot_conversations_count) * 100).quantize(
+                    Decimal("0.01")
+                )
+                if bot_conversations_count
+                else None
+            )
+
+            serializer = SaleOrderCustomerInsightsSerializer(
+                {
+                    "period": window.label,
+                    "new_customers": new_customers,
+                    "returning_customers": returning_customers,
+                    "bot_conversations_count": bot_conversations_count,
+                    "bot_converted_count": bot_converted_count,
+                    "bot_conversion_rate": bot_conversion_rate,
+                }
+            )
+            return serializer.data
+
+        data = _cached_dashboard_aggregate("customers", store.id, window.cache_key, compute)
+        return Response(data)
+
+
+class BotConversationViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """Read-only bot conversation history for authenticated dashboard users."""
 
     permission_classes = [IsAuthenticated, IsDashboardReadRole]
@@ -769,7 +838,7 @@ class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):
 
         return BotConversationSummarySerializer
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         """Return bot conversations with optional dashboard filters."""
         queryset = BotConversation.objects.annotate(message_count=Count("messages"))
 
@@ -904,7 +973,7 @@ class BotMessageView(APIView):
         return value
 
     @staticmethod
-    def _resolve_conversation(validated_data) -> BotConversation:
+    def _resolve_conversation(validated_data, store: Store) -> BotConversation:
         conversation_id = validated_data.get("conversation_id")
         session_id = validated_data.get("session_id", "").strip()
         channel = validated_data["channel"]
@@ -913,13 +982,14 @@ class BotMessageView(APIView):
         conversation = None
 
         if conversation_id:
-            conversation = BotConversation.objects.filter(id=conversation_id).first()
+            conversation = BotConversation.objects.filter(id=conversation_id, store=store).first()
 
         if conversation is None and session_id:
-            conversation = BotConversation.objects.filter(session_id=session_id).first()
+            conversation = BotConversation.objects.filter(session_id=session_id, store=store).first()
 
         if conversation is None:
             conversation = BotConversation.objects.create(
+                store=store,
                 channel=channel,
                 customer_phone=customer_phone,
             )
@@ -940,12 +1010,13 @@ class BotMessageView(APIView):
         return conversation
 
     def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
         input_serializer = BotMessageRequestSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
 
         validated_data = input_serializer.validated_data
         user_message = validated_data["message"]
-        conversation = self._resolve_conversation(validated_data)
+        conversation = self._resolve_conversation(validated_data, store)
         bot_reply = build_bot_reply(user_message)
 
         next_status = (
@@ -1237,6 +1308,12 @@ class CheckoutWhatsAppView(APIView):
                     for item in normalized_items
                 ]
             )
+
+            bot_session_id = validated_data.get("bot_session_id", "").strip()
+            if bot_session_id:
+                BotConversation.objects.filter(
+                    session_id=bot_session_id, store=store, sale_order__isnull=True
+                ).update(sale_order=sale_order)
 
             response_payload = {
                 "order_reference": order_reference,
