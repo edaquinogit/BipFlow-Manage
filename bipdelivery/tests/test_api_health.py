@@ -1331,3 +1331,56 @@ class SaleOrderBreakdownAPITest(TestCase):
         self.assertEqual(response.data["period"], "90d")
         by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
         self.assertEqual(by_status, {"prepared": 1})
+
+
+class SaleOrderAggregateCacheTest(TestCase):
+    """Dashboard aggregate endpoints cache briefly, scoped per store."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salescache", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_order(self, total: Decimal) -> SaleOrder:
+        return SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=total,
+            delivery_fee=Decimal("0.00"),
+            total=total,
+        )
+
+    def test_summary_response_is_cached_until_cleared(self) -> None:
+        """A second request within the TTL window must not recompute from a changed DB."""
+        self._make_order(Decimal("50.00"))
+        first: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(first.data["revenue_total"], "50.00")
+
+        self._make_order(Decimal("100.00"))
+        second: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(second.data["revenue_total"], "50.00")
+
+        cache.clear()
+        third: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(third.data["revenue_total"], "150.00")
+
+    def test_cached_summary_does_not_leak_across_stores(self) -> None:
+        """Two different stores must never share a cached aggregate, even by coincidence."""
+        self._make_order(Decimal("50.00"))
+        self.client.get("/api/v1/sales-orders/summary/?period=30d")
+
+        other_store = Store.objects.create(name="Outra Loja", slug="outra-loja")
+        other_user = User.objects.create_user(
+            username="salescacheother", password="testpass123", is_staff=True
+        )
+        other_client = APIClient()
+        other_client.force_authenticate(user=other_user, token={"store_id": other_store.id})
+
+        response: Any = other_client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(response.data["revenue_total"], "0.00")

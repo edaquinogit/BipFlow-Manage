@@ -4,6 +4,7 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Q, Sum
@@ -369,6 +370,25 @@ class DeliveryRegionViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
 
 VALID_SUMMARY_PERIODS = {"today", "7d", "30d", "90d", "month"}
 
+DASHBOARD_AGGREGATE_CACHE_SECONDS = 90
+
+
+def _cached_dashboard_aggregate(action_name: str, store_id: int, period: str, compute):
+    """Cache a dashboard aggregate response for a short TTL, keyed per store and period.
+
+    These aggregates are read-heavy and recomputed from scratch on every
+    request; a short TTL trades a little staleness for not re-running the
+    same query on every dashboard refresh/store-switch.
+    """
+    cache_key = f"dashboard:sales:{action_name}:{store_id}:{period}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    data = compute()
+    cache.set(cache_key, data, timeout=DASHBOARD_AGGREGATE_CACHE_SECONDS)
+    return data
+
 
 def _resolve_summary_period(period: str) -> tuple:
     """Return (start, previous_start) datetimes bounding a dashboard summary period.
@@ -451,38 +471,44 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         period = request.query_params.get("period", "30d")
         if period not in VALID_SUMMARY_PERIODS:
             period = "30d"
-        start, previous_start = _resolve_summary_period(period)
 
-        orders = self.get_queryset().exclude(status="cancelled")
-        current = orders.filter(created_at__gte=start).aggregate(
-            revenue_total=Sum("total"), orders_count=Count("id")
-        )
-        revenue_total = current["revenue_total"] or Decimal("0.00")
-        orders_count = current["orders_count"] or 0
-        average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
+        def compute():
+            start, previous_start = _resolve_summary_period(period)
 
-        previous_revenue = (
-            orders.filter(created_at__gte=previous_start, created_at__lt=start).aggregate(
-                revenue_total=Sum("total")
-            )["revenue_total"]
-            or Decimal("0.00")
-        )
-        comparison_previous_period = None
-        if previous_revenue:
-            comparison_previous_period = (
-                (revenue_total - previous_revenue) / previous_revenue * 100
-            ).quantize(Decimal("0.01"))
+            orders = self.get_queryset().exclude(status="cancelled")
+            current = orders.filter(created_at__gte=start).aggregate(
+                revenue_total=Sum("total"), orders_count=Count("id")
+            )
+            revenue_total = current["revenue_total"] or Decimal("0.00")
+            orders_count = current["orders_count"] or 0
+            average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
 
-        serializer = SaleOrderSummarySerializer(
-            {
-                "period": period,
-                "revenue_total": revenue_total,
-                "orders_count": orders_count,
-                "average_ticket": average_ticket,
-                "comparison_previous_period": comparison_previous_period,
-            }
-        )
-        return Response(serializer.data)
+            previous_revenue = (
+                orders.filter(created_at__gte=previous_start, created_at__lt=start).aggregate(
+                    revenue_total=Sum("total")
+                )["revenue_total"]
+                or Decimal("0.00")
+            )
+            comparison_previous_period = None
+            if previous_revenue:
+                comparison_previous_period = (
+                    (revenue_total - previous_revenue) / previous_revenue * 100
+                ).quantize(Decimal("0.01"))
+
+            serializer = SaleOrderSummarySerializer(
+                {
+                    "period": period,
+                    "revenue_total": revenue_total,
+                    "orders_count": orders_count,
+                    "average_ticket": average_ticket,
+                    "comparison_previous_period": comparison_previous_period,
+                }
+            )
+            return serializer.data
+
+        store_id = self.get_request_store().id
+        data = _cached_dashboard_aggregate("summary", store_id, period, compute)
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="timeseries")
     def timeseries(self, request):
@@ -493,35 +519,40 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             period = "30d"
         days = period_days[period]
 
-        current_timezone = timezone.get_current_timezone()
-        today_local = timezone.localtime(timezone.now()).date()
-        start_date = today_local - timedelta(days=days - 1)
-        start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
+        def compute():
+            current_timezone = timezone.get_current_timezone()
+            today_local = timezone.localtime(timezone.now()).date()
+            start_date = today_local - timedelta(days=days - 1)
+            start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
 
-        rows = (
-            self.get_queryset()
-            .exclude(status="cancelled")
-            .filter(created_at__gte=start)
-            .annotate(day=TruncDate("created_at"))
-            .values("day")
-            .annotate(revenue=Sum("total"), orders_count=Count("id"))
-        )
-        revenue_by_day = {row["day"]: row for row in rows}
-
-        points = []
-        for offset in range(days):
-            day = start_date + timedelta(days=offset)
-            row = revenue_by_day.get(day)
-            points.append(
-                {
-                    "date": day,
-                    "revenue": row["revenue"] if row else Decimal("0.00"),
-                    "orders_count": row["orders_count"] if row else 0,
-                }
+            rows = (
+                self.get_queryset()
+                .exclude(status="cancelled")
+                .filter(created_at__gte=start)
+                .annotate(day=TruncDate("created_at"))
+                .values("day")
+                .annotate(revenue=Sum("total"), orders_count=Count("id"))
             )
+            revenue_by_day = {row["day"]: row for row in rows}
 
-        serializer = SaleOrderTimeseriesPointSerializer(points, many=True)
-        return Response(serializer.data)
+            points = []
+            for offset in range(days):
+                day = start_date + timedelta(days=offset)
+                row = revenue_by_day.get(day)
+                points.append(
+                    {
+                        "date": day,
+                        "revenue": row["revenue"] if row else Decimal("0.00"),
+                        "orders_count": row["orders_count"] if row else 0,
+                    }
+                )
+
+            serializer = SaleOrderTimeseriesPointSerializer(points, many=True)
+            return serializer.data
+
+        store_id = self.get_request_store().id
+        data = _cached_dashboard_aggregate("timeseries", store_id, period, compute)
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="breakdown")
     def breakdown(self, request):
@@ -529,54 +560,60 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         period = request.query_params.get("period", "30d")
         if period not in VALID_SUMMARY_PERIODS:
             period = "30d"
-        start, _ = _resolve_summary_period(period)
+        store = self.get_request_store()
 
-        orders = self.get_queryset().filter(created_at__gte=start)
-        active_orders = orders.exclude(status="cancelled")
+        def compute():
+            start, _ = _resolve_summary_period(period)
 
-        top_products_rows = (
-            SaleOrderItem.objects.filter(order__store=self.get_request_store(), order__created_at__gte=start)
-            .exclude(order__status="cancelled")
-            .values("product_id", "product_name")
-            .annotate(quantity_total=Sum("quantity"), revenue_total=Sum("line_total"))
-            .order_by("-revenue_total")[:5]
-        )
+            orders = self.get_queryset().filter(created_at__gte=start)
+            active_orders = orders.exclude(status="cancelled")
 
-        product_ids = [row["product_id"] for row in top_products_rows if row["product_id"] is not None]
-        image_by_product_id = {
-            product.id: request.build_absolute_uri(product.image.url) if product.image else None
-            for product in Product.objects.filter(id__in=product_ids)
-        }
+            top_products_rows = (
+                SaleOrderItem.objects.filter(order__store=store, order__created_at__gte=start)
+                .exclude(order__status="cancelled")
+                .values("product_id", "product_name")
+                .annotate(quantity_total=Sum("quantity"), revenue_total=Sum("line_total"))
+                .order_by("-revenue_total")[:5]
+            )
 
-        top_products = [
-            {
-                "product_id": row["product_id"],
-                "product_name": row["product_name"],
-                "image_url": image_by_product_id.get(row["product_id"]),
-                "quantity_total": row["quantity_total"],
-                "revenue_total": row["revenue_total"] or Decimal("0.00"),
+            product_ids = [row["product_id"] for row in top_products_rows if row["product_id"] is not None]
+            image_by_product_id = {
+                product.id: request.build_absolute_uri(product.image.url) if product.image else None
+                for product in Product.objects.filter(id__in=product_ids)
             }
-            for row in top_products_rows
-        ]
 
-        by_payment_method = list(
-            active_orders.values("payment_method")
-            .annotate(revenue_total=Sum("total"), orders_count=Count("id"))
-            .order_by("-revenue_total")
-        )
-        by_status = list(
-            orders.values("status").annotate(orders_count=Count("id")).order_by("status")
-        )
+            top_products = [
+                {
+                    "product_id": row["product_id"],
+                    "product_name": row["product_name"],
+                    "image_url": image_by_product_id.get(row["product_id"]),
+                    "quantity_total": row["quantity_total"],
+                    "revenue_total": row["revenue_total"] or Decimal("0.00"),
+                }
+                for row in top_products_rows
+            ]
 
-        serializer = SaleOrderBreakdownSerializer(
-            {
-                "period": period,
-                "top_products": top_products,
-                "by_payment_method": by_payment_method,
-                "by_status": by_status,
-            }
-        )
-        return Response(serializer.data)
+            by_payment_method = list(
+                active_orders.values("payment_method")
+                .annotate(revenue_total=Sum("total"), orders_count=Count("id"))
+                .order_by("-revenue_total")
+            )
+            by_status = list(
+                orders.values("status").annotate(orders_count=Count("id")).order_by("status")
+            )
+
+            serializer = SaleOrderBreakdownSerializer(
+                {
+                    "period": period,
+                    "top_products": top_products,
+                    "by_payment_method": by_payment_method,
+                    "by_status": by_status,
+                }
+            )
+            return serializer.data
+
+        data = _cached_dashboard_aggregate("breakdown", store.id, period, compute)
+        return Response(data)
 
 
 class BotConversationViewSet(viewsets.ReadOnlyModelViewSet):

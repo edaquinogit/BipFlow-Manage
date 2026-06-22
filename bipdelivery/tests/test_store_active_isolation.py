@@ -24,6 +24,7 @@ other test in this suite, not a StoreMembership role.
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -59,6 +60,7 @@ class TwoStoreFixtureMixin:
 
     def setUp(self) -> None:
         super().setUp()
+        cache.clear()
         self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
 
