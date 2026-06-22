@@ -9,8 +9,14 @@ const props = defineProps<{
   points: SaleOrderTimeseriesPoint[];
   ordersCount: number;
   averageTicket: string;
+  comparisonSamePeriodLastYear?: string | null;
   isLoading: boolean;
 }>();
+
+const hasYoyComparison = computed(
+  () => props.comparisonSamePeriodLastYear !== null && props.comparisonSamePeriodLastYear !== undefined
+);
+const isPositiveYoyComparison = computed(() => Number(props.comparisonSamePeriodLastYear ?? 0) >= 0);
 
 const series = computed(() => [
   {
@@ -89,6 +95,18 @@ const chartOptions = computed(() => ({
           <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Ticket medio</p>
           <p class="text-xl font-black text-white">{{ formatBRL(averageTicket) }}</p>
         </div>
+        <template v-if="hasYoyComparison">
+          <div class="h-8 w-px bg-white/10" />
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Vs ano anterior</p>
+            <p
+              class="text-xl font-black"
+              :class="isPositiveYoyComparison ? 'text-emerald-300' : 'text-rose-300'"
+            >
+              {{ isPositiveYoyComparison ? '▲' : '▼' }} {{ Math.abs(Number(comparisonSamePeriodLastYear ?? 0)).toFixed(1) }}%
+            </p>
+          </div>
+        </template>
       </div>
     </div>
 

@@ -12,6 +12,7 @@ import type { FilterState } from '@/types/filters';
 import type {
   SaleOrder,
   SaleOrderBreakdown,
+  SaleOrderDateRange,
   SaleOrderFilters,
   SaleOrderStatus,
   SaleOrderSummary,
@@ -25,6 +26,7 @@ import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
 import { storeService } from '@/services/store.service';
 import { storeSettingsService } from '@/services/store-settings.service';
+import { downloadCsv } from '@/utils/csv';
 import { formatBRL } from '@/utils/formatters';
 
 // Layout & UI Components
@@ -57,7 +59,8 @@ const currentUserName = ref<string | null>(null);
 const canManageCatalog = ref(false);
 const recentSales = ref<SaleOrder[]>([]);
 const salesSummary = ref<SaleOrderSummary | null>(null);
-const salesAnalyticsPeriod = ref<SaleOrderTimeseriesPeriod>('30d');
+const salesAnalyticsPeriod = ref<SaleOrderTimeseriesPeriod | 'custom'>('30d');
+const salesAnalyticsCustomRange = ref<SaleOrderDateRange | null>(null);
 const salesAnalyticsSummary = ref<SaleOrderSummary | null>(null);
 const salesTimeseries = ref<SaleOrderTimeseriesPoint[]>([]);
 const salesBreakdown = ref<SaleOrderBreakdown | null>(null);
@@ -229,15 +232,24 @@ const fetchSalesSummary = async (): Promise<void> => {
   }
 };
 
-const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnalyticsPeriod.value): Promise<void> => {
+const resolveSalesAnalyticsQuery = (): SaleOrderTimeseriesPeriod | SaleOrderDateRange | null => {
+  if (salesAnalyticsPeriod.value === 'custom') {
+    return salesAnalyticsCustomRange.value;
+  }
+  return salesAnalyticsPeriod.value;
+};
+
+const fetchSalesAnalytics = async (
+  query: SaleOrderTimeseriesPeriod | SaleOrderDateRange
+): Promise<void> => {
   isSalesAnalyticsLoading.value = true;
   salesAnalyticsError.value = null;
 
   try {
     const [summaryResult, timeseriesResult, breakdownResult] = await Promise.all([
-      salesService.summary(period),
-      salesService.timeseries(period),
-      salesService.breakdown(period),
+      salesService.summary(query),
+      salesService.timeseries(query),
+      salesService.breakdown(query),
     ]);
     salesAnalyticsSummary.value = summaryResult;
     salesTimeseries.value = timeseriesResult;
@@ -251,13 +263,37 @@ const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnal
   }
 };
 
+const refreshSalesAnalytics = (): void => {
+  const query = resolveSalesAnalyticsQuery();
+  if (query === null) {
+    return;
+  }
+  void fetchSalesAnalytics(query);
+};
+
 const handleSalesAnalyticsPeriodChange = (period: string): void => {
-  salesAnalyticsPeriod.value = period as SaleOrderTimeseriesPeriod;
-  void fetchSalesAnalytics(salesAnalyticsPeriod.value);
+  salesAnalyticsPeriod.value = period as SaleOrderTimeseriesPeriod | 'custom';
+
+  if (period === 'custom') {
+    salesAnalyticsCustomRange.value = null;
+    return;
+  }
+
+  void fetchSalesAnalytics(salesAnalyticsPeriod.value as SaleOrderTimeseriesPeriod);
+};
+
+const handleSalesAnalyticsCustomRangeChange = (range: SaleOrderDateRange): void => {
+  salesAnalyticsCustomRange.value = range;
+  void fetchSalesAnalytics(range);
+};
+
+const handleExportSalesAnalyticsCsv = (): void => {
+  const rows = salesTimeseries.value.map((point) => [point.date, point.revenue, point.orders_count]);
+  downloadCsv(`vendas-${salesAnalyticsPeriod.value}.csv`, ['Data', 'Receita', 'Pedidos'], rows);
 };
 
 const handleRefreshSalesAnalytics = (): void => {
-  void fetchSalesAnalytics(salesAnalyticsPeriod.value);
+  refreshSalesAnalytics();
 };
 
 const fetchDeliveryRegions = async (): Promise<void> => {
@@ -331,12 +367,14 @@ const handleOpenStore = (): void => {
 const refreshStoreScopedData = async (): Promise<void> => {
   clearSelection();
 
+  const salesAnalyticsQuery = resolveSalesAnalyticsQuery();
+
   await Promise.allSettled([
     fetchData(),
     fetchCategories(true),
     fetchSalesHistory(),
     fetchSalesSummary(),
-    fetchSalesAnalytics(),
+    ...(salesAnalyticsQuery !== null ? [fetchSalesAnalytics(salesAnalyticsQuery)] : []),
     fetchDeliveryRegions(),
     fetchStoreSettings()
   ]);
@@ -652,11 +690,15 @@ onMounted(async () => {
         :breakdown="salesBreakdown"
         :orders-count="salesAnalyticsSummary?.orders_count ?? 0"
         :average-ticket="salesAnalyticsSummary?.average_ticket ?? '0.00'"
+        :comparison-same-period-last-year="salesAnalyticsSummary?.comparison_same_period_last_year ?? null"
+        :custom-range="salesAnalyticsCustomRange"
         :is-loading="isSalesAnalyticsLoading"
         :error="salesAnalyticsError"
         :updated-at="salesAnalyticsUpdatedAt"
         @update:period="handleSalesAnalyticsPeriodChange"
+        @update:custom-range="handleSalesAnalyticsCustomRangeChange"
         @refresh="handleRefreshSalesAnalytics"
+        @export="handleExportSalesAnalyticsCsv"
       />
 
       <BotConversationPanel ref="botPanelRef" />

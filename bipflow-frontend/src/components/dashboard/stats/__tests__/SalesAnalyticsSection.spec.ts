@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SalesAnalyticsSection from '../SalesAnalyticsSection.vue'
-import type { SaleOrderBreakdown, SaleOrderTimeseriesPoint } from '@/types/sales'
+import type { SaleOrderBreakdown, SaleOrderDateRange, SaleOrderTimeseriesPoint } from '@/types/sales'
 
 interface SalesAnalyticsSectionProps {
   period: string
@@ -9,6 +9,8 @@ interface SalesAnalyticsSectionProps {
   breakdown: SaleOrderBreakdown | null
   ordersCount: number
   averageTicket: string
+  comparisonSamePeriodLastYear: string | null
+  customRange: SaleOrderDateRange | null
   isLoading: boolean
   error: string | null
   updatedAt: Date | null
@@ -20,6 +22,8 @@ const baseProps: SalesAnalyticsSectionProps = {
   breakdown: null,
   ordersCount: 0,
   averageTicket: '0.00',
+  comparisonSamePeriodLastYear: null,
+  customRange: null,
   isLoading: false,
   error: null,
   updatedAt: null,
@@ -67,5 +71,34 @@ describe('SalesAnalyticsSection', () => {
     const wrapper = mountSection({ isLoading: true })
 
     expect(wrapper.find('button[aria-label="Atualizar analise de vendas"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('emits export when the CSV button is clicked', async () => {
+    const wrapper = mountSection()
+
+    const exportButton = wrapper.findAll('button').find((button) => button.text().includes('CSV'))
+    await exportButton!.trigger('click')
+
+    expect(wrapper.emitted('export')).toHaveLength(1)
+  })
+
+  it('hides the custom range inputs unless "custom" is the active period', () => {
+    const wrapper = mountSection({ period: '30d' })
+
+    expect(wrapper.find('input[type="date"]').exists()).toBe(false)
+  })
+
+  it('emits update:custom-range once both dates are filled in', async () => {
+    const wrapper = mountSection({ period: 'custom' })
+
+    const dateInputs = wrapper.findAll('input[type="date"]')
+    expect(dateInputs).toHaveLength(2)
+
+    await dateInputs[0]!.setValue('2026-06-01')
+    await dateInputs[1]!.setValue('2026-06-10')
+
+    expect(wrapper.emitted('update:custom-range')?.at(-1)).toEqual([
+      { start: '2026-06-01', end: '2026-06-10' },
+    ])
   })
 })

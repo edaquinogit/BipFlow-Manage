@@ -3,6 +3,7 @@ import type {
   PaginatedSalesOrdersResponse,
   SaleOrder,
   SaleOrderBreakdown,
+  SaleOrderDateRange,
   SaleOrderFilters,
   SaleOrderStatus,
   SaleOrderSummary,
@@ -10,6 +11,16 @@ import type {
   SaleOrderTimeseriesPeriod,
   SaleOrderTimeseriesPoint,
 } from '@/types/sales'
+
+const buildRangeParams = (
+  periodOrRange: SaleOrderSummaryPeriod | SaleOrderTimeseriesPeriod | SaleOrderDateRange
+): Record<string, string> => {
+  if (typeof periodOrRange === 'string') {
+    return { period: periodOrRange }
+  }
+
+  return { start: periodOrRange.start, end: periodOrRange.end }
+}
 
 export const salesService = {
   async list(filters: SaleOrderFilters = {}): Promise<PaginatedSalesOrdersResponse> {
@@ -37,25 +48,31 @@ export const salesService = {
     return response.data
   },
 
-  async summary(period: SaleOrderSummaryPeriod = '30d'): Promise<SaleOrderSummary> {
+  async summary(
+    periodOrRange: SaleOrderSummaryPeriod | SaleOrderDateRange = '30d'
+  ): Promise<SaleOrderSummary> {
     const response = await api.get<SaleOrderSummary>('v1/sales-orders/summary/', {
-      params: { period },
+      params: buildRangeParams(periodOrRange),
     })
 
     return response.data
   },
 
-  async timeseries(period: SaleOrderTimeseriesPeriod = '30d'): Promise<SaleOrderTimeseriesPoint[]> {
+  async timeseries(
+    periodOrRange: SaleOrderTimeseriesPeriod | SaleOrderDateRange = '30d'
+  ): Promise<SaleOrderTimeseriesPoint[]> {
     const response = await api.get<SaleOrderTimeseriesPoint[]>('v1/sales-orders/timeseries/', {
-      params: { period },
+      params: buildRangeParams(periodOrRange),
     })
 
     return response.data
   },
 
-  async breakdown(period: SaleOrderSummaryPeriod = '30d'): Promise<SaleOrderBreakdown> {
+  async breakdown(
+    periodOrRange: SaleOrderSummaryPeriod | SaleOrderDateRange = '30d'
+  ): Promise<SaleOrderBreakdown> {
     const response = await api.get<SaleOrderBreakdown>('v1/sales-orders/breakdown/', {
-      params: { period },
+      params: buildRangeParams(periodOrRange),
     })
 
     return response.data

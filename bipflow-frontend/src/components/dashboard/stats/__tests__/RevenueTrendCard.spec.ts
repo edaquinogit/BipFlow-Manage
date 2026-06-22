@@ -7,6 +7,7 @@ const mountCard = (props: {
   points: SaleOrderTimeseriesPoint[]
   ordersCount: number
   averageTicket: string
+  comparisonSamePeriodLastYear?: string | null
   isLoading: boolean
 }) =>
   mount(RevenueTrendCard, {
@@ -49,5 +50,24 @@ describe('RevenueTrendCard', () => {
     })
 
     expect(wrapper.find('[role="img"]').exists()).toBe(true)
+  })
+
+  it('hides the year-over-year chip when there is nothing to compare', () => {
+    const wrapper = mountCard({ points: [], ordersCount: 0, averageTicket: '0.00', isLoading: false })
+
+    expect(wrapper.text()).not.toContain('Vs ano anterior')
+  })
+
+  it('shows the year-over-year comparison when provided', () => {
+    const wrapper = mountCard({
+      points: [],
+      ordersCount: 0,
+      averageTicket: '0.00',
+      comparisonSamePeriodLastYear: '25.00',
+      isLoading: false,
+    })
+
+    expect(wrapper.text()).toContain('Vs ano anterior')
+    expect(wrapper.text()).toContain('▲ 25.0%')
   })
 })

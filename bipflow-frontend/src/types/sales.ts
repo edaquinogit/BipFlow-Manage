@@ -46,11 +46,17 @@ export interface SaleOrderFilters {
 export type SaleOrderSummaryPeriod = 'today' | '7d' | '30d' | '90d' | 'month'
 
 export interface SaleOrderSummary {
-  period: SaleOrderSummaryPeriod
+  period: SaleOrderSummaryPeriod | 'custom'
   revenue_total: string
   orders_count: number
   average_ticket: string
   comparison_previous_period: string | null
+  comparison_same_period_last_year: string | null
+}
+
+export interface SaleOrderDateRange {
+  start: string
+  end: string
 }
 
 export type SaleOrderTimeseriesPeriod = '7d' | '30d' | '90d'
@@ -80,9 +86,16 @@ export interface StatusBreakdown {
   orders_count: number
 }
 
+export interface RegionBreakdown {
+  region: string
+  revenue_total: string
+  orders_count: number
+}
+
 export interface SaleOrderBreakdown {
-  period: SaleOrderSummaryPeriod
+  period: SaleOrderSummaryPeriod | 'custom'
   top_products: TopProductBreakdown[]
   by_payment_method: PaymentMethodBreakdown[]
   by_status: StatusBreakdown[]
+  by_region: RegionBreakdown[]
 }
