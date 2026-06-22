@@ -586,11 +586,21 @@ class BotConversationMessageSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class BotConversationOrderSerializer(serializers.Serializer):
+    """The order a bot conversation converted into, shown on the dashboard."""
+
+    order_reference = serializers.CharField()
+    status = serializers.CharField()
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)
+    created_at = serializers.DateTimeField()
+
+
 class BotConversationSummarySerializer(serializers.ModelSerializer):
     """Compact bot conversation payload for dashboard lists."""
 
     message_count = serializers.SerializerMethodField()
     last_message_preview = serializers.SerializerMethodField()
+    sale_order = BotConversationOrderSerializer(read_only=True, allow_null=True)
 
     class Meta:
         model = BotConversation
@@ -603,6 +613,7 @@ class BotConversationSummarySerializer(serializers.ModelSerializer):
             "last_intent",
             "message_count",
             "last_message_preview",
+            "sale_order",
             "created_at",
             "updated_at",
         ]

@@ -840,7 +840,9 @@ class BotConversationViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelView
 
     def get_base_queryset(self):
         """Return bot conversations with optional dashboard filters."""
-        queryset = BotConversation.objects.annotate(message_count=Count("messages"))
+        queryset = BotConversation.objects.select_related("sale_order").annotate(
+            message_count=Count("messages")
+        )
 
         if self.action == "retrieve":
             queryset = queryset.prefetch_related("messages")

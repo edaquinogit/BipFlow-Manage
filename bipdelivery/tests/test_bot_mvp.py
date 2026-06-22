@@ -14,6 +14,7 @@ from bipdelivery.api.models import (
     Category,
     DeliveryRegion,
     Product,
+    SaleOrder,
     Store,
     StoreSettings,
 )
@@ -301,7 +302,34 @@ class BotConversationDashboardAPITest(TestCase):
         self.assertEqual(response.data["results"][0]["message_count"], 2)
         self.assertEqual(response.data["results"][0]["status"], BotConversation.STATUS_WAITING_HUMAN)
         self.assertIn("atendimento humano", response.data["results"][0]["last_message_preview"])
+        self.assertIsNone(response.data["results"][0]["sale_order"])
         self.assertNotIn("messages", response.data["results"][0])
+
+    def test_dashboard_lists_the_order_a_conversation_converted_into(self) -> None:
+        """Once checkout links a conversation to an order, the dashboard should see it."""
+        conversation_id = self._create_conversation("Oi")
+        order = SaleOrder.objects.create(
+            order_reference="BPF-DASHTEST-0001",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("50.00"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("50.00"),
+        )
+        BotConversation.objects.filter(id=conversation_id).update(sale_order=order)
+        dashboard_user = User.objects.create_user(
+            username="dashboardbotorder", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=dashboard_user)
+
+        list_response: Any = self.client.get("/api/v1/bot-conversations/")
+        detail_response: Any = self.client.get(f"/api/v1/bot-conversations/{conversation_id}/")
+
+        self.assertEqual(list_response.data["results"][0]["sale_order"]["order_reference"], "BPF-DASHTEST-0001")
+        self.assertEqual(list_response.data["results"][0]["sale_order"]["total"], "50.00")
+        self.assertEqual(detail_response.data["sale_order"]["order_reference"], "BPF-DASHTEST-0001")
 
     def test_dashboard_user_can_retrieve_bot_conversation_messages(self) -> None:
         """Conversation details should include persisted user and bot messages."""
