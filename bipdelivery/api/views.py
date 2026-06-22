@@ -1,5 +1,6 @@
 from datetime import datetime, time as time_of_day, timedelta
 from decimal import Decimal
+from typing import NamedTuple, Optional
 from urllib.parse import quote
 
 from django.conf import settings
@@ -422,6 +423,87 @@ def _resolve_summary_period(period: str) -> tuple:
     return start, start - timedelta(days=days)
 
 
+def _resolve_custom_range(request) -> Optional[tuple]:
+    """Return (start, end, start_param, end_param) for a valid `?start=&end=` range, else None.
+
+    `end` is exclusive (the day after `end_param`, at local midnight) so callers can
+    always filter with `created_at__lt=end` regardless of time-of-day precision.
+    """
+    start_param = request.query_params.get("start", "").strip()
+    end_param = request.query_params.get("end", "").strip()
+    if not start_param or not end_param:
+        return None
+
+    try:
+        start_date = datetime.strptime(start_param, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_param, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    if start_date > end_date:
+        return None
+
+    current_timezone = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
+    end = timezone.make_aware(datetime.combine(end_date, time_of_day.min), current_timezone) + timedelta(days=1)
+    return start, end, start_param, end_param
+
+
+class PeriodWindow(NamedTuple):
+    """A resolved dashboard date window, from either a `period` shorthand or a custom range."""
+
+    label: str
+    cache_key: str
+    start: datetime
+    end: Optional[datetime]
+    previous_start: datetime
+    previous_end: datetime
+
+
+def _resolve_period_window(request) -> PeriodWindow:
+    """Resolve the dashboard window for `summary`/`breakdown`: a custom range wins over `period`."""
+    custom_range = _resolve_custom_range(request)
+    if custom_range is not None:
+        start, end, start_param, end_param = custom_range
+        duration = end - start
+        return PeriodWindow(
+            label="custom",
+            cache_key=f"custom:{start_param}:{end_param}",
+            start=start,
+            end=end,
+            previous_start=start - duration,
+            previous_end=start,
+        )
+
+    period = request.query_params.get("period", "30d")
+    if period not in VALID_SUMMARY_PERIODS:
+        period = "30d"
+    start, previous_start = _resolve_summary_period(period)
+    return PeriodWindow(
+        label=period,
+        cache_key=period,
+        start=start,
+        end=None,
+        previous_start=previous_start,
+        previous_end=start,
+    )
+
+
+def _shift_one_year_back(moment: datetime) -> datetime:
+    """Shift a datetime exactly one calendar year back (Feb 29 falls back to Feb 28)."""
+    try:
+        return moment.replace(year=moment.year - 1)
+    except ValueError:
+        return moment.replace(year=moment.year - 1, day=28)
+
+
+def _percentage_change(current: Decimal, previous: Decimal) -> Optional[Decimal]:
+    """Return the % change from `previous` to `current`, or None when there's nothing to compare."""
+    if not previous:
+        return None
+    return ((current - previous) / previous * 100).quantize(Decimal("0.01"))
+
+
 class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """Sales history for authenticated dashboard users, scoped to their store (Etapa 3)."""
 
@@ -467,69 +549,96 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="summary")
     def summary(self, request):
-        """Aggregate real sales revenue for the dashboard's revenue card."""
-        period = request.query_params.get("period", "30d")
-        if period not in VALID_SUMMARY_PERIODS:
-            period = "30d"
+        """Aggregate real sales revenue for the dashboard's revenue card.
+
+        Accepts either `?period=today|7d|30d|90d|month` or an explicit
+        `?start=YYYY-MM-DD&end=YYYY-MM-DD` custom range (the latter wins).
+        """
+        window = _resolve_period_window(request)
 
         def compute():
-            start, previous_start = _resolve_summary_period(period)
-
             orders = self.get_queryset().exclude(status="cancelled")
-            current = orders.filter(created_at__gte=start).aggregate(
-                revenue_total=Sum("total"), orders_count=Count("id")
-            )
+
+            current_qs = orders.filter(created_at__gte=window.start)
+            if window.end is not None:
+                current_qs = current_qs.filter(created_at__lt=window.end)
+            current = current_qs.aggregate(revenue_total=Sum("total"), orders_count=Count("id"))
             revenue_total = current["revenue_total"] or Decimal("0.00")
             orders_count = current["orders_count"] or 0
             average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
 
             previous_revenue = (
-                orders.filter(created_at__gte=previous_start, created_at__lt=start).aggregate(
+                orders.filter(
+                    created_at__gte=window.previous_start, created_at__lt=window.previous_end
+                ).aggregate(revenue_total=Sum("total"))["revenue_total"]
+                or Decimal("0.00")
+            )
+            comparison_previous_period = _percentage_change(revenue_total, previous_revenue)
+
+            last_year_end = _shift_one_year_back(window.end if window.end is not None else timezone.now())
+            last_year_start = _shift_one_year_back(window.start)
+            last_year_revenue = (
+                orders.filter(created_at__gte=last_year_start, created_at__lt=last_year_end).aggregate(
                     revenue_total=Sum("total")
                 )["revenue_total"]
                 or Decimal("0.00")
             )
-            comparison_previous_period = None
-            if previous_revenue:
-                comparison_previous_period = (
-                    (revenue_total - previous_revenue) / previous_revenue * 100
-                ).quantize(Decimal("0.01"))
+            comparison_same_period_last_year = _percentage_change(revenue_total, last_year_revenue)
 
             serializer = SaleOrderSummarySerializer(
                 {
-                    "period": period,
+                    "period": window.label,
                     "revenue_total": revenue_total,
                     "orders_count": orders_count,
                     "average_ticket": average_ticket,
                     "comparison_previous_period": comparison_previous_period,
+                    "comparison_same_period_last_year": comparison_same_period_last_year,
                 }
             )
             return serializer.data
 
         store_id = self.get_request_store().id
-        data = _cached_dashboard_aggregate("summary", store_id, period, compute)
+        data = _cached_dashboard_aggregate("summary", store_id, window.cache_key, compute)
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="timeseries")
     def timeseries(self, request):
-        """Daily revenue and order counts for the dashboard's trend chart."""
-        period_days = {"7d": 7, "30d": 30, "90d": 90}
-        period = request.query_params.get("period", "30d")
-        if period not in period_days:
-            period = "30d"
-        days = period_days[period]
+        """Daily revenue and order counts for the dashboard's trend chart.
 
-        def compute():
+        Accepts either `?period=7d|30d|90d` or an explicit
+        `?start=YYYY-MM-DD&end=YYYY-MM-DD` custom range (the latter wins,
+        capped at 366 days so a wide range can't generate an unbounded
+        number of points).
+        """
+        custom_range = _resolve_custom_range(request)
+        end_boundary = None
+        if custom_range is not None:
+            start, end, start_param, end_param = custom_range
+            start_date = timezone.localtime(start).date()
+            end_date = timezone.localtime(end).date() - timedelta(days=1)
+            days = min((end_date - start_date).days + 1, 366)
+            end_boundary = end
+            cache_period_key = f"custom:{start_param}:{end_param}"
+        else:
+            period_days = {"7d": 7, "30d": 30, "90d": 90}
+            period = request.query_params.get("period", "30d")
+            if period not in period_days:
+                period = "30d"
+            days = period_days[period]
+
             current_timezone = timezone.get_current_timezone()
             today_local = timezone.localtime(timezone.now()).date()
             start_date = today_local - timedelta(days=days - 1)
             start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
+            cache_period_key = period
+
+        def compute():
+            rows_qs = self.get_queryset().exclude(status="cancelled").filter(created_at__gte=start)
+            if end_boundary is not None:
+                rows_qs = rows_qs.filter(created_at__lt=end_boundary)
 
             rows = (
-                self.get_queryset()
-                .exclude(status="cancelled")
-                .filter(created_at__gte=start)
-                .annotate(day=TruncDate("created_at"))
+                rows_qs.annotate(day=TruncDate("created_at"))
                 .values("day")
                 .annotate(revenue=Sum("total"), orders_count=Count("id"))
             )
@@ -551,27 +660,34 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return serializer.data
 
         store_id = self.get_request_store().id
-        data = _cached_dashboard_aggregate("timeseries", store_id, period, compute)
+        data = _cached_dashboard_aggregate("timeseries", store_id, cache_period_key, compute)
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="breakdown")
     def breakdown(self, request):
-        """Sales breakdown by top products, payment method and operational status."""
-        period = request.query_params.get("period", "30d")
-        if period not in VALID_SUMMARY_PERIODS:
-            period = "30d"
+        """Sales breakdown by top products, payment method, region and operational status.
+
+        Accepts either `?period=today|7d|30d|90d|month` or an explicit
+        `?start=YYYY-MM-DD&end=YYYY-MM-DD` custom range (the latter wins).
+        """
+        window = _resolve_period_window(request)
         store = self.get_request_store()
 
         def compute():
-            start, _ = _resolve_summary_period(period)
-
-            orders = self.get_queryset().filter(created_at__gte=start)
+            orders = self.get_queryset().filter(created_at__gte=window.start)
+            if window.end is not None:
+                orders = orders.filter(created_at__lt=window.end)
             active_orders = orders.exclude(status="cancelled")
 
-            top_products_rows = (
-                SaleOrderItem.objects.filter(order__store=store, order__created_at__gte=start)
+            items_qs = (
+                SaleOrderItem.objects.filter(order__store=store, order__created_at__gte=window.start)
                 .exclude(order__status="cancelled")
-                .values("product_id", "product_name")
+            )
+            if window.end is not None:
+                items_qs = items_qs.filter(order__created_at__lt=window.end)
+
+            top_products_rows = (
+                items_qs.values("product_id", "product_name")
                 .annotate(quantity_total=Sum("quantity"), revenue_total=Sum("line_total"))
                 .order_by("-revenue_total")[:5]
             )
@@ -602,17 +718,41 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 orders.values("status").annotate(orders_count=Count("id")).order_by("status")
             )
 
+            region_rows = active_orders.values("delivery_method", "delivery_region_name").annotate(
+                revenue_total=Sum("total"), orders_count=Count("id")
+            )
+            region_totals: dict = {}
+            for row in region_rows:
+                if row["delivery_method"] == "pickup":
+                    label = "Retirada na loja"
+                else:
+                    label = row["delivery_region_name"] or "Sem regiao"
+                bucket = region_totals.setdefault(
+                    label, {"revenue_total": Decimal("0.00"), "orders_count": 0}
+                )
+                bucket["revenue_total"] += row["revenue_total"] or Decimal("0.00")
+                bucket["orders_count"] += row["orders_count"]
+            by_region = sorted(
+                (
+                    {"region": label, "revenue_total": totals["revenue_total"], "orders_count": totals["orders_count"]}
+                    for label, totals in region_totals.items()
+                ),
+                key=lambda entry: entry["revenue_total"],
+                reverse=True,
+            )
+
             serializer = SaleOrderBreakdownSerializer(
                 {
-                    "period": period,
+                    "period": window.label,
                     "top_products": top_products,
                     "by_payment_method": by_payment_method,
                     "by_status": by_status,
+                    "by_region": by_region,
                 }
             )
             return serializer.data
 
-        data = _cached_dashboard_aggregate("breakdown", store.id, period, compute)
+        data = _cached_dashboard_aggregate("breakdown", store.id, window.cache_key, compute)
         return Response(data)
 
 

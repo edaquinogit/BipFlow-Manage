@@ -824,6 +824,9 @@ class SaleOrderSummarySerializer(serializers.Serializer):
     comparison_previous_period = serializers.DecimalField(
         max_digits=6, decimal_places=2, allow_null=True
     )
+    comparison_same_period_last_year = serializers.DecimalField(
+        max_digits=6, decimal_places=2, allow_null=True
+    )
 
 
 class SaleOrderTimeseriesPointSerializer(serializers.Serializer):
@@ -859,13 +862,22 @@ class StatusBreakdownSerializer(serializers.Serializer):
     orders_count = serializers.IntegerField()
 
 
+class RegionBreakdownSerializer(serializers.Serializer):
+    """Revenue share for a single delivery region (or pickup) within the period."""
+
+    region = serializers.CharField()
+    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    orders_count = serializers.IntegerField()
+
+
 class SaleOrderBreakdownSerializer(serializers.Serializer):
-    """Sales breakdown by product, payment method and status for the dashboard."""
+    """Sales breakdown by product, payment method, region and status for the dashboard."""
 
     period = serializers.CharField()
     top_products = TopProductBreakdownSerializer(many=True)
     by_payment_method = PaymentMethodBreakdownSerializer(many=True)
     by_status = StatusBreakdownSerializer(many=True)
+    by_region = RegionBreakdownSerializer(many=True)
 
 
 class RegisterUserSerializer(serializers.Serializer):

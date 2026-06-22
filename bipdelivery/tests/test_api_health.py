@@ -1148,6 +1148,16 @@ class SaleOrderSummaryAPITest(TestCase):
         self.assertEqual(response.data["revenue_total"], "100.00")
         self.assertEqual(response.data["comparison_previous_period"], "100.00")
 
+    def test_summary_compares_against_same_period_last_year(self) -> None:
+        """A second comparison field measures growth against the same window, one year back."""
+        self._make_order(Decimal("100.00"), days_ago=5)
+        self._make_order(Decimal("50.00"), days_ago=380)
+
+        response: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+
+        self.assertEqual(response.data["revenue_total"], "100.00")
+        self.assertEqual(response.data["comparison_same_period_last_year"], "100.00")
+
     def test_summary_unknown_period_falls_back_to_30d(self) -> None:
         """An invalid period query param should not error out the dashboard."""
         response: Any = self.client.get("/api/v1/sales-orders/summary/?period=invalid")
@@ -1252,12 +1262,15 @@ class SaleOrderBreakdownAPITest(TestCase):
         days_ago: int = 0,
         order_status: str = "prepared",
         payment_method: str = "pix",
+        delivery_method: str = "pickup",
+        delivery_region_name: str = "",
     ) -> SaleOrder:
         order = SaleOrder.objects.create(
             order_reference=f"BPF-{uuid4().hex[:8].upper()}",
             customer_name="Cliente Teste",
             customer_phone="71999990000",
-            delivery_method="pickup",
+            delivery_method=delivery_method,
+            delivery_region_name=delivery_region_name,
             payment_method=payment_method,
             subtotal=total,
             delivery_fee=Decimal("0.00"),
@@ -1313,6 +1326,20 @@ class SaleOrderBreakdownAPITest(TestCase):
 
         by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
         self.assertEqual(by_status, {"prepared": 1, "cancelled": 1})
+
+    def test_breakdown_groups_revenue_by_delivery_region(self) -> None:
+        """Pickup orders, named regions and unnamed deliveries each bucket separately."""
+        self._make_order(Decimal("30.00"), delivery_method="pickup")
+        self._make_order(Decimal("50.00"), delivery_method="delivery", delivery_region_name="Centro")
+        self._make_order(Decimal("20.00"), delivery_method="delivery", delivery_region_name="")
+
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
+
+        by_region = {row["region"]: row["revenue_total"] for row in response.data["by_region"]}
+        self.assertEqual(
+            by_region,
+            {"Retirada na loja": "30.00", "Centro": "50.00", "Sem regiao": "20.00"},
+        )
 
     def test_breakdown_unknown_period_falls_back_to_30d(self) -> None:
         """An invalid period query param should not error out the dashboard."""
@@ -1384,3 +1411,100 @@ class SaleOrderAggregateCacheTest(TestCase):
 
         response: Any = other_client.get("/api/v1/sales-orders/summary/?period=30d")
         self.assertEqual(response.data["revenue_total"], "0.00")
+
+
+class SaleOrderCustomRangeAPITest(TestCase):
+    """An explicit ?start=&end= range overrides the period shorthand on all three endpoints."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salescustomrange", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_order(self, total: Decimal, days_ago: int) -> SaleOrder:
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=total,
+            delivery_fee=Decimal("0.00"),
+            total=total,
+        )
+        SaleOrder.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def _date_str(self, days_ago: int) -> str:
+        return (timezone.localtime(timezone.now()) - timedelta(days=days_ago)).date().isoformat()
+
+    def test_summary_uses_custom_range_instead_of_period(self) -> None:
+        self._make_order(Decimal("40.00"), days_ago=10)
+        self._make_order(Decimal("999.00"), days_ago=40)
+
+        response: Any = self.client.get(
+            f"/api/v1/sales-orders/summary/?start={self._date_str(15)}&end={self._date_str(5)}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "custom")
+        self.assertEqual(response.data["revenue_total"], "40.00")
+
+    def test_timeseries_uses_custom_range_instead_of_period(self) -> None:
+        self._make_order(Decimal("40.00"), days_ago=10)
+
+        response: Any = self.client.get(
+            f"/api/v1/sales-orders/timeseries/?start={self._date_str(15)}&end={self._date_str(5)}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 11)
+        revenue_by_date = {point["date"]: point["revenue"] for point in response.data}
+        self.assertEqual(revenue_by_date[self._date_str(10)], "40.00")
+
+    def test_breakdown_uses_custom_range_instead_of_period(self) -> None:
+        self._make_order(Decimal("40.00"), days_ago=10)
+
+        response: Any = self.client.get(
+            f"/api/v1/sales-orders/breakdown/?start={self._date_str(15)}&end={self._date_str(5)}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "custom")
+        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        self.assertEqual(by_status, {"prepared": 1})
+
+    def test_invalid_custom_range_falls_back_to_default_period(self) -> None:
+        response: Any = self.client.get(
+            "/api/v1/sales-orders/summary/?start=not-a-date&end=also-not-a-date"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "30d")
+
+    def test_start_after_end_falls_back_to_default_period(self) -> None:
+        response: Any = self.client.get(
+            f"/api/v1/sales-orders/summary/?start={self._date_str(5)}&end={self._date_str(15)}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "30d")
+
+    def test_custom_ranges_do_not_share_a_cache_entry(self) -> None:
+        """A different start/end must never reuse another range's cached aggregate."""
+        self._make_order(Decimal("40.00"), days_ago=10)
+
+        first: Any = self.client.get(
+            f"/api/v1/sales-orders/summary/?start={self._date_str(15)}&end={self._date_str(5)}"
+        )
+        second: Any = self.client.get(
+            f"/api/v1/sales-orders/summary/?start={self._date_str(45)}&end={self._date_str(35)}"
+        )
+
+        self.assertEqual(first.data["revenue_total"], "40.00")
+        self.assertEqual(second.data["revenue_total"], "0.00")
