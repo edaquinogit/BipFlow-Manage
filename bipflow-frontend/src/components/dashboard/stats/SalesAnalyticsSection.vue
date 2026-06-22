@@ -6,7 +6,13 @@ import RevenueTrendCard from './RevenueTrendCard.vue';
 import TopProductsCard from './TopProductsCard.vue';
 import PaymentBreakdownCard from './PaymentBreakdownCard.vue';
 import RegionBreakdownCard from './RegionBreakdownCard.vue';
-import type { SaleOrderBreakdown, SaleOrderDateRange, SaleOrderTimeseriesPoint } from '@/types/sales';
+import CustomerInsightsCard from './CustomerInsightsCard.vue';
+import type {
+  SaleOrderBreakdown,
+  SaleOrderCustomerInsights,
+  SaleOrderDateRange,
+  SaleOrderTimeseriesPoint,
+} from '@/types/sales';
 
 const PERIOD_OPTIONS = [
   { value: '7d', label: '7D' },
@@ -19,6 +25,7 @@ const props = defineProps<{
   period: string;
   points: SaleOrderTimeseriesPoint[];
   breakdown: SaleOrderBreakdown | null;
+  customerInsights: SaleOrderCustomerInsights | null;
   ordersCount: number;
   averageTicket: string;
   comparisonSamePeriodLastYear?: string | null;
@@ -165,7 +172,7 @@ const updatedAtLabel = computed(() => {
       />
     </div>
 
-    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
       <TopProductsCard :products="breakdown?.top_products ?? []" :is-loading="isLoading" />
       <PaymentBreakdownCard
         :by-payment-method="breakdown?.by_payment_method ?? []"
@@ -173,6 +180,7 @@ const updatedAtLabel = computed(() => {
         :is-loading="isLoading"
       />
       <RegionBreakdownCard :regions="breakdown?.by_region ?? []" :is-loading="isLoading" />
+      <CustomerInsightsCard :insights="customerInsights" :is-loading="isLoading" />
     </div>
   </section>
 </template>

@@ -103,6 +103,7 @@ export interface CheckoutPayloadCustomer {
 export interface CheckoutPayload {
   items: CheckoutPayloadItem[]
   customer: CheckoutPayloadCustomer
+  bot_session_id?: string
 }
 
 export interface CheckoutResponseItem {

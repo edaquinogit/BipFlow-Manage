@@ -205,7 +205,7 @@ import {
   PhoneIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { botService } from '@/services/bot.service'
+import { botService, getStoredBotSessionId, storeBotSessionId } from '@/services/bot.service'
 import { Logger } from '@/services/logger'
 import type { BotMessageResponse, BotOption } from '@/types/bot'
 import { formatBRL } from '@/utils/formatters'
@@ -220,29 +220,6 @@ interface ConversationEntry {
 const emit = defineEmits<{
   openProduct: [slug: string]
 }>()
-
-const BOT_SESSION_STORAGE_KEY = 'bipflow.catalogBot.sessionId'
-
-function readStoredSessionId(): string {
-  try {
-    return sessionStorage.getItem(BOT_SESSION_STORAGE_KEY) ?? ''
-  } catch (error) {
-    Logger.debug('Catalog bot session storage is unavailable', {
-      error: error instanceof Error ? error.message : 'unknown_error',
-    })
-    return ''
-  }
-}
-
-function storeSessionId(nextSessionId: string): void {
-  try {
-    sessionStorage.setItem(BOT_SESSION_STORAGE_KEY, nextSessionId)
-  } catch (error) {
-    Logger.debug('Failed to store catalog bot session id', {
-      error: error instanceof Error ? error.message : 'unknown_error',
-    })
-  }
-}
 
 const welcomeResponse: BotMessageResponse = {
   conversation_id: 0,
@@ -280,7 +257,7 @@ const draftMessage = ref('')
 const errorMessage = ref('')
 const messageList = ref<HTMLElement | null>(null)
 const conversationId = ref<number | null>(null)
-const sessionId = ref(readStoredSessionId())
+const sessionId = ref(getStoredBotSessionId())
 const entries = ref<ConversationEntry[]>([
   {
     id: 1,
@@ -337,7 +314,7 @@ async function sendMessage(message: string): Promise<void> {
     })
     conversationId.value = response.conversation_id
     sessionId.value = response.session_id
-    storeSessionId(response.session_id)
+    storeBotSessionId(response.session_id)
     appendEntry({
       role: 'bot',
       text: response.reply,

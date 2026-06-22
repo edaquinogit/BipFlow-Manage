@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../api'
-import { botService } from '../bot.service'
+import { botService, getStoredBotSessionId, storeBotSessionId } from '../bot.service'
 
 vi.mock('../api', () => ({
   default: {
@@ -141,5 +141,21 @@ describe('BotService', () => {
 
     expect(api.get).toHaveBeenCalledWith('v1/bot-conversations/3/')
     expect(response.messages).toHaveLength(1)
+  })
+})
+
+describe('bot session storage helpers', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+  })
+
+  it('returns an empty string when no session id was ever stored', () => {
+    expect(getStoredBotSessionId()).toBe('')
+  })
+
+  it('round-trips a stored session id', () => {
+    storeBotSessionId('session-42')
+
+    expect(getStoredBotSessionId()).toBe('session-42')
   })
 })

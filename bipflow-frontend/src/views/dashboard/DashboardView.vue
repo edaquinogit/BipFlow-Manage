@@ -12,6 +12,7 @@ import type { FilterState } from '@/types/filters';
 import type {
   SaleOrder,
   SaleOrderBreakdown,
+  SaleOrderCustomerInsights,
   SaleOrderDateRange,
   SaleOrderFilters,
   SaleOrderStatus,
@@ -64,6 +65,7 @@ const salesAnalyticsCustomRange = ref<SaleOrderDateRange | null>(null);
 const salesAnalyticsSummary = ref<SaleOrderSummary | null>(null);
 const salesTimeseries = ref<SaleOrderTimeseriesPoint[]>([]);
 const salesBreakdown = ref<SaleOrderBreakdown | null>(null);
+const salesCustomerInsights = ref<SaleOrderCustomerInsights | null>(null);
 const salesAnalyticsUpdatedAt = ref<Date | null>(null);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 const storeSettings = ref<StoreSettings | null>(null);
@@ -246,14 +248,16 @@ const fetchSalesAnalytics = async (
   salesAnalyticsError.value = null;
 
   try {
-    const [summaryResult, timeseriesResult, breakdownResult] = await Promise.all([
+    const [summaryResult, timeseriesResult, breakdownResult, customerInsightsResult] = await Promise.all([
       salesService.summary(query),
       salesService.timeseries(query),
       salesService.breakdown(query),
+      salesService.customers(query),
     ]);
     salesAnalyticsSummary.value = summaryResult;
     salesTimeseries.value = timeseriesResult;
     salesBreakdown.value = breakdownResult;
+    salesCustomerInsights.value = customerInsightsResult;
     salesAnalyticsUpdatedAt.value = new Date();
   } catch (error: unknown) {
     Logger.warn('Failed to fetch dashboard sales analytics', { error });
@@ -688,6 +692,7 @@ onMounted(async () => {
         :period="salesAnalyticsPeriod"
         :points="salesTimeseries"
         :breakdown="salesBreakdown"
+        :customer-insights="salesCustomerInsights"
         :orders-count="salesAnalyticsSummary?.orders_count ?? 0"
         :average-ticket="salesAnalyticsSummary?.average_ticket ?? '0.00'"
         :comparison-same-period-last-year="salesAnalyticsSummary?.comparison_same_period_last_year ?? null"

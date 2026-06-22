@@ -99,3 +99,12 @@ export interface SaleOrderBreakdown {
   by_status: StatusBreakdown[]
   by_region: RegionBreakdown[]
 }
+
+export interface SaleOrderCustomerInsights {
+  period: SaleOrderSummaryPeriod | 'custom'
+  new_customers: number
+  returning_customers: number
+  bot_conversations_count: number
+  bot_converted_count: number
+  bot_conversion_rate: string | null
+}

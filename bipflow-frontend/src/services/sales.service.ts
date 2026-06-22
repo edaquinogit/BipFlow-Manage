@@ -3,6 +3,7 @@ import type {
   PaginatedSalesOrdersResponse,
   SaleOrder,
   SaleOrderBreakdown,
+  SaleOrderCustomerInsights,
   SaleOrderDateRange,
   SaleOrderFilters,
   SaleOrderStatus,
@@ -72,6 +73,16 @@ export const salesService = {
     periodOrRange: SaleOrderSummaryPeriod | SaleOrderDateRange = '30d'
   ): Promise<SaleOrderBreakdown> {
     const response = await api.get<SaleOrderBreakdown>('v1/sales-orders/breakdown/', {
+      params: buildRangeParams(periodOrRange),
+    })
+
+    return response.data
+  },
+
+  async customers(
+    periodOrRange: SaleOrderSummaryPeriod | SaleOrderDateRange = '30d'
+  ): Promise<SaleOrderCustomerInsights> {
+    const response = await api.get<SaleOrderCustomerInsights>('v1/sales-orders/customers/', {
       params: buildRangeParams(periodOrRange),
     })
 

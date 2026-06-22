@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SalesAnalyticsSection from '../SalesAnalyticsSection.vue'
-import type { SaleOrderBreakdown, SaleOrderDateRange, SaleOrderTimeseriesPoint } from '@/types/sales'
+import type {
+  SaleOrderBreakdown,
+  SaleOrderCustomerInsights,
+  SaleOrderDateRange,
+  SaleOrderTimeseriesPoint,
+} from '@/types/sales'
 
 interface SalesAnalyticsSectionProps {
   period: string
   points: SaleOrderTimeseriesPoint[]
   breakdown: SaleOrderBreakdown | null
+  customerInsights: SaleOrderCustomerInsights | null
   ordersCount: number
   averageTicket: string
   comparisonSamePeriodLastYear: string | null
@@ -20,6 +26,7 @@ const baseProps: SalesAnalyticsSectionProps = {
   period: '30d',
   points: [],
   breakdown: null,
+  customerInsights: null,
   ordersCount: 0,
   averageTicket: '0.00',
   comparisonSamePeriodLastYear: null,

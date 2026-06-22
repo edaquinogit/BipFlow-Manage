@@ -1,4 +1,5 @@
 import api from './api'
+import { getStoredBotSessionId } from './bot.service'
 import type {
   CartCustomer,
   CartItem,
@@ -8,7 +9,7 @@ import type {
 import { formatBRL } from '@/utils/formatters'
 
 function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): CheckoutPayload {
-  return {
+  const payload: CheckoutPayload = {
     items: items.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
@@ -26,6 +27,13 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
       notes: customer.notes.trim(),
     },
   }
+
+  const botSessionId = getStoredBotSessionId()
+  if (botSessionId) {
+    payload.bot_session_id = botSessionId
+  }
+
+  return payload
 }
 
 function buildWhatsAppHandoffMessage(items: CartItem[], subtotal: number): string {
