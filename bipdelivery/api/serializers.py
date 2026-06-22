@@ -826,6 +826,48 @@ class SaleOrderSummarySerializer(serializers.Serializer):
     )
 
 
+class SaleOrderTimeseriesPointSerializer(serializers.Serializer):
+    """One day of aggregated sales for the dashboard's revenue trend chart."""
+
+    date = serializers.DateField()
+    revenue = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    orders_count = serializers.IntegerField()
+
+
+class TopProductBreakdownSerializer(serializers.Serializer):
+    """A best-selling product within a dashboard summary period."""
+
+    product_id = serializers.IntegerField(allow_null=True)
+    product_name = serializers.CharField()
+    image_url = serializers.CharField(allow_null=True)
+    quantity_total = serializers.IntegerField()
+    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+
+
+class PaymentMethodBreakdownSerializer(serializers.Serializer):
+    """Revenue share for a single payment method within the period."""
+
+    payment_method = serializers.CharField()
+    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    orders_count = serializers.IntegerField()
+
+
+class StatusBreakdownSerializer(serializers.Serializer):
+    """Order count for a single operational status within the period."""
+
+    status = serializers.CharField()
+    orders_count = serializers.IntegerField()
+
+
+class SaleOrderBreakdownSerializer(serializers.Serializer):
+    """Sales breakdown by product, payment method and status for the dashboard."""
+
+    period = serializers.CharField()
+    top_products = TopProductBreakdownSerializer(many=True)
+    by_payment_method = PaymentMethodBreakdownSerializer(many=True)
+    by_status = StatusBreakdownSerializer(many=True)
+
+
 class RegisterUserSerializer(serializers.Serializer):
     """Register a new active user account with password validation.
 

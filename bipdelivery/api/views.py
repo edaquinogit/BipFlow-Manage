@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time as time_of_day, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -53,9 +54,11 @@ from .serializers import (
     ProductSerializer,
     PublicStoreSettingsSerializer,
     RegisterUserSerializer,
+    SaleOrderBreakdownSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
     SaleOrderSummarySerializer,
+    SaleOrderTimeseriesPointSerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
@@ -364,24 +367,38 @@ class DeliveryRegionViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+VALID_SUMMARY_PERIODS = {"today", "7d", "30d", "90d", "month"}
+
+
 def _resolve_summary_period(period: str) -> tuple:
-    """Return (start, previous_start) datetimes bounding a dashboard summary period."""
-    now = timezone.now()
+    """Return (start, previous_start) datetimes bounding a dashboard summary period.
+
+    "today" and "month" are calendar boundaries, so they're resolved in the
+    server's local time zone (America/Sao_Paulo) rather than UTC midnight --
+    otherwise "today" would start three hours off from the store's actual day.
+    """
+    current_timezone = timezone.get_current_timezone()
+    today_local = timezone.localtime(timezone.now()).date()
 
     if period == "month":
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if start.month == 1:
-            previous_start = start.replace(year=start.year - 1, month=12)
+        month_start_date = today_local.replace(day=1)
+        if month_start_date.month == 1:
+            previous_month_start_date = month_start_date.replace(
+                year=month_start_date.year - 1, month=12
+            )
         else:
-            previous_start = start.replace(month=start.month - 1)
+            previous_month_start_date = month_start_date.replace(month=month_start_date.month - 1)
+        start = timezone.make_aware(datetime.combine(month_start_date, time_of_day.min), current_timezone)
+        previous_start = timezone.make_aware(
+            datetime.combine(previous_month_start_date, time_of_day.min), current_timezone
+        )
         return start, previous_start
 
-    days = {"today": 1, "7d": 7, "30d": 30}[period]
-    start = (
-        now.replace(hour=0, minute=0, second=0, microsecond=0)
-        if period == "today"
-        else now - timedelta(days=days)
-    )
+    days = {"today": 1, "7d": 7, "30d": 30, "90d": 90}[period]
+    if period == "today":
+        start = timezone.make_aware(datetime.combine(today_local, time_of_day.min), current_timezone)
+    else:
+        start = timezone.now() - timedelta(days=days)
     return start, start - timedelta(days=days)
 
 
@@ -432,7 +449,7 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     def summary(self, request):
         """Aggregate real sales revenue for the dashboard's revenue card."""
         period = request.query_params.get("period", "30d")
-        if period not in {"today", "7d", "30d", "month"}:
+        if period not in VALID_SUMMARY_PERIODS:
             period = "30d"
         start, previous_start = _resolve_summary_period(period)
 
@@ -463,6 +480,100 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 "orders_count": orders_count,
                 "average_ticket": average_ticket,
                 "comparison_previous_period": comparison_previous_period,
+            }
+        )
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="timeseries")
+    def timeseries(self, request):
+        """Daily revenue and order counts for the dashboard's trend chart."""
+        period_days = {"7d": 7, "30d": 30, "90d": 90}
+        period = request.query_params.get("period", "30d")
+        if period not in period_days:
+            period = "30d"
+        days = period_days[period]
+
+        current_timezone = timezone.get_current_timezone()
+        today_local = timezone.localtime(timezone.now()).date()
+        start_date = today_local - timedelta(days=days - 1)
+        start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
+
+        rows = (
+            self.get_queryset()
+            .exclude(status="cancelled")
+            .filter(created_at__gte=start)
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(revenue=Sum("total"), orders_count=Count("id"))
+        )
+        revenue_by_day = {row["day"]: row for row in rows}
+
+        points = []
+        for offset in range(days):
+            day = start_date + timedelta(days=offset)
+            row = revenue_by_day.get(day)
+            points.append(
+                {
+                    "date": day,
+                    "revenue": row["revenue"] if row else Decimal("0.00"),
+                    "orders_count": row["orders_count"] if row else 0,
+                }
+            )
+
+        serializer = SaleOrderTimeseriesPointSerializer(points, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="breakdown")
+    def breakdown(self, request):
+        """Sales breakdown by top products, payment method and operational status."""
+        period = request.query_params.get("period", "30d")
+        if period not in VALID_SUMMARY_PERIODS:
+            period = "30d"
+        start, _ = _resolve_summary_period(period)
+
+        orders = self.get_queryset().filter(created_at__gte=start)
+        active_orders = orders.exclude(status="cancelled")
+
+        top_products_rows = (
+            SaleOrderItem.objects.filter(order__store=self.get_request_store(), order__created_at__gte=start)
+            .exclude(order__status="cancelled")
+            .values("product_id", "product_name")
+            .annotate(quantity_total=Sum("quantity"), revenue_total=Sum("line_total"))
+            .order_by("-revenue_total")[:5]
+        )
+
+        product_ids = [row["product_id"] for row in top_products_rows if row["product_id"] is not None]
+        image_by_product_id = {
+            product.id: request.build_absolute_uri(product.image.url) if product.image else None
+            for product in Product.objects.filter(id__in=product_ids)
+        }
+
+        top_products = [
+            {
+                "product_id": row["product_id"],
+                "product_name": row["product_name"],
+                "image_url": image_by_product_id.get(row["product_id"]),
+                "quantity_total": row["quantity_total"],
+                "revenue_total": row["revenue_total"] or Decimal("0.00"),
+            }
+            for row in top_products_rows
+        ]
+
+        by_payment_method = list(
+            active_orders.values("payment_method")
+            .annotate(revenue_total=Sum("total"), orders_count=Count("id"))
+            .order_by("-revenue_total")
+        )
+        by_status = list(
+            orders.values("status").annotate(orders_count=Count("id")).order_by("status")
+        )
+
+        serializer = SaleOrderBreakdownSerializer(
+            {
+                "period": period,
+                "top_products": top_products,
+                "by_payment_method": by_payment_method,
+                "by_status": by_status,
             }
         )
         return Response(serializer.data)

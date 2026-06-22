@@ -40,7 +40,15 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
-from bipdelivery.api.models import Category, DeliveryRegion, Product, SaleOrder, Store, StoreSettings  # noqa: E402
+from bipdelivery.api.models import (  # noqa: E402
+    Category,
+    DeliveryRegion,
+    Product,
+    SaleOrder,
+    SaleOrderItem,
+    Store,
+    StoreSettings,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -1156,3 +1164,170 @@ class SaleOrderSummaryAPITest(TestCase):
         response: Any = client.get("/api/v1/sales-orders/summary/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SaleOrderTimeseriesAPITest(TestCase):
+    """Daily revenue/order points backing the dashboard's trend chart."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salestimeseries", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_order(self, total: Decimal, days_ago: int, order_status: str = "prepared") -> SaleOrder:
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=total,
+            delivery_fee=Decimal("0.00"),
+            total=total,
+            status=order_status,
+        )
+        SaleOrder.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def test_timeseries_returns_one_point_per_day_with_zero_filled_gaps(self) -> None:
+        """Days with no sales must still appear as zero-revenue points, not gaps."""
+        self._make_order(Decimal("50.00"), days_ago=0)
+        self._make_order(Decimal("30.00"), days_ago=2)
+
+        response: Any = self.client.get("/api/v1/sales-orders/timeseries/?period=7d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 7)
+        revenue_by_date = {point["date"]: point["revenue"] for point in response.data}
+        today_local = timezone.localtime(timezone.now()).date()
+        self.assertEqual(revenue_by_date[today_local.isoformat()], "50.00")
+        self.assertEqual(revenue_by_date[(today_local - timedelta(days=2)).isoformat()], "30.00")
+        self.assertEqual(revenue_by_date[(today_local - timedelta(days=1)).isoformat()], "0.00")
+
+    def test_timeseries_excludes_cancelled_orders(self) -> None:
+        """A cancelled order's total should not inflate the trend chart."""
+        self._make_order(Decimal("999.00"), days_ago=0, order_status="cancelled")
+
+        response: Any = self.client.get("/api/v1/sales-orders/timeseries/?period=7d")
+
+        today_local = timezone.localtime(timezone.now()).date()
+        revenue_by_date = {point["date"]: point["revenue"] for point in response.data}
+        self.assertEqual(revenue_by_date[today_local.isoformat()], "0.00")
+
+    def test_timeseries_unknown_period_falls_back_to_30d(self) -> None:
+        """An invalid period query param should not error out the dashboard."""
+        response: Any = self.client.get("/api/v1/sales-orders/timeseries/?period=invalid")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 30)
+
+
+class SaleOrderBreakdownAPITest(TestCase):
+    """Top products, payment method and status breakdown for the dashboard."""
+
+    def setUp(self) -> None:
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="salesbreakdown", password="testpass123", is_staff=True
+        )
+        self.client.force_authenticate(user=self.user)
+        self.category = Category.objects.create(name="Lanches")
+        self.product = Product.objects.create(
+            name="Combo Executivo",
+            sku="CMB-BRK",
+            price=Decimal("25.00"),
+            stock_quantity=20,
+            category=self.category,
+        )
+
+    def _make_order(
+        self,
+        total: Decimal,
+        days_ago: int = 0,
+        order_status: str = "prepared",
+        payment_method: str = "pix",
+    ) -> SaleOrder:
+        order = SaleOrder.objects.create(
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method=payment_method,
+            subtotal=total,
+            delivery_fee=Decimal("0.00"),
+            total=total,
+            status=order_status,
+        )
+        SaleOrder.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def test_breakdown_ranks_top_products_by_revenue(self) -> None:
+        """The best seller by revenue should be first, with quantity and revenue summed."""
+        order = self._make_order(Decimal("50.00"))
+        SaleOrderItem.objects.create(
+            order=order,
+            product=self.product,
+            product_name=self.product.name,
+            sku=self.product.sku,
+            quantity=2,
+            unit_price=Decimal("25.00"),
+            line_total=Decimal("50.00"),
+        )
+
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        top_products = response.data["top_products"]
+        self.assertEqual(len(top_products), 1)
+        self.assertEqual(top_products[0]["product_name"], "Combo Executivo")
+        self.assertEqual(top_products[0]["quantity_total"], 2)
+        self.assertEqual(top_products[0]["revenue_total"], "50.00")
+
+    def test_breakdown_groups_revenue_by_payment_method(self) -> None:
+        """Active orders should be grouped by how the customer paid."""
+        self._make_order(Decimal("40.00"), payment_method="pix")
+        self._make_order(Decimal("60.00"), payment_method="card")
+        self._make_order(Decimal("999.00"), payment_method="cash", order_status="cancelled")
+
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
+
+        by_payment_method = {
+            row["payment_method"]: row["revenue_total"] for row in response.data["by_payment_method"]
+        }
+        self.assertEqual(by_payment_method, {"card": "60.00", "pix": "40.00"})
+
+    def test_breakdown_includes_cancelled_orders_in_status_distribution(self) -> None:
+        """Status distribution is the one place cancelled orders should still count."""
+        self._make_order(Decimal("40.00"), order_status="prepared")
+        self._make_order(Decimal("999.00"), order_status="cancelled")
+
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
+
+        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        self.assertEqual(by_status, {"prepared": 1, "cancelled": 1})
+
+    def test_breakdown_unknown_period_falls_back_to_30d(self) -> None:
+        """An invalid period query param should not error out the dashboard."""
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=invalid")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "30d")
+
+    def test_breakdown_accepts_90d_to_match_the_trend_chart_period_switcher(self) -> None:
+        """The dashboard's period switcher offers 7d/30d/90d for both endpoints."""
+        self._make_order(Decimal("40.00"), days_ago=45)
+
+        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=90d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["period"], "90d")
+        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        self.assertEqual(by_status, {"prepared": 1})

@@ -166,6 +166,20 @@ class DashboardSalesIsolationTest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.data["orders_count"], 1)
         self.assertEqual(response.data["revenue_total"], "10.00")
 
+    def test_timeseries_only_aggregates_the_authenticated_users_store(self) -> None:
+        response = self.client.get("/api/v1/sales-orders/timeseries/?period=7d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        total_revenue = sum(Decimal(point["revenue"]) for point in response.data)
+        self.assertEqual(total_revenue, Decimal("10.00"))
+
+    def test_breakdown_only_aggregates_the_authenticated_users_store(self) -> None:
+        response = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        self.assertEqual(by_status, {"prepared": 1})
+
 
 class DashboardCreateAssignsAuthenticatedStoreTest(TwoStoreFixtureMixin, TestCase):
     def test_creating_a_category_assigns_the_authenticated_users_store(self) -> None:
