@@ -9,10 +9,18 @@ const props = defineProps<{
 
 const hasComparison = computed(() => props.comparison !== null && props.comparison !== undefined);
 const isPositiveComparison = computed(() => (props.comparison ?? 0) >= 0);
+const accessibleLabel = computed(() => {
+  if (!hasComparison.value) {
+    return `Receita de vendas dos ultimos 30 dias: ${props.value}`;
+  }
+
+  const trend = isPositiveComparison.value ? 'aumento' : 'queda';
+  return `Receita de vendas dos ultimos 30 dias: ${props.value}, ${trend} de ${Math.abs(props.comparison ?? 0).toFixed(1)}% vs periodo anterior`;
+});
 </script>
 
 <template>
-  <div class="revenue-card-root">
+  <div role="group" :aria-label="accessibleLabel" class="revenue-card-root">
     <div class="relative z-10">
       <p class="text-[10px] font-black text-rose-100 uppercase tracking-[0.3em] mb-1 opacity-80">
         Receita de vendas (30 dias)
@@ -31,6 +39,7 @@ const isPositiveComparison = computed(() => (props.comparison ?? 0) >= 0);
 
     <BanknotesIcon
       class="revenue-icon"
+      aria-hidden="true"
     />
 
     <div class="glass-overlay"></div>

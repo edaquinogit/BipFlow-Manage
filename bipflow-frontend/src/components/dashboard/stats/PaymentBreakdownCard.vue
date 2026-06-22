@@ -75,7 +75,7 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-  <div class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
+  <section aria-label="Formas de pagamento e status dos pedidos" class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Formas de pagamento</p>
@@ -85,11 +85,15 @@ const chartOptions = computed(() => ({
     </div>
 
     <div class="mt-6">
-      <div v-if="isLoading" class="h-56 animate-pulse rounded-2xl bg-zinc-800/40" />
+      <div v-if="isLoading" aria-live="polite" class="h-56 animate-pulse rounded-2xl bg-zinc-800/40">
+        <span class="sr-only">Carregando formas de pagamento</span>
+      </div>
       <p v-else-if="byPaymentMethod.length === 0" class="text-sm text-zinc-500">
         Nenhuma venda registrada neste periodo.
       </p>
-      <VueApexCharts v-else type="donut" height="230" :options="chartOptions" :series="series" />
+      <div v-else role="img" aria-label="Grafico de rosca com a receita por forma de pagamento">
+        <VueApexCharts type="donut" height="230" :options="chartOptions" :series="series" />
+      </div>
     </div>
 
     <div v-if="byStatus.length > 0" class="mt-6 flex flex-wrap gap-2">
@@ -102,5 +106,5 @@ const chartOptions = computed(() => ({
         {{ STATUS_LABELS[row.status] ?? row.status }}: {{ row.orders_count }}
       </span>
     </div>
-  </div>
+  </section>
 </template>

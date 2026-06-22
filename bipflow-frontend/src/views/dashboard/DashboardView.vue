@@ -61,6 +61,7 @@ const salesAnalyticsPeriod = ref<SaleOrderTimeseriesPeriod>('30d');
 const salesAnalyticsSummary = ref<SaleOrderSummary | null>(null);
 const salesTimeseries = ref<SaleOrderTimeseriesPoint[]>([]);
 const salesBreakdown = ref<SaleOrderBreakdown | null>(null);
+const salesAnalyticsUpdatedAt = ref<Date | null>(null);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 const storeSettings = ref<StoreSettings | null>(null);
 
@@ -75,6 +76,7 @@ const isSalesLoading = ref(false);
 const salesError = ref<string | null>(null);
 const isSalesSummaryLoading = ref(false);
 const isSalesAnalyticsLoading = ref(false);
+const salesAnalyticsError = ref<string | null>(null);
 const updatingSaleOrderId = ref<number | null>(null);
 const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
@@ -229,6 +231,7 @@ const fetchSalesSummary = async (): Promise<void> => {
 
 const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnalyticsPeriod.value): Promise<void> => {
   isSalesAnalyticsLoading.value = true;
+  salesAnalyticsError.value = null;
 
   try {
     const [summaryResult, timeseriesResult, breakdownResult] = await Promise.all([
@@ -239,8 +242,10 @@ const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnal
     salesAnalyticsSummary.value = summaryResult;
     salesTimeseries.value = timeseriesResult;
     salesBreakdown.value = breakdownResult;
+    salesAnalyticsUpdatedAt.value = new Date();
   } catch (error: unknown) {
     Logger.warn('Failed to fetch dashboard sales analytics', { error });
+    salesAnalyticsError.value = 'Nao foi possivel carregar a analise de vendas agora.';
   } finally {
     isSalesAnalyticsLoading.value = false;
   }
@@ -248,6 +253,10 @@ const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnal
 
 const handleSalesAnalyticsPeriodChange = (period: string): void => {
   salesAnalyticsPeriod.value = period as SaleOrderTimeseriesPeriod;
+  void fetchSalesAnalytics(salesAnalyticsPeriod.value);
+};
+
+const handleRefreshSalesAnalytics = (): void => {
   void fetchSalesAnalytics(salesAnalyticsPeriod.value);
 };
 
@@ -644,7 +653,10 @@ onMounted(async () => {
         :orders-count="salesAnalyticsSummary?.orders_count ?? 0"
         :average-ticket="salesAnalyticsSummary?.average_ticket ?? '0.00'"
         :is-loading="isSalesAnalyticsLoading"
+        :error="salesAnalyticsError"
+        :updated-at="salesAnalyticsUpdatedAt"
         @update:period="handleSalesAnalyticsPeriodChange"
+        @refresh="handleRefreshSalesAnalytics"
       />
 
       <BotConversationPanel ref="botPanelRef" />

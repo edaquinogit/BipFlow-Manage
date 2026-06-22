@@ -23,7 +23,7 @@ const progressFor = (revenue: string): number => {
 </script>
 
 <template>
-  <div class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
+  <section aria-label="Top produtos mais vendidos" class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Mais vendidos</p>
@@ -34,6 +34,7 @@ const progressFor = (revenue: string): number => {
 
     <div class="mt-6 space-y-4">
       <template v-if="isLoading">
+        <span class="sr-only">Carregando top produtos</span>
         <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-2xl bg-zinc-800/40" />
       </template>
 
@@ -41,19 +42,21 @@ const progressFor = (revenue: string): number => {
         <p class="text-sm text-zinc-500">Nenhuma venda registrada neste periodo.</p>
       </template>
 
-      <template v-else>
-        <div
+      <ol v-else class="space-y-4">
+        <li
           v-for="(product, index) in products"
           :key="product.product_id ?? product.product_name"
           class="flex items-center gap-3"
+          :aria-label="`${index + 1}o lugar: ${product.product_name}, ${product.quantity_total} unidades, ${formatBRL(product.revenue_total)}`"
         >
-          <span class="w-4 shrink-0 text-xs font-black text-zinc-600">{{ index + 1 }}</span>
+          <span class="w-4 shrink-0 text-xs font-black text-zinc-600" aria-hidden="true">{{ index + 1 }}</span>
 
           <div class="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-950">
             <img
               v-if="product.image_url"
               :src="product.image_url"
               :alt="product.product_name"
+              loading="lazy"
               class="h-full w-full object-cover"
             />
             <div v-else class="flex h-full w-full items-center justify-center">
@@ -76,8 +79,8 @@ const progressFor = (revenue: string): number => {
               {{ product.quantity_total }} unid. vendidas
             </p>
           </div>
-        </div>
-      </template>
+        </li>
+      </ol>
     </div>
-  </div>
+  </section>
 </template>

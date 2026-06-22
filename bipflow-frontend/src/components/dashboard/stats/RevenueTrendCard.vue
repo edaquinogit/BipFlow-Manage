@@ -69,7 +69,10 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-  <div class="relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
+  <section
+    aria-label="Receita no periodo"
+    class="relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md"
+  >
     <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Evolucao de vendas</p>
@@ -90,16 +93,20 @@ const chartOptions = computed(() => ({
     </div>
 
     <div class="relative z-10 mt-8">
-      <div v-if="isLoading" class="h-64 animate-pulse rounded-2xl bg-zinc-800/40" />
+      <div v-if="isLoading" aria-live="polite" class="h-64 animate-pulse rounded-2xl bg-zinc-800/40">
+        <span class="sr-only">Carregando grafico de receita</span>
+      </div>
       <div
         v-else-if="points.length === 0"
         class="flex h-64 items-center justify-center text-sm text-zinc-500"
       >
         Nenhuma venda registrada neste periodo.
       </div>
-      <VueApexCharts v-else type="area" height="260" :options="chartOptions" :series="series" />
+      <div v-else role="img" :aria-label="`Grafico de receita diaria, total de ${ordersCount} pedidos no periodo`">
+        <VueApexCharts type="area" height="260" :options="chartOptions" :series="series" />
+      </div>
     </div>
 
     <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-rose-500/5" />
-  </div>
+  </section>
 </template>
