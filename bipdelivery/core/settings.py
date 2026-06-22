@@ -5,6 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -251,6 +252,11 @@ else:
 CSRF_TRUSTED_ORIGINS = get_env_list("CSRF_TRUSTED_ORIGINS")
 
 CORS_ALLOW_CREDENTIALS = True
+# The dashboard's store switcher sends this on every request (see
+# store_scope.resolve_request_store) -- without it in the allowlist, the
+# browser's CORS preflight rejects every call that carries it, including
+# login itself, before it ever reaches Django.
+CORS_ALLOW_HEADERS = [*default_headers, "x-store-slug"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 REST_FRAMEWORK = {
