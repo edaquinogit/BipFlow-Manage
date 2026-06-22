@@ -69,7 +69,7 @@ router.beforeEach((to) => {
 
   // 2. Proteção de Rotas de Convidados (Guest Only - Login/Register)
   if (to.meta.guestOnly && isLogged) {
-    return { name: DashboardRoutes.Root }
+    return { name: DashboardRoutes.Overview }
   }
 
   // 3. Telemetria em modo Desenvolvimento

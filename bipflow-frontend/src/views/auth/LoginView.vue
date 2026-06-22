@@ -26,7 +26,7 @@ const handleLogin = async () => {
 
   try {
     await authService.login(form)
-    router.push({ name: DashboardRoutes.Root })
+    router.push({ name: DashboardRoutes.Overview })
   } catch (error) {
     const err = error as ApiError
     errorMessage.value = err.response?.data?.detail || 'Connection failed. Check your backend.'
