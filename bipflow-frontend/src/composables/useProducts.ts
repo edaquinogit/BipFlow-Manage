@@ -24,6 +24,17 @@ import {
 } from "../types/filters";
 import { debounce } from "../utils/debounce";
 
+// Estado FORA da função para funcionar como singleton (mesmo padrão de
+// useCategories/useCurrentStore): paginas diferentes do dashboard (Visao
+// Geral, Produtos) podem chamar useProducts() sem duplicar fetch/estado.
+const products = ref<Product[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const filters = ref<FilterState>(createDefaultFilterState());
+const isSearching = ref(false);
+const selectedAssetIds = ref<Set<number>>(new Set());
+let debouncedSearch: ReturnType<typeof debounce> | null = null;
+
 /**
  * Product Management Composable
  *
@@ -38,23 +49,7 @@ import { debounce } from "../utils/debounce";
  * - Automatic filter state persistence
  */
 export function useProducts() {
-  // ==========================================
-  // STATE
-  // ==========================================
-  const products = ref<Product[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
   const toast = useToast();
-
-  // 🔍 FILTER STATE
-  const filters = ref<FilterState>(createDefaultFilterState());
-  const isSearching = ref(false);
-
-  // 🔄 BULK SELECTION STATE
-  const selectedAssetIds = ref<Set<number>>(new Set());
-
-  // Debounced search function (will be initialized below)
-  let debouncedSearch: ReturnType<typeof debounce> | null = null;
 
   // ==========================================
   // HELPERS

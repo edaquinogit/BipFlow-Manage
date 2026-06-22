@@ -71,6 +71,13 @@ export interface BotConversationMessage {
   created_at: string
 }
 
+export interface BotConversationOrder {
+  order_reference: string
+  status: string
+  total: string
+  created_at: string
+}
+
 export interface BotConversationSummary {
   id: number
   session_id: string
@@ -82,6 +89,7 @@ export interface BotConversationSummary {
   updated_at: string
   message_count: number
   last_message_preview: string
+  sale_order: BotConversationOrder | null
 }
 
 export interface BotConversationDetail extends BotConversationSummary {
