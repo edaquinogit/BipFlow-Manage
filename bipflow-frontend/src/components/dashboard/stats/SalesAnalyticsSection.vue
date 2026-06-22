@@ -48,9 +48,13 @@ const customEnd = ref(props.customRange?.end ?? '');
 watch(
   () => props.customRange,
   (range) => {
-    customStart.value = range?.start ?? customStart.value;
-    customEnd.value = range?.end ?? customEnd.value;
+    customStart.value = range?.start ?? '';
+    customEnd.value = range?.end ?? '';
   }
+);
+
+const isCustomRangeInvalid = computed(
+  () => Boolean(customStart.value) && Boolean(customEnd.value) && customStart.value > customEnd.value
 );
 
 const emitCustomRangeIfValid = (): void => {
@@ -131,27 +135,35 @@ const updatedAtLabel = computed(() => {
       </div>
     </div>
 
-    <div v-if="period === 'custom'" class="mt-4 flex flex-wrap items-end gap-3">
-      <label class="text-xs">
-        <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">De</span>
-        <input
-          v-model="customStart"
-          type="date"
-          :max="customEnd || undefined"
-          class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
-          @change="emitCustomRangeIfValid"
-        />
-      </label>
-      <label class="text-xs">
-        <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Ate</span>
-        <input
-          v-model="customEnd"
-          type="date"
-          :min="customStart || undefined"
-          class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
-          @change="emitCustomRangeIfValid"
-        />
-      </label>
+    <div v-if="period === 'custom'" class="mt-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-xs">
+          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">De</span>
+          <input
+            v-model="customStart"
+            type="date"
+            :max="customEnd || undefined"
+            class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
+            @change="emitCustomRangeIfValid"
+          />
+        </label>
+        <label class="text-xs">
+          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Ate</span>
+          <input
+            v-model="customEnd"
+            type="date"
+            :min="customStart || undefined"
+            class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
+            @change="emitCustomRangeIfValid"
+          />
+        </label>
+      </div>
+      <p v-if="isCustomRangeInvalid" class="mt-2 text-xs font-bold text-rose-300">
+        A data final deve ser igual ou posterior a data inicial.
+      </p>
+      <p v-else-if="!customRange" class="mt-2 text-xs font-bold text-zinc-500">
+        Selecione as duas datas para atualizar a analise.
+      </p>
     </div>
 
     <div

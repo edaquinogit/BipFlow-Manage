@@ -108,4 +108,34 @@ describe('SalesAnalyticsSection', () => {
       { start: '2026-06-01', end: '2026-06-10' },
     ])
   })
+
+  it('hints that dates are needed when "custom" is active but no range was applied yet', () => {
+    const wrapper = mountSection({ period: 'custom', customRange: null })
+
+    expect(wrapper.text()).toContain('Selecione as duas datas')
+  })
+
+  it('warns instead of emitting when the end date is before the start date', async () => {
+    const wrapper = mountSection({ period: 'custom' })
+
+    const dateInputs = wrapper.findAll('input[type="date"]')
+    await dateInputs[0]!.setValue('2026-06-10')
+    await dateInputs[1]!.setValue('2026-06-01')
+
+    expect(wrapper.text()).toContain('data final deve ser igual ou posterior')
+    expect(wrapper.emitted('update:custom-range')).toBeUndefined()
+  })
+
+  it('clears the date inputs when the applied custom range is reset', async () => {
+    const wrapper = mountSection({ period: 'custom', customRange: { start: '2026-06-01', end: '2026-06-10' } })
+
+    const dateInputsBefore = wrapper.findAll('input[type="date"]')
+    expect((dateInputsBefore[0]!.element as HTMLInputElement).value).toBe('2026-06-01')
+
+    await wrapper.setProps({ customRange: null })
+
+    const dateInputsAfter = wrapper.findAll('input[type="date"]')
+    expect((dateInputsAfter[0]!.element as HTMLInputElement).value).toBe('')
+    expect((dateInputsAfter[1]!.element as HTMLInputElement).value).toBe('')
+  })
 })
