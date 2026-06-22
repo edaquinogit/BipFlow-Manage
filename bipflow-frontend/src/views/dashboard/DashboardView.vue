@@ -9,7 +9,15 @@ import type { CategoryCreatePayload } from '@/schemas/category.schema';
 import type { Product } from '@/schemas/product.schema';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import type { FilterState } from '@/types/filters';
-import type { SaleOrder, SaleOrderFilters, SaleOrderStatus, SaleOrderSummary } from '@/types/sales';
+import type {
+  SaleOrder,
+  SaleOrderBreakdown,
+  SaleOrderFilters,
+  SaleOrderStatus,
+  SaleOrderSummary,
+  SaleOrderTimeseriesPeriod,
+  SaleOrderTimeseriesPoint,
+} from '@/types/sales';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { authService } from '@/services/auth.service';
 import { deliveryRegionService } from '@/services/delivery-region.service';
@@ -24,6 +32,7 @@ import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
 import DashboardMenuDrawer from '@/components/dashboard/layout/DashboardMenuDrawer.vue';
 import BotConversationPanel from '@/components/dashboard/bot/BotConversationPanel.vue';
 import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
+import SalesAnalyticsSection from '@/components/dashboard/stats/SalesAnalyticsSection.vue';
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
@@ -48,6 +57,10 @@ const currentUserName = ref<string | null>(null);
 const canManageCatalog = ref(false);
 const recentSales = ref<SaleOrder[]>([]);
 const salesSummary = ref<SaleOrderSummary | null>(null);
+const salesAnalyticsPeriod = ref<SaleOrderTimeseriesPeriod>('30d');
+const salesAnalyticsSummary = ref<SaleOrderSummary | null>(null);
+const salesTimeseries = ref<SaleOrderTimeseriesPoint[]>([]);
+const salesBreakdown = ref<SaleOrderBreakdown | null>(null);
 const deliveryRegions = ref<DeliveryRegion[]>([]);
 const storeSettings = ref<StoreSettings | null>(null);
 
@@ -61,6 +74,7 @@ const isBulkUpdating = ref(false);
 const isSalesLoading = ref(false);
 const salesError = ref<string | null>(null);
 const isSalesSummaryLoading = ref(false);
+const isSalesAnalyticsLoading = ref(false);
 const updatingSaleOrderId = ref<number | null>(null);
 const isDeliveryRegionsLoading = ref(false);
 const deliveryRegionsError = ref<string | null>(null);
@@ -213,6 +227,30 @@ const fetchSalesSummary = async (): Promise<void> => {
   }
 };
 
+const fetchSalesAnalytics = async (period: SaleOrderTimeseriesPeriod = salesAnalyticsPeriod.value): Promise<void> => {
+  isSalesAnalyticsLoading.value = true;
+
+  try {
+    const [summaryResult, timeseriesResult, breakdownResult] = await Promise.all([
+      salesService.summary(period),
+      salesService.timeseries(period),
+      salesService.breakdown(period),
+    ]);
+    salesAnalyticsSummary.value = summaryResult;
+    salesTimeseries.value = timeseriesResult;
+    salesBreakdown.value = breakdownResult;
+  } catch (error: unknown) {
+    Logger.warn('Failed to fetch dashboard sales analytics', { error });
+  } finally {
+    isSalesAnalyticsLoading.value = false;
+  }
+};
+
+const handleSalesAnalyticsPeriodChange = (period: string): void => {
+  salesAnalyticsPeriod.value = period as SaleOrderTimeseriesPeriod;
+  void fetchSalesAnalytics(salesAnalyticsPeriod.value);
+};
+
 const fetchDeliveryRegions = async (): Promise<void> => {
   isDeliveryRegionsLoading.value = true;
   deliveryRegionsError.value = null;
@@ -289,6 +327,7 @@ const refreshStoreScopedData = async (): Promise<void> => {
     fetchCategories(true),
     fetchSalesHistory(),
     fetchSalesSummary(),
+    fetchSalesAnalytics(),
     fetchDeliveryRegions(),
     fetchStoreSettings()
   ]);
@@ -596,6 +635,16 @@ onMounted(async () => {
         :revenue="salesRevenueDisplay"
         :revenue-comparison="salesRevenueComparison"
         :is-loading="productsLoading || isSalesSummaryLoading"
+      />
+
+      <SalesAnalyticsSection
+        :period="salesAnalyticsPeriod"
+        :points="salesTimeseries"
+        :breakdown="salesBreakdown"
+        :orders-count="salesAnalyticsSummary?.orders_count ?? 0"
+        :average-ticket="salesAnalyticsSummary?.average_ticket ?? '0.00'"
+        :is-loading="isSalesAnalyticsLoading"
+        @update:period="handleSalesAnalyticsPeriodChange"
       />
 
       <BotConversationPanel ref="botPanelRef" />

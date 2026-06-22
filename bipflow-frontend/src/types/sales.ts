@@ -43,7 +43,7 @@ export interface SaleOrderFilters {
   pageSize?: number
 }
 
-export type SaleOrderSummaryPeriod = 'today' | '7d' | '30d' | 'month'
+export type SaleOrderSummaryPeriod = 'today' | '7d' | '30d' | '90d' | 'month'
 
 export interface SaleOrderSummary {
   period: SaleOrderSummaryPeriod
@@ -51,4 +51,38 @@ export interface SaleOrderSummary {
   orders_count: number
   average_ticket: string
   comparison_previous_period: string | null
+}
+
+export type SaleOrderTimeseriesPeriod = '7d' | '30d' | '90d'
+
+export interface SaleOrderTimeseriesPoint {
+  date: string
+  revenue: string
+  orders_count: number
+}
+
+export interface TopProductBreakdown {
+  product_id: number | null
+  product_name: string
+  image_url: string | null
+  quantity_total: number
+  revenue_total: string
+}
+
+export interface PaymentMethodBreakdown {
+  payment_method: SaleOrder['payment_method']
+  revenue_total: string
+  orders_count: number
+}
+
+export interface StatusBreakdown {
+  status: SaleOrderStatus
+  orders_count: number
+}
+
+export interface SaleOrderBreakdown {
+  period: SaleOrderSummaryPeriod
+  top_products: TopProductBreakdown[]
+  by_payment_method: PaymentMethodBreakdown[]
+  by_status: StatusBreakdown[]
 }

@@ -2,10 +2,13 @@ import api from './api'
 import type {
   PaginatedSalesOrdersResponse,
   SaleOrder,
+  SaleOrderBreakdown,
   SaleOrderFilters,
   SaleOrderStatus,
   SaleOrderSummary,
   SaleOrderSummaryPeriod,
+  SaleOrderTimeseriesPeriod,
+  SaleOrderTimeseriesPoint,
 } from '@/types/sales'
 
 export const salesService = {
@@ -36,6 +39,22 @@ export const salesService = {
 
   async summary(period: SaleOrderSummaryPeriod = '30d'): Promise<SaleOrderSummary> {
     const response = await api.get<SaleOrderSummary>('v1/sales-orders/summary/', {
+      params: { period },
+    })
+
+    return response.data
+  },
+
+  async timeseries(period: SaleOrderTimeseriesPeriod = '30d'): Promise<SaleOrderTimeseriesPoint[]> {
+    const response = await api.get<SaleOrderTimeseriesPoint[]>('v1/sales-orders/timeseries/', {
+      params: { period },
+    })
+
+    return response.data
+  },
+
+  async breakdown(period: SaleOrderSummaryPeriod = '30d'): Promise<SaleOrderBreakdown> {
+    const response = await api.get<SaleOrderBreakdown>('v1/sales-orders/breakdown/', {
       params: { period },
     })
 
