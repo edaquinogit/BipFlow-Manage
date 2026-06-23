@@ -542,6 +542,10 @@ class SaleOrder(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["store", "created_at"]),
+            models.Index(fields=["store", "status", "created_at"]),
+        ]
 
     def __str__(self) -> str:
         """Return a readable order identifier for admin/debug purposes."""

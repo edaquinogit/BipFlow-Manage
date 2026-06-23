@@ -392,6 +392,24 @@ def _cached_dashboard_aggregate(action_name: str, store_id: int, period: str, co
     return data
 
 
+DASHBOARD_AGGREGATE_ACTIONS = ("summary", "timeseries", "breakdown", "customers")
+
+
+def invalidate_dashboard_cache(store_id: int) -> None:
+    """Bust every cached dashboard aggregate for a store after a SaleOrder write.
+
+    Only the period-shorthand keys are enumerable and cheap to clear this
+    way; a custom `?start=&end=` range produces a one-off cache key per
+    request and is left to expire via the existing TTL instead.
+    """
+    keys = [
+        f"dashboard:sales:{action}:{store_id}:{period}"
+        for action in DASHBOARD_AGGREGATE_ACTIONS
+        for period in VALID_SUMMARY_PERIODS
+    ]
+    cache.delete_many(keys)
+
+
 def _resolve_summary_period(period: str) -> tuple:
     """Return (start, previous_start) datetimes bounding a dashboard summary period.
 
@@ -531,6 +549,19 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    def _active_orders_in_window(self, window: "PeriodWindow"):
+        """Return non-cancelled orders within the resolved dashboard window.
+
+        Shared by summary/breakdown/customers, which all need the same
+        "active orders in this date range" shape; `breakdown.by_status` is
+        the one place that deliberately keeps cancelled orders, so it stays
+        outside this helper.
+        """
+        orders = self.get_queryset().exclude(status="cancelled").filter(created_at__gte=window.start)
+        if window.end is not None:
+            orders = orders.filter(created_at__lt=window.end)
+        return orders
+
     @action(detail=True, methods=["patch"], url_path="status")
     def update_status(self, request, pk=None):
         """Allow dashboard operators to update the operational order status."""
@@ -558,18 +589,17 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         window = _resolve_period_window(request)
 
         def compute():
-            orders = self.get_queryset().exclude(status="cancelled")
+            active_orders = self.get_queryset().exclude(status="cancelled")
 
-            current_qs = orders.filter(created_at__gte=window.start)
-            if window.end is not None:
-                current_qs = current_qs.filter(created_at__lt=window.end)
-            current = current_qs.aggregate(revenue_total=Sum("total"), orders_count=Count("id"))
+            current = self._active_orders_in_window(window).aggregate(
+                revenue_total=Sum("total"), orders_count=Count("id")
+            )
             revenue_total = current["revenue_total"] or Decimal("0.00")
             orders_count = current["orders_count"] or 0
             average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
 
             previous_revenue = (
-                orders.filter(
+                active_orders.filter(
                     created_at__gte=window.previous_start, created_at__lt=window.previous_end
                 ).aggregate(revenue_total=Sum("total"))["revenue_total"]
                 or Decimal("0.00")
@@ -579,7 +609,7 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             last_year_end = _shift_one_year_back(window.end if window.end is not None else timezone.now())
             last_year_start = _shift_one_year_back(window.start)
             last_year_revenue = (
-                orders.filter(created_at__gte=last_year_start, created_at__lt=last_year_end).aggregate(
+                active_orders.filter(created_at__gte=last_year_start, created_at__lt=last_year_end).aggregate(
                     revenue_total=Sum("total")
                 )["revenue_total"]
                 or Decimal("0.00")
@@ -678,7 +708,7 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             orders = self.get_queryset().filter(created_at__gte=window.start)
             if window.end is not None:
                 orders = orders.filter(created_at__lt=window.end)
-            active_orders = orders.exclude(status="cancelled")
+            active_orders = self._active_orders_in_window(window)
 
             items_qs = (
                 SaleOrderItem.objects.filter(order__store=store, order__created_at__gte=window.start)
@@ -768,10 +798,7 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         def compute():
             base_orders = self.get_queryset().exclude(status="cancelled")
-
-            period_orders = base_orders.filter(created_at__gte=window.start)
-            if window.end is not None:
-                period_orders = period_orders.filter(created_at__lt=window.end)
+            period_orders = self._active_orders_in_window(window)
 
             period_phones = {
                 normalized

@@ -1433,19 +1433,40 @@ class SaleOrderAggregateCacheTest(TestCase):
             total=total,
         )
 
-    def test_summary_response_is_cached_until_cleared(self) -> None:
-        """A second request within the TTL window must not recompute from a changed DB."""
+    def test_summary_response_is_cached_between_identical_requests(self) -> None:
+        """Two requests with no write in between must reuse the cached value."""
+        self._make_order(Decimal("50.00"))
+        first: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(first.data["revenue_total"], "50.00")
+
+        second: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(second.data["revenue_total"], "50.00")
+
+    def test_new_order_invalidates_the_cached_summary(self) -> None:
+        """A new SaleOrder must bust the cache so the dashboard never serves stale revenue."""
         self._make_order(Decimal("50.00"))
         first: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
         self.assertEqual(first.data["revenue_total"], "50.00")
 
         self._make_order(Decimal("100.00"))
         second: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
-        self.assertEqual(second.data["revenue_total"], "50.00")
+        self.assertEqual(second.data["revenue_total"], "150.00")
 
-        cache.clear()
-        third: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
-        self.assertEqual(third.data["revenue_total"], "150.00")
+    def test_status_update_invalidates_the_cached_summary(self) -> None:
+        """Cancelling an order must immediately drop it out of the cached revenue total."""
+        order = self._make_order(Decimal("50.00"))
+        first: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(first.data["revenue_total"], "50.00")
+
+        response: Any = self.client.patch(
+            f"/api/v1/sales-orders/{order.id}/status/",  # type: ignore
+            {"status": "cancelled"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        second: Any = self.client.get("/api/v1/sales-orders/summary/?period=30d")
+        self.assertEqual(second.data["revenue_total"], "0.00")
 
     def test_cached_summary_does_not_leak_across_stores(self) -> None:
         """Two different stores must never share a cached aggregate, even by coincidence."""
