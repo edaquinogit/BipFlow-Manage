@@ -32,7 +32,7 @@ const storeWhatsappValidationMessage = computed(() => {
   }
 
   if (storeWhatsappDigits.value.length < 10 || storeWhatsappDigits.value.length > 15) {
-    return 'Use codigo do pais e DDD. Ex.: 5571999999999';
+    return 'Use código do país e DDD. Ex.: 5571999999999';
   }
 
   return '';
@@ -49,7 +49,7 @@ const canSaveStoreSettings = computed(() => (
 async function fetchStoreSettings(): Promise<void> {
   await runFetchStoreSettings(
     () => storeSettingsService.get(),
-    'Nao foi possivel carregar o WhatsApp da loja agora.'
+    'Não foi possível carregar o WhatsApp da loja agora.'
   );
   storeSettingsDraft.value = { whatsapp_phone: storeSettings.value?.whatsapp_phone ?? '' };
 }
@@ -65,7 +65,7 @@ async function submitStoreSettings(): Promise<void> {
     success('WhatsApp da loja atualizado.');
   } catch (error: unknown) {
     Logger.error('Store settings save failed', { error });
-    toastError('Nao foi possivel salvar o WhatsApp da loja.');
+    toastError('Não foi possível salvar o WhatsApp da loja.');
   } finally {
     isSavingStoreSettings.value = false;
   }
@@ -82,27 +82,27 @@ useStoreSwitchEffect(() => {
 
 <template>
   <section class="max-w-md">
-    <div v-if="isStoreSettingsLoading" class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <div class="h-4 w-44 animate-pulse rounded bg-zinc-800" />
-      <div class="mt-3 h-3 w-64 animate-pulse rounded bg-zinc-800" />
+    <div v-if="isStoreSettingsLoading" class="rounded-lg border border-[#E5E7EB] bg-white p-4">
+      <div class="h-4 w-44 animate-pulse rounded bg-zinc-100" />
+      <div class="mt-3 h-3 w-64 animate-pulse rounded bg-zinc-100" />
     </div>
 
-    <div v-else-if="storeSettingsError" class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+    <div v-else-if="storeSettingsError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]">
       {{ storeSettingsError }}
     </div>
 
-    <div class="rounded-lg border border-white/10 bg-zinc-950 p-3">
-      <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Destino atual</p>
+    <div class="rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
+      <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Destino atual</p>
       <div class="mt-2 flex items-center justify-between gap-3">
-        <p class="min-w-0 truncate text-sm font-bold text-white">
-          {{ storeSettings?.is_whatsapp_configured ? storeSettings.whatsapp_phone_digits : 'Nao configurado' }}
+        <p class="min-w-0 truncate text-sm font-bold text-[#05050A]">
+          {{ storeSettings?.is_whatsapp_configured ? storeSettings.whatsapp_phone_digits : 'Não configurado' }}
         </p>
         <a
           v-if="storeWhatsappTestUrl"
           :href="storeWhatsappTestUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400/20 bg-emerald-400/10 text-emerald-200 transition hover:bg-emerald-400/15"
+          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
           aria-label="Abrir WhatsApp configurado"
         >
           <ArrowTopRightOnSquareIcon class="h-4 w-4" />
@@ -110,27 +110,27 @@ useStoreSwitchEffect(() => {
       </div>
     </div>
 
-    <form v-if="canManageCatalog" class="mt-4 space-y-4 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="submitStoreSettings">
+    <form v-if="canManageCatalog" class="mt-4 space-y-4 rounded-lg border border-[#E5E7EB] bg-white p-4" @submit.prevent="submitStoreSettings">
       <label class="block">
-        <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Numero da loja</span>
+        <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-bip-muted">Número da loja</span>
         <input
           v-model="storeSettingsDraft.whatsapp_phone"
           type="tel"
           inputmode="tel"
           autocomplete="tel"
-          class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
           placeholder="+55 71 99999-9999"
         />
       </label>
 
-      <p v-if="storeWhatsappValidationMessage" class="text-xs font-semibold text-amber-200">
+      <p v-if="storeWhatsappValidationMessage" class="text-xs font-semibold text-amber-700">
         {{ storeWhatsappValidationMessage }}
       </p>
 
       <button
         type="submit"
         :disabled="!canSaveStoreSettings"
-        class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+        class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
       >
         {{ isSavingStoreSettings ? 'Salvando...' : 'Salvar WhatsApp' }}
       </button>

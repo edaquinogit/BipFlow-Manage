@@ -13,8 +13,9 @@ import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 const {
-  products,
   selectedAssetIds,
+  outOfStockProducts,
+  lowStockProducts,
   fetchData,
   createProduct,
   updateProduct,
@@ -36,21 +37,11 @@ const isBulkUpdating = ref(false);
 
 const getProductStockValue = (product: Product): number => Number(product.stock_quantity ?? 0);
 
-const outOfStockProducts = computed(() => (
-  products.value
-    .filter((product) => getProductStockValue(product) <= 0 || !product.is_available)
-    .slice(0, 5)
-));
-
-const lowStockProducts = computed(() => (
-  products.value
-    .filter((product) => {
-      const stockValue = getProductStockValue(product);
-      return stockValue > 0 && stockValue <= 5 && product.is_available;
-    })
-    .sort((left, right) => getProductStockValue(left) - getProductStockValue(right))
-    .slice(0, 5)
-));
+// A secao "Produtos em atencao" e um resumo compacto; o limite de 5 e
+// apenas uma escolha de apresentacao desta view (a lista completa fica
+// disponivel via useProducts() para quem precisar dela, ex: StockAlertDrawer).
+const outOfStockPreview = computed(() => outOfStockProducts.value.slice(0, 5));
+const lowStockPreview = computed(() => lowStockProducts.value.slice(0, 5));
 
 const handleOpenNewPanel = (): void => {
   selectedProduct.value = null;
@@ -84,7 +75,7 @@ const handleSave = async (payload: Partial<Product>): Promise<void> => {
     await fetchData();
     handleClosePanel();
   } catch {
-    toastError('Nao foi possivel salvar o produto. Tente novamente.');
+    toastError('Não foi possível salvar o produto. Tente novamente.');
   } finally {
     isSaving.value = false;
   }
@@ -105,7 +96,7 @@ const executeDelete = async (): Promise<void> => {
     await fetchData();
   } catch (error: unknown) {
     Logger.error('Product deletion failed', { error });
-    toastError('Nao foi possivel remover o produto. Tente novamente.');
+    toastError('Não foi possível remover o produto. Tente novamente.');
   } finally {
     isDeletingAction.value = false;
     isDeleteModalOpen.value = false;
@@ -124,7 +115,7 @@ const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
     await bulkUpdateCategory(Array.from(selectedAssetIds.value), categoryId);
   } catch (error: unknown) {
     Logger.error('Bulk category update failed', { error, categoryId });
-    toastError('Nao foi possivel atualizar os produtos selecionados.');
+    toastError('Não foi possível atualizar os produtos selecionados.');
   } finally {
     isBulkUpdating.value = false;
   }
@@ -148,34 +139,34 @@ useStoreSwitchEffect(refreshProducts);
     <section v-if="outOfStockProducts.length > 0 || lowStockProducts.length > 0" class="space-y-3">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Inventario</p>
-          <h2 class="mt-1 text-sm font-black uppercase tracking-widest text-white">Produtos em atencao</h2>
+          <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Inventário</p>
+          <h2 class="mt-1 text-sm font-black uppercase tracking-widest text-[#05050A]">Produtos em atenção</h2>
         </div>
-        <span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-200">
+        <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
           {{ outOfStockProducts.length + lowStockProducts.length }}
         </span>
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <article
-          v-for="product in outOfStockProducts"
+          v-for="product in outOfStockPreview"
           :key="`out-${product.id ?? product.name}`"
-          class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4"
+          class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4"
         >
           <div class="flex items-center justify-between gap-4">
-            <p class="min-w-0 truncate text-sm font-bold text-white">{{ product.name }}</p>
-            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-rose-200">zerado</span>
+            <p class="min-w-0 truncate text-sm font-bold text-[#05050A]">{{ product.name }}</p>
+            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-[#D81B60]">zerado</span>
           </div>
         </article>
 
         <article
-          v-for="product in lowStockProducts"
+          v-for="product in lowStockPreview"
           :key="`low-${product.id ?? product.name}`"
-          class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4"
+          class="rounded-lg border border-amber-200 bg-amber-50 p-4"
         >
           <div class="flex items-center justify-between gap-4">
-            <p class="min-w-0 truncate text-sm font-bold text-white">{{ product.name }}</p>
-            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-amber-200">
+            <p class="min-w-0 truncate text-sm font-bold text-[#05050A]">{{ product.name }}</p>
+            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-amber-700">
               {{ getProductStockValue(product) }} un.
             </span>
           </div>
@@ -204,8 +195,8 @@ useStoreSwitchEffect(refreshProducts);
 
     <ConfirmModal
       :show="isDeleteModalOpen"
-      title="Confirm Asset Deletion"
-      message="This action is irreversible. The asset will be permanently removed from the BipFlow global registry."
+      title="Excluir produto?"
+      message="Essa ação não pode ser desfeita. O produto será removido definitivamente do catálogo."
       :is-loading="isDeletingAction"
       @close="isDeleteModalOpen = false"
       @confirm="executeDelete"

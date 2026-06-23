@@ -51,7 +51,7 @@ function buildSalesFilters(): Omit<SaleOrderFilters, 'pageSize'> {
 const fetchSalesHistory = (filters: SaleOrderFilters = {}): Promise<void> => (
   runSalesHistory(
     () => salesService.list({ pageSize: 20, ...filters }),
-    'Nao foi possivel carregar o historico agora.'
+    'Não foi possível carregar o histórico agora.'
   )
 );
 
@@ -92,7 +92,7 @@ const handleUpdateSaleStatus = async (orderId: number, nextStatus: SaleOrderStat
     success('Status do pedido atualizado.');
   } catch (error: unknown) {
     Logger.error('Sale order status update failed', { error, orderId, nextStatus });
-    toastError('Nao foi possivel atualizar o pedido.');
+    toastError('Não foi possível atualizar o pedido.');
   } finally {
     updatingSaleOrderId.value = null;
   }
@@ -102,7 +102,7 @@ function formatSaleDate(dateString: string): string {
   const date = new Date(dateString);
 
   if (Number.isNaN(date.getTime())) {
-    return 'Data indisponivel';
+    return 'Data indisponível';
   }
 
   return new Intl.DateTimeFormat('pt-BR', {
@@ -113,14 +113,14 @@ function formatSaleDate(dateString: string): string {
   }).format(date);
 }
 
-function getSaleStatusClass(status: SaleOrderStatus): string {
-  const classes: Record<SaleOrderStatus, string> = {
-    prepared: 'border-amber-400/20 bg-amber-400/10 text-amber-100',
-    sent: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100',
-    cancelled: 'border-rose-400/20 bg-rose-400/10 text-rose-100',
-  };
+const SALE_STATUS_BADGE_CLASS: Record<SaleOrderStatus, string> = {
+  prepared: 'border-amber-200 bg-amber-50 text-amber-800',
+  sent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  cancelled: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
+};
 
-  return classes[status];
+function getSaleStatusClass(status: SaleOrderStatus): string {
+  return SALE_STATUS_BADGE_CLASS[status];
 }
 
 function getSaleTimelineStepClass(
@@ -128,14 +128,14 @@ function getSaleTimelineStepClass(
   stepStatus: Exclude<SaleOrderStatus, 'cancelled'>
 ): string {
   if (currentStatus === 'sent') {
-    return 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100';
+    return SALE_STATUS_BADGE_CLASS.sent;
   }
 
   if (currentStatus === stepStatus) {
-    return 'border-amber-400/20 bg-amber-400/10 text-amber-100';
+    return SALE_STATUS_BADGE_CLASS.prepared;
   }
 
-  return 'border-white/10 bg-zinc-950 text-zinc-500';
+  return 'border-[#E5E7EB] bg-zinc-50 text-bip-muted';
 }
 
 function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
@@ -157,20 +157,20 @@ onMounted(() => {
   <div>
     <div class="flex items-center justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Vendas</p>
-        <h1 class="mt-1 text-xl font-black italic tracking-tighter text-white">Pedidos</h1>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Vendas</p>
+        <h1 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">Pedidos</h1>
       </div>
     </div>
 
     <div class="mt-6 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
       <label class="relative block">
         <span class="sr-only">Buscar pedido</span>
-        <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+        <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bip-muted" />
         <input
           v-model="salesSearchTerm"
           type="search"
-          class="h-11 w-full rounded-lg border border-zinc-800 bg-zinc-950 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
-          placeholder="Cliente, telefone ou referencia"
+          class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          placeholder="Cliente, telefone ou referência"
         />
       </label>
 
@@ -178,7 +178,7 @@ onMounted(() => {
         <span class="sr-only">Filtrar por status</span>
         <select
           v-model="salesStatusFilter"
-          class="h-11 w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-white outline-none transition focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
         >
           <option value="all">Todos status</option>
           <option v-for="option in saleStatusOptions" :key="option.value" :value="option.value">
@@ -189,20 +189,20 @@ onMounted(() => {
     </div>
 
     <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <div v-if="isSalesLoading" class="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:col-span-2 xl:col-span-3">
-        <div class="h-4 w-32 animate-pulse rounded bg-zinc-800" />
-        <div class="mt-3 h-3 w-48 animate-pulse rounded bg-zinc-800" />
+      <div v-if="isSalesLoading" class="rounded-lg border border-[#E5E7EB] bg-white p-4 sm:col-span-2 xl:col-span-3">
+        <div class="h-4 w-32 animate-pulse rounded bg-zinc-100" />
+        <div class="mt-3 h-3 w-48 animate-pulse rounded bg-zinc-100" />
       </div>
 
-      <div v-else-if="salesError" class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200 sm:col-span-2 xl:col-span-3">
+      <div v-else-if="salesError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D] sm:col-span-2 xl:col-span-3">
         {{ salesError }}
       </div>
 
-      <div v-else-if="recentSales.length === 0" class="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:col-span-2 xl:col-span-3">
-        <p class="text-sm font-semibold text-white">
+      <div v-else-if="recentSales.length === 0" class="rounded-lg border border-[#E5E7EB] bg-white p-4 sm:col-span-2 xl:col-span-3">
+        <p class="text-sm font-semibold text-[#05050A]">
           {{ hasActiveSalesFilters ? 'Nenhum pedido encontrado.' : 'Nenhuma venda registrada ainda.' }}
         </p>
-        <p class="mt-1 text-xs leading-5 text-zinc-500">
+        <p class="mt-1 text-xs leading-5 text-bip-muted">
           {{
             hasActiveSalesFilters
               ? 'Ajuste a busca ou o filtro de status.'
@@ -215,43 +215,43 @@ onMounted(() => {
         <article
           v-for="sale in recentSales"
           :key="sale.id"
-          class="rounded-lg border border-white/10 bg-white/[0.03] p-4"
+          class="rounded-lg border border-[#E5E7EB] bg-white p-4"
         >
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
-              <p class="truncate text-sm font-bold text-white">{{ sale.customer_name }}</p>
-              <p class="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+              <p class="truncate text-sm font-bold text-[#05050A]">{{ sale.customer_name }}</p>
+              <p class="mt-1 flex items-center gap-1.5 text-xs text-bip-muted">
                 <ClockIcon class="h-3.5 w-3.5" />
                 {{ formatSaleDate(sale.created_at) }} - {{ getPaymentLabel(sale.payment_method) }}
               </p>
             </div>
-            <p class="shrink-0 text-sm font-black text-emerald-300">
+            <p class="shrink-0 text-sm font-black text-[#D81B60]">
               {{ formatBRL(sale.total) }}
             </p>
           </div>
 
-          <p class="mt-3 text-xs text-zinc-500">
+          <p class="mt-3 text-xs text-bip-muted">
             {{ sale.item_count }} item<span v-if="sale.item_count !== 1">s</span> - {{ sale.order_reference }}
           </p>
 
-          <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-zinc-400">
-            <span class="rounded-full border border-white/10 bg-zinc-950 px-2.5 py-1">
+          <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-bip-muted">
+            <span class="rounded-full border border-[#E5E7EB] bg-zinc-50 px-2.5 py-1">
               {{ getDeliveryMethodLabel(sale.delivery_method) }}
             </span>
             <span
               v-if="sale.delivery_region_name"
-              class="max-w-full truncate rounded-full border border-white/10 bg-zinc-950 px-2.5 py-1"
+              class="max-w-full truncate rounded-full border border-[#E5E7EB] bg-zinc-50 px-2.5 py-1"
             >
               {{ sale.delivery_region_name }}
             </span>
           </div>
 
-          <div class="mt-4 rounded-lg border border-white/10 bg-zinc-950/70 p-3">
+          <div class="mt-4 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
             <div
               v-if="sale.status === 'cancelled'"
-              class="flex items-center gap-2 rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-rose-100"
+              class="flex items-center gap-2 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D]"
             >
-              <span class="h-2 w-2 rounded-full bg-rose-300" />
+              <span class="h-2 w-2 rounded-full bg-[#D81B60]" />
               Pedido cancelado
             </div>
 
@@ -264,7 +264,7 @@ onMounted(() => {
               >
                 <span
                   class="h-2 w-2 rounded-full"
-                  :class="sale.status === 'sent' || sale.status === step.value ? 'bg-current' : 'bg-zinc-700'"
+                  :class="sale.status === 'sent' || sale.status === step.value ? 'bg-current' : 'bg-zinc-300'"
                 />
                 {{ step.label }}
               </div>
@@ -283,7 +283,7 @@ onMounted(() => {
               <select
                 :value="sale.status"
                 :disabled="updatingSaleOrderId === sale.id"
-                class="h-9 w-full rounded-lg border border-white/10 bg-zinc-950 px-2 text-xs font-bold text-zinc-100 outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                class="h-9 w-full rounded-lg border border-[#D1D5DB] bg-white px-2 text-xs font-bold text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-60"
                 @change="handleSaleStatusChange(sale, $event)"
               >
                 <option v-for="option in saleStatusOptions" :key="option.value" :value="option.value">

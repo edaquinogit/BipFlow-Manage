@@ -67,6 +67,10 @@ export function useProducts() {
     return Number(stockValue);
   };
 
+  // Limite usado para classificar um produto como "estoque baixo". Produtos
+  // zerados/indisponiveis entram em outOfStockProducts, nao aqui.
+  const LOW_STOCK_THRESHOLD = 5;
+
   /**
    * Convert product data to FormData for multipart uploads.
    *
@@ -208,13 +212,34 @@ export function useProducts() {
   });
 
   /**
+   * Products with zero stock or marked unavailable.
+   */
+  const outOfStockProducts = computed(() =>
+    products.value.filter((p) => _getStockValue(p) <= 0 || !p.is_available)
+  );
+
+  /**
+   * Products with low but nonzero stock, sorted ascending by remaining quantity
+   * (most critical first). Excludes unavailable products, which already show
+   * up in outOfStockProducts.
+   */
+  const lowStockProducts = computed(() =>
+    products.value
+      .filter((p) => {
+        const stockValue = _getStockValue(p);
+        return stockValue > 0 && stockValue <= LOW_STOCK_THRESHOLD && p.is_available;
+      })
+      .sort((left, right) => _getStockValue(left) - _getStockValue(right))
+  );
+
+  /**
    * Calculate inventory statistics.
    *
-   * Tracks total items and low-stock count (< 5 units).
+   * Tracks total items and the critical-alert count (out-of-stock + low-stock).
    */
   const inventoryStats = computed(() => ({
     totalItems: products.value.reduce((acc, p) => acc + _getStockValue(p), 0),
-    lowStockCount: products.value.filter((p) => _getStockValue(p) < 5).length,
+    lowStockCount: outOfStockProducts.value.length + lowStockProducts.value.length,
   }));
 
   /**
@@ -678,6 +703,8 @@ export function useProducts() {
     // Computed
     totalRevenue,
     inventoryStats,
+    outOfStockProducts,
+    lowStockProducts,
     hasFilters,
     isFilteringActive,
     filterPayload,

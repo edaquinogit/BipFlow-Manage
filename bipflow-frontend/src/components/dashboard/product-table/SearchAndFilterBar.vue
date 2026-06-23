@@ -221,7 +221,7 @@ function cancelNewCategory(): void {
 <template>
   <div class="sticky top-24 z-40 overflow-visible">
     <div
-      class="relative overflow-visible rounded-lg border border-white/10 bg-zinc-950/85 p-3 shadow-2xl shadow-black/30 backdrop-blur-xl"
+      class="relative overflow-visible rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-2xl shadow-black/5"
       data-cy="search-filter-bar"
       @click="closeDropdowns"
     >
@@ -229,22 +229,22 @@ function cancelNewCategory(): void {
         <label class="relative block min-w-0 flex-1">
           <span class="sr-only">Buscar produtos</span>
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-            <MagnifyingGlassIcon class="h-4 w-4 text-zinc-500" />
+            <MagnifyingGlassIcon class="h-4 w-4 text-bip-muted" />
           </div>
 
           <input
             :value="localFilters.search"
             type="text"
-            placeholder="Buscar por nome, SKU ou descricao"
+            placeholder="Buscar por nome, SKU ou descrição"
             data-cy="search-input"
-            class="h-11 w-full rounded-lg border border-transparent bg-white/[0.06] py-3 pl-11 pr-10 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/20 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10"
+            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white py-3 pl-11 pr-10 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             @input="handleSearchInput"
           />
 
           <button
             v-if="localFilters.search"
             type="button"
-            class="absolute inset-y-0 right-0 flex items-center pr-4 text-zinc-500 transition hover:text-white"
+            class="absolute inset-y-0 right-0 flex items-center pr-4 text-bip-muted transition hover:text-[#05050A]"
             aria-label="Limpar busca"
             @click.stop="clearSearch"
           >
@@ -252,73 +252,73 @@ function cancelNewCategory(): void {
           </button>
         </label>
 
-        <div v-if="isSearching" class="inline-flex h-11 items-center gap-2 rounded-lg border border-white/10 px-4 text-sm text-zinc-300">
-          <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+        <div v-if="isSearching" class="inline-flex h-11 items-center gap-2 rounded-lg border border-[#E5E7EB] px-4 text-sm text-bip-muted">
+          <span class="h-2 w-2 animate-pulse rounded-full bg-[#D81B60]" />
           Buscando
         </div>
 
         <div v-if="categories.length > 0" class="relative min-w-[11rem]">
           <button
             type="button"
-            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-transparent bg-white/[0.06] px-4 text-left text-sm text-white transition hover:bg-white/[0.08] focus:border-white/20 focus:outline-none focus:ring-2 focus:ring-white/10"
+            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#D1D5DB] bg-white px-4 text-left text-sm text-[#05050A] transition hover:border-[#D81B60]/40 focus:border-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
             :aria-expanded="isCategoryDropdownOpen"
             @click.stop="toggleCategoryDropdown"
           >
             <span class="truncate">{{ getCategoryName(localFilters.categoryId) }}</span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" :class="{ 'rotate-180': isCategoryDropdownOpen }" />
+            <ChevronDownIcon class="h-4 w-4 shrink-0 text-bip-muted transition-transform" :class="{ 'rotate-180': isCategoryDropdownOpen }" />
           </button>
 
           <div
             v-if="isCategoryDropdownOpen"
-            class="absolute left-0 z-[80] mt-2 w-64 overflow-hidden rounded-lg border border-white/10 bg-zinc-950/95 p-1 shadow-2xl shadow-black/40 ring-1 ring-black/20 backdrop-blur-xl"
+            class="absolute left-0 z-[80] mt-2 w-64 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white p-1 shadow-2xl shadow-black/10 ring-1 ring-black/5"
             role="listbox"
           >
             <div class="flex items-center justify-between px-3 py-2">
-              <span class="text-xs font-medium text-zinc-500">Categorias</span>
-              <span v-if="categories.length" class="text-xs text-zinc-600">
+              <span class="text-xs font-medium text-bip-muted">Categorias</span>
+              <span v-if="categories.length" class="text-xs text-bip-muted">
                 {{ categories.length }}
               </span>
             </div>
 
             <button
               type="button"
-              class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-zinc-200 transition hover:bg-white/[0.06]"
+              class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-[#05050A] transition hover:bg-zinc-50"
               @click.stop="showNewCategoryModal = true; isCategoryDropdownOpen = false"
             >
-              <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-400">
+              <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#E5E7EB] bg-zinc-50 text-bip-muted">
                 <PlusIcon class="h-4 w-4" />
               </span>
               <span class="min-w-0">
                 <span class="block truncate font-medium">Nova categoria</span>
-                <span class="block truncate text-xs text-zinc-500">Criar e aplicar filtro</span>
+                <span class="block truncate text-xs text-bip-muted">Criar e aplicar filtro</span>
               </span>
             </button>
 
-            <div class="my-1 h-px bg-white/10" />
+            <div class="my-1 h-px bg-[#E5E7EB]" />
 
             <div class="filter-popover-scroll max-h-64 overflow-y-auto pr-1">
               <button
                 type="button"
-                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-white/[0.06]"
-                :class="!localFilters.categoryId ? 'bg-white/[0.08] text-white' : 'text-zinc-300 hover:text-white'"
+                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
+                :class="!localFilters.categoryId ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
                 :aria-selected="!localFilters.categoryId"
                 @click.stop="selectCategory(null)"
               >
                 <span class="truncate">Todas as categorias</span>
-                <CheckIcon v-if="!localFilters.categoryId" class="h-4 w-4 shrink-0 text-emerald-300" />
+                <CheckIcon v-if="!localFilters.categoryId" class="h-4 w-4 shrink-0 text-[#D81B60]" />
               </button>
 
               <button
                 v-for="category in categories"
                 :key="category.id"
                 type="button"
-                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-white/[0.06]"
-                :class="localFilters.categoryId === category.id ? 'bg-white/[0.08] text-white' : 'text-zinc-300 hover:text-white'"
+                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
+                :class="localFilters.categoryId === category.id ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
                 :aria-selected="localFilters.categoryId === category.id"
                 @click.stop="selectCategory(category.id)"
               >
                 <span class="truncate">{{ category.name }}</span>
-                <CheckIcon v-if="localFilters.categoryId === category.id" class="h-4 w-4 shrink-0 text-emerald-300" />
+                <CheckIcon v-if="localFilters.categoryId === category.id" class="h-4 w-4 shrink-0 text-[#D81B60]" />
               </button>
             </div>
           </div>
@@ -327,77 +327,77 @@ function cancelNewCategory(): void {
         <div class="relative min-w-[9.5rem]">
           <button
             type="button"
-            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-transparent bg-white/[0.06] px-4 text-left text-sm text-white transition hover:bg-white/[0.08] focus:border-white/20 focus:outline-none focus:ring-2 focus:ring-white/10"
+            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#D1D5DB] bg-white px-4 text-left text-sm text-[#05050A] transition hover:border-[#D81B60]/40 focus:border-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
             :aria-expanded="isAvailabilityDropdownOpen"
             @click.stop="toggleAvailabilityDropdown"
           >
             <span class="truncate">{{ getAvailabilityText(localFilters.inStock) }}</span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-zinc-500 transition-transform" :class="{ 'rotate-180': isAvailabilityDropdownOpen }" />
+            <ChevronDownIcon class="h-4 w-4 shrink-0 text-bip-muted transition-transform" :class="{ 'rotate-180': isAvailabilityDropdownOpen }" />
           </button>
 
           <div
             v-if="isAvailabilityDropdownOpen"
-            class="absolute right-0 z-[80] mt-2 w-52 overflow-hidden rounded-lg border border-white/10 bg-zinc-950/95 p-1 shadow-2xl shadow-black/40 ring-1 ring-black/20 backdrop-blur-xl"
+            class="absolute right-0 z-[80] mt-2 w-52 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white p-1 shadow-2xl shadow-black/10 ring-1 ring-black/5"
             role="listbox"
           >
-            <div class="px-3 py-2 text-xs font-medium text-zinc-500">
+            <div class="px-3 py-2 text-xs font-medium text-bip-muted">
               Disponibilidade
             </div>
 
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-white/[0.06]"
-              :class="localFilters.inStock === null ? 'bg-white/[0.08] text-white' : 'text-zinc-300 hover:text-white'"
+              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
+              :class="localFilters.inStock === null ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
               :aria-selected="localFilters.inStock === null"
               @click.stop="selectAvailability(null)"
             >
               <span>Todos os itens</span>
-              <CheckIcon v-if="localFilters.inStock === null" class="h-4 w-4 shrink-0 text-emerald-300" />
+              <CheckIcon v-if="localFilters.inStock === null" class="h-4 w-4 shrink-0 text-[#D81B60]" />
             </button>
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-white/[0.06]"
-              :class="localFilters.inStock === true ? 'bg-white/[0.08] text-white' : 'text-zinc-300 hover:text-white'"
+              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
+              :class="localFilters.inStock === true ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
               :aria-selected="localFilters.inStock === true"
               @click.stop="selectAvailability(true)"
             >
               <span>Em estoque</span>
-              <CheckIcon v-if="localFilters.inStock === true" class="h-4 w-4 shrink-0 text-emerald-300" />
+              <CheckIcon v-if="localFilters.inStock === true" class="h-4 w-4 shrink-0 text-[#D81B60]" />
             </button>
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-white/[0.06]"
-              :class="localFilters.inStock === false ? 'bg-white/[0.08] text-white' : 'text-zinc-300 hover:text-white'"
+              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
+              :class="localFilters.inStock === false ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
               :aria-selected="localFilters.inStock === false"
               @click.stop="selectAvailability(false)"
             >
               <span>Sem estoque</span>
-              <CheckIcon v-if="localFilters.inStock === false" class="h-4 w-4 shrink-0 text-emerald-300" />
+              <CheckIcon v-if="localFilters.inStock === false" class="h-4 w-4 shrink-0 text-[#D81B60]" />
             </button>
           </div>
         </div>
 
         <div v-if="showPriceControls" class="grid grid-cols-2 gap-2 lg:w-52">
           <label class="block">
-            <span class="sr-only">Preco minimo</span>
+            <span class="sr-only">Preço minimo</span>
             <input
               :value="localFilters.minPrice ?? ''"
               type="number"
               min="0"
               step="0.01"
-              class="h-11 w-full rounded-lg border border-transparent bg-white/[0.06] px-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/20 focus:ring-2 focus:ring-white/10"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               placeholder="Min."
               @input="handleMinPriceInput"
             />
           </label>
           <label class="block">
-            <span class="sr-only">Preco maximo</span>
+            <span class="sr-only">Preço maximo</span>
             <input
               :value="localFilters.maxPrice ?? ''"
               type="number"
               min="0"
               step="0.01"
-              class="h-11 w-full rounded-lg border border-transparent bg-white/[0.06] px-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/20 focus:ring-2 focus:ring-white/10"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               placeholder="Max."
               @input="handleMaxPriceInput"
             />
@@ -408,7 +408,7 @@ function cancelNewCategory(): void {
           v-if="hasAnyActiveFilters"
           type="button"
           data-cy="btn-clear-filters"
-          class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-white/10 px-4 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] px-4 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#05050A]"
           @click.stop="handleClearFilters"
         >
           <XMarkIcon class="h-4 w-4" />
@@ -420,7 +420,7 @@ function cancelNewCategory(): void {
         <button
           v-if="localFilters.search.trim()"
           type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300"
+          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
           @click.stop="removeFilter('search')"
         >
           {{ activeFilterSummary.find((item) => item.startsWith('Busca:')) }}
@@ -430,7 +430,7 @@ function cancelNewCategory(): void {
         <button
           v-if="localFilters.categoryId"
           type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300"
+          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
           @click.stop="removeFilter('category')"
         >
           {{ getCategoryName(localFilters.categoryId) }}
@@ -440,7 +440,7 @@ function cancelNewCategory(): void {
         <button
           v-if="localFilters.inStock !== null"
           type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300"
+          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
           @click.stop="removeFilter('availability')"
         >
           {{ getAvailabilityText(localFilters.inStock) }}
@@ -450,7 +450,7 @@ function cancelNewCategory(): void {
         <button
           v-if="localFilters.minPrice !== null || localFilters.maxPrice !== null"
           type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300"
+          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
           @click.stop="removeFilter('price')"
         >
           {{ formatPriceRange() }}
@@ -464,21 +464,21 @@ function cancelNewCategory(): void {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="cancelNewCategory"
     >
-      <div class="mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+      <div class="mx-4 w-full max-w-md rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-2xl shadow-black/10">
         <div class="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h3 class="text-lg font-semibold text-white">
+            <h3 class="text-lg font-semibold text-[#05050A]">
               Nova categoria
             </h3>
-            <p class="mt-1 text-sm text-zinc-500">
+            <p class="mt-1 text-sm text-bip-muted">
               Crie uma categoria e aplique o filtro em seguida.
             </p>
           </div>
 
           <button
             type="button"
-            class="text-zinc-500 transition hover:text-white"
-            aria-label="Fechar criacao de categoria"
+            class="text-bip-muted transition hover:text-[#05050A]"
+            aria-label="Fechar criação de categoria"
             @click="cancelNewCategory"
           >
             <XMarkIcon class="h-5 w-5" />
@@ -487,7 +487,7 @@ function cancelNewCategory(): void {
 
         <form class="space-y-4" @submit.prevent="createNewCategory">
           <label class="block">
-            <span class="mb-2 block text-sm font-medium text-zinc-300">
+            <span class="mb-2 block text-sm font-medium text-bip-muted">
               Nome da categoria
             </span>
             <input
@@ -496,7 +496,7 @@ function cancelNewCategory(): void {
               required
               minlength="2"
               maxlength="50"
-              class="h-12 w-full rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/30 focus:ring-2 focus:ring-white/10"
+              class="h-12 w-full rounded-xl border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               placeholder="Ex.: Bebidas"
             />
           </label>
@@ -504,7 +504,7 @@ function cancelNewCategory(): void {
           <div class="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              class="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:text-white"
+              class="rounded-xl border border-[#E5E7EB] px-4 py-3 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/30 hover:text-[#05050A]"
               :disabled="isCreatingCategory"
               @click="cancelNewCategory"
             >
@@ -513,7 +513,7 @@ function cancelNewCategory(): void {
 
             <button
               type="submit"
-              class="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-xl bg-[#D81B60] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="isCreatingCategory || !newCategoryName.trim()"
             >
               <span v-if="isCreatingCategory">Criando...</span>
@@ -541,11 +541,11 @@ function cancelNewCategory(): void {
 }
 
 .filter-popover-scroll::-webkit-scrollbar-thumb {
-  background: rgb(113 113 122 / 0.55);
+  background: rgb(209 213 219 / 0.8);
   border-radius: 999px;
 }
 
 .filter-popover-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgb(161 161 170 / 0.72);
+  background: rgb(156 163 175 / 0.9);
 }
 </style>

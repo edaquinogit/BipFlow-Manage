@@ -116,11 +116,11 @@ onUnmounted(() => {
 <template>
   <section class="space-y-6 pb-4">
     <header>
-      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">
+      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#D81B60]">
         Imagens da vitrine
       </h3>
-      <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
-        Ate 3 imagens do produto no catalogo
+      <p class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
+        Até 3 imagens do produto no catálogo
       </p>
     </header>
 
@@ -128,8 +128,8 @@ onUnmounted(() => {
       <div
         v-for="slot in allSlots"
         :key="slot.key"
-        class="group relative flex h-44 items-center justify-center overflow-hidden rounded-xl border border-dashed border-zinc-800 bg-zinc-950 shadow-inner transition-all hover:border-indigo-500/50"
-        :class="{ 'border-red-500/40 bg-red-500/5': error }"
+        class="group relative flex h-44 items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#D1D5DB] bg-zinc-50 transition-all hover:border-[#D81B60]/50"
+        :class="{ 'border-[#D81B60]/40 bg-[#FCE7F3]': error }"
       >
         <Transition name="fade">
           <img
@@ -175,8 +175,8 @@ onUnmounted(() => {
 
         <div class="pointer-events-none z-10 flex flex-col items-center gap-3 px-3 text-center">
           <div
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-zinc-500 transition-all duration-300 group-hover:bg-indigo-500/10 group-hover:text-indigo-400"
-            :class="{ 'bg-indigo-500/10 text-indigo-400': slot.preview }"
+            class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-bip-muted transition-all duration-300 group-hover:bg-[#FCE7F3] group-hover:text-[#D81B60]"
+            :class="{ 'bg-[#FCE7F3] text-[#D81B60]': slot.preview }"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path v-if="!slot.preview" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -184,10 +184,10 @@ onUnmounted(() => {
             </svg>
           </div>
           <div>
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#05050A]">
               {{ slot.label }}
             </p>
-            <p class="mt-1 text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+            <p class="mt-1 text-[9px] font-bold uppercase tracking-widest text-bip-muted">
               {{ slot.preview ? 'Trocar imagem' : 'Enviar imagem' }}
             </p>
           </div>
@@ -196,7 +196,7 @@ onUnmounted(() => {
     </div>
 
     <Transition name="slide-up">
-      <p v-if="error" class="text-center text-[9px] font-black uppercase tracking-widest text-red-500">
+      <p v-if="error" class="text-center text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
         {{ error }}
       </p>
     </Transition>

@@ -17,8 +17,17 @@ import { formatBRL } from '@/utils/formatters';
 
 import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
 import SalesAnalyticsSection from '@/components/dashboard/stats/SalesAnalyticsSection.vue';
+import StockAlertDrawer from '@/components/dashboard/stats/StockAlertDrawer.vue';
 
-const { loading: productsLoading, inventoryStats, fetchData } = useProducts();
+const {
+  loading: productsLoading,
+  inventoryStats,
+  outOfStockProducts,
+  lowStockProducts,
+  fetchData,
+} = useProducts();
+
+const isStockAlertDrawerOpen = ref(false);
 
 const salesSummary = ref<SaleOrderSummary | null>(null);
 const isSalesSummaryLoading = ref(false);
@@ -134,6 +143,7 @@ useStoreSwitchEffect(refreshOverview);
       :revenue="salesRevenueDisplay"
       :revenue-comparison="salesRevenueComparison"
       :is-loading="productsLoading || isSalesSummaryLoading"
+      @open-stock-alerts="isStockAlertDrawerOpen = true"
     />
 
     <SalesAnalyticsSection
@@ -152,6 +162,14 @@ useStoreSwitchEffect(refreshOverview);
       @update:custom-range="handleSalesAnalyticsCustomRangeChange"
       @refresh="handleRefreshSalesAnalytics"
       @export="handleExportSalesAnalyticsCsv"
+    />
+
+    <StockAlertDrawer
+      :is-open="isStockAlertDrawerOpen"
+      :out-of-stock-products="outOfStockProducts"
+      :low-stock-products="lowStockProducts"
+      :is-loading="productsLoading"
+      @close="isStockAlertDrawerOpen = false"
     />
   </div>
 </template>

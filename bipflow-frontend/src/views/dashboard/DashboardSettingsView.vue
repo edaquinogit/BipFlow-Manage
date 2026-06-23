@@ -29,11 +29,11 @@ const activeTabComponent = computed(() => (
 <template>
   <div>
     <div>
-      <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Operacao</p>
-      <h1 class="mt-1 text-xl font-black italic tracking-tighter text-white">Configuracoes</h1>
+      <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Operação</p>
+      <h1 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">Configurações</h1>
     </div>
 
-    <nav role="tablist" aria-label="Secoes de configuracao" class="mt-6 inline-flex flex-wrap items-center gap-1 rounded-full border border-white/10 bg-zinc-950 p-1">
+    <nav role="tablist" aria-label="Secoes de configuracao" class="mt-6 inline-flex flex-wrap items-center gap-1 rounded-full border border-[#E5E7EB] bg-zinc-100 p-1">
       <button
         v-for="tab in TABS"
         :key="tab.value"
@@ -41,7 +41,7 @@ const activeTabComponent = computed(() => (
         role="tab"
         :aria-selected="activeTab === tab.value"
         class="flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all duration-300"
-        :class="activeTab === tab.value ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'text-zinc-500 hover:text-zinc-200'"
+        :class="activeTab === tab.value ? 'bg-[#D81B60] text-white shadow-lg shadow-[#D81B60]/30' : 'text-bip-muted hover:text-[#05050A]'"
         @click="activeTab = tab.value"
       >
         <component :is="tab.icon" class="h-4 w-4" />

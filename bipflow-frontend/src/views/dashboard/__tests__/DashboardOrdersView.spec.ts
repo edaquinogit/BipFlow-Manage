@@ -75,7 +75,7 @@ describe('DashboardOrdersView', () => {
     const wrapper = mount(DashboardOrdersView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Nao foi possivel carregar o historico agora.')
+    expect(wrapper.text()).toContain('Não foi possível carregar o histórico agora.')
   })
 
   it('shows the empty state when there are no orders', async () => {

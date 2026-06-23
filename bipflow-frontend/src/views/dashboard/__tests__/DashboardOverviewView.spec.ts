@@ -19,7 +19,12 @@ vi.mock('@/services/sales.service', () => ({
 
 const mountOverview = () =>
   mount(DashboardOverviewView, {
-    global: { stubs: { apexchart: true } },
+    global: {
+      stubs: {
+        apexchart: true,
+        RouterLink: { template: '<a><slot /></a>' },
+      },
+    },
   })
 
 describe('DashboardOverviewView', () => {
@@ -28,6 +33,8 @@ describe('DashboardOverviewView', () => {
     vi.mocked(useProducts).mockReturnValue({
       loading: ref(false),
       inventoryStats: ref({ totalItems: 10, lowStockCount: 1 }),
+      outOfStockProducts: ref([{ id: 1, name: 'Zeroed Product', stock_quantity: 0, is_available: false }]),
+      lowStockProducts: ref([]),
       fetchData: vi.fn(),
     } as any)
     vi.mocked(useCurrentStore).mockReturnValue({ selectedStore: ref(null) } as any)
@@ -78,5 +85,39 @@ describe('DashboardOverviewView', () => {
 
     expect(wrapper.text()).toContain('R$')
     expect(wrapper.text()).toContain('150,00')
+  })
+
+  it('opens the stock alert drawer with the critical products when the alert card is clicked', async () => {
+    vi.mocked(salesService.summary).mockResolvedValue({
+      period: '30d',
+      revenue_total: '0.00',
+      orders_count: 0,
+      average_ticket: '0.00',
+      comparison_previous_period: null,
+      comparison_same_period_last_year: null,
+    })
+    vi.mocked(salesService.timeseries).mockResolvedValue([])
+    vi.mocked(salesService.breakdown).mockResolvedValue({
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+    })
+    vi.mocked(salesService.customers).mockResolvedValue({
+      period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,
+    })
+
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+    const alertCard = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Alertas criticos'))
+    expect(alertCard).toBeDefined()
+
+    await alertCard!.trigger('click')
+
+    const drawer = wrapper.find('[role="dialog"]')
+    expect(drawer.exists()).toBe(true)
+    expect(drawer.text()).toContain('Zeroed Product')
   })
 })

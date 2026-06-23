@@ -29,7 +29,7 @@ async function handleCreateStore(): Promise<void> {
     success(`Loja "${newStore.name}" criada com sucesso.`);
   } catch (error: unknown) {
     Logger.error('Store creation failed', { error, name });
-    createStoreError.value = 'Nao foi possivel criar a loja. Tente novamente.';
+    createStoreError.value = 'Não foi possível criar a loja. Tente novamente.';
   } finally {
     isCreatingStore.value = false;
   }
@@ -38,27 +38,27 @@ async function handleCreateStore(): Promise<void> {
 
 <template>
   <section class="max-w-md">
-    <p class="text-xs leading-5 text-zinc-500">
-      Voce passa a ser dona/dono dessa loja e pode trocar entre as suas lojas pelo seletor no topo.
+    <p class="text-xs leading-5 text-bip-muted">
+      Você passa a ser dona/dono dessa loja e pode trocar entre as suas lojas pelo seletor no topo.
     </p>
 
-    <form class="mt-4 space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-4" @submit.prevent="handleCreateStore">
+    <form class="mt-4 space-y-3 rounded-lg border border-[#E5E7EB] bg-white p-4" @submit.prevent="handleCreateStore">
       <label class="block">
-        <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Nome da loja</span>
+        <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-bip-muted">Nome da loja</span>
         <input
           v-model="newStoreName"
           type="text"
-          class="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
           placeholder="Ex.: Filial Centro"
         />
       </label>
 
-      <p v-if="createStoreError" class="text-xs font-semibold text-rose-300">{{ createStoreError }}</p>
+      <p v-if="createStoreError" class="text-xs font-semibold text-[#D81B60]">{{ createStoreError }}</p>
 
       <button
         type="submit"
         :disabled="isCreatingStore || newStoreName.trim().length < 2"
-        class="w-full rounded-lg bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+        class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
       >
         {{ isCreatingStore ? 'Criando...' : 'Criar loja' }}
       </button>

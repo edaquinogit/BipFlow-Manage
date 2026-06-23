@@ -39,8 +39,8 @@ const chartOptions = computed(() => ({
     background: 'transparent',
     fontFamily: 'inherit',
   },
-  theme: { mode: 'dark' as const },
-  colors: ['#fb7185'],
+  theme: { mode: 'light' as const },
+  colors: ['#D81B60'],
   dataLabels: { enabled: false },
   stroke: { curve: 'smooth' as const, width: 3 },
   fill: {
@@ -53,7 +53,7 @@ const chartOptions = computed(() => ({
     },
   },
   grid: {
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: '#F3F4F6',
     strokeDashArray: 4,
     yaxis: { lines: { show: false } },
     padding: { left: 8, right: 8 },
@@ -63,12 +63,12 @@ const chartOptions = computed(() => ({
     axisBorder: { show: false },
     axisTicks: { show: false },
     labels: {
-      style: { colors: '#71717a', fontSize: '10px', fontWeight: 700 },
+      style: { colors: '#6B7280', fontSize: '10px', fontWeight: 700 },
     },
   },
   yaxis: { show: false },
   tooltip: {
-    theme: 'dark' as const,
+    theme: 'light' as const,
     y: { formatter: (value: number) => formatBRL(value) },
   },
 }));
@@ -77,31 +77,31 @@ const chartOptions = computed(() => ({
 <template>
   <section
     aria-label="Receita no periodo"
-    class="relative overflow-hidden rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md"
+    class="relative overflow-hidden rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]"
   >
     <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Evolucao de vendas</p>
-        <h3 class="mt-2 text-2xl font-black italic tracking-tighter text-white">Receita no periodo</h3>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Evolucao de vendas</p>
+        <h3 class="mt-2 text-2xl font-black italic tracking-tighter text-[#05050A]">Receita no periodo</h3>
       </div>
 
       <div class="flex items-center gap-4 text-right">
         <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Pedidos</p>
-          <p class="text-xl font-black text-white">{{ ordersCount }}</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Pedidos</p>
+          <p class="text-xl font-black text-[#05050A]">{{ ordersCount }}</p>
         </div>
-        <div class="h-8 w-px bg-white/10" />
+        <div class="h-8 w-px bg-[#E5E7EB]" />
         <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Ticket medio</p>
-          <p class="text-xl font-black text-white">{{ formatBRL(averageTicket) }}</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Ticket medio</p>
+          <p class="text-xl font-black text-[#05050A]">{{ formatBRL(averageTicket) }}</p>
         </div>
         <template v-if="hasYoyComparison">
-          <div class="h-8 w-px bg-white/10" />
+          <div class="h-8 w-px bg-[#E5E7EB]" />
           <div>
-            <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Vs ano anterior</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Vs ano anterior</p>
             <p
               class="text-xl font-black"
-              :class="isPositiveYoyComparison ? 'text-emerald-300' : 'text-rose-300'"
+              :class="isPositiveYoyComparison ? 'text-emerald-600' : 'text-[#D81B60]'"
             >
               {{ isPositiveYoyComparison ? '▲' : '▼' }} {{ Math.abs(Number(comparisonSamePeriodLastYear ?? 0)).toFixed(1) }}%
             </p>
@@ -111,12 +111,12 @@ const chartOptions = computed(() => ({
     </div>
 
     <div class="relative z-10 mt-8">
-      <div v-if="isLoading" aria-live="polite" class="h-64 animate-pulse rounded-2xl bg-zinc-800/40">
+      <div v-if="isLoading" aria-live="polite" class="h-64 animate-pulse rounded-2xl bg-zinc-100">
         <span class="sr-only">Carregando grafico de receita</span>
       </div>
       <div
         v-else-if="points.length === 0"
-        class="flex h-64 items-center justify-center text-sm text-zinc-500"
+        class="flex h-64 items-center justify-center text-sm text-bip-muted"
       >
         Nenhuma venda registrada neste periodo.
       </div>
@@ -125,6 +125,6 @@ const chartOptions = computed(() => ({
       </div>
     </div>
 
-    <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-rose-500/5" />
+    <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-[#D81B60]/5" />
   </section>
 </template>

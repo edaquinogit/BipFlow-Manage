@@ -18,7 +18,7 @@ const emit = defineEmits<{
   <div
     role="group"
     aria-label="Selecionar periodo"
-    class="inline-flex items-center gap-1 rounded-full border border-white/10 bg-zinc-950 p-1"
+    class="inline-flex items-center gap-1 rounded-full border border-[#E5E7EB] bg-zinc-100 p-1"
   >
     <button
       v-for="option in options"
@@ -27,8 +27,8 @@ const emit = defineEmits<{
       :aria-pressed="modelValue === option.value"
       class="rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-widest transition-all duration-300"
       :class="modelValue === option.value
-        ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-        : 'text-zinc-500 hover:text-zinc-200'"
+        ? 'bg-[#D81B60] text-white shadow-lg shadow-[#D81B60]/30'
+        : 'text-bip-muted hover:text-[#05050A]'"
       @click="emit('update:modelValue', option.value)"
     >
       {{ option.label }}

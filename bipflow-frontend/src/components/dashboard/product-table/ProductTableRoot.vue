@@ -49,16 +49,16 @@ const onDelete = (id: number) => {
 </script>
 
 <template>
-  <div class="relative z-0 w-full min-h-96 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+  <div class="relative z-0 w-full min-h-96 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-2xl shadow-black/5">
 
     <Transition name="fade">
       <div
   v-if="props.isLoading && hasProducts"
-  class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/60 backdrop-blur-sm transition-all"
+  class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm transition-all"
 >
         <div class="flex flex-col items-center gap-4">
-          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-rose-500 border-t-transparent"></div>
-          <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white italic">Atualizando vitrine...</span>
+          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-[#D81B60] border-t-transparent"></div>
+          <span class="text-[10px] font-black uppercase tracking-[0.3em] text-[#05050A] italic">Atualizando vitrine...</span>
         </div>
       </div>
     </Transition>
@@ -66,18 +66,18 @@ const onDelete = (id: number) => {
     <div class="overflow-x-auto">
       <table class="w-full text-left border-collapse table-auto" data-cy="product-table">
         <thead>
-          <tr class="bg-zinc-800/50 text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black border-b border-zinc-800">
+          <tr class="bg-zinc-50 text-[10px] uppercase tracking-[0.2em] text-bip-muted font-black border-b border-[#E5E7EB]">
             <th class="px-6 py-5">
               <button
                 v-if="props.canManageCatalog"
                 @click="emit('select-all')"
-                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-rose-500/50 hover:border-rose-400"
+                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] hover:border-[#D81B60]/50"
                 :class="[
                   props.isAllSelected || props.isIndeterminate
-                    ? 'bg-rose-500 border-rose-500'
-                    : 'border-zinc-600 bg-zinc-800/50'
+                    ? 'bg-[#D81B60] border-[#D81B60]'
+                    : 'border-[#D1D5DB] bg-white'
                 ]"
-                title="Select All Assets"
+                title="Selecionar todos os produtos"
               >
                 <svg
                   v-if="isAllSelected"
@@ -99,15 +99,15 @@ const onDelete = (id: number) => {
                 </svg>
               </button>
             </th>
-            <th class="px-6 py-5">Asset Details</th>
-            <th class="px-6 py-5 text-center">Category</th>
-            <th class="px-6 py-5 text-center">Stock</th>
-            <th class="px-6 py-5 text-right">Valuation</th>
-            <th class="px-6 py-5 text-right">Actions</th>
+            <th class="px-6 py-5">Produto</th>
+            <th class="px-6 py-5 text-center">Categoria</th>
+            <th class="px-6 py-5 text-center">Estoque</th>
+            <th class="px-6 py-5 text-right">Preço</th>
+            <th class="px-6 py-5 text-right">Ações</th>
           </tr>
         </thead>
 
-        <tbody class="divide-y divide-zinc-800 relative">
+        <tbody class="divide-y divide-[#E5E7EB] relative">
           <TableEmptyState
             v-if="!hasProducts && !props.isLoading"
             :colspan="6"
@@ -115,7 +115,7 @@ const onDelete = (id: number) => {
 
           <template v-if="props.isLoading && !hasProducts">
             <tr v-for="i in 5" :key="i" class="animate-pulse">
-              <td colspan="5" class="px-6 py-8 bg-zinc-800/10 border-b border-zinc-800/50"></td>
+              <td colspan="5" class="px-6 py-8 bg-zinc-50 border-b border-[#E5E7EB]"></td>
             </tr>
           </template>
 
@@ -133,11 +133,11 @@ const onDelete = (id: number) => {
       </table>
     </div>
 
-    <footer v-if="hasProducts" class="bg-zinc-800/20 px-6 py-3 border-t border-zinc-800 flex justify-between items-center">
-      <span class="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">
-        Total Assets: {{ props.products.length }}
+    <footer v-if="hasProducts" class="bg-zinc-50 px-6 py-3 border-t border-[#E5E7EB] flex justify-between items-center">
+      <span class="text-[9px] text-bip-muted font-bold uppercase tracking-widest">
+        Total de produtos: {{ props.products.length }}
       </span>
-      <span class="text-[9px] text-zinc-600 font-medium italic">
+      <span class="text-[9px] text-bip-muted font-medium italic">
         {{ activeStoreName }}
       </span>
     </footer>
@@ -157,7 +157,7 @@ const onDelete = (id: number) => {
   height: 4px;
 }
 .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #d1d5db;
   border-radius: 10px;
 }
 </style>

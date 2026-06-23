@@ -52,19 +52,19 @@ const { canManageCatalog } = useCurrentUser();
 <template>
   <section class="relative isolate space-y-8 overflow-visible" data-cy="product-listing-section">
 
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-rose-500 pl-6">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-[#D81B60] pl-6">
       <div>
-        <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter leading-none">
+        <h3 class="text-3xl font-black text-[#05050A] italic uppercase tracking-tighter leading-none">
           Produtos ativos
         </h3>
-        <p class="text-[10px] text-zinc-500 font-bold uppercase mt-2 tracking-[0.2em]">Controle da vitrine em tempo real</p>
+        <p class="text-[10px] text-bip-muted font-bold uppercase mt-2 tracking-[0.4em]">Controle da vitrine em tempo real</p>
       </div>
 
       <button
         v-if="canManageCatalog"
         data-cy="btn-add-product"
         @click="$emit('open-panel')"
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white shadow-xl shadow-rose-950/20 transition-all hover:bg-rose-500 active:scale-[0.98]"
+        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.98]"
       >
         <PlusIcon class="h-4 w-4 stroke-2" />
         Novo produto
@@ -81,18 +81,18 @@ const { canManageCatalog } = useCurrentUser();
     />
 
     <div v-if="isLoading" data-cy="loading-skeleton" class="space-y-4">
-      <div v-for="i in 5" :key="i" class="h-24 bg-zinc-900/30 animate-pulse rounded-2xl border border-white/5"></div>
+      <div v-for="i in 5" :key="i" class="h-24 bg-zinc-100 animate-pulse rounded-2xl border border-[#E5E7EB]"></div>
     </div>
 
-    <div v-else-if="error" data-cy="error-state" class="p-16 bg-red-950/10 border border-red-500/20 rounded-[3rem] text-center backdrop-blur-sm">
-      <ExclamationTriangleIcon class="w-12 h-12 text-red-500 mx-auto mb-4 opacity-50" />
-      <p class="text-red-400 font-black uppercase text-[11px] tracking-[0.3em] mb-6">{{ error }}</p>
+    <div v-else-if="error" data-cy="error-state" class="p-16 bg-[#FCE7F3] border border-[#D81B60]/20 rounded-[3rem] text-center">
+      <ExclamationTriangleIcon class="w-12 h-12 text-[#D81B60] mx-auto mb-4 opacity-70" />
+      <p class="text-[#7A143D] font-black uppercase text-[11px] tracking-[0.3em] mb-6">{{ error }}</p>
       <button
         data-cy="btn-retry-connection"
         @click="fetchData"
-        class="text-white font-black text-[10px] border border-white/10 px-10 py-3 rounded-full hover:bg-white/5 transition-all uppercase tracking-widest"
+        class="text-[#05050A] font-black text-[10px] border border-[#E5E7EB] px-10 py-3 rounded-full hover:bg-zinc-50 transition-all uppercase tracking-widest"
       >
-        Re-establish Connection
+        Tentar novamente
       </button>
     </div>
 

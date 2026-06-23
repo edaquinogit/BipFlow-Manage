@@ -23,23 +23,23 @@ const progressFor = (revenue: string): number => {
 </script>
 
 <template>
-  <section aria-label="Top produtos mais vendidos" class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
+  <section aria-label="Top produtos mais vendidos" class="rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Mais vendidos</p>
-        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-white">Top produtos</h3>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Mais vendidos</p>
+        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-[#05050A]">Top produtos</h3>
       </div>
-      <TrophyIcon class="h-6 w-6 text-amber-300/70" />
+      <TrophyIcon class="h-6 w-6 text-amber-500" />
     </div>
 
     <div class="mt-6 space-y-4">
       <template v-if="isLoading">
         <span class="sr-only">Carregando top produtos</span>
-        <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-2xl bg-zinc-800/40" />
+        <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-2xl bg-zinc-100" />
       </template>
 
       <template v-else-if="products.length === 0">
-        <p class="text-sm text-zinc-500">Nenhuma venda registrada neste periodo.</p>
+        <p class="text-sm text-bip-muted">Nenhuma venda registrada neste periodo.</p>
       </template>
 
       <ol v-else class="space-y-4">
@@ -49,9 +49,9 @@ const progressFor = (revenue: string): number => {
           class="flex items-center gap-3"
           :aria-label="`${index + 1}o lugar: ${product.product_name}, ${product.quantity_total} unidades, ${formatBRL(product.revenue_total)}`"
         >
-          <span class="w-4 shrink-0 text-xs font-black text-zinc-600" aria-hidden="true">{{ index + 1 }}</span>
+          <span class="w-4 shrink-0 text-xs font-black text-zinc-400" aria-hidden="true">{{ index + 1 }}</span>
 
-          <div class="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-950">
+          <div class="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-zinc-100">
             <img
               v-if="product.image_url"
               :src="product.image_url"
@@ -60,22 +60,22 @@ const progressFor = (revenue: string): number => {
               class="h-full w-full object-cover"
             />
             <div v-else class="flex h-full w-full items-center justify-center">
-              <CubeIcon class="h-5 w-5 text-zinc-600" />
+              <CubeIcon class="h-5 w-5 text-zinc-400" />
             </div>
           </div>
 
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
-              <p class="truncate text-sm font-bold text-white">{{ product.product_name }}</p>
-              <p class="shrink-0 text-sm font-black text-rose-300">{{ formatBRL(product.revenue_total) }}</p>
+              <p class="truncate text-sm font-bold text-[#05050A]">{{ product.product_name }}</p>
+              <p class="shrink-0 text-sm font-black text-[#D81B60]">{{ formatBRL(product.revenue_total) }}</p>
             </div>
-            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-300"
+                class="h-full rounded-full bg-gradient-to-r from-[#D81B60] to-[#D81B60]/60"
                 :style="{ width: progressFor(product.revenue_total) + '%' }"
               />
             </div>
-            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-bip-muted">
               {{ product.quantity_total }} unid. vendidas
             </p>
           </div>

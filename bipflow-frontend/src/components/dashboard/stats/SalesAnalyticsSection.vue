@@ -102,18 +102,18 @@ const updatedAtLabel = computed(() => {
   <section aria-label="Analise de vendas da loja">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Analise de vendas</p>
-        <h2 class="mt-1 text-xl font-black italic tracking-tighter text-white">Performance da loja</h2>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Analise de vendas</p>
+        <h2 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">Performance da loja</h2>
       </div>
 
       <div class="flex items-center gap-3">
-        <span v-if="updatedAtLabel" class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+        <span v-if="updatedAtLabel" class="text-[10px] font-bold uppercase tracking-widest text-bip-muted">
           {{ updatedAtLabel }}
         </span>
         <button
           type="button"
           aria-label="Atualizar analise de vendas"
-          class="rounded-full border border-white/10 bg-zinc-950 p-2 text-zinc-400 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-full border border-[#E5E7EB] bg-white p-2 text-bip-muted transition-colors hover:text-[#05050A] disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="isLoading"
           @click="emit('refresh')"
         >
@@ -126,7 +126,7 @@ const updatedAtLabel = computed(() => {
         />
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-950 px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-zinc-400 transition-colors hover:text-white"
+          class="flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-bip-muted transition-colors hover:text-[#05050A]"
           @click="emit('export')"
         >
           <ArrowDownTrayIcon class="h-3.5 w-3.5" />
@@ -138,30 +138,30 @@ const updatedAtLabel = computed(() => {
     <div v-if="period === 'custom'" class="mt-4">
       <div class="flex flex-wrap items-end gap-3">
         <label class="text-xs">
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">De</span>
+          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">De</span>
           <input
             v-model="customStart"
             type="date"
             :max="customEnd || undefined"
-            class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
+            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             @change="emitCustomRangeIfValid"
           />
         </label>
         <label class="text-xs">
-          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-zinc-500">Ate</span>
+          <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">Ate</span>
           <input
             v-model="customEnd"
             type="date"
             :min="customStart || undefined"
-            class="h-10 rounded-lg border border-white/10 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-rose-500"
+            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             @change="emitCustomRangeIfValid"
           />
         </label>
       </div>
-      <p v-if="isCustomRangeInvalid" class="mt-2 text-xs font-bold text-rose-300">
+      <p v-if="isCustomRangeInvalid" class="mt-2 text-xs font-bold text-[#D81B60]">
         A data final deve ser igual ou posterior a data inicial.
       </p>
-      <p v-else-if="!customRange" class="mt-2 text-xs font-bold text-zinc-500">
+      <p v-else-if="!customRange" class="mt-2 text-xs font-bold text-bip-muted">
         Selecione as duas datas para atualizar a analise.
       </p>
     </div>
@@ -169,7 +169,7 @@ const updatedAtLabel = computed(() => {
     <div
       v-if="error"
       role="alert"
-      class="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200"
+      class="mt-4 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]"
     >
       {{ error }}
     </div>

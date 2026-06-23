@@ -56,7 +56,7 @@ describe('DashboardSupportView', () => {
     const wrapper = mount(DashboardSupportView, { props: {} })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Nao foi possivel carregar as conversas do bot agora.')
+    expect(wrapper.text()).toContain('Não foi possível carregar as conversas do bot agora.')
   })
 
   it('shows the empty state when there are no conversations', async () => {

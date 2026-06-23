@@ -30,23 +30,23 @@ defineProps<Props>();
 </script>
 
 <template>
-  <section class="space-y-8 border-b border-zinc-800/50 pb-10">
+  <section class="space-y-8 border-b border-[#E5E7EB] pb-10">
     <header>
-      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">
-        Preco e estoque
+      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#D81B60]">
+        Preço e estoque
       </h3>
-      <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+      <p class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
         Valores usados no catalogo e no checkout
       </p>
     </header>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
       <div class="group flex flex-col gap-2">
-        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-emerald-400">
-          Preco de venda
+        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#D81B60]">
+          Preço de venda
         </label>
         <div class="relative">
-          <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-sm text-zinc-500">$</span>
+          <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-sm text-bip-muted">$</span>
           <input
             v-model.number="price"
             type="number"
@@ -54,17 +54,17 @@ defineProps<Props>();
             data-cy="input-product-price"
             step="0.01"
             min="0"
-            class="w-full rounded-xl border border-zinc-800 bg-zinc-950 py-3 pl-8 pr-4 font-mono text-sm text-emerald-400 shadow-inner outline-none transition-all focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20"
+            class="w-full rounded-xl border border-[#D1D5DB] bg-white py-3 pl-8 pr-4 font-mono text-sm text-emerald-700 outline-none transition-all focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             placeholder="0.00"
           />
         </div>
-        <p v-if="errors.price" class="text-[9px] font-black uppercase tracking-widest text-red-500">
+        <p v-if="errors.price" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
           {{ errors.price[0] }}
         </p>
       </div>
 
       <div class="group flex flex-col gap-2">
-        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+        <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#D81B60]">
           Estoque
         </label>
         <input
@@ -73,17 +73,17 @@ defineProps<Props>();
           name="stock_quantity"
           data-cy="input-product-stock"
           min="0"
-          class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-sm text-zinc-100 shadow-inner outline-none transition-all focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20"
+          class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 font-mono text-sm text-[#05050A] outline-none transition-all focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
           placeholder="0"
         />
-        <p v-if="errors.stock_quantity" class="text-[9px] font-black uppercase tracking-widest text-red-500">
+        <p v-if="errors.stock_quantity" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
           {{ errors.stock_quantity[0] }}
         </p>
       </div>
     </div>
 
     <div class="group flex flex-col gap-2">
-      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 transition-colors group-focus-within:text-indigo-400">
+      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#D81B60]">
         Tamanho ou unidade
       </label>
       <input
@@ -91,10 +91,10 @@ defineProps<Props>();
         type="text"
         name="size"
         data-cy="input-product-size"
-        class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-bold text-zinc-100 shadow-inner outline-none transition-all placeholder:text-zinc-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10"
+        class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-sm font-bold text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
         placeholder="Ex.: 500ml, P, unidade"
       />
-      <p v-if="errors.size" class="text-[9px] font-black uppercase tracking-widest text-red-500">
+      <p v-if="errors.size" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
         {{ errors.size[0] }}
       </p>
     </div>

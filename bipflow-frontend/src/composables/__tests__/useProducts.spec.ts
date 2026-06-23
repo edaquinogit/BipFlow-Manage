@@ -285,6 +285,54 @@ describe("useProducts Composable", () => {
     });
   });
 
+  describe("Stock Alert Classification", () => {
+    /**
+     * Verify out-of-stock vs low-stock buckets are mutually exclusive and that
+     * the critical-alert KPI count is derived from the same source of truth
+     * (regression guard for the DashboardProductsView/Overview consolidation).
+     */
+    it("should classify zeroed, unavailable, low-stock and healthy products correctly", () => {
+      const { products, outOfStockProducts, lowStockProducts, inventoryStats } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Zeroed", stock_quantity: 0, is_available: true } as any,
+        { id: 2, name: "Unavailable but in stock", stock_quantity: 10, is_available: false } as any,
+        { id: 3, name: "Low stock", stock_quantity: 3, is_available: true } as any,
+        { id: 4, name: "Right at the threshold", stock_quantity: 5, is_available: true } as any,
+        { id: 5, name: "Healthy stock", stock_quantity: 50, is_available: true } as any,
+      ];
+
+      expect(outOfStockProducts.value.map((p) => p.id)).toEqual([1, 2]);
+      expect(lowStockProducts.value.map((p) => p.id)).toEqual([3, 4]);
+      expect(inventoryStats.value.lowStockCount).toBe(4);
+    });
+
+    it("should sort low-stock products ascending by remaining quantity", () => {
+      const { products, lowStockProducts } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Four left", stock_quantity: 4, is_available: true } as any,
+        { id: 2, name: "One left", stock_quantity: 1, is_available: true } as any,
+        { id: 3, name: "Three left", stock_quantity: 3, is_available: true } as any,
+      ];
+
+      expect(lowStockProducts.value.map((p) => p.id)).toEqual([2, 3, 1]);
+    });
+
+    it("should report zero alerts for a healthy catalog", () => {
+      const { products, outOfStockProducts, lowStockProducts, inventoryStats } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Healthy A", stock_quantity: 20, is_available: true } as any,
+        { id: 2, name: "Healthy B", stock_quantity: 30, is_available: true } as any,
+      ];
+
+      expect(outOfStockProducts.value).toHaveLength(0);
+      expect(lowStockProducts.value).toHaveLength(0);
+      expect(inventoryStats.value.lowStockCount).toBe(0);
+    });
+  });
+
   afterEach(() => {
     dispose?.();
   });

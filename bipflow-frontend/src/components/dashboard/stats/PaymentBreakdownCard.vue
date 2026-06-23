@@ -24,9 +24,9 @@ const STATUS_LABELS: Record<SaleOrderStatus, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<SaleOrderStatus, string> = {
-  prepared: 'border-amber-400/20 bg-amber-400/10 text-amber-100',
-  sent: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100',
-  cancelled: 'border-rose-400/20 bg-rose-400/10 text-rose-100',
+  prepared: 'border-amber-200 bg-amber-50 text-amber-800',
+  sent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  cancelled: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
 };
 
 const series = computed(() => props.byPaymentMethod.map((row) => Number(row.revenue_total)));
@@ -36,12 +36,12 @@ const labels = computed(() =>
 
 const chartOptions = computed(() => ({
   chart: { background: 'transparent', fontFamily: 'inherit' },
-  theme: { mode: 'dark' as const },
+  theme: { mode: 'light' as const },
   labels: labels.value,
-  colors: ['#fb7185', '#f59e0b', '#34d399', '#818cf8'],
+  colors: ['#D81B60', '#f59e0b', '#34d399', '#818cf8'],
   legend: {
     position: 'bottom' as const,
-    labels: { colors: '#a1a1aa' },
+    labels: { colors: '#6B7280' },
     fontSize: '11px',
     fontWeight: 700,
   },
@@ -59,7 +59,7 @@ const chartOptions = computed(() => ({
           total: {
             show: true,
             label: 'Total',
-            color: '#a1a1aa',
+            color: '#6B7280',
             formatter: (chart: { globals: { seriesTotals: number[] } }) =>
               formatBRL(chart.globals.seriesTotals.reduce((sum, value) => sum + value, 0)),
           },
@@ -68,27 +68,27 @@ const chartOptions = computed(() => ({
     },
   },
   tooltip: {
-    theme: 'dark' as const,
+    theme: 'light' as const,
     y: { formatter: (value: number) => formatBRL(value) },
   },
 }));
 </script>
 
 <template>
-  <section aria-label="Formas de pagamento e status dos pedidos" class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md">
+  <section aria-label="Formas de pagamento e status dos pedidos" class="rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Formas de pagamento</p>
-        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-white">Como vendem</h3>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Formas de pagamento</p>
+        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-[#05050A]">Como vendem</h3>
       </div>
-      <CreditCardIcon class="h-6 w-6 text-rose-300/70" />
+      <CreditCardIcon class="h-6 w-6 text-[#D81B60]" />
     </div>
 
     <div class="mt-6">
-      <div v-if="isLoading" aria-live="polite" class="h-56 animate-pulse rounded-2xl bg-zinc-800/40">
+      <div v-if="isLoading" aria-live="polite" class="h-56 animate-pulse rounded-2xl bg-zinc-100">
         <span class="sr-only">Carregando formas de pagamento</span>
       </div>
-      <p v-else-if="byPaymentMethod.length === 0" class="text-sm text-zinc-500">
+      <p v-else-if="byPaymentMethod.length === 0" class="text-sm text-bip-muted">
         Nenhuma venda registrada neste periodo.
       </p>
       <div v-else role="img" aria-label="Grafico de rosca com a receita por forma de pagamento">
@@ -101,7 +101,7 @@ const chartOptions = computed(() => ({
         v-for="row in byStatus"
         :key="row.status"
         class="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest"
-        :class="STATUS_BADGE_CLASS[row.status] ?? 'border-white/10 bg-white/5 text-zinc-300'"
+        :class="STATUS_BADGE_CLASS[row.status] ?? 'border-[#E5E7EB] bg-zinc-50 text-[#05050A]'"
       >
         {{ STATUS_LABELS[row.status] ?? row.status }}: {{ row.orders_count }}
       </span>

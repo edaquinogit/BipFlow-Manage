@@ -57,7 +57,7 @@ const accessibleLabel = computed(() => {
   border-radius: 2.5rem;
   background: linear-gradient(135deg, #05050a 0%, #5f1235 48%, #d81b60 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(216, 27, 96, 0.32);
+  box-shadow: 0 20px 45px -20px rgba(5, 5, 10, 0.35), 0 25px 50px -12px rgba(216, 27, 96, 0.32);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: default;
 }

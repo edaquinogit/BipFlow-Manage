@@ -61,7 +61,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#05050A] text-zinc-200 selection:bg-rose-500/30 font-sans antialiased" data-cy="dashboard-view">
+  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A] selection:bg-[#FCE7F3] font-sans antialiased" data-cy="dashboard-view">
     <DashboardHeader
       :user-name="currentUserName"
       :stores="stores"
@@ -73,13 +73,13 @@ onMounted(async () => {
       @logout="handleLogout"
     />
 
-    <div class="fixed bottom-5 left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-rose-500/20 bg-[#05050A]/90 px-4 py-3 text-xs shadow-2xl shadow-black/30 backdrop-blur-xl sm:flex">
-      <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]" />
+    <div class="fixed bottom-5 left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white/95 px-4 py-3 text-xs shadow-[0_14px_35px_-28px_rgba(5,5,10,0.45)] backdrop-blur-xl sm:flex">
+      <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.55)]" />
       <div class="min-w-0">
-        <p class="font-black uppercase tracking-[0.18em] text-zinc-500">Loja {{ activeStoreStatusLabel.toLowerCase() }}</p>
-        <p class="mt-1 truncate font-semibold text-white">
+        <p class="font-black uppercase tracking-[0.18em] text-bip-muted">Loja {{ activeStoreStatusLabel.toLowerCase() }}</p>
+        <p class="mt-1 truncate font-semibold text-[#05050A]">
           {{ activeStoreBadgeLabel }}
-          <span class="font-normal text-zinc-500">{{ activeStoreSlug }}</span>
+          <span class="font-normal text-bip-muted">{{ activeStoreSlug }}</span>
         </p>
       </div>
     </div>
@@ -88,7 +88,7 @@ onMounted(async () => {
       v-if="currentStoreError"
       class="mx-auto mt-6 max-w-7xl px-6"
     >
-      <div class="rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
+      <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
         {{ currentStoreError }}
       </div>
     </div>

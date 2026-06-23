@@ -79,7 +79,7 @@ async function selectConversation(conversationId: number): Promise<void> {
     selectedConversation.value = await botService.getConversation(conversationId);
   } catch (error: unknown) {
     Logger.warn('Failed to load bot conversation detail', { error, conversationId });
-    detailError.value = 'Nao foi possivel abrir essa conversa.';
+    detailError.value = 'Não foi possível abrir essa conversa.';
   } finally {
     isLoadingDetail.value = false;
   }
@@ -114,7 +114,7 @@ async function fetchConversations(): Promise<void> {
     await selectConversation(nextId);
   } catch (error: unknown) {
     Logger.warn('Failed to load bot conversations', { error });
-    listError.value = 'Nao foi possivel carregar as conversas do bot agora.';
+    listError.value = 'Não foi possível carregar as conversas do bot agora.';
   } finally {
     isLoadingList.value = false;
   }
@@ -153,10 +153,10 @@ function getStatusLabel(status: BotConversationStatus): string {
 
 function getStatusClass(status: BotConversationStatus): string {
   const classes: Record<BotConversationStatus, string> = {
-    open: 'border-sky-400/20 bg-sky-400/10 text-sky-200',
-    waiting_customer: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
-    waiting_human: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
-    closed: 'border-zinc-500/20 bg-zinc-500/10 text-zinc-300',
+    open: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
+    waiting_customer: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    waiting_human: 'border-amber-200 bg-amber-50 text-amber-800',
+    closed: 'border-[#E5E7EB] bg-zinc-50 text-bip-muted',
   };
 
   return classes[status];
@@ -165,7 +165,7 @@ function getStatusClass(status: BotConversationStatus): string {
 function getIntentLabel(intent: string): string {
   const labels: Record<string, string> = {
     greeting: 'Boas-vindas',
-    catalog: 'Catalogo',
+    catalog: 'Catálogo',
     product_search: 'Busca',
     delivery: 'Entrega',
     checkout: 'Checkout',
@@ -173,7 +173,7 @@ function getIntentLabel(intent: string): string {
     fallback: 'Fallback',
   };
 
-  return labels[intent] ?? 'Sem intencao';
+  return labels[intent] ?? 'Sem intenção';
 }
 
 function getMessageAuthorLabel(role: 'bot' | 'user'): string {
@@ -184,7 +184,7 @@ function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
 
   if (Number.isNaN(date.getTime())) {
-    return 'Data indisponivel';
+    return 'Data indisponível';
   }
 
   return new Intl.DateTimeFormat('pt-BR', {
@@ -224,13 +224,13 @@ onBeforeUnmount(() => {
   <div :aria-busy="isLoadingList || isLoadingDetail ? 'true' : 'false'">
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div class="min-w-0">
-        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Atendimento</p>
-        <h1 class="mt-1 text-xl font-black italic tracking-tighter text-white">Conversas do bot</h1>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Atendimento</p>
+        <h1 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">Conversas do bot</h1>
       </div>
 
       <button
         type="button"
-        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-400 transition hover:border-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/40 disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="isLoadingList"
         aria-label="Atualizar conversas do bot"
         @click="refreshConversations"
@@ -240,43 +240,43 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="mt-6 grid gap-3 md:grid-cols-3">
-      <div class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-        <p class="text-sm text-zinc-500">Conversas</p>
-        <p class="mt-2 text-3xl font-semibold text-white">{{ totalConversations }}</p>
+      <div class="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        <p class="text-sm text-bip-muted">Conversas</p>
+        <p class="mt-2 text-3xl font-semibold text-[#05050A]">{{ totalConversations }}</p>
       </div>
 
-      <div class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-        <p class="text-sm text-zinc-500">Handoff humano</p>
-        <p class="mt-2 text-3xl font-semibold text-amber-200">{{ humanQueueCount }}</p>
+      <div class="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        <p class="text-sm text-bip-muted">Handoff humano</p>
+        <p class="mt-2 text-3xl font-semibold text-amber-700">{{ humanQueueCount }}</p>
       </div>
 
-      <div class="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-        <p class="text-sm text-zinc-500">Mensagens na pagina</p>
-        <p class="mt-2 text-3xl font-semibold text-emerald-200">{{ currentPageMessageCount }}</p>
+      <div class="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        <p class="text-sm text-bip-muted">Mensagens na página</p>
+        <p class="mt-2 text-3xl font-semibold text-emerald-700">{{ currentPageMessageCount }}</p>
       </div>
     </div>
 
     <div class="mt-6 grid min-h-0 gap-4 lg:grid-cols-[minmax(280px,0.92fr)_minmax(0,1.38fr)]">
-      <aside class="min-h-0 rounded-lg border border-white/10 bg-zinc-950/60">
-        <div class="border-b border-white/10 p-4">
+      <aside class="min-h-0 rounded-lg border border-[#E5E7EB] bg-white">
+        <div class="border-b border-[#E5E7EB] p-4">
           <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] lg:grid-cols-1">
             <label class="relative block">
               <span class="sr-only">Buscar conversa</span>
-              <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bip-muted" />
               <input
                 v-model="searchTerm"
                 type="search"
-                class="h-10 w-full rounded-lg border border-transparent bg-white/[0.06] pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-white/20 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10"
-                placeholder="Buscar sessao, telefone ou mensagem"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                placeholder="Buscar sessão, telefone ou mensagem"
               />
             </label>
 
             <label class="relative block">
               <span class="sr-only">Filtrar por status</span>
-              <FunnelIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <FunnelIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bip-muted" />
               <select
                 v-model="statusFilter"
-                class="h-10 w-full appearance-none rounded-lg border border-transparent bg-white/[0.06] pl-10 pr-3 text-sm text-white outline-none transition focus:border-white/20 focus:bg-white/[0.08] focus:ring-2 focus:ring-white/10"
+                class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               >
                 <option v-for="option in STATUS_OPTIONS" :key="option.value" :value="option.value">
                   {{ option.label }}
@@ -288,12 +288,12 @@ onBeforeUnmount(() => {
 
         <div class="max-h-[32rem] overflow-y-auto p-3 lg:max-h-none lg:h-full">
           <div v-if="isLoadingList && conversations.length === 0" class="space-y-3">
-            <div v-for="index in 4" :key="index" class="h-24 animate-pulse rounded-lg border border-white/10 bg-white/[0.03]" />
+            <div v-for="index in 4" :key="index" class="h-24 animate-pulse rounded-lg border border-[#E5E7EB] bg-zinc-50" />
           </div>
 
           <div
             v-else-if="listError"
-            class="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-medium text-rose-100"
+            class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm font-medium text-[#7A143D]"
           >
             <ExclamationTriangleIcon class="mb-3 h-5 w-5" />
             {{ listError }}
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
 
           <div
             v-else-if="conversations.length === 0"
-            class="rounded-lg border border-white/10 bg-white/[0.03] p-5 text-sm font-medium text-zinc-300"
+            class="rounded-lg border border-[#E5E7EB] bg-white p-5 text-sm font-medium text-bip-muted"
           >
             Nenhuma conversa encontrada.
           </div>
@@ -311,19 +311,19 @@ onBeforeUnmount(() => {
               v-for="conversation in conversations"
               :key="conversation.id"
               type="button"
-              class="w-full rounded-lg border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/40"
+              class="w-full rounded-lg border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FCE7F3]"
               :class="selectedConversationId === conversation.id
-                ? 'border-white/30 bg-white/[0.08]'
-                : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]'"
+                ? 'border-[#D81B60]/30 bg-[#FCE7F3]'
+                : 'border-[#E5E7EB] bg-white hover:border-[#D81B60]/20 hover:bg-zinc-50'"
               :aria-label="`Abrir conversa ${conversation.session_id}`"
               @click="openConversation(conversation.id)"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold text-white">
+                  <p class="truncate text-sm font-semibold text-[#05050A]">
                     {{ conversation.customer_phone || conversation.session_id }}
                   </p>
-                  <p class="mt-1 text-xs text-zinc-500">
+                  <p class="mt-1 text-xs text-bip-muted">
                     {{ formatDateTime(conversation.updated_at) }}
                   </p>
                 </div>
@@ -332,11 +332,11 @@ onBeforeUnmount(() => {
                 </span>
               </div>
 
-              <p class="mt-3 line-clamp-2 text-xs leading-5 text-zinc-400">
+              <p class="mt-3 line-clamp-2 text-xs leading-5 text-bip-muted">
                 {{ conversation.last_message_preview || 'Sem mensagem recente.' }}
               </p>
 
-              <p v-if="conversation.sale_order" class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-bold text-emerald-200">
+              <p v-if="conversation.sale_order" class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
                 <ShoppingBagIcon class="h-3.5 w-3.5" />
                 Converteu: {{ conversation.sale_order.order_reference }}
               </p>
@@ -345,27 +345,27 @@ onBeforeUnmount(() => {
         </div>
       </aside>
 
-      <section class="flex min-h-0 flex-col rounded-lg border border-white/10 bg-zinc-950/60">
-        <div class="flex items-start justify-between gap-4 border-b border-white/10 p-5">
+      <section class="flex min-h-0 flex-col rounded-lg border border-[#E5E7EB] bg-white">
+        <div class="flex items-start justify-between gap-4 border-b border-[#E5E7EB] p-5">
           <div class="min-w-0">
-            <p class="text-sm text-zinc-500">Conversa aberta</p>
-            <h2 class="mt-1 truncate text-xl font-semibold text-white">
-              {{ selectedConversation?.customer_phone || selectedConversation?.session_id || 'Nenhuma sessao aberta' }}
+            <p class="text-sm text-bip-muted">Conversa aberta</p>
+            <h2 class="mt-1 truncate text-xl font-semibold text-[#05050A]">
+              {{ selectedConversation?.customer_phone || selectedConversation?.session_id || 'Nenhuma sessão aberta' }}
             </h2>
           </div>
 
-          <ChatBubbleLeftRightIcon class="h-6 w-6 shrink-0 text-zinc-400" />
+          <ChatBubbleLeftRightIcon class="h-6 w-6 shrink-0 text-bip-muted" />
         </div>
 
         <div v-if="isLoadingDetail" class="space-y-4 p-5">
-          <div class="h-20 animate-pulse rounded-lg border border-white/10 bg-white/[0.03]" />
-          <div class="ml-auto h-20 w-4/5 animate-pulse rounded-lg border border-white/10 bg-white/[0.03]" />
-          <div class="h-20 animate-pulse rounded-lg border border-white/10 bg-white/[0.03]" />
+          <div class="h-20 animate-pulse rounded-lg border border-[#E5E7EB] bg-zinc-50" />
+          <div class="ml-auto h-20 w-4/5 animate-pulse rounded-lg border border-[#E5E7EB] bg-zinc-50" />
+          <div class="h-20 animate-pulse rounded-lg border border-[#E5E7EB] bg-zinc-50" />
         </div>
 
         <div
           v-else-if="detailError"
-          class="m-5 rounded-lg border border-rose-500/20 bg-rose-500/10 p-5 text-sm font-medium text-rose-100"
+          class="m-5 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-5 text-sm font-medium text-[#7A143D]"
         >
           <ExclamationTriangleIcon class="mb-3 h-5 w-5" />
           {{ detailError }}
@@ -373,45 +373,45 @@ onBeforeUnmount(() => {
 
         <div
           v-else-if="!selectedConversation"
-          class="m-5 rounded-lg border border-white/10 bg-white/[0.03] p-6 text-sm font-medium text-zinc-300"
+          class="m-5 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-6 text-sm font-medium text-bip-muted"
         >
           Nenhuma conversa selecionada.
         </div>
 
         <div v-else class="flex min-h-0 flex-1 flex-col">
-          <div class="grid gap-3 border-b border-white/10 p-5 sm:grid-cols-3">
+          <div class="grid gap-3 border-b border-[#E5E7EB] p-5 sm:grid-cols-3">
             <div>
-              <p class="text-xs text-zinc-500">Status</p>
-              <p class="mt-1 text-sm font-semibold text-white">{{ getStatusLabel(selectedConversation.status) }}</p>
+              <p class="text-xs text-bip-muted">Status</p>
+              <p class="mt-1 text-sm font-semibold text-[#05050A]">{{ getStatusLabel(selectedConversation.status) }}</p>
             </div>
             <div>
-              <p class="text-xs text-zinc-500">Intencao</p>
-              <p class="mt-1 text-sm font-semibold text-white">{{ getIntentLabel(selectedConversation.last_intent) }}</p>
+              <p class="text-xs text-bip-muted">Intenção</p>
+              <p class="mt-1 text-sm font-semibold text-[#05050A]">{{ getIntentLabel(selectedConversation.last_intent) }}</p>
             </div>
             <div>
-              <p class="text-xs text-zinc-500">Canal</p>
-              <p class="mt-1 text-sm font-semibold text-white">{{ selectedConversation.channel }}</p>
+              <p class="text-xs text-bip-muted">Canal</p>
+              <p class="mt-1 text-sm font-semibold text-[#05050A]">{{ selectedConversation.channel }}</p>
             </div>
           </div>
 
           <div
             v-if="selectedConversation.sale_order"
-            class="m-5 rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-4"
+            class="m-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4"
           >
             <div class="flex items-center justify-between gap-4">
-              <div class="flex items-center gap-2 text-emerald-200">
+              <div class="flex items-center gap-2 text-emerald-800">
                 <ShoppingBagIcon class="h-5 w-5" />
                 <p class="text-sm font-black uppercase tracking-widest">Converteu em pedido</p>
               </div>
-              <span class="rounded-full border border-emerald-400/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
+              <span class="rounded-full border border-emerald-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-800">
                 {{ getSaleStatusLabel(selectedConversation.sale_order.status) }}
               </span>
             </div>
             <div class="mt-3 flex items-center justify-between gap-4">
-              <p class="text-sm font-semibold text-white">{{ selectedConversation.sale_order.order_reference }}</p>
-              <p class="text-lg font-black text-emerald-200">{{ formatBRL(selectedConversation.sale_order.total) }}</p>
+              <p class="text-sm font-semibold text-[#05050A]">{{ selectedConversation.sale_order.order_reference }}</p>
+              <p class="text-lg font-black text-emerald-800">{{ formatBRL(selectedConversation.sale_order.total) }}</p>
             </div>
-            <p class="mt-1 text-xs text-emerald-200/70">{{ formatDateTime(selectedConversation.sale_order.created_at) }}</p>
+            <p class="mt-1 text-xs text-emerald-700/70">{{ formatDateTime(selectedConversation.sale_order.created_at) }}</p>
           </div>
 
           <div class="flex-1 space-y-4 overflow-y-auto p-5">
@@ -420,18 +420,18 @@ onBeforeUnmount(() => {
               :key="message.id"
               class="max-w-[88%] rounded-lg border p-4"
               :class="message.role === 'bot'
-                ? 'border-white/10 bg-white/[0.04] text-zinc-100'
-                : 'ml-auto border-rose-400/20 bg-rose-500/10 text-white'"
+                ? 'border-[#E5E7EB] bg-zinc-50 text-[#05050A]'
+                : 'ml-auto border-[#D81B60]/20 bg-[#FCE7F3] text-[#05050A]'"
             >
               <div class="mb-2 flex items-center justify-between gap-3">
-                <span class="inline-flex items-center gap-2 text-xs font-medium text-zinc-400">
+                <span class="inline-flex items-center gap-2 text-xs font-medium text-bip-muted">
                   <component :is="message.role === 'bot' ? ChatBubbleLeftRightIcon : UserCircleIcon" class="h-4 w-4" />
                   {{ getMessageAuthorLabel(message.role) }}
                 </span>
-                <span class="shrink-0 text-xs text-zinc-500">{{ formatDateTime(message.created_at) }}</span>
+                <span class="shrink-0 text-xs text-bip-muted">{{ formatDateTime(message.created_at) }}</span>
               </div>
               <p class="whitespace-pre-line text-sm leading-6">{{ message.content }}</p>
-              <p v-if="message.intent" class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-xs text-zinc-400">
+              <p v-if="message.intent" class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] px-2.5 py-1 text-xs text-bip-muted">
                 <PhoneIcon v-if="message.intent === 'human_support'" class="h-3.5 w-3.5" />
                 {{ getIntentLabel(message.intent) }}
               </p>

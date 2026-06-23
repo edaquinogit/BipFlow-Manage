@@ -72,7 +72,7 @@ describe('CategoriesTab', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(toastState.error).toHaveBeenCalledWith('Nao foi possivel salvar a categoria.')
+    expect(toastState.error).toHaveBeenCalledWith('Não foi possível salvar a categoria.')
   })
 
   it('deletes a category and shows a success toast', async () => {

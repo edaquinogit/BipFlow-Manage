@@ -27,7 +27,7 @@ const hasCategories = computed(() => props.categories && props.categories.length
  * 🎨 NYC STATION THEME UTILITIES
  */
 const getGlowClass = (isActive: boolean) => {
-  return isActive ? 'shadow-lg shadow-indigo-500/25' : '';
+  return isActive ? 'shadow-lg shadow-[#D81B60]/15' : '';
 };
 
 /**
@@ -64,34 +64,33 @@ const handleConfirm = () => {
       class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50"
       :class="getGlowClass(true)"
     >
-      <div class="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-2xl px-6 py-4 shadow-2xl">
+      <div class="bg-white/95 backdrop-blur-xl border border-[#E5E7EB] rounded-2xl px-6 py-4 shadow-2xl shadow-black/10">
         <div class="flex items-center gap-6">
 
           <!-- Selection Count -->
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-              <span class="text-xs font-black text-indigo-400">{{ selectedCount }}</span>
+            <div class="w-8 h-8 rounded-full bg-[#FCE7F3] border border-[#D81B60]/30 flex items-center justify-center">
+              <span class="text-xs font-black text-[#D81B60]">{{ selectedCount }}</span>
             </div>
-            <span class="text-sm font-bold text-white uppercase tracking-wide">
-              Asset{{ selectedCount === 1 ? '' : 's' }} Selected
+            <span class="text-sm font-bold text-[#05050A] uppercase tracking-wide">
+              {{ selectedCount }} produto{{ selectedCount === 1 ? '' : 's' }} selecionado{{ selectedCount === 1 ? '' : 's' }}
             </span>
           </div>
 
           <!-- Category Selector -->
           <div v-if="hasCategories" class="flex items-center gap-3">
-            <TagIcon class="w-5 h-5 text-zinc-400" />
+            <TagIcon class="w-5 h-5 text-bip-muted" />
             <select
               v-model="selectedCategoryId"
               @change="(e) => handleCategorySelect(parseInt((e.target as HTMLSelectElement).value))"
               :disabled="isUpdating"
-              class="bg-zinc-800/50 border border-zinc-600/50 rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="bg-white border border-[#D1D5DB] rounded-lg px-4 py-2 text-sm font-medium text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:border-[#D81B60] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="" disabled selected>Choose Category</option>
+              <option value="" disabled selected>Escolher categoria</option>
               <option
                 v-for="category in categories"
                 :key="category.id"
                 :value="category.id"
-                class="bg-zinc-800 text-white"
               >
                 {{ category.name }}
               </option>
@@ -103,26 +102,26 @@ const handleConfirm = () => {
             v-if="hasSelectedCategory"
             @click="handleConfirm"
             :disabled="isUpdating"
-            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/50 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center gap-2 px-4 py-2 bg-[#D81B60] hover:bg-[#D81B60]/90 border border-[#D81B60]/50 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckIcon class="w-4 h-4" />
-            <span class="uppercase tracking-wide">Confirm</span>
+            <span class="uppercase tracking-wide">Confirmar</span>
           </button>
 
           <!-- Loading State -->
           <div v-if="isUpdating" class="flex items-center gap-2">
-            <div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <span class="text-xs text-zinc-400 font-medium uppercase tracking-wider">Updating...</span>
+            <div class="w-4 h-4 border-2 border-[#D81B60] border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-xs text-bip-muted font-medium uppercase tracking-wider">Atualizando...</span>
           </div>
 
           <!-- Cancel Button -->
           <button
             @click="emit('cancel')"
             :disabled="isUpdating"
-            class="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-600/50 rounded-lg text-sm font-medium text-zinc-300 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center gap-2 px-4 py-2 bg-white hover:bg-zinc-50 border border-[#E5E7EB] rounded-lg text-sm font-medium text-bip-muted hover:text-[#05050A] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <XMarkIcon class="w-4 h-4" />
-            <span class="uppercase tracking-wide">Cancel</span>
+            <span class="uppercase tracking-wide">Cancelar</span>
           </button>
         </div>
       </div>
@@ -137,16 +136,16 @@ select::-webkit-scrollbar {
 }
 
 select::-webkit-scrollbar-track {
-  background: rgba(39, 39, 42, 0.5);
+  background: rgba(229, 231, 235, 0.5);
   border-radius: 3px;
 }
 
 select::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(216, 27, 96, 0.4);
   border-radius: 3px;
 }
 
 select::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.7);
+  background: rgba(216, 27, 96, 0.6);
 }
 </style>

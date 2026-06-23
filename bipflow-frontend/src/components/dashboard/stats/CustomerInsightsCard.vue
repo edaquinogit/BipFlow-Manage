@@ -34,44 +34,44 @@ const returningShare = computed(() => {
 <template>
   <section
     aria-label="Conversao do bot e perfil de clientes"
-    class="rounded-[2.5rem] border border-white/5 bg-zinc-900/40 p-8 backdrop-blur-md"
+    class="rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]"
   >
     <div class="flex items-center justify-between gap-4">
       <div>
-        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Conversao e clientes</p>
-        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-white">Bot e recorrencia</h3>
+        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Conversao e clientes</p>
+        <h3 class="mt-2 text-lg font-black italic tracking-tighter text-[#05050A]">Bot e recorrencia</h3>
       </div>
-      <UserGroupIcon class="h-6 w-6 text-indigo-300/70" />
+      <UserGroupIcon class="h-6 w-6 text-indigo-600" />
     </div>
 
     <div v-if="isLoading" aria-live="polite" class="mt-6 grid grid-cols-2 gap-4">
       <span class="sr-only">Carregando conversao e clientes</span>
-      <div class="h-20 animate-pulse rounded-2xl bg-zinc-800/40" />
-      <div class="h-20 animate-pulse rounded-2xl bg-zinc-800/40" />
+      <div class="h-20 animate-pulse rounded-2xl bg-zinc-100" />
+      <div class="h-20 animate-pulse rounded-2xl bg-zinc-100" />
     </div>
 
     <div v-else class="mt-6 grid grid-cols-2 gap-4">
       <div>
-        <div class="flex items-center gap-1.5 text-zinc-500">
+        <div class="flex items-center gap-1.5 text-bip-muted">
           <ChatBubbleLeftRightIcon class="h-3.5 w-3.5" />
           <p class="text-[10px] font-black uppercase tracking-widest">Conversao do bot</p>
         </div>
-        <p class="mt-1 text-3xl font-black italic tracking-tighter text-white">{{ conversionLabel }}</p>
-        <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+        <p class="mt-1 text-3xl font-black italic tracking-tighter text-[#05050A]">{{ conversionLabel }}</p>
+        <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-bip-muted">
           {{ insights?.bot_converted_count ?? 0 }} de {{ insights?.bot_conversations_count ?? 0 }} conversas
         </p>
       </div>
 
       <div>
-        <p class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Clientes recorrentes</p>
-        <p class="mt-1 text-3xl font-black italic tracking-tighter text-white">{{ returningShare }}%</p>
-        <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+        <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Clientes recorrentes</p>
+        <p class="mt-1 text-3xl font-black italic tracking-tighter text-[#05050A]">{{ returningShare }}%</p>
+        <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
           <div
-            class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-300"
+            class="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-400"
             :style="{ width: returningShare + '%' }"
           />
         </div>
-        <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+        <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-bip-muted">
           {{ insights?.new_customers ?? 0 }} novos - {{ insights?.returning_customers ?? 0 }} recorrentes
         </p>
       </div>

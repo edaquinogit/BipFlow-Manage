@@ -25,7 +25,7 @@ defineEmits(['update:modelValue']);
 
 <template>
   <div class="space-y-2 group">
-    <label class="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-focus-within:text-indigo-400 transition-colors">
+    <label class="block text-[10px] font-black text-bip-muted uppercase tracking-[0.2em] group-focus-within:text-[#D81B60] transition-colors">
       {{ label }}
     </label>
 
@@ -36,13 +36,13 @@ defineEmits(['update:modelValue']);
         :value="modelValue"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         :placeholder="placeholder"
-        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-700 shadow-inner"
-        :class="{ 'border-red-500/50 bg-red-500/5': error }"
+        class="w-full bg-white border border-[#D1D5DB] rounded-xl px-4 py-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] transition-all placeholder:text-bip-muted/70"
+        :class="{ 'border-[#D81B60]/50 bg-[#FCE7F3]': error }"
       />
     </div>
 
     <Transition name="error-slide">
-      <p v-if="error" class="text-[9px] text-red-500 font-black uppercase tracking-widest animate-pulse">
+      <p v-if="error" class="text-[9px] text-[#D81B60] font-black uppercase tracking-widest animate-pulse">
         {{ error }}
       </p>
     </Transition>
@@ -58,12 +58,12 @@ defineEmits(['update:modelValue']);
   opacity: 0;
 }
 
-/* Remove estilos padrão de preenchimento automático do Chrome em modo dark */
+/* Remove estilos padrão de preenchimento automático do Chrome */
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
+input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-text-fill-color: white;
-  -webkit-box-shadow: 0 0 0px 1000px #09090b inset;
+  -webkit-text-fill-color: #05050A;
+  -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset;
   transition: background-color 5000s ease-in-out 0s;
 }
 </style>

@@ -106,7 +106,7 @@ const onImageError = (e: Event): void => {
 
 <template>
   <div
-    class="relative flex-none overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-inner group transition-all duration-300"
+    class="relative flex-none overflow-hidden rounded-lg border border-[#E5E7EB] bg-zinc-50 shadow-inner group transition-all duration-300"
     :class="{
       'h-8 w-8': size === 'sm',
       'h-11 w-11': size === 'md',
@@ -126,14 +126,14 @@ const onImageError = (e: Event): void => {
 
       <div
         v-else
-        class="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-500 font-black uppercase italic select-none"
+        class="flex h-full w-full items-center justify-center bg-zinc-100 text-bip-muted font-black uppercase italic select-none"
         :class="size === 'lg' ? 'text-lg' : 'text-[10px]'"
       >
         {{ fallbackInitials }}
       </div>
     </transition>
 
-    <div class="absolute inset-0 pointer-events-none ring-1 ring-inset ring-white/5 rounded-lg z-20" />
+    <div class="absolute inset-0 pointer-events-none ring-1 ring-inset ring-black/5 rounded-lg z-20" />
   </div>
 </template>
 

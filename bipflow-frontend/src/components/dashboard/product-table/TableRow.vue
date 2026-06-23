@@ -32,7 +32,7 @@ const resolvedCategory = computed(() => {
 
 <template>
   <tr
-    class="group hover:bg-zinc-800/40 transition-all duration-200 border-b border-zinc-800/50 last:border-0"
+    class="group hover:bg-zinc-50 transition-all duration-200 border-b border-[#E5E7EB] last:border-0"
     data-cy="product-table-row"
   >
 
@@ -41,11 +41,11 @@ const resolvedCategory = computed(() => {
       <button
         v-if="canManageCatalog"
         @click="emit('toggle-selection', product.id!)"
-        class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+        class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
         :class="[
           isSelected
-            ? 'bg-indigo-500 border-indigo-500 shadow-lg shadow-indigo-500/25'
-            : 'border-zinc-600 hover:border-indigo-400 bg-zinc-800/50'
+            ? 'bg-[#D81B60] border-[#D81B60] shadow-lg shadow-[#D81B60]/25'
+            : 'border-[#D1D5DB] hover:border-[#D81B60]/50 bg-white'
         ]"
         title="Selecionar produto"
       >
@@ -66,11 +66,11 @@ const resolvedCategory = computed(() => {
         <ProductAvatar :image="product.image" :name="product.name" />
 
         <div class="flex flex-col">
-          <span class="text-sm font-bold text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">
+          <span class="text-sm font-bold text-[#05050A] uppercase tracking-tight group-hover:text-[#D81B60] transition-colors">
             {{ product.name }}
           </span>
-          <span class="text-[9px] text-zinc-500 font-mono font-bold tracking-widest uppercase">
-            {{ product.sku || 'N/A-STATION' }}
+          <span class="text-[9px] text-bip-muted font-mono font-bold tracking-widest uppercase">
+            {{ product.sku || 'Sem SKU' }}
           </span>
         </div>
       </div>
@@ -84,16 +84,16 @@ const resolvedCategory = computed(() => {
       <div class="flex flex-col items-center">
         <span
           class="text-xs font-black font-mono"
-          :class="product.stock_quantity > 5 ? 'text-zinc-300' : 'text-amber-500'"
+          :class="product.stock_quantity > 5 ? 'text-[#05050A]' : 'text-amber-600'"
         >
           {{ product.stock_quantity.toString().padStart(2, '0') }}
         </span>
         <div
-          class="h-1 w-8 rounded-full mt-1 overflow-hidden bg-zinc-800"
-          title="Nivel de estoque"
+          class="h-1 w-8 rounded-full mt-1 overflow-hidden bg-zinc-100"
+          title="Nível de estoque"
         >
           <div
-            class="h-full bg-indigo-500 transition-all duration-500"
+            class="h-full bg-[#D81B60] transition-all duration-500"
             :style="{ width: `${Math.min(product.stock_quantity * 10, 100)}%` }"
           />
         </div>
@@ -102,11 +102,11 @@ const resolvedCategory = computed(() => {
 
     <td class="px-6 py-4 text-right">
       <div class="flex flex-col items-end">
-        <span class="text-sm font-black text-indigo-400 font-mono">
+        <span class="text-sm font-black text-[#D81B60] font-mono">
           {{ formatBRL(product.price) }}
         </span>
-        <span class="text-[8px] text-zinc-600 uppercase font-bold tracking-widest">
-          Preco unitario
+        <span class="text-[8px] text-bip-muted uppercase font-bold tracking-widest">
+          Preço unitário
         </span>
       </div>
     </td>
@@ -115,7 +115,7 @@ const resolvedCategory = computed(() => {
       <div v-if="canManageCatalog" class="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
         <button
           @click="emit('edit', product)"
-          class="p-2.5 hover:bg-indigo-500/10 rounded-lg text-zinc-500 hover:text-indigo-400 transition-colors"
+          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
           title="Editar produto"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,7 +125,7 @@ const resolvedCategory = computed(() => {
 
         <button
           @click="emit('delete', product.id!)"
-          class="p-2.5 hover:bg-red-500/10 rounded-lg text-zinc-500 hover:text-red-500 transition-colors"
+          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
           title="Remover produto"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

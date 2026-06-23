@@ -65,7 +65,7 @@ function closeMobileNav(): void {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-rose-500/10 bg-[#05050A]/90 backdrop-blur-xl">
+  <header class="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white/95 backdrop-blur-xl">
     <div class="mx-auto max-w-7xl px-6 py-4">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
@@ -78,19 +78,19 @@ function closeMobileNav(): void {
               />
             </div>
             <div class="flex flex-col">
-              <span class="brand-wordmark brand-wordmark-premium-dark max-w-[18rem] truncate text-lg">
+              <span class="brand-wordmark brand-wordmark-premium max-w-[18rem] truncate text-lg">
                 {{ activeBranding.name }}
               </span>
-              <span class="text-[8px] font-bold uppercase tracking-widest text-rose-400/90">
+              <span class="text-[8px] font-bold uppercase tracking-widest text-[#D81B60]">
                 {{ activeBranding.tagline }}
               </span>
             </div>
           </div>
 
-          <div class="hidden md:block h-8 border-l border-rose-500/15 mx-2"></div>
+          <div class="hidden md:block h-8 border-l border-[#E5E7EB] mx-2"></div>
 
-          <span class="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-200">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+          <span class="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             <span class="truncate">Loja {{ activeBranding.statusLabel.toLowerCase() }} {{ activeStorePathSlug }}</span>
           </span>
         </div>
@@ -101,7 +101,7 @@ function closeMobileNav(): void {
             <select
               :value="activeStoreSlug"
               :disabled="isStoreLoading || stores.length === 0"
-              class="h-11 w-full appearance-none rounded-xl border border-rose-500/20 bg-white/[0.03] px-3 pr-9 text-sm font-semibold text-white outline-none transition hover:border-rose-400/50 focus:border-rose-400/60 focus:ring-2 focus:ring-rose-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+              class="h-11 w-full appearance-none rounded-xl border border-[#D1D5DB] bg-white px-3 pr-9 text-sm font-semibold text-[#05050A] outline-none transition hover:border-[#D81B60]/50 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-60"
               @change="handleStoreSelect"
             >
               <option value="" disabled>
@@ -111,7 +111,6 @@ function closeMobileNav(): void {
                 v-for="store in stores"
                 :key="store.id"
                 :value="store.slug"
-                class="bg-[#05050A] text-white"
               >
                 {{ store.name }}
               </option>
@@ -122,7 +121,7 @@ function closeMobileNav(): void {
             :href="storefrontPath"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-xs font-black uppercase tracking-widest text-zinc-200 transition hover:border-rose-400/40 hover:bg-rose-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
             :title="`Abrir ${storefrontPath}`"
             @click="emit('openStore')"
           >
@@ -131,17 +130,17 @@ function closeMobileNav(): void {
           </a>
 
           <div class="flex min-w-0 flex-col items-end">
-            <span class="hidden text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 sm:block">
+            <span class="hidden text-[9px] font-black uppercase tracking-[0.2em] text-bip-muted sm:block">
               Operador
             </span>
-            <span class="max-w-[8rem] truncate text-xs font-bold text-white sm:max-w-[13rem] sm:text-sm">
+            <span class="max-w-[8rem] truncate text-xs font-bold text-[#05050A] sm:max-w-[13rem] sm:text-sm">
               {{ welcomeMessage }}
             </span>
           </div>
 
           <button
             type="button"
-            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-rose-500/20 bg-white/[0.03] text-zinc-300 transition-all duration-300 hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40 lg:flex"
+            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-all duration-300 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] lg:flex"
             aria-label="Finalizar sessao"
             title="Finalizar sessao"
             @click="emit('logout')"
@@ -151,7 +150,7 @@ function closeMobileNav(): void {
 
           <button
             type="button"
-            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-500/20 bg-white/[0.03] text-zinc-300 transition-all duration-300 hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40 lg:hidden"
+            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-all duration-300 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] lg:hidden"
             :aria-expanded="isMobileNavOpen"
             aria-label="Abrir menu de navegacao"
             @click="isMobileNavOpen = !isMobileNavOpen"
@@ -167,9 +166,9 @@ function closeMobileNav(): void {
           v-for="item in NAV_ITEMS"
           :key="item.label"
           :to="item.to"
-          class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
-          active-class="bg-rose-500/10 text-rose-200"
-          exact-active-class="bg-rose-500/10 text-rose-200"
+          class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-[#FCE7F3]/60 hover:text-[#05050A]"
+          active-class="bg-[#FCE7F3] text-[#D81B60]"
+          exact-active-class="bg-[#FCE7F3] text-[#D81B60]"
         >
           <component :is="item.icon" class="h-4 w-4" />
           {{ item.label }}
@@ -181,15 +180,15 @@ function closeMobileNav(): void {
       <nav
         v-if="isMobileNavOpen"
         aria-label="Secoes do dashboard (mobile)"
-        class="border-t border-white/10 bg-[#05050A] px-6 py-4 lg:hidden"
+        class="border-t border-[#E5E7EB] bg-white px-6 py-4 lg:hidden"
       >
         <RouterLink
           v-for="item in NAV_ITEMS"
           :key="item.label"
           :to="item.to"
-          class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white"
-          active-class="bg-rose-500/10 text-rose-200"
-          exact-active-class="bg-rose-500/10 text-rose-200"
+          class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[#05050A] transition hover:bg-[#FCE7F3]/60"
+          active-class="bg-[#FCE7F3] text-[#D81B60]"
+          exact-active-class="bg-[#FCE7F3] text-[#D81B60]"
           @click="closeMobileNav"
         >
           <component :is="item.icon" class="h-5 w-5" />
@@ -198,7 +197,7 @@ function closeMobileNav(): void {
 
         <button
           type="button"
-          class="mt-2 flex w-full items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-3 text-sm font-bold text-rose-100 transition hover:bg-rose-500/15"
+          class="mt-2 flex w-full items-center gap-3 rounded-xl border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-3 text-sm font-bold text-[#D81B60] transition hover:bg-[#FCE7F3]/70"
           @click="emit('logout')"
         >
           <ArrowLeftOnRectangleIcon class="h-5 w-5" />

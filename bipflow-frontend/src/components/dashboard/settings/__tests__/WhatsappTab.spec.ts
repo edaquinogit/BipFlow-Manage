@@ -56,7 +56,7 @@ describe('WhatsappTab', () => {
 
     await wrapper.find('input[type="tel"]').setValue('12345')
 
-    expect(wrapper.text()).toContain('Use codigo do pais e DDD')
+    expect(wrapper.text()).toContain('Use código do país e DDD')
     expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
@@ -81,6 +81,6 @@ describe('WhatsappTab', () => {
     const wrapper = mount(WhatsappTab)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Nao foi possivel carregar o WhatsApp da loja agora.')
+    expect(wrapper.text()).toContain('Não foi possível carregar o WhatsApp da loja agora.')
   })
 })

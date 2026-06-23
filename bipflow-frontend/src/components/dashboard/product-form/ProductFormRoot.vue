@@ -135,7 +135,7 @@ const submitLabel = computed(() => {
     return 'Salvando...';
   }
 
-  return props.initialData ? 'Salvar alteracoes' : 'Criar produto';
+  return props.initialData ? 'Salvar alterações' : 'Criar produto';
 });
 </script>
 
@@ -148,15 +148,15 @@ const submitLabel = computed(() => {
       />
 
       <aside
-        class="relative flex w-full max-w-xl flex-col overflow-hidden border-l border-white/10 bg-zinc-950/95 p-6 shadow-2xl shadow-black/40 sm:p-8"
+        class="relative flex w-full max-w-xl flex-col overflow-hidden border-l border-[#E5E7EB] bg-white p-6 shadow-2xl shadow-black/10 sm:p-8"
         data-cy="product-form-panel"
       >
         <header class="mb-9 flex shrink-0 items-start justify-between gap-6">
           <div>
-            <h2 class="text-2xl font-semibold leading-none tracking-normal text-white">
+            <h2 class="text-2xl font-semibold leading-none tracking-normal text-[#05050A]">
               {{ title }}
             </h2>
-            <p class="mt-2 text-sm text-zinc-500">
+            <p class="mt-2 text-sm text-bip-muted">
               {{ subtitle }}
             </p>
           </div>
@@ -164,8 +164,8 @@ const submitLabel = computed(() => {
           <button
             type="button"
             data-cy="btn-close-form"
-            aria-label="Fechar formulario de produto"
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-400 transition-all hover:bg-white/10 hover:text-white active:scale-95"
+            aria-label="Fechar formulário de produto"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-bip-muted transition-all hover:bg-zinc-50 hover:text-[#05050A] active:scale-95"
             @click="emit('close')"
           >
             <XMarkIcon class="h-5 w-5" />
@@ -200,15 +200,15 @@ const submitLabel = computed(() => {
           />
         </form>
 
-        <footer class="mt-8 shrink-0 border-t border-white/10 pt-5">
+        <footer class="mt-8 shrink-0 border-t border-[#E5E7EB] pt-5">
           <button
             form="product-registry-form"
             type="submit"
             data-cy="btn-submit-product"
             :disabled="isSubmitting"
-            class="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-white px-5 text-sm font-semibold text-black shadow-xl shadow-white/5 transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span v-if="isSubmitting" class="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
+            <span v-if="isSubmitting" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             <CheckIcon v-else class="h-4 w-4" />
             <span>{{ submitLabel }}</span>
           </button>
@@ -234,11 +234,11 @@ const submitLabel = computed(() => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #e5e7eb;
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #d1d5db;
 }
 </style>
