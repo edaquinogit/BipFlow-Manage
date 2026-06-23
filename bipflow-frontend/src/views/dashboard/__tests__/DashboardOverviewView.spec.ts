@@ -1,0 +1,82 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
+import DashboardOverviewView from '../DashboardOverviewView.vue'
+import { useProducts } from '@/composables/useProducts'
+import { useCurrentStore } from '@/composables/useCurrentStore'
+import { salesService } from '@/services/sales.service'
+
+vi.mock('@/composables/useProducts', () => ({ useProducts: vi.fn() }))
+vi.mock('@/composables/useCurrentStore', () => ({ useCurrentStore: vi.fn() }))
+vi.mock('@/services/sales.service', () => ({
+  salesService: {
+    summary: vi.fn(),
+    timeseries: vi.fn(),
+    breakdown: vi.fn(),
+    customers: vi.fn(),
+  },
+}))
+
+const mountOverview = () =>
+  mount(DashboardOverviewView, {
+    global: { stubs: { apexchart: true } },
+  })
+
+describe('DashboardOverviewView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useProducts).mockReturnValue({
+      loading: ref(false),
+      inventoryStats: ref({ totalItems: 10, lowStockCount: 1 }),
+      fetchData: vi.fn(),
+    } as any)
+    vi.mocked(useCurrentStore).mockReturnValue({ selectedStore: ref(null) } as any)
+  })
+
+  it('shows an error banner when the analytics request fails', async () => {
+    vi.mocked(salesService.summary).mockResolvedValue({
+      period: '30d',
+      revenue_total: '0.00',
+      orders_count: 0,
+      average_ticket: '0.00',
+      comparison_previous_period: null,
+      comparison_same_period_last_year: null,
+    })
+    vi.mocked(salesService.timeseries).mockRejectedValue(new Error('network down'))
+    vi.mocked(salesService.breakdown).mockResolvedValue({
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+    })
+    vi.mocked(salesService.customers).mockResolvedValue({
+      period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,
+    })
+
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Nao foi possivel carregar a analise de vendas agora.')
+  })
+
+  it('renders the revenue summary once the request resolves', async () => {
+    vi.mocked(salesService.summary).mockResolvedValue({
+      period: '30d',
+      revenue_total: '150.00',
+      orders_count: 3,
+      average_ticket: '50.00',
+      comparison_previous_period: '10.00',
+      comparison_same_period_last_year: null,
+    })
+    vi.mocked(salesService.timeseries).mockResolvedValue([])
+    vi.mocked(salesService.breakdown).mockResolvedValue({
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+    })
+    vi.mocked(salesService.customers).mockResolvedValue({
+      period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,
+    })
+
+    const wrapper = mountOverview()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('R$')
+    expect(wrapper.text()).toContain('150,00')
+  })
+})

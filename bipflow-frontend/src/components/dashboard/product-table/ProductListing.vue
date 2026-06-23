@@ -3,47 +3,50 @@ import ProductTable from '@/components/dashboard/product-table/ProductTableRoot.
 import SearchAndFilterBar from '@/components/dashboard/product-table/SearchAndFilterBar.vue';
 import BulkActionBar from '@/components/dashboard/product-table/ui/BulkActionBar.vue';
 import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/vue/24/outline';
+import { useCategories } from '@/composables/useCategories';
+import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useCurrentUser } from '@/composables/useCurrentUser';
+import { useProducts } from '@/composables/useProducts';
 import type { Product } from '@/schemas/product.schema';
-import type { Category } from '@/schemas/category.schema';
-import type { FilterState } from '@/types/filters';
-import type { Store } from '@/types/store';
 
 /**
- * 🏷️ PROPS BOUNDARY (Strict Typing)
- * Define o contrato de dados que este componente exige do DashboardView.
+ * Only state that genuinely belongs to the parent view's own orchestration
+ * (panel/modal open state, the in-flight flag for its bulk-update call)
+ * comes in as props/emits. Everything else below (products, filters,
+ * categories, the active store, catalog permission) is read straight from
+ * the same singleton composables the parent itself reads from -- there is
+ * no need to thread it through props just to hand it back down.
  */
 defineProps<{
-  products: Product[];
-  isLoading: boolean;
-  error: string | null;
-  filters: FilterState;
-  activeStore?: Store | null;
-  isSearching?: boolean;
-  categories?: Category[];
-  canManageCatalog?: boolean;
-  selectedAssetIds?: Set<number>;
-  isAllSelected?: boolean;
-  isIndeterminate?: boolean;
   isBulkUpdating?: boolean;
 }>();
 
-/**
- * 📡 EVENT DISPATCHER (Type-Safe Emits)
- * Abandonamos o array simples ['edit', 'delete'] e usamos a tipagem baseada em interface.
- * Isso garante que o VS Code grite se você tentar emitir um 'delete' sem passar um 'id' numérico.
- */
 defineEmits<{
   (e: 'open-panel'): void;
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
-  (e: 'retry'): void;
-  (e: 'updateFilters', filters: Partial<FilterState>): void;
-  (e: 'clear-filters'): void;
-  (e: 'toggle-selection', productId: number): void;
-  (e: 'select-all'): void;
-  (e: 'clear-selection'): void;
   (e: 'bulk-update-category', categoryId: number): void;
 }>();
+
+const {
+  products,
+  loading: isLoading,
+  error,
+  filters,
+  isSearching,
+  selectedAssetIds,
+  isAllSelected,
+  isIndeterminate,
+  fetchData,
+  updateFilters,
+  clearFilters,
+  toggleSelection,
+  selectAll,
+  clearSelection,
+} = useProducts();
+const { categories } = useCategories();
+const { selectedStore: activeStore } = useCurrentStore();
+const { canManageCatalog } = useCurrentUser();
 </script>
 
 <template>
@@ -73,8 +76,8 @@ defineEmits<{
       :filters="filters"
       :is-searching="isSearching"
       :categories="categories"
-      @updateFilters="(f) => $emit('updateFilters', f)"
-      @clear-filters="$emit('clear-filters')"
+      @updateFilters="(f) => updateFilters(f)"
+      @clear-filters="clearFilters"
     />
 
     <div v-if="isLoading" data-cy="loading-skeleton" class="space-y-4">
@@ -86,7 +89,7 @@ defineEmits<{
       <p class="text-red-400 font-black uppercase text-[11px] tracking-[0.3em] mb-6">{{ error }}</p>
       <button
         data-cy="btn-retry-connection"
-        @click="$emit('retry')"
+        @click="fetchData"
         class="text-white font-black text-[10px] border border-white/10 px-10 py-3 rounded-full hover:bg-white/5 transition-all uppercase tracking-widest"
       >
         Re-establish Connection
@@ -103,8 +106,8 @@ defineEmits<{
       :is-indeterminate="isIndeterminate"
       @delete="(id) => $emit('delete', id)"
       @edit="(product) => $emit('edit', product)"
-      @toggle-selection="(productId) => $emit('toggle-selection', productId)"
-      @select-all="$emit('select-all')"
+      @toggle-selection="(productId) => toggleSelection(productId)"
+      @select-all="selectAll"
     />
   </section>
 
@@ -113,7 +116,7 @@ defineEmits<{
     :selected-count="selectedAssetIds?.size || 0"
     :categories="categories || []"
     :is-updating="isBulkUpdating"
-    @cancel="$emit('clear-selection')"
+    @cancel="clearSelection"
     @confirm-bulk-update="(categoryId) => $emit('bulk-update-category', categoryId)"
   />
 </template>

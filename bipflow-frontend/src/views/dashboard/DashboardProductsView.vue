@@ -3,10 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
 import { useCurrentStore } from '@/composables/useCurrentStore';
-import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
-import type { FilterState } from '@/types/filters';
 import { Logger } from '@/services/logger';
 import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productPayload';
 
@@ -15,29 +13,18 @@ import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 const {
-  loading: productsLoading,
-  error,
   products,
-  filters,
-  isSearching,
   selectedAssetIds,
-  isAllSelected,
-  isIndeterminate,
   fetchData,
   createProduct,
   updateProduct,
   deleteProduct,
-  updateFilters,
-  clearFilters,
-  toggleSelection,
-  selectAll,
   clearSelection,
   bulkUpdateCategory,
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
 const { selectedStore } = useCurrentStore();
-const { canManageCatalog } = useCurrentUser();
 const { success, error: toastError } = useToast();
 
 const isPanelOpen = ref(false);
@@ -127,14 +114,6 @@ const executeDelete = async (): Promise<void> => {
   }
 };
 
-const handleFiltersUpdate = (newFilters: Partial<FilterState>): void => {
-  updateFilters(newFilters);
-};
-
-const handleClearFilters = async (): Promise<void> => {
-  await clearFilters();
-};
-
 const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
   if (selectedAssetIds.value.size === 0) {
     toastError('Selecione pelo menos um produto antes de alterar a categoria.');
@@ -207,27 +186,10 @@ watch(selectedStore, refreshProducts);
 
     <section id="dashboard-products">
       <ProductListing
-        :products="products"
-        :is-loading="productsLoading"
-        :error="error"
-        :filters="filters"
-        :active-store="selectedStore"
-        :is-searching="isSearching"
-        :categories="categories"
-        :can-manage-catalog="canManageCatalog"
-        :selected-asset-ids="selectedAssetIds"
-        :is-all-selected="isAllSelected"
-        :is-indeterminate="isIndeterminate"
         :is-bulk-updating="isBulkUpdating"
         @open-panel="handleOpenNewPanel"
         @edit="handleEditRequest"
         @delete="openDeleteConfirm"
-        @retry="fetchData"
-        @updateFilters="handleFiltersUpdate"
-        @clear-filters="handleClearFilters"
-        @toggle-selection="toggleSelection"
-        @select-all="selectAll"
-        @clear-selection="clearSelection"
         @bulk-update-category="handleBulkUpdateCategory"
       />
     </section>

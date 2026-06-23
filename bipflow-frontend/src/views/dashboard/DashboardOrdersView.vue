@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ClockIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
+import { useAsyncResource } from '@/composables/useAsyncResource';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
-import type { SaleOrder, SaleOrderFilters, SaleOrderStatus } from '@/types/sales';
+import {
+  getDeliveryMethodLabel,
+  getPaymentLabel,
+  getSaleStatusLabel,
+  SALE_STATUS_OPTIONS,
+  SALE_TIMELINE_STEPS,
+} from '@/constants/saleOrder';
+import type {
+  PaginatedSalesOrdersResponse,
+  SaleOrder,
+  SaleOrderFilters,
+  SaleOrderStatus,
+} from '@/types/sales';
 import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
 import { useDebounceFn } from '@/utils/debounce';
@@ -14,22 +27,16 @@ const { selectedStore } = useCurrentStore();
 const { canManageCatalog } = useCurrentUser();
 const { success, error: toastError } = useToast();
 
-const recentSales = ref<SaleOrder[]>([]);
-const isSalesLoading = ref(false);
-const salesError = ref<string | null>(null);
+const { data: salesHistory, isLoading: isSalesLoading, error: salesError, run: runSalesHistory } = (
+  useAsyncResource<PaginatedSalesOrdersResponse>()
+);
+const recentSales = computed(() => salesHistory.value?.results ?? []);
 const updatingSaleOrderId = ref<number | null>(null);
 
 const salesSearchTerm = ref('');
 const salesStatusFilter = ref<'all' | SaleOrderStatus>('all');
-const saleStatusOptions: { value: SaleOrderStatus; label: string }[] = [
-  { value: 'prepared', label: 'Novo' },
-  { value: 'sent', label: 'Enviado' },
-  { value: 'cancelled', label: 'Cancelado' },
-];
-const saleTimelineSteps: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: string }[] = [
-  { value: 'prepared', label: 'Novo' },
-  { value: 'sent', label: 'Enviado' },
-];
+const saleStatusOptions = SALE_STATUS_OPTIONS;
+const saleTimelineSteps = SALE_TIMELINE_STEPS;
 
 const hasActiveSalesFilters = computed(() => (
   salesSearchTerm.value.trim() !== '' || salesStatusFilter.value !== 'all'
@@ -42,20 +49,12 @@ function buildSalesFilters(): Omit<SaleOrderFilters, 'pageSize'> {
   };
 }
 
-const fetchSalesHistory = async (filters: SaleOrderFilters = {}): Promise<void> => {
-  isSalesLoading.value = true;
-  salesError.value = null;
-
-  try {
-    const response = await salesService.list({ pageSize: 20, ...filters });
-    recentSales.value = response.results;
-  } catch (error: unknown) {
-    Logger.warn('Failed to fetch dashboard sales history', { error });
-    salesError.value = 'Nao foi possivel carregar o historico agora.';
-  } finally {
-    isSalesLoading.value = false;
-  }
-};
+const fetchSalesHistory = (filters: SaleOrderFilters = {}): Promise<void> => (
+  runSalesHistory(
+    () => salesService.list({ pageSize: 20, ...filters }),
+    'Nao foi possivel carregar o historico agora.'
+  )
+);
 
 const [emitSalesFiltersDebounced, cancelSalesFiltersDebounce] = useDebounceFn(() => {
   void fetchSalesHistory(buildSalesFilters());
@@ -83,9 +82,14 @@ const handleUpdateSaleStatus = async (orderId: number, nextStatus: SaleOrderStat
 
   try {
     const updatedOrder = await salesService.updateStatus(orderId, nextStatus);
-    recentSales.value = recentSales.value.map((sale) => (
-      sale.id === updatedOrder.id ? updatedOrder : sale
-    ));
+    if (salesHistory.value) {
+      salesHistory.value = {
+        ...salesHistory.value,
+        results: salesHistory.value.results.map((sale) => (
+          sale.id === updatedOrder.id ? updatedOrder : sale
+        )),
+      };
+    }
     success('Status do pedido atualizado.');
   } catch (error: unknown) {
     Logger.error('Sale order status update failed', { error, orderId, nextStatus });
@@ -108,24 +112,6 @@ function formatSaleDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-}
-
-function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
-  const labels: Record<SaleOrder['payment_method'], string> = {
-    pix: 'Pix',
-    card: 'Cartao',
-    cash: 'Dinheiro',
-  };
-
-  return labels[paymentMethod];
-}
-
-function getDeliveryMethodLabel(deliveryMethod: SaleOrder['delivery_method']): string {
-  return deliveryMethod === 'delivery' ? 'Delivery' : 'Retirada';
-}
-
-function getSaleStatusLabel(status: SaleOrderStatus): string {
-  return saleStatusOptions.find((option) => option.value === status)?.label ?? status;
 }
 
 function getSaleStatusClass(status: SaleOrderStatus): string {

@@ -1,3 +1,5 @@
+import type { SaleOrderStatus } from './sales'
+
 export type BotChannel = 'web' | 'whatsapp'
 
 export type BotConversationStatus = 'open' | 'waiting_customer' | 'waiting_human' | 'closed'
@@ -73,7 +75,7 @@ export interface BotConversationMessage {
 
 export interface BotConversationOrder {
   order_reference: string
-  status: string
+  status: SaleOrderStatus
   total: string
   created_at: string
 }

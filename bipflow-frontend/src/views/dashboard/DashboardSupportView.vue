@@ -12,6 +12,7 @@ import {
   UserCircleIcon,
 } from '@heroicons/vue/24/outline';
 import { useCurrentStore } from '@/composables/useCurrentStore';
+import { getSaleStatusLabel } from '@/constants/saleOrder';
 import { botService } from '@/services/bot.service';
 import { Logger } from '@/services/logger';
 import { DashboardRoutes } from '@/router/dashboard.routes';
@@ -178,16 +179,6 @@ function getIntentLabel(intent: string): string {
 
 function getMessageAuthorLabel(role: 'bot' | 'user'): string {
   return role === 'bot' ? 'Bot' : 'Cliente';
-}
-
-function getOrderStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    prepared: 'Novo',
-    sent: 'Enviado',
-    cancelled: 'Cancelado',
-  };
-
-  return labels[status] ?? status;
 }
 
 function formatDateTime(dateString: string): string {
@@ -414,7 +405,7 @@ onBeforeUnmount(() => {
                 <p class="text-sm font-black uppercase tracking-widest">Converteu em pedido</p>
               </div>
               <span class="rounded-full border border-emerald-400/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-200">
-                {{ getOrderStatusLabel(selectedConversation.sale_order.status) }}
+                {{ getSaleStatusLabel(selectedConversation.sale_order.status) }}
               </span>
             </div>
             <div class="mt-3 flex items-center justify-between gap-4">
