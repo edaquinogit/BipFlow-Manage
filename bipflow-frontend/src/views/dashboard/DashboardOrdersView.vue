@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ClockIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
 import { useAsyncResource } from '@/composables/useAsyncResource';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import {
@@ -23,7 +23,6 @@ import { salesService } from '@/services/sales.service';
 import { useDebounceFn } from '@/utils/debounce';
 import { formatBRL } from '@/utils/formatters';
 
-const { selectedStore } = useCurrentStore();
 const { canManageCatalog } = useCurrentUser();
 const { success, error: toastError } = useToast();
 
@@ -69,7 +68,7 @@ watch(salesStatusFilter, () => {
   void fetchSalesHistory(buildSalesFilters());
 });
 
-watch(selectedStore, () => {
+useStoreSwitchEffect(() => {
   void fetchSalesHistory(buildSalesFilters());
 });
 

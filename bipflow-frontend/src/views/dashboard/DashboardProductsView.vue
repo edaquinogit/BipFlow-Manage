@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
 import { Logger } from '@/services/logger';
@@ -24,7 +24,6 @@ const {
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
-const { selectedStore } = useCurrentStore();
 const { success, error: toastError } = useToast();
 
 const isPanelOpen = ref(false);
@@ -141,7 +140,7 @@ const refreshProducts = (): void => {
 };
 
 onMounted(refreshProducts);
-watch(selectedStore, refreshProducts);
+useStoreSwitchEffect(refreshProducts);
 </script>
 
 <template>

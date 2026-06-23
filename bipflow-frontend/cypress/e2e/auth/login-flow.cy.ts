@@ -38,7 +38,9 @@ describe('Authentication flow', () => {
     cy.get('input[type="password"]').type(password)
     cy.get('button[type="submit"]').click()
 
-    cy.location('pathname', { timeout: 15000 }).should('eq', '/')
+    // '/' immediately redirects to '/dashboard' (Overview) since the
+    // dashboard routing split -- assert the route it actually settles on.
+    cy.location('pathname', { timeout: 15000 }).should('eq', '/dashboard')
     cy.get('[data-cy="dashboard-view"]', { timeout: 15000 }).should('exist')
 
     cy.window().then((win) => {

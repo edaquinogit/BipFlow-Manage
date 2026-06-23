@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import { useAsyncResource } from '@/composables/useAsyncResource';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
@@ -11,7 +11,6 @@ import { Logger } from '@/services/logger';
 import { formatBRL } from '@/utils/formatters';
 
 const { canManageCatalog } = useCurrentUser();
-const { selectedStore } = useCurrentStore();
 const { success, error: toastError } = useToast();
 
 const {
@@ -108,7 +107,7 @@ onMounted(() => {
   void fetchDeliveryRegions();
 });
 
-watch(selectedStore, () => {
+useStoreSwitchEffect(() => {
   void fetchDeliveryRegions();
 });
 </script>

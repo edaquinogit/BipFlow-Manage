@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { onMounted, watch, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { TrashIcon } from '@heroicons/vue/24/outline';
 import { useCategories } from '@/composables/useCategories';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { CategoryCreatePayload } from '@/schemas/category.schema';
 import { Logger } from '@/services/logger';
 
 const { canManageCatalog } = useCurrentUser();
-const { selectedStore } = useCurrentStore();
 const { success, error: toastError } = useToast();
 
 const {
@@ -64,7 +63,7 @@ onMounted(() => {
   void fetchCategories(true);
 });
 
-watch(selectedStore, () => {
+useStoreSwitchEffect(() => {
   void fetchCategories(true);
 });
 </script>

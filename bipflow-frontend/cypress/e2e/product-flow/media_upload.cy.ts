@@ -141,8 +141,10 @@ describe('Product Image Upload Flow', () => {
     cy.intercept('GET', API_PATTERNS.products).as('getProducts');
     cy.intercept('GET', API_PATTERNS.categories).as('getCategories');
 
-    // 3. Navigate to dashboard
-    cy.visitWithAuth('/');
+    // 3. Navigate to the products page (dashboard routes are per-section
+    // since the routing split; '/' only redirects to the Overview page
+    // and never fetches products/categories at all).
+    cy.visitWithAuth('/dashboard/produtos');
 
     // 4. Wait for data to load
     cy.wait('@getProducts', { timeout: 10000 });

@@ -11,7 +11,7 @@ import {
   ShoppingBagIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { getSaleStatusLabel } from '@/constants/saleOrder';
 import { botService } from '@/services/bot.service';
 import { Logger } from '@/services/logger';
@@ -38,7 +38,6 @@ const STATUS_OPTIONS: Array<{ label: string; value: StatusFilter }> = [
 ];
 
 const router = useRouter();
-const { selectedStore } = useCurrentStore();
 
 const conversations = ref<BotConversationSummary[]>([]);
 const selectedConversation = ref<BotConversationDetail | null>(null);
@@ -208,7 +207,7 @@ watch(() => props.conversationId, (id) => {
   }
 });
 
-watch(selectedStore, () => {
+useStoreSwitchEffect(() => {
   void fetchConversations();
 });
 

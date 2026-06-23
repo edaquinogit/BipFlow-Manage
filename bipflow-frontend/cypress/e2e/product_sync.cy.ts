@@ -17,7 +17,9 @@ const ASSET_SELECTORS = {
 
 describe('Product Image Synchronization & Integrity', () => {
   const API_URL = Cypress.env('apiUrl') || 'http://127.0.0.1:8000';
-  const INVENTORY_ROUTE = '/';
+  // Dashboard routes are per-section since the routing split; '/' only
+  // redirects to the Overview page and never renders the product table.
+  const INVENTORY_ROUTE = '/dashboard/produtos';
 
   beforeEach(() => {
     // Authenticate via API to bypass login flow

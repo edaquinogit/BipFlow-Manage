@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline';
 import { useAsyncResource } from '@/composables/useAsyncResource';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
@@ -10,7 +10,6 @@ import { Logger } from '@/services/logger';
 import { storeSettingsService } from '@/services/store-settings.service';
 
 const { canManageCatalog } = useCurrentUser();
-const { selectedStore } = useCurrentStore();
 const { success, error: toastError } = useToast();
 
 const {
@@ -76,7 +75,7 @@ onMounted(() => {
   void fetchStoreSettings();
 });
 
-watch(selectedStore, () => {
+useStoreSwitchEffect(() => {
   void fetchStoreSettings();
 });
 </script>

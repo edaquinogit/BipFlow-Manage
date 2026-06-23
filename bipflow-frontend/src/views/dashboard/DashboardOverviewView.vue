@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useProducts } from '@/composables/useProducts';
-import { useCurrentStore } from '@/composables/useCurrentStore';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import type {
   SaleOrderBreakdown,
   SaleOrderCustomerInsights,
@@ -19,7 +19,6 @@ import StatsGrid from '@/components/dashboard/stats/StatsGrid.vue';
 import SalesAnalyticsSection from '@/components/dashboard/stats/SalesAnalyticsSection.vue';
 
 const { loading: productsLoading, inventoryStats, fetchData } = useProducts();
-const { selectedStore } = useCurrentStore();
 
 const salesSummary = ref<SaleOrderSummary | null>(null);
 const isSalesSummaryLoading = ref(false);
@@ -125,7 +124,7 @@ onMounted(refreshOverview);
 
 // A loja ativa pode mudar pelo seletor no cabecalho enquanto esta pagina
 // esta montada; sem isso os cards ficariam mostrando dados da loja anterior.
-watch(selectedStore, () => refreshOverview());
+useStoreSwitchEffect(refreshOverview);
 </script>
 
 <template>
