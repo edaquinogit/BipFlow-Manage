@@ -1,12 +1,21 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { Logger } from "./logger";
 import { getSelectedStoreSlug } from "./store-scope";
-import { tokenStore, type TokenRefreshPayload } from "./token-store";
+import { tokenStore } from "./token-store";
+
+interface TokenRefreshPayload {
+  access: string;
+}
 
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
+ *
+ * Fallback must match whatever hostname the page itself is opened with
+ * (localhost, not 127.0.0.1): the refresh_token cookie is SameSite=Strict,
+ * and browsers treat those as different sites, silently dropping the cookie
+ * on a mismatch.
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/";
 
 /**
  * 🚨 Environment Validation
@@ -30,16 +39,16 @@ let refreshRequest: Promise<TokenRefreshPayload> | null = null;
  */
 const pendingRequests = new Map<string, AbortController>();
 
-function refreshAuthTokens(refreshToken: string): Promise<TokenRefreshPayload> {
+function refreshAuthTokens(): Promise<TokenRefreshPayload> {
   if (!refreshRequest) {
-    const refreshInstance = axios.create({ baseURL: API_BASE_URL });
+    // Separate instance: the refresh token rides the httpOnly cookie
+    // automatically via withCredentials, never the request body.
+    const refreshInstance = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
 
     refreshRequest = refreshInstance
-      .post<TokenRefreshPayload>("auth/token/refresh/", {
-        refresh: refreshToken,
-      })
+      .post<TokenRefreshPayload>("auth/token/refresh/")
       .then((response) => {
-        tokenStore.saveRefreshedTokens(response.data);
+        tokenStore.setAccessToken(response.data.access);
         return response.data;
       })
       .finally(() => {
@@ -50,10 +59,28 @@ function refreshAuthTokens(refreshToken: string): Promise<TokenRefreshPayload> {
   return refreshRequest;
 }
 
+/**
+ * Restore the in-memory access token on app boot via the httpOnly refresh
+ * cookie. Memoized so every guarded route navigation on first load shares
+ * the same network round-trip instead of firing one each.
+ */
+let authBootPromise: Promise<void> | null = null;
+
+export function ensureAuthBooted(): Promise<void> {
+  if (!authBootPromise) {
+    authBootPromise = refreshAuthTokens()
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+
+  return authBootPromise;
+}
+
 // Instância principal
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -132,15 +159,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const refreshToken = tokenStore.getRefreshToken();
-
-      if (refreshToken && !isAuthFailureInProgress) {
+      if (!isAuthFailureInProgress) {
         try {
           if (import.meta.env.DEV) {
             Logger.info("Attempting to refresh access token");
           }
 
-          const { access } = await refreshAuthTokens(refreshToken);
+          // No client-side way to know if the httpOnly refresh cookie is
+          // still valid -- attempt the refresh and let it fail if not.
+          const { access } = await refreshAuthTokens();
 
           // Re-execute original request with new Authorization header
           if (originalRequest.headers) {
@@ -159,8 +186,6 @@ api.interceptors.response.use(
           handleAuthFailure();
           return Promise.reject(refreshError);
         }
-      } else if (!isAuthFailureInProgress) {
-        handleAuthFailure();
       }
     }
 
@@ -209,7 +234,7 @@ function handleAuthFailure() {
   pendingRequests.clear();
 
   // Clear authentication state through the centralized contract
-  tokenStore.clearTokens();
+  tokenStore.clearAccessToken();
 
   // Prevent redirect loops - check current location
   const currentPath = window.location.pathname;

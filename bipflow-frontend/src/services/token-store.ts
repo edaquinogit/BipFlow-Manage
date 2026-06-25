@@ -1,131 +1,47 @@
 /**
- * 🔐 Centralized Token Storage Module
+ * 🔐 In-Memory Access Token Store
  *
- * Single source of truth for all authentication token management.
- * Prevents fragmentation and inconsistency in token key naming.
+ * The refresh token lives exclusively in an httpOnly cookie set by the
+ * backend (bipdelivery/api/views.py) -- it is never sent to or readable by
+ * page JavaScript, so this module has nothing to do with it.
  *
- * Contract:
- * - access_token: JWT access token (short-lived)
- * - refresh_token: JWT refresh token (long-lived)
- *
- * All token operations must go through this module.
+ * The access token lives only in memory (never localStorage/sessionStorage),
+ * so an XSS payload reading browser storage can't exfiltrate it. It is lost
+ * on every full page reload by design; services/api.ts's `ensureAuthBooted`
+ * restores it via a silent cookie-based refresh when the app boots.
  */
 
-/**
- * Standard authentication storage keys
- */
-const TOKEN_KEYS = {
-  ACCESS: 'access_token',
-  REFRESH: 'refresh_token',
-} as const
+let accessToken: string | null = null
 
-type TokenKey = typeof TOKEN_KEYS[keyof typeof TOKEN_KEYS]
-
-/**
- * Token storage interface for type safety
- */
-interface TokenPayload {
-  access: string
-  refresh: string
-}
-
-interface TokenRefreshPayload {
-  access: string
-  refresh?: string | null
-}
-
-/**
- * Centralized token store
- * Single module responsible for all token persistence operations
- */
 export const tokenStore = {
   /**
-   * Save both access and refresh tokens atomically
-   * @param payload - { access, refresh } from auth endpoint
+   * Store the access token returned by login or refresh.
    */
-  saveTokens(payload: TokenPayload): void {
-    if (!payload.access || !payload.refresh) {
-      throw new Error('Invalid token payload: both access and refresh are required')
-    }
-    localStorage.setItem(TOKEN_KEYS.ACCESS, payload.access)
-    localStorage.setItem(TOKEN_KEYS.REFRESH, payload.refresh)
-  },
-
-  /**
-   * Persist tokens returned by the refresh endpoint.
-   * When refresh rotation is enabled, the backend returns a new refresh token.
-   * If rotation is disabled, only the access token is updated.
-   */
-  saveRefreshedTokens(payload: TokenRefreshPayload): void {
-    if (!payload.access) {
-      throw new Error('Invalid token refresh payload: access is required')
-    }
-
-    if (payload.refresh) {
-      this.saveTokens({ access: payload.access, refresh: payload.refresh })
-      return
-    }
-
-    this.updateAccessToken(payload.access)
-  },
-
-  /**
-   * Get access token for Authorization header
-   */
-  getAccessToken(): string | null {
-    return localStorage.getItem(TOKEN_KEYS.ACCESS)
-  },
-
-  /**
-   * Get refresh token for token refresh requests
-   */
-  getRefreshToken(): string | null {
-    return localStorage.getItem(TOKEN_KEYS.REFRESH)
-  },
-
-  /**
-   * Update only access token (after refresh)
-   * Preserves existing refresh token
-   */
-  updateAccessToken(accessToken: string): void {
-    if (!accessToken) {
+  setAccessToken(token: string): void {
+    if (!token) {
       throw new Error('Access token cannot be empty')
     }
-    localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken)
+    accessToken = token
   },
 
   /**
-   * Update only refresh token if needed
+   * Get access token for Authorization header.
    */
-  updateRefreshToken(refreshToken: string): void {
-    if (!refreshToken) {
-      throw new Error('Refresh token cannot be empty')
-    }
-    localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken)
+  getAccessToken(): string | null {
+    return accessToken
   },
 
   /**
-   * Check if user has valid tokens
+   * Check if an access token is currently held in memory.
    */
-  hasTokens(): boolean {
-    return Boolean(this.getAccessToken() && this.getRefreshToken())
+  hasAccessToken(): boolean {
+    return Boolean(accessToken)
   },
 
   /**
-   * Clear all authentication tokens (logout)
+   * Drop the in-memory access token (logout / auth failure).
    */
-  clearTokens(): void {
-    localStorage.removeItem(TOKEN_KEYS.ACCESS)
-    localStorage.removeItem(TOKEN_KEYS.REFRESH)
-  },
-
-  /**
-   * Get token keys for reference (avoid magic strings elsewhere)
-   */
-  getKeys(): typeof TOKEN_KEYS {
-    return { ...TOKEN_KEYS }
+  clearAccessToken(): void {
+    accessToken = null
   },
 }
-
-export { TOKEN_KEYS }
-export type { TokenPayload, TokenRefreshPayload, TokenKey }

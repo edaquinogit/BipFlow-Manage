@@ -3,10 +3,13 @@ import { Logger } from "./logger";
 import { tokenStore } from "./token-store";
 import type {
   LoginCredentials,
-  LoginResponse,
+  LoginResult,
   CurrentUser,
   ConfirmResetPayload,
   ConfirmResetResponse,
+  MfaSetupConfirmResponse,
+  MfaSetupResponse,
+  MfaVerifyPayload,
   RegisterPayload,
   RegisterResponse,
   RequestResetPayload,
@@ -29,28 +32,29 @@ export const authService = {
    * Authenticate user with email and password.
    *
    * Converts email to username format (Django SimpleJWT requirement).
-   * Stores access and refresh tokens in localStorage after successful login.
+   * The backend sets the refresh token as an httpOnly cookie; only the
+   * access token comes back in the body, and it's kept in memory only.
    *
    * @param credentials User login credentials
-   * @returns LoginResponse containing access and refresh tokens
+   * @returns Either the access token, or an MFA challenge to complete via verifyMfa()
    * @throws Error if authentication fails
    */
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+  async login(credentials: LoginCredentials): Promise<LoginResult> {
     try {
       const payload = {
         username: credentials.email,
         password: credentials.password,
+        remember_me: Boolean(credentials.remember_me),
+        ...(credentials.captcha_token ? { captcha_token: credentials.captcha_token } : {}),
       };
 
-      const { data } = await api.post<LoginResponse>("auth/token/", payload);
+      const { data } = await api.post<LoginResult>("auth/token/", payload);
 
-      if (data.access && data.refresh) {
-        tokenStore.saveTokens({ access: data.access, refresh: data.refresh });
+      if ("access" in data && data.access) {
+        tokenStore.setAccessToken(data.access);
       }
 
-      Logger.info("User authenticated successfully", {
-        email: credentials.email,
-      });
+      Logger.info("User authenticated successfully");
       return data;
     } catch (error: unknown) {
       const errorMessage = isAxiosError(error)
@@ -61,7 +65,6 @@ export const authService = {
 
       Logger.error("Authentication failed",
         buildErrorContext(error as ApplicationError, {
-          email: credentials.email,
           errorMessage,
         })
       );
@@ -78,9 +81,7 @@ export const authService = {
     try {
       const { data } = await api.post<RegisterResponse>("auth/register/", payload);
 
-      Logger.info("User registration submitted successfully", {
-        email: payload.email,
-      });
+      Logger.info("User registration submitted successfully");
       return data;
     } catch (error: unknown) {
       const errorMessage = isAxiosError(error)
@@ -91,7 +92,6 @@ export const authService = {
 
       Logger.error("Registration failed",
         buildErrorContext(error as ApplicationError, {
-          email: payload.email,
           errorMessage,
         })
       );
@@ -114,9 +114,7 @@ export const authService = {
     try {
       const { data } = await api.post<RequestResetResponse>("auth/password-reset/", payload);
 
-      Logger.info("Password reset requested", {
-        email: payload.email,
-      });
+      Logger.info("Password reset requested");
       return data;
     } catch (error: unknown) {
       const errorMessage = isAxiosError(error)
@@ -127,7 +125,6 @@ export const authService = {
 
       Logger.error("Password reset request failed",
         buildErrorContext(error as ApplicationError, {
-          email: payload.email,
           errorMessage,
         })
       );
@@ -169,21 +166,89 @@ export const authService = {
   /**
    * Log out the current user.
    *
-   * Clears authentication tokens and redirects to login page.
+   * Best-effort revokes the refresh cookie on the backend (sent
+   * automatically via withCredentials), then always clears the in-memory
+   * access token and redirects, even if the revocation call fails (offline,
+   * already-expired access token, etc.) so the user is never stuck logged in.
    */
-  logout(): void {
-    tokenStore.clearTokens();
+  async logout(): Promise<void> {
+    try {
+      await api.post("auth/logout/");
+    } catch (error) {
+      Logger.warn("Failed to revoke refresh token on logout",
+        buildErrorContext(error as ApplicationError)
+      );
+    }
+
+    tokenStore.clearAccessToken();
     sessionStorage.clear();
     Logger.info("User logged out");
     window.location.href = "/login";
   },
 
   /**
+   * Revoke every outstanding refresh token for this user, then log out
+   * locally the same way `logout()` does -- the current session is also
+   * invalidated by this call, it isn't exempted.
+   */
+  async logoutAllDevices(): Promise<{ message: string; revoked_count: number }> {
+    const { data } = await api.post<{ message: string; revoked_count: number }>("auth/logout-all/");
+
+    tokenStore.clearAccessToken();
+    sessionStorage.clear();
+    Logger.info("User logged out from all devices");
+    window.location.href = "/login";
+
+    return data;
+  },
+
+  /**
+   * Complete a login that returned an MFA challenge, exchanging the
+   * mfa_token + a TOTP code (or a backup code) for real tokens.
+   */
+  async verifyMfa(payload: MfaVerifyPayload): Promise<void> {
+    const { data } = await api.post<{ access: string }>("auth/mfa/verify/", payload);
+    tokenStore.setAccessToken(data.access);
+    Logger.info("MFA challenge completed successfully");
+  },
+
+  /**
+   * Start MFA setup: generates a new (unconfirmed) TOTP secret + QR code
+   * for the current user. Calling it again before confirming replaces the
+   * pending secret; it refuses to run if MFA is already confirmed.
+   */
+  async setupMfa(): Promise<MfaSetupResponse> {
+    const { data } = await api.post<MfaSetupResponse>("auth/mfa/setup/");
+    return data;
+  },
+
+  /**
+   * Confirm a pending MFA setup with a live code from the authenticator
+   * app, activating MFA and returning one-time backup codes.
+   */
+  async confirmMfaSetup(code: string): Promise<MfaSetupConfirmResponse> {
+    const { data } = await api.post<MfaSetupConfirmResponse>("auth/mfa/setup/confirm/", { code });
+    return data;
+  },
+
+  /**
+   * Disable MFA for the current user. Requires re-entering the password.
+   */
+  async disableMfa(password: string): Promise<void> {
+    await api.post("auth/mfa/disable/", { password });
+  },
+
+  /**
    * Check if user is currently authenticated.
    *
-   * @returns True if both access and refresh tokens exist in storage
+   * Synchronous, in-memory check only -- callers that run before the app's
+   * auth boot sequence (see services/api.ts's `ensureAuthBooted`) has had a
+   * chance to silently refresh from the httpOnly cookie will see a false
+   * negative even if the user has a valid session.
+   *
+   * @returns True if an access token is currently held in memory
    */
   isAuthenticated(): boolean {
-    return tokenStore.hasTokens();
+    return tokenStore.hasAccessToken();
   },
 };

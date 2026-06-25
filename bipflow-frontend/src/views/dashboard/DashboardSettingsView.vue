@@ -3,21 +3,24 @@ import { computed, ref, type Component } from 'vue';
 import {
   BuildingStorefrontIcon,
   PhoneIcon,
+  ShieldCheckIcon,
   TagIcon,
   TruckIcon,
 } from '@heroicons/vue/24/outline';
 import CategoriesTab from '@/components/dashboard/settings/CategoriesTab.vue';
 import DeliveryRegionsTab from '@/components/dashboard/settings/DeliveryRegionsTab.vue';
+import SecurityTab from '@/components/dashboard/settings/SecurityTab.vue';
 import StoresTab from '@/components/dashboard/settings/StoresTab.vue';
 import WhatsappTab from '@/components/dashboard/settings/WhatsappTab.vue';
 
-type SettingsTab = 'categorias' | 'frete' | 'whatsapp' | 'lojas';
+type SettingsTab = 'categorias' | 'frete' | 'whatsapp' | 'lojas' | 'seguranca';
 
 const TABS: { value: SettingsTab; label: string; icon: typeof TagIcon; component: Component }[] = [
   { value: 'categorias', label: 'Categorias', icon: TagIcon, component: CategoriesTab },
   { value: 'frete', label: 'Frete', icon: TruckIcon, component: DeliveryRegionsTab },
   { value: 'whatsapp', label: 'WhatsApp', icon: PhoneIcon, component: WhatsappTab },
   { value: 'lojas', label: 'Lojas', icon: BuildingStorefrontIcon, component: StoresTab },
+  { value: 'seguranca', label: 'Seguranca', icon: ShieldCheckIcon, component: SecurityTab },
 ];
 
 const activeTab = ref<SettingsTab>('categorias');

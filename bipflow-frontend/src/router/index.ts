@@ -5,6 +5,7 @@ import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
 import { errorRoutes } from './error.routes'
 import { publicRoutes } from './public.routes'
 import { authService } from '@/services/auth.service'
+import { ensureAuthBooted } from '@/services/api'
 import { Logger } from '@/services/logger'
 
 /**
@@ -36,21 +37,23 @@ const router = createRouter({
  * Implementação limpa sem 'next()', seguindo o padrão moderno do Vue Router 4.
  * Added deadlock prevention and loading state bypass for resilience.
  */
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  // Restores the in-memory access token from the httpOnly refresh cookie on
+  // first load (no-op on every navigation after that -- memoized).
+  await ensureAuthBooted()
   const isLogged = authService.isAuthenticated()
 
-  // 🚨 DEADLOCK PREVENTION: Prevent infinite redirect loops
-  const isRedirectingToLogin = to.name === AuthRouteNames.Login
-
-  // Allow login page to always mount, even during API failures
-  if (isRedirectingToLogin) {
-    if (import.meta.env.DEV) {
-      Logger.info("Allowing login page mount", {
-        reason: String(to.query.reason || 'direct_access'),
-      })
-    }
-    return true // Explicitly allow navigation to login
-  }
+  // NOTE: there used to be a blanket "always allow navigation to /login"
+  // early-return here, justified as deadlock prevention. It was dead code
+  // protecting against a loop that can't happen -- /login has no
+  // requiresAuth meta, so an unauthenticated visit already falls through
+  // to `return true` at the bottom on its own -- and it had the side
+  // effect of unconditionally skipping the guestOnly check below for
+  // EVERY visit to /login, so an already-authenticated user revisiting
+  // /login was never redirected back to the dashboard. Removed rather
+  // than special-cased further: the requiresAuth/guestOnly checks already
+  // handle /login correctly in both the authenticated and unauthenticated
+  // case without it.
 
   // 1. Proteção de Rotas Privadas (Requires Auth)
   if (to.meta.requiresAuth && !isLogged) {

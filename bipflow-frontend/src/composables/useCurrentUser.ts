@@ -8,6 +8,7 @@ import { Logger } from "../services/logger";
 const currentUserName = ref<string | null>(null);
 const canManageCatalog = ref(false);
 const canAccessDashboard = ref<boolean | null>(null);
+const mfaEnabled = ref(false);
 const loading = ref(false);
 
 export function useCurrentUser() {
@@ -24,6 +25,7 @@ export function useCurrentUser() {
 
       currentUserName.value = currentUser.display_name || currentUser.email || currentUser.username;
       canManageCatalog.value = currentUser.can_manage_catalog;
+      mfaEnabled.value = currentUser.mfa_enabled;
       return true;
     } catch (error: unknown) {
       Logger.warn("Failed to fetch dashboard user profile", { error });
@@ -40,6 +42,7 @@ export function useCurrentUser() {
     currentUserName,
     canManageCatalog,
     canAccessDashboard,
+    mfaEnabled,
     loading,
     fetchCurrentUser,
   };

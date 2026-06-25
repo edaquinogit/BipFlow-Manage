@@ -15,7 +15,6 @@
 describe('Product Image Upload Flow', () => {
   type AuthTokens = {
     access: string;
-    refresh: string;
   };
 
   type CategoryResponse = {

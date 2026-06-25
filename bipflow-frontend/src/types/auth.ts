@@ -1,5 +1,10 @@
-export interface LoginCredentials { email: string; password: string; }
-export interface LoginResponse { access: string; refresh: string; }
+export interface LoginCredentials { email: string; password: string; captcha_token?: string; remember_me?: boolean; }
+export interface LoginResponse { access: string; }
+export interface MfaChallengeResponse { mfa_required: true; mfa_token: string; }
+export type LoginResult = LoginResponse | MfaChallengeResponse;
+export interface MfaVerifyPayload { mfa_token: string; code?: string; backup_code?: string; }
+export interface MfaSetupResponse { secret: string; provisioning_uri: string; qr_code: string; }
+export interface MfaSetupConfirmResponse { message: string; backup_codes: string[]; }
 export interface CurrentUser {
   id: number;
   username: string;
@@ -12,6 +17,7 @@ export interface CurrentUser {
   roles: string[];
   can_access_dashboard: boolean;
   can_manage_catalog: boolean;
+  mfa_enabled: boolean;
 }
 export interface RegisterPayload { email: string; password: string; confirm_password: string; store_name: string; }
 export interface RegisterResponse { message: string; email: string; }

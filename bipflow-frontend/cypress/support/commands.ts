@@ -1,10 +1,11 @@
 type DashboardAuthTokens = {
   access: string;
-  refresh: string;
 };
 
 const normalizeApiBaseUrl = (): string => {
-  const configuredUrl = Cypress.env('apiBaseUrl') || 'http://127.0.0.1:8000/api';
+  // Fallback must match the page's hostname (localhost): the refresh_token
+  // cookie is SameSite=Strict, and 127.0.0.1 is a different site to browsers.
+  const configuredUrl = Cypress.env('apiBaseUrl') || 'http://localhost:8000/api';
   return String(configuredUrl).replace(/\/$/, '');
 };
 
@@ -13,15 +14,14 @@ const getAdminCredentials = () => ({
   password: Cypress.env('adminPassword') || 'admin123',
 });
 
-const persistTokens = (win: Window, tokens: DashboardAuthTokens): void => {
-  win.localStorage.setItem('access_token', tokens.access);
-  win.localStorage.setItem('refresh_token', tokens.refresh);
-};
-
 Cypress.Commands.add('loginViaApi', () => {
   const apiBaseUrl = normalizeApiBaseUrl();
   const credentials = getAdminCredentials();
 
+  // cy.request() shares Cypress's cookie jar with the browser, so the
+  // Set-Cookie response here (the httpOnly refresh_token cookie) is what
+  // lets visitWithAuth()/the app's own boot-time refresh authenticate later
+  // -- no token injection into page storage needed or possible anymore.
   return cy
     .request<DashboardAuthTokens>({
       method: 'POST',
@@ -32,10 +32,9 @@ Cypress.Commands.add('loginViaApi', () => {
       },
     })
     .then((response) => {
-      const { access, refresh } = response.body;
+      const { access } = response.body;
       expect(access, 'access token').to.be.a('string').and.not.be.empty;
-      expect(refresh, 'refresh token').to.be.a('string').and.not.be.empty;
-      const tokens = { access, refresh };
+      const tokens = { access };
       Cypress.env('authTokens', tokens);
       return tokens;
     });
@@ -44,13 +43,11 @@ Cypress.Commands.add('loginViaApi', () => {
 Cypress.Commands.add('visitWithAuth', (path = '/') => {
   const tokens = Cypress.env('authTokens') as DashboardAuthTokens | undefined;
 
-  if (!tokens?.access || !tokens?.refresh) {
+  if (!tokens?.access) {
     throw new Error('Missing auth tokens. Call cy.loginViaApi() before cy.visitWithAuth().');
   }
 
-  return cy.visit(path, {
-    onBeforeLoad(win) {
-      persistTokens(win, tokens);
-    },
-  });
+  // The app restores its in-memory access token from the refresh_token
+  // cookie (set by loginViaApi's request) on boot, so a plain visit suffices.
+  return cy.visit(path);
 });

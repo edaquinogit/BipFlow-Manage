@@ -5,6 +5,8 @@
  * Complements the unit/integration tests around auth.service.ts and
  * token-store.ts with a UI-driven, end-to-end view of the same contract:
  * - valid credentials reach the dashboard;
+ * - the refresh token lands in an httpOnly cookie (never page storage) and
+ *   survives a full reload via the app's silent boot-time refresh;
  * - invalid credentials never grant access and surface a visible error;
  * - the router guard blocks anonymous access to protected routes instead
  *   of silently rendering them.
@@ -43,9 +45,19 @@ describe('Authentication flow', () => {
     cy.location('pathname', { timeout: 15000 }).should('eq', '/dashboard')
     cy.get('[data-cy="dashboard-view"]', { timeout: 15000 }).should('exist')
 
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('access_token')).to.be.a('string').and.not.be.empty
+    // The access token lives only in JS memory now (never page storage), so
+    // there's nothing to assert there. The refresh token is the httpOnly
+    // cookie that actually carries the session -- confirm it landed and that
+    // page JS still can't read it (httpOnly), then prove the session survives
+    // a full reload via the app's silent boot-time refresh from that cookie.
+    cy.getCookie('refresh_token').should((cookie) => {
+      expect(cookie, 'refresh_token cookie').to.not.be.null
+      expect(cookie?.httpOnly, 'httpOnly').to.be.true
     })
+
+    cy.reload()
+    cy.location('pathname', { timeout: 15000 }).should('eq', '/dashboard')
+    cy.get('[data-cy="dashboard-view"]', { timeout: 15000 }).should('exist')
   })
 
   it('rejects invalid credentials and keeps the user on the login page', () => {
@@ -56,14 +68,12 @@ describe('Authentication flow', () => {
 
     cy.location('pathname', { timeout: 15000 }).should('eq', '/login')
 
-    // A 401 from the backend renders its `detail` message, not the generic
-    // "Connection failed" fallback (that one is network-failure only) --
-    // assert the real error banner renders instead of asserting an absence.
-    // Asserts existence + content rather than pixel visibility: the login
-    // card can get clipped by the shell's `overflow-hidden` decorative
-    // wrapper at the 1280x720 headless viewport, which is a layout detail
-    // unrelated to whether the auth rejection actually happened.
-    cy.get('.border-red-500\\/40', { timeout: 15000 })
+    // A 401 renders a fixed generic message (never the backend's raw
+    // `detail`), so invalid credentials and an unknown email look identical
+    // -- assert the real error banner renders instead of asserting an
+    // absence. Uses the data-cy hook instead of a color/border class so this
+    // assertion survives visual redesigns of the auth pages.
+    cy.get('[data-cy="login-error"]', { timeout: 15000 })
       .should('exist')
       .invoke('text')
       .should('not.be.empty')
@@ -71,6 +81,7 @@ describe('Authentication flow', () => {
     cy.window().then((win) => {
       expect(win.localStorage.getItem('access_token')).to.be.null
     })
+    cy.getCookie('refresh_token').should('be.null')
   })
 
   it('blocks anonymous access to the dashboard and redirects to login', () => {

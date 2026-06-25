@@ -67,23 +67,17 @@ function unauthorizedError(config: RetriableConfig) {
 
 describe("API token refresh interceptor", () => {
   beforeEach(() => {
-    localStorage.clear();
+    tokenStore.clearAccessToken();
     axiosMocks.apiInstance.mockClear();
     axiosMocks.refreshPost.mockReset();
   });
 
-  it("persists the rotated refresh token before retrying the original request", async () => {
+  it("persists the refreshed access token before retrying the original request", async () => {
     expect(api).toBe(axiosMocks.apiInstance);
 
-    tokenStore.saveTokens({
-      access: "expired-access",
-      refresh: "old-refresh",
-    });
+    tokenStore.setAccessToken("expired-access");
     axiosMocks.refreshPost.mockResolvedValue({
-      data: {
-        access: "new-access",
-        refresh: "new-refresh",
-      },
+      data: { access: "new-access" },
     });
 
     const originalRequest: RetriableConfig = {
@@ -94,27 +88,19 @@ describe("API token refresh interceptor", () => {
 
     await getRejectedInterceptor()(unauthorizedError(originalRequest));
 
-    expect(axiosMocks.refreshPost).toHaveBeenCalledWith("auth/token/refresh/", {
-      refresh: "old-refresh",
-    });
+    // The refresh token rides the httpOnly cookie automatically (withCredentials),
+    // never an explicit body field.
+    expect(axiosMocks.refreshPost).toHaveBeenCalledWith("auth/token/refresh/");
     expect(tokenStore.getAccessToken()).toBe("new-access");
-    expect(tokenStore.getRefreshToken()).toBe("new-refresh");
     expect(originalRequest.headers?.Authorization).toBe("Bearer new-access");
     expect(axiosMocks.apiInstance).toHaveBeenCalledWith(originalRequest);
   });
 
   it("shares a single refresh request across simultaneous 401 responses", async () => {
-    tokenStore.saveTokens({
-      access: "expired-access",
-      refresh: "old-refresh",
-    });
+    tokenStore.setAccessToken("expired-access");
 
-    let resolveRefresh: (value: {
-      data: { access: string; refresh: string };
-    }) => void = () => undefined;
-    const refreshPromise = new Promise<{
-      data: { access: string; refresh: string };
-    }>((resolve) => {
+    let resolveRefresh: (value: { data: { access: string } }) => void = () => undefined;
+    const refreshPromise = new Promise<{ data: { access: string } }>((resolve) => {
       resolveRefresh = resolve;
     });
     axiosMocks.refreshPost.mockReturnValue(refreshPromise);
@@ -136,18 +122,30 @@ describe("API token refresh interceptor", () => {
 
     expect(axiosMocks.refreshPost).toHaveBeenCalledTimes(1);
 
-    resolveRefresh({
-      data: {
-        access: "shared-access",
-        refresh: "rotated-refresh",
-      },
-    });
+    resolveRefresh({ data: { access: "shared-access" } });
 
     await Promise.all([firstRetry, secondRetry]);
 
-    expect(tokenStore.getRefreshToken()).toBe("rotated-refresh");
+    expect(tokenStore.getAccessToken()).toBe("shared-access");
     expect(firstRequest.headers?.Authorization).toBe("Bearer shared-access");
     expect(secondRequest.headers?.Authorization).toBe("Bearer shared-access");
     expect(axiosMocks.apiInstance).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the access token and rejects when the refresh call itself fails", async () => {
+    tokenStore.setAccessToken("expired-access");
+    axiosMocks.refreshPost.mockRejectedValue(new Error("refresh failed"));
+
+    const originalRequest: RetriableConfig = {
+      method: "get",
+      url: "v1/orders/",
+      headers: {},
+    };
+
+    await expect(
+      getRejectedInterceptor()(unauthorizedError(originalRequest))
+    ).rejects.toThrow("refresh failed");
+
+    expect(tokenStore.getAccessToken()).toBeNull();
   });
 });

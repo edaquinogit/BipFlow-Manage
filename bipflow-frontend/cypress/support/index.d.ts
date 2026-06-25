@@ -2,7 +2,6 @@
 
 type AuthTokens = {
   access: string;
-  refresh: string;
 };
 
 declare namespace Cypress {

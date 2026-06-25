@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
+import { usePasswordStrength } from '@/composables/usePasswordStrength'
+import AuthShell from '@/components/auth/AuthShell.vue'
 import type { ApiError } from '@/types/auth'
 
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+// Separate from errorMessage: a reminder to finish the form, not a
+// rejection -- gets the calmer amber treatment instead of the red banner.
+const validationHint = ref('')
 const successMessage = ref('')
 
 const form = reactive({
@@ -17,20 +22,27 @@ const form = reactive({
   store_name: '',
 })
 
-const passwordRules = computed(() => [
-  { label: 'No minimo 8 caracteres', passed: form.password.length >= 8 },
-  { label: 'Contem uma letra', passed: /[A-Za-z]/.test(form.password) },
-  { label: 'Contem um numero', passed: /\d/.test(form.password) },
-  {
-    label: 'Confirmacao igual a senha',
-    passed: Boolean(form.confirm_password) && form.password === form.confirm_password,
-  },
-])
+const {
+  rules: passwordRules,
+  label: strengthLabel,
+  barClass: strengthBarClass,
+  filledBars: strengthFilledBars,
+  totalBars: strengthTotalBars,
+  isValid: isPasswordValid,
+} = usePasswordStrength(computed(() => form.password))
+
+const confirmRule = computed(() => ({
+  label: 'Confirmação igual à senha',
+  passed: Boolean(form.confirm_password) && form.password === form.confirm_password,
+}))
+
+const allPasswordRules = computed(() => [...passwordRules.value, confirmRule.value])
 
 const isFormReady = computed(() =>
   Boolean(form.email.trim())
   && Boolean(form.store_name.trim())
-  && passwordRules.value.every((rule) => rule.passed)
+  && isPasswordValid.value
+  && confirmRule.value.passed
 )
 
 const extractErrorMessage = (error: unknown) => {
@@ -53,13 +65,15 @@ const extractErrorMessage = (error: unknown) => {
 }
 
 const handleRegister = async () => {
+  validationHint.value = ''
+  errorMessage.value = ''
+
   if (!isFormReady.value) {
-    errorMessage.value = 'Preencha o nome da loja, email, senha e confirmacao seguindo os criterios de seguranca.'
+    validationHint.value = 'Preencha o nome da loja, email, senha e confirmação seguindo os critérios de segurança.'
     return
   }
 
   isSubmitting.value = true
-  errorMessage.value = ''
   successMessage.value = ''
 
   try {
@@ -79,235 +93,156 @@ const handleRegister = async () => {
 </script>
 
 <template>
-  <main class="register-shell min-h-screen overflow-hidden bg-gray-950 px-4 py-6 text-white sm:px-6">
-    <div class="register-orbit" aria-hidden="true"></div>
-    <div class="register-grid" aria-hidden="true"></div>
+  <AuthShell
+    eyebrow="Novo acesso"
+    title="Comece a vender em minutos."
+    description="Crie sua loja e tenha controle total sobre produtos, pedidos e atendimento desde o primeiro dia."
+  >
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold text-bip-black">Criar sua loja</h2>
+      <p class="mt-1 text-sm text-bip-muted">
+        Configure o nome da sua loja e uma credencial administrativa segura.
+      </p>
+    </div>
 
-    <section class="relative z-10 flex min-h-[calc(100vh-3rem)] items-center justify-center">
-      <div
-        class="register-card w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-gray-900/85 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8"
-      >
-        <div class="register-card-glow" aria-hidden="true"></div>
-
-        <div class="relative">
-          <div class="mb-8 text-center">
-            <div
-              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-zinc-950 shadow-lg shadow-black/30"
-            >
-              <span class="text-lg font-black tracking-tighter text-indigo-500">BF</span>
-            </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">
-              Novo acesso
-            </p>
-            <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Criar sua loja
-            </h1>
-            <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-400">
-              Configure o nome da sua loja e uma credencial administrativa segura para acessar o BipFlow Manage.
-            </p>
-          </div>
-
-          <div
-            v-if="successMessage"
-            class="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100"
-          >
-            <div class="flex gap-3">
-              <CheckCircleIcon class="h-5 w-5 shrink-0 text-emerald-300" />
-              <div>
-                <p class="font-semibold">Conta criada</p>
-                <p class="mt-1 leading-6 text-emerald-100/80">{{ successMessage }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="errorMessage"
-            class="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300"
-          >
-            {{ errorMessage }}
-          </div>
-
-          <form v-if="!successMessage" @submit.prevent="handleRegister" class="space-y-5">
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Nome da loja
-              </label>
-              <input
-                v-model="form.store_name"
-                type="text"
-                autocomplete="organization"
-                placeholder="Ex.: Pizzaria do Joao"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Email
-              </label>
-              <input
-                v-model="form.email"
-                type="email"
-                autocomplete="email"
-                placeholder="admin@bipflow.com"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Senha
-              </label>
-              <input
-                v-model="form.password"
-                type="password"
-                autocomplete="new-password"
-                placeholder="Crie uma senha segura"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Confirmar senha
-              </label>
-              <input
-                v-model="form.confirm_password"
-                type="password"
-                autocomplete="new-password"
-                placeholder="Repita a senha"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <ul class="grid gap-2 border-t border-white/10 pt-4">
-              <li
-                v-for="rule in passwordRules"
-                :key="rule.label"
-                class="flex items-center gap-2 text-xs"
-                :class="rule.passed ? 'text-emerald-300' : 'text-gray-500'"
-              >
-                <span
-                  class="h-2 w-2 rounded-full"
-                  :class="rule.passed ? 'bg-emerald-300' : 'bg-gray-700'"
-                ></span>
-                {{ rule.label }}
-              </li>
-            </ul>
-
-            <button
-              type="submit"
-              :disabled="isSubmitting || !isFormReady"
-              class="flex w-full items-center justify-center rounded-xl bg-white py-3 text-xs font-black uppercase tracking-widest text-black shadow-xl shadow-white/5 transition-all hover:-translate-y-0.5 hover:bg-zinc-200 disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            >
-              {{ isSubmitting ? 'Criando conta...' : 'Criar conta segura' }}
-            </button>
-          </form>
-
-          <div class="mt-7 border-t border-white/10 pt-5 text-center">
-            <RouterLink
-              :to="{ name: AuthRouteNames.Login }"
-              class="text-sm font-semibold text-zinc-400 transition-colors hover:text-indigo-300"
-            >
-              Ja tenho conta administrativa
-            </RouterLink>
-            <p class="mt-4 text-xs leading-5 text-gray-600">
-              Contas administrativas devem ser usadas apenas por pessoas autorizadas.
-            </p>
-          </div>
+    <div
+      v-if="successMessage"
+      class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+    >
+      <div class="flex gap-3">
+        <CheckCircleIcon class="h-5 w-5 shrink-0 text-emerald-600" />
+        <div>
+          <p class="font-semibold">Conta criada</p>
+          <p class="mt-1 leading-6 text-emerald-700">{{ successMessage }}</p>
         </div>
       </div>
-    </section>
-  </main>
+
+      <RouterLink
+        :to="{ name: AuthRouteNames.Login }"
+        class="mt-4 flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f]"
+      >
+        Ir para o login
+      </RouterLink>
+    </div>
+
+    <div
+      v-if="validationHint"
+      class="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+    >
+      <ExclamationTriangleIcon class="h-5 w-5 shrink-0 text-amber-600" />
+      <span>{{ validationHint }}</span>
+    </div>
+
+    <div
+      v-if="errorMessage"
+      class="mb-6 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+    >
+      {{ errorMessage }}
+    </div>
+
+    <form v-if="!successMessage" @submit.prevent="handleRegister" class="space-y-5">
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Nome da loja
+        </label>
+        <input
+          v-model="form.store_name"
+          type="text"
+          autocomplete="organization"
+          placeholder="Ex.: Pizzaria do Joao"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+      </div>
+
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Email
+        </label>
+        <input
+          v-model="form.email"
+          type="email"
+          autocomplete="email"
+          placeholder="admin@suaempresa.com"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+      </div>
+
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Senha
+        </label>
+        <input
+          v-model="form.password"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Crie uma senha segura"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+
+        <div v-if="form.password" class="mt-2 space-y-1">
+          <div class="flex gap-1">
+            <span
+              v-for="index in strengthTotalBars"
+              :key="index"
+              class="h-1.5 flex-1 rounded-full transition-colors"
+              :class="index <= strengthFilledBars ? strengthBarClass : 'bg-zinc-200'"
+            />
+          </div>
+          <p class="text-xs font-semibold text-bip-muted">Força: {{ strengthLabel }}</p>
+        </div>
+      </div>
+
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Confirmar senha
+        </label>
+        <input
+          v-model="form.confirm_password"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Repita a senha"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+      </div>
+
+      <ul class="grid gap-2 border-t border-bip-line pt-4">
+        <li
+          v-for="rule in allPasswordRules"
+          :key="rule.label"
+          class="flex items-center gap-2 text-xs"
+          :class="rule.passed ? 'text-emerald-700' : 'text-bip-muted'"
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="rule.passed ? 'bg-emerald-500' : 'bg-zinc-300'"
+          ></span>
+          {{ rule.label }}
+        </li>
+      </ul>
+
+      <button
+        type="submit"
+        :disabled="isSubmitting || !isFormReady"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
+      >
+        {{ isSubmitting ? 'Criando conta...' : 'Criar conta segura' }}
+      </button>
+    </form>
+
+    <template #footer>
+      <RouterLink
+        :to="{ name: AuthRouteNames.Login }"
+        class="text-sm font-semibold text-bip-muted transition-colors hover:text-bip-rose"
+      >
+        Ja tenho conta administrativa
+      </RouterLink>
+      <p class="mt-4 text-xs leading-5 text-bip-muted">
+        Contas administrativas devem ser usadas apenas por pessoas autorizadas.
+      </p>
+    </template>
+  </AuthShell>
 </template>
-
-<style scoped>
-.register-shell {
-  position: relative;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12), transparent 32rem),
-    radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
-    #09090b;
-}
-
-.register-orbit {
-  position: absolute;
-  inset: -18rem;
-  background:
-    conic-gradient(
-      from 180deg,
-      transparent 0deg,
-      rgba(99, 102, 241, 0.08) 72deg,
-      transparent 150deg,
-      rgba(255, 255, 255, 0.06) 240deg,
-      transparent 360deg
-    );
-  filter: blur(36px);
-  animation: register-orbit-spin 24s linear infinite;
-}
-
-.register-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: radial-gradient(circle at center, black, transparent 72%);
-}
-
-.register-card {
-  position: relative;
-  isolation: isolate;
-}
-
-.register-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  z-index: -2;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(99, 102, 241, 0.42),
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.14)
-  );
-  opacity: 0.55;
-}
-
-.register-card-glow {
-  position: absolute;
-  inset: auto -30% -30% -30%;
-  height: 16rem;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 66%);
-  animation: register-glow-float 8s ease-in-out infinite alternate;
-}
-
-@keyframes register-orbit-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes register-glow-float {
-  from {
-    transform: translate3d(-4%, 0, 0) scale(1);
-  }
-
-  to {
-    transform: translate3d(4%, -8%, 0) scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .register-orbit,
-  .register-card-glow {
-    animation: none;
-  }
-}
-</style>

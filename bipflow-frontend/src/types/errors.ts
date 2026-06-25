@@ -27,6 +27,7 @@ export interface ApiErrorResponse {
   detail?: string;
   message?: string;
   errors?: Record<string, string[]>;
+  details?: { requires_captcha?: boolean; mfa_required?: boolean; [key: string]: unknown };
   [key: string]: unknown;
 }
 

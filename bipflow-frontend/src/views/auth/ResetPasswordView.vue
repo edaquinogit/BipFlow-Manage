@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
+import { usePasswordStrength } from '@/composables/usePasswordStrength'
+import AuthShell from '@/components/auth/AuthShell.vue'
 import type { ApiError } from '@/types/auth'
 
 const route = useRoute()
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+// Separate from errorMessage: a reminder to finish the form, not a
+// rejection -- gets the calmer amber treatment instead of the red banner.
+const validationHint = ref('')
 const successMessage = ref('')
 
 const form = reactive({
@@ -20,18 +25,24 @@ const uid = computed(() => String(route.query.uid || route.params.token || ''))
 const token = computed(() => String(route.query.token || ''))
 const hasValidLink = computed(() => Boolean(uid.value && token.value))
 
-const passwordRules = computed(() => [
-  { label: 'No minimo 8 caracteres', passed: form.password.length >= 8 },
-  { label: 'Contem uma letra', passed: /[A-Za-z]/.test(form.password) },
-  { label: 'Contem um numero', passed: /\d/.test(form.password) },
-  {
-    label: 'Confirmacao igual a senha',
-    passed: Boolean(form.confirm_password) && form.password === form.confirm_password,
-  },
-])
+const {
+  rules: passwordRules,
+  label: strengthLabel,
+  barClass: strengthBarClass,
+  filledBars: strengthFilledBars,
+  totalBars: strengthTotalBars,
+  isValid: isPasswordValid,
+} = usePasswordStrength(computed(() => form.password))
+
+const confirmRule = computed(() => ({
+  label: 'Confirmação igual à senha',
+  passed: Boolean(form.confirm_password) && form.password === form.confirm_password,
+}))
+
+const allPasswordRules = computed(() => [...passwordRules.value, confirmRule.value])
 
 const isFormReady = computed(() =>
-  hasValidLink.value && passwordRules.value.every((rule) => rule.passed)
+  hasValidLink.value && isPasswordValid.value && confirmRule.value.passed
 )
 
 const extractErrorMessage = (error: unknown) => {
@@ -54,15 +65,17 @@ const extractErrorMessage = (error: unknown) => {
 }
 
 const handlePasswordResetConfirm = async () => {
+  validationHint.value = ''
+  errorMessage.value = ''
+
   if (!isFormReady.value) {
-    errorMessage.value = hasValidLink.value
-      ? 'Preencha a nova senha seguindo os criterios de seguranca.'
-      : 'Link de recuperacao incompleto. Solicite um novo email.'
+    validationHint.value = hasValidLink.value
+      ? 'Preencha a nova senha seguindo os critérios de segurança.'
+      : 'Link de recuperação incompleto. Solicite um novo email.'
     return
   }
 
   isSubmitting.value = true
-  errorMessage.value = ''
   successMessage.value = ''
 
   try {
@@ -82,214 +95,135 @@ const handlePasswordResetConfirm = async () => {
 </script>
 
 <template>
-  <main class="reset-shell min-h-screen overflow-hidden bg-gray-950 px-4 py-6 text-white sm:px-6">
-    <div class="reset-orbit" aria-hidden="true"></div>
-    <div class="reset-grid" aria-hidden="true"></div>
+  <AuthShell
+    eyebrow="Nova senha"
+    title="Defina uma senha forte e exclusiva."
+    description="Uma senha exclusiva para o BipFlow Manage protege o acesso administrativo da sua loja."
+  >
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold text-bip-black">Criar nova senha</h2>
+      <p class="mt-1 text-sm text-bip-muted">
+        Defina uma senha forte para recuperar o acesso administrativo.
+      </p>
+    </div>
 
-    <section class="relative z-10 flex min-h-[calc(100vh-3rem)] items-center justify-center">
-      <div
-        class="reset-card w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-gray-900/85 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8"
-      >
-        <div class="reset-card-glow" aria-hidden="true"></div>
-
-        <div class="relative">
-          <div class="mb-8 text-center">
-            <div
-              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-zinc-950 shadow-lg shadow-black/30"
-            >
-              <span class="text-lg font-black tracking-tighter text-indigo-500">BF</span>
-            </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">
-              Nova senha
-            </p>
-            <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Criar nova senha
-            </h1>
-            <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-400">
-              Defina uma senha forte para recuperar o acesso administrativo.
-            </p>
-          </div>
-
-          <div
-            v-if="successMessage"
-            class="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100"
-          >
-            <div class="flex gap-3">
-              <CheckCircleIcon class="h-5 w-5 shrink-0 text-emerald-300" />
-              <div>
-                <p class="font-semibold">Senha redefinida</p>
-                <p class="mt-1 leading-6 text-emerald-100/80">{{ successMessage }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="errorMessage"
-            class="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300"
-          >
-            {{ errorMessage }}
-          </div>
-
-          <div
-            v-if="!hasValidLink"
-            class="mb-6 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100"
-          >
-            Este link nao possui os parametros de seguranca necessarios. Solicite um novo email de recuperacao.
-          </div>
-
-          <form v-if="!successMessage" @submit.prevent="handlePasswordResetConfirm" class="space-y-5">
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Nova senha
-              </label>
-              <input
-                v-model="form.password"
-                type="password"
-                autocomplete="new-password"
-                placeholder="Digite a nova senha"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Confirmar nova senha
-              </label>
-              <input
-                v-model="form.confirm_password"
-                type="password"
-                autocomplete="new-password"
-                placeholder="Repita a nova senha"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <ul class="grid gap-2 border-t border-white/10 pt-4">
-              <li
-                v-for="rule in passwordRules"
-                :key="rule.label"
-                class="flex items-center gap-2 text-xs"
-                :class="rule.passed ? 'text-emerald-300' : 'text-gray-500'"
-              >
-                <span
-                  class="h-2 w-2 rounded-full"
-                  :class="rule.passed ? 'bg-emerald-300' : 'bg-gray-700'"
-                ></span>
-                {{ rule.label }}
-              </li>
-            </ul>
-
-            <button
-              type="submit"
-              :disabled="isSubmitting || !isFormReady"
-              class="flex w-full items-center justify-center rounded-xl bg-white py-3 text-xs font-black uppercase tracking-widest text-black shadow-xl shadow-white/5 transition-all hover:-translate-y-0.5 hover:bg-zinc-200 disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            >
-              {{ isSubmitting ? 'Redefinindo senha...' : 'Redefinir senha' }}
-            </button>
-          </form>
-
-          <div class="mt-7 border-t border-white/10 pt-5 text-center">
-            <RouterLink
-              :to="{ name: AuthRouteNames.Login }"
-              class="text-sm font-semibold text-zinc-400 transition-colors hover:text-indigo-300"
-            >
-              Voltar para login
-            </RouterLink>
-            <p class="mt-4 text-xs leading-5 text-gray-600">
-              Use uma senha exclusiva para proteger o painel administrativo.
-            </p>
-          </div>
+    <div
+      v-if="successMessage"
+      class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+    >
+      <div class="flex gap-3">
+        <CheckCircleIcon class="h-5 w-5 shrink-0 text-emerald-600" />
+        <div>
+          <p class="font-semibold">Senha redefinida</p>
+          <p class="mt-1 leading-6 text-emerald-700">{{ successMessage }}</p>
         </div>
       </div>
-    </section>
-  </main>
+
+      <RouterLink
+        :to="{ name: AuthRouteNames.Login }"
+        class="mt-4 flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f]"
+      >
+        Ir para o login
+      </RouterLink>
+    </div>
+
+    <div
+      v-if="validationHint"
+      class="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+    >
+      <ExclamationTriangleIcon class="h-5 w-5 shrink-0 text-amber-600" />
+      <span>{{ validationHint }}</span>
+    </div>
+
+    <div
+      v-if="errorMessage"
+      class="mb-6 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+    >
+      {{ errorMessage }}
+    </div>
+
+    <div
+      v-if="!hasValidLink"
+      class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800"
+    >
+      Este link não possui os parâmetros de segurança necessários. Solicite um novo email de recuperação.
+    </div>
+
+    <form v-if="!successMessage" @submit.prevent="handlePasswordResetConfirm" class="space-y-5">
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Nova senha
+        </label>
+        <input
+          v-model="form.password"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Digite a nova senha"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+
+        <div v-if="form.password" class="mt-2 space-y-1">
+          <div class="flex gap-1">
+            <span
+              v-for="index in strengthTotalBars"
+              :key="index"
+              class="h-1.5 flex-1 rounded-full transition-colors"
+              :class="index <= strengthFilledBars ? strengthBarClass : 'bg-zinc-200'"
+            />
+          </div>
+          <p class="text-xs font-semibold text-bip-muted">Força: {{ strengthLabel }}</p>
+        </div>
+      </div>
+
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Confirmar nova senha
+        </label>
+        <input
+          v-model="form.confirm_password"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Repita a nova senha"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+      </div>
+
+      <ul class="grid gap-2 border-t border-bip-line pt-4">
+        <li
+          v-for="rule in allPasswordRules"
+          :key="rule.label"
+          class="flex items-center gap-2 text-xs"
+          :class="rule.passed ? 'text-emerald-700' : 'text-bip-muted'"
+        >
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="rule.passed ? 'bg-emerald-500' : 'bg-zinc-300'"
+          ></span>
+          {{ rule.label }}
+        </li>
+      </ul>
+
+      <button
+        type="submit"
+        :disabled="isSubmitting || !isFormReady"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
+      >
+        {{ isSubmitting ? 'Redefinindo senha...' : 'Redefinir senha' }}
+      </button>
+    </form>
+
+    <template #footer>
+      <RouterLink
+        :to="{ name: AuthRouteNames.Login }"
+        class="text-sm font-semibold text-bip-muted transition-colors hover:text-bip-rose"
+      >
+        Voltar para login
+      </RouterLink>
+      <p class="mt-4 text-xs leading-5 text-bip-muted">
+        Use uma senha exclusiva para proteger o painel administrativo.
+      </p>
+    </template>
+  </AuthShell>
 </template>
-
-<style scoped>
-.reset-shell {
-  position: relative;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12), transparent 32rem),
-    radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
-    #09090b;
-}
-
-.reset-orbit {
-  position: absolute;
-  inset: -18rem;
-  background:
-    conic-gradient(
-      from 180deg,
-      transparent 0deg,
-      rgba(99, 102, 241, 0.08) 72deg,
-      transparent 150deg,
-      rgba(255, 255, 255, 0.06) 240deg,
-      transparent 360deg
-    );
-  filter: blur(36px);
-  animation: reset-orbit-spin 24s linear infinite;
-}
-
-.reset-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: radial-gradient(circle at center, black, transparent 72%);
-}
-
-.reset-card {
-  position: relative;
-  isolation: isolate;
-}
-
-.reset-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  z-index: -2;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(99, 102, 241, 0.42),
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.14)
-  );
-  opacity: 0.55;
-}
-
-.reset-card-glow {
-  position: absolute;
-  inset: auto -30% -30% -30%;
-  height: 16rem;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 66%);
-  animation: reset-glow-float 8s ease-in-out infinite alternate;
-}
-
-@keyframes reset-orbit-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes reset-glow-float {
-  from {
-    transform: translate3d(-4%, 0, 0) scale(1);
-  }
-
-  to {
-    transform: translate3d(4%, -8%, 0) scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reset-orbit,
-  .reset-card-glow {
-    animation: none;
-  }
-}
-</style>

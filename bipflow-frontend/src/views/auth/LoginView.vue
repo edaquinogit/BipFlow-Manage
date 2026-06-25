@@ -1,229 +1,318 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { BoltIcon, Square3Stack3DIcon, ChatBubbleLeftRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
 import { DashboardRoutes } from '@/router/dashboard.routes'
-import type { ApiError } from '@/types/auth'
+import { isAxiosError } from '@/types/errors'
+import AuthShell from '@/components/auth/AuthShell.vue'
+import TurnstileWidget from '@/components/auth/TurnstileWidget.vue'
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
 const router = useRouter()
 const isLoading = ref(false)
 const errorMessage = ref('')
+// Separate from errorMessage on purpose: this is a reminder to finish
+// filling the form or completing a required step (captcha), not a
+// rejection -- it gets a calmer amber treatment instead of the red "your
+// credentials/code were wrong" banner.
+const validationHint = ref('')
+const requiresCaptcha = ref(false)
+const captchaToken = ref('')
+const rememberMe = ref(false)
+
+const mfaToken = ref('')
+const mfaCode = ref('')
+const useBackupCode = ref(false)
+const isVerifyingMfa = ref(false)
 
 const form = reactive({
   email: '',
   password: '',
 })
 
+const canSubmit = computed(() => !isLoading.value && (!requiresCaptcha.value || Boolean(captchaToken.value)))
+const canSubmitMfa = computed(() => !isVerifyingMfa.value && mfaCode.value.trim().length > 0)
+
+const handleCaptchaVerified = (token: string) => {
+  captchaToken.value = token
+}
+
+const handleCaptchaExpired = () => {
+  captchaToken.value = ''
+}
+
+const highlights = [
+  { icon: BoltIcon, label: 'Pedidos em tempo real, sem recarregar a tela' },
+  { icon: Square3Stack3DIcon, label: 'Catálogo e categorias sempre atualizados' },
+  { icon: ChatBubbleLeftRightIcon, label: 'Atendimento centralizado em um só painel' },
+]
+
+const formatWait = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.ceil(seconds / 60)} min`
+}
+
 const handleLogin = async () => {
+  validationHint.value = ''
+  errorMessage.value = ''
+
   if (!form.email || !form.password) {
-    errorMessage.value = 'Please fill in all fields.'
+    validationHint.value = 'Preencha email e senha para continuar.'
+    return
+  }
+
+  if (requiresCaptcha.value && !captchaToken.value) {
+    validationHint.value = 'Confirme que você não é um robô para continuar.'
     return
   }
 
   isLoading.value = true
-  errorMessage.value = ''
 
   try {
-    await authService.login(form)
+    const result = await authService.login({
+      ...form,
+      remember_me: rememberMe.value,
+      captcha_token: captchaToken.value || undefined,
+    })
+
+    if ('mfa_required' in result) {
+      mfaToken.value = result.mfa_token
+      return
+    }
+
     router.push({ name: DashboardRoutes.Overview })
   } catch (error) {
-    const err = error as ApiError
-    errorMessage.value = err.response?.data?.detail || 'Connection failed. Check your backend.'
+    if (isAxiosError(error)) {
+      const status = error.response?.status
+
+      if (error.response?.data?.details?.requires_captcha) {
+        requiresCaptcha.value = true
+        captchaToken.value = ''
+        validationHint.value = 'Confirme que você não é um robô para continuar.'
+      } else if (status === 429) {
+        const retryAfterHeader = error.response?.headers?.['retry-after']
+        const waitSeconds = Number(retryAfterHeader)
+        errorMessage.value = Number.isFinite(waitSeconds) && waitSeconds > 0
+          ? `Muitas tentativas. Tente novamente em ${formatWait(waitSeconds)}.`
+          : 'Muitas tentativas. Aguarde um momento e tente novamente.'
+      } else if (status === 401) {
+        errorMessage.value = 'Email ou senha inválidos.'
+        captchaToken.value = ''
+      } else if (status) {
+        errorMessage.value = error.response?.data?.detail || 'Não foi possível entrar agora. Tente novamente.'
+      } else {
+        errorMessage.value = 'Falha de conexão. Verifique sua internet e tente novamente.'
+      }
+    } else {
+      errorMessage.value = 'Não foi possível entrar agora. Tente novamente.'
+    }
   } finally {
     isLoading.value = false
   }
 }
+
+const handleVerifyMfa = async () => {
+  if (!canSubmitMfa.value) return
+
+  isVerifyingMfa.value = true
+  errorMessage.value = ''
+  validationHint.value = ''
+
+  try {
+    await authService.verifyMfa({
+      mfa_token: mfaToken.value,
+      ...(useBackupCode.value ? { backup_code: mfaCode.value.trim() } : { code: mfaCode.value.trim() }),
+    })
+    router.push({ name: DashboardRoutes.Overview })
+  } catch (error) {
+    errorMessage.value = isAxiosError(error) && error.response?.status === 429
+      ? 'Muitas tentativas. Aguarde um momento e tente novamente.'
+      : useBackupCode.value
+        ? 'Codigo de backup invalido ou ja utilizado.'
+        : 'Codigo invalido. Confira o app autenticador e tente novamente.'
+  } finally {
+    isVerifyingMfa.value = false
+  }
+}
+
+const handleBackToLogin = () => {
+  mfaToken.value = ''
+  mfaCode.value = ''
+  useBackupCode.value = false
+  errorMessage.value = ''
+  validationHint.value = ''
+}
 </script>
 
 <template>
-  <main class="login-shell min-h-screen overflow-hidden bg-gray-950 px-4 py-6 text-white sm:px-6">
-    <div class="login-orbit" aria-hidden="true"></div>
-    <div class="login-grid" aria-hidden="true"></div>
+  <AuthShell
+    eyebrow="Painel administrativo"
+    title="Sua operação, sob controle total."
+    description="Gerencie produtos, pedidos e atendimento em um painel pensado para o dia a dia do seu delivery."
+  >
+    <template #highlights>
+      <li v-for="item in highlights" :key="item.label" class="flex items-center gap-3 text-sm text-zinc-300">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+          <component :is="item.icon" class="h-4 w-4 text-bip-rose" />
+        </span>
+        {{ item.label }}
+      </li>
+    </template>
 
-    <section class="relative z-10 flex min-h-[calc(100vh-3rem)] items-center justify-center">
-      <div
-        class="login-card w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-gray-900/85 p-6 shadow-2xl shadow-black/35 backdrop-blur-2xl sm:p-8"
-      >
-        <div class="login-card-glow" aria-hidden="true"></div>
+    <div class="mb-8">
+      <h2 class="text-2xl font-semibold text-bip-black">{{ mfaToken ? 'Verificacao em duas etapas' : 'Entrar' }}</h2>
+      <p class="mt-1 text-sm text-bip-muted">
+        {{ mfaToken
+          ? (useBackupCode ? 'Digite um dos seus codigos de backup.' : 'Digite o codigo do seu app autenticador.')
+          : 'Acesse sua conta para gerenciar sua loja.' }}
+      </p>
+    </div>
 
-        <div class="relative">
-          <div class="mb-8 text-center">
-            <div
-              class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-zinc-950 shadow-lg shadow-black/30"
-            >
-              <span class="text-lg font-black tracking-tighter text-indigo-500">BF</span>
-            </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.28em] text-indigo-500">
-              Painel Administrativo
-            </p>
-            <h1 class="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              BipFlow Manage
-            </h1>
-            <p class="mt-2 text-sm leading-6 text-gray-400">
-              Acesse seu painel para gerenciar produtos, categorias e operacao.
-            </p>
-          </div>
+    <div
+      v-if="validationHint"
+      data-cy="login-hint"
+      class="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+    >
+      <ExclamationTriangleIcon class="h-5 w-5 shrink-0 text-amber-600" />
+      <span>{{ validationHint }}</span>
+    </div>
 
-          <div
-            v-if="errorMessage"
-            class="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300"
-          >
-            {{ errorMessage }}
-          </div>
+    <div
+      v-if="errorMessage"
+      data-cy="login-error"
+      class="mb-6 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+    >
+      {{ errorMessage }}
+    </div>
 
-          <form @submit.prevent="handleLogin" class="space-y-5">
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Email Address
-              </label>
-              <input
-                v-model="form.email"
-                type="email"
-                autocomplete="email"
-                placeholder="admin@bipflow.com"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Password
-              </label>
-              <input
-                v-model="form.password"
-                type="password"
-                autocomplete="current-password"
-                placeholder="........"
-                class="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-inner transition-all placeholder:text-zinc-700 hover:border-zinc-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              :disabled="isLoading"
-              class="flex w-full items-center justify-center rounded-xl bg-white py-3 text-xs font-black uppercase tracking-widest text-black shadow-xl shadow-white/5 transition-all hover:-translate-y-0.5 hover:bg-zinc-200 disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            >
-              <span
-                v-if="isLoading"
-                class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-gray-950/20 border-t-gray-950"
-              ></span>
-              {{ isLoading ? 'Authenticating...' : 'Sign In' }}
-            </button>
-          </form>
-
-          <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-            <RouterLink
-              :to="{ name: AuthRouteNames.ForgotPassword }"
-              class="inline-flex flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-zinc-400 transition-all hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-300"
-            >
-              Recuperar senha
-            </RouterLink>
-
-            <RouterLink
-              :to="{ name: AuthRouteNames.Register }"
-              class="inline-flex flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-gray-300 transition-all hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
-            >
-              Criar conta
-            </RouterLink>
-          </div>
-
-          <div class="mt-7 border-t border-white/10 pt-5 text-center">
-            <p class="text-xs leading-5 text-gray-600">
-              Acesso administrativo protegido por credenciais. Use uma conta autorizada.
-            </p>
-          </div>
-        </div>
+    <form v-if="!mfaToken" @submit.prevent="handleLogin" class="space-y-5">
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Email
+        </label>
+        <input
+          v-model="form.email"
+          type="email"
+          autocomplete="email"
+          placeholder="admin@suaempresa.com"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
       </div>
-    </section>
-  </main>
+
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          Senha
+        </label>
+        <input
+          v-model="form.password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="........"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-bip-black shadow-sm transition-colors placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+        />
+      </div>
+
+      <label class="flex items-center gap-2 text-sm text-bip-muted">
+        <input
+          v-model="rememberMe"
+          type="checkbox"
+          class="h-4 w-4 rounded border-bip-line text-bip-rose focus:ring-2 focus:ring-bip-blush"
+        />
+        Lembrar de mim neste dispositivo
+      </label>
+
+      <TurnstileWidget
+        v-if="requiresCaptcha && TURNSTILE_SITE_KEY"
+        :site-key="TURNSTILE_SITE_KEY"
+        @verified="handleCaptchaVerified"
+        @expired="handleCaptchaExpired"
+      />
+
+      <button
+        type="submit"
+        :disabled="!canSubmit"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
+      >
+        <span
+          v-if="isLoading"
+          class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+        ></span>
+        {{ isLoading ? 'Entrando...' : 'Entrar' }}
+      </button>
+    </form>
+
+    <form v-else @submit.prevent="handleVerifyMfa" class="space-y-5" data-cy="mfa-verify-form">
+      <div>
+        <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-bip-muted">
+          {{ useBackupCode ? 'Codigo de backup' : 'Codigo de 6 digitos' }}
+        </label>
+        <input
+          v-model="mfaCode"
+          type="text"
+          inputmode="text"
+          autocomplete="one-time-code"
+          :placeholder="useBackupCode ? 'AB3K-9XQ2' : '123456'"
+          class="h-11 w-full rounded-lg border border-bip-line bg-white px-4 text-center text-lg tracking-[0.3em] text-bip-black shadow-sm transition-colors placeholder:tracking-normal placeholder:text-zinc-400 focus:border-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+          required
+          autofocus
+        />
+      </div>
+
+      <button
+        type="submit"
+        :disabled="!canSubmitMfa"
+        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
+      >
+        <span
+          v-if="isVerifyingMfa"
+          class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+        ></span>
+        {{ isVerifyingMfa ? 'Verificando...' : 'Verificar' }}
+      </button>
+
+      <div class="flex items-center justify-between text-xs">
+        <button
+          type="button"
+          class="font-semibold text-bip-muted transition-colors hover:text-bip-rose"
+          @click="useBackupCode = !useBackupCode; mfaCode = ''"
+        >
+          {{ useBackupCode ? 'Usar codigo do app autenticador' : 'Usar codigo de backup' }}
+        </button>
+        <button
+          type="button"
+          class="font-semibold text-bip-muted transition-colors hover:text-bip-rose"
+          @click="handleBackToLogin"
+        >
+          Voltar
+        </button>
+      </div>
+    </form>
+
+    <div class="mt-5 flex flex-col gap-3 sm:flex-row">
+      <RouterLink
+        :to="{ name: AuthRouteNames.ForgotPassword }"
+        class="inline-flex flex-1 items-center justify-center rounded-lg border border-bip-line bg-white px-4 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-bip-muted transition-colors hover:border-bip-rose hover:text-bip-rose"
+      >
+        Recuperar senha
+      </RouterLink>
+
+      <RouterLink
+        :to="{ name: AuthRouteNames.Register }"
+        class="inline-flex flex-1 items-center justify-center rounded-lg border border-bip-line bg-white px-4 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-bip-muted transition-colors hover:border-bip-rose hover:text-bip-rose"
+      >
+        Criar conta
+      </RouterLink>
+    </div>
+
+    <template #footer>
+      <p class="text-xs leading-5 text-bip-muted">
+        Acesso administrativo protegido por credenciais. Use uma conta autorizada.
+      </p>
+    </template>
+  </AuthShell>
 </template>
-
-<style scoped>
-.login-shell {
-  position: relative;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12), transparent 32rem),
-    radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
-    #09090b;
-}
-
-.login-orbit {
-  position: absolute;
-  inset: -18rem;
-  background:
-    conic-gradient(
-      from 180deg,
-      transparent 0deg,
-      rgba(99, 102, 241, 0.08) 72deg,
-      transparent 150deg,
-      rgba(255, 255, 255, 0.07) 240deg,
-      transparent 360deg
-    );
-  filter: blur(36px);
-  animation: login-orbit-spin 24s linear infinite;
-}
-
-.login-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: radial-gradient(circle at center, black, transparent 72%);
-}
-
-.login-card {
-  position: relative;
-  isolation: isolate;
-}
-
-.login-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  z-index: -2;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(99, 102, 241, 0.42),
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.16)
-  );
-  opacity: 0.55;
-}
-
-.login-card-glow {
-  position: absolute;
-  inset: auto -30% -30% -30%;
-  height: 16rem;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 66%);
-  animation: login-glow-float 8s ease-in-out infinite alternate;
-}
-
-@keyframes login-orbit-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes login-glow-float {
-  from {
-    transform: translate3d(-4%, 0, 0) scale(1);
-  }
-
-  to {
-    transform: translate3d(4%, -8%, 0) scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-orbit,
-  .login-card-glow {
-    animation: none;
-  }
-}
-</style>

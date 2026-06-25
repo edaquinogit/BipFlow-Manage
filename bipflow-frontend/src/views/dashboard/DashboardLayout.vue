@@ -44,8 +44,7 @@ const handleOpenStore = (): void => {
 };
 
 const handleLogout = async (): Promise<void> => {
-  authService.logout();
-  await router.push('/login');
+  await authService.logout();
 };
 
 onMounted(async () => {

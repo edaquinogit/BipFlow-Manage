@@ -14,9 +14,22 @@ export const AuthRouteNames = {
 /**
  * 🛡️ Guest Meta Helper
  * Define permissões para rotas acessíveis apenas por usuários não autenticados.
+ *
+ * Só faz sentido para /login: se você já está logado, não há motivo para ver
+ * o formulário de login de novo. As demais (registrar segunda loja, recuperar
+ * senha de OUTRA conta, ou completar um link de reset clicado enquanto uma
+ * sessão antiga ainda está ativa em outra aba) são tarefas legítimas mesmo
+ * autenticado -- guestOnly nelas bloqueava essas tarefas, jogando o usuário
+ * direto para o dashboard sem nunca completar o que veio fazer.
  */
 const guestMeta = (title: string) => ({
   guestOnly: true, // Redireciona para o Dashboard se já estiver logado
+  public: true,
+  title,
+  module: "auth"
+});
+
+const authTaskMeta = (title: string) => ({
   public: true,
   title,
   module: "auth"
@@ -37,13 +50,13 @@ export const authRoutes: RouteRecordRaw[] = [
     path: "/register",
     name: AuthRouteNames.Register,
     component: () => import(/* webpackChunkName: "auth-register" */ "@/views/auth/RegisterView.vue"),
-    meta: guestMeta("Criar Conta")
+    meta: authTaskMeta("Criar Conta")
   },
   {
     path: "/forgot-password",
     name: AuthRouteNames.ForgotPassword,
     component: () => import(/* webpackChunkName: "auth-forgot" */ "@/views/auth/ForgotPasswordView.vue"),
-    meta: guestMeta("Recuperar Senha")
+    meta: authTaskMeta("Recuperar Senha")
   },
   {
     /**
@@ -56,6 +69,6 @@ export const authRoutes: RouteRecordRaw[] = [
     props: (route) => ({
       token: (route.params?.token as string) || (route.query?.token as string) || ""
     }),
-    meta: guestMeta("Redefinir Senha")
+    meta: authTaskMeta("Redefinir Senha")
   }
 ];
