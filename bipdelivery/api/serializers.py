@@ -25,6 +25,7 @@ from .models import (
     Store,
     StoreMembership,
     StoreSettings,
+    TOTPDevice,
 )
 from .permissions import (
     get_user_roles,
@@ -42,6 +43,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     can_access_dashboard = serializers.SerializerMethodField()
     can_manage_catalog = serializers.SerializerMethodField()
+    mfa_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -57,6 +59,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "roles",
             "can_access_dashboard",
             "can_manage_catalog",
+            "mfa_enabled",
         ]
         read_only_fields = fields
 
@@ -82,6 +85,10 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     def get_can_manage_catalog(self, user: User) -> bool:
         """Expose whether the user can mutate catalog and freight resources."""
         return has_dashboard_write_access(user)
+
+    def get_mfa_enabled(self, user: User) -> bool:
+        """Expose whether a confirmed TOTP device is active for this account."""
+        return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
 
 
 class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):

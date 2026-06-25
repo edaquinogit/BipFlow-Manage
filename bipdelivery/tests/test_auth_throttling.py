@@ -25,6 +25,7 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
+from bipdelivery.api.throttling import REFRESH_TOKEN_COOKIE_NAME  # noqa: E402
 from bipdelivery.tests.throttle_utils import rest_framework_with_rates  # noqa: E402
 
 pytestmark = pytest.mark.django_db
@@ -157,14 +158,15 @@ class AuthEndpointThrottlingTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
     def test_token_refresh_is_throttled_by_submitted_refresh_token(self) -> None:
-        payload = {"refresh": "invalid-refresh-token"}
+        # The refresh token travels via the httpOnly cookie, not the body.
+        self.client.cookies[REFRESH_TOKEN_COOKIE_NAME] = "invalid-refresh-token"
 
-        response: Any = self.client.post("/api/auth/token/refresh/", payload, format="json")
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         response = self.client.post(
             "/api/auth/token/refresh/",
-            payload,
+            {},
             format="json",
             REMOTE_ADDR="198.51.100.50",
         )

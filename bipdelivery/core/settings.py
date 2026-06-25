@@ -113,6 +113,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     # 'rest_framework_simplejwt',  # JWT auth is configured in REST_FRAMEWORK settings, not as installed app
+    "rest_framework_simplejwt.token_blacklist",  # Needed for its OutstandingToken/BlacklistedToken models (logout revocation)
 ]
 
 LOCAL_APPS = [
@@ -259,6 +260,15 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [*default_headers, "x-store-slug"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Cookies/redirects are only forced in production: the proxy must already send
+# X-Forwarded-Proto (see SECURE_PROXY_SSL_HEADER above) or this redirect loops.
+# Verify in staging with the real proxy config before relying on this in prod.
+if IS_PRODUCTION:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -292,6 +302,7 @@ REST_FRAMEWORK = {
         "auth_token_refresh_identity": get_env_value(
             "BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IDENTITY", "10/minute"
         ),
+        "mfa_verify_ip": get_env_value("BIPFLOW_THROTTLE_MFA_VERIFY_IP", "10/minute"),
     },
 }
 
@@ -301,13 +312,30 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
+
+# "Lembrar-me" (Fase 3.3): when checked at login, the refresh cookie/token
+# get this longer lifetime instead of SIMPLE_JWT's default, and the cookie
+# itself becomes persistent (Max-Age set) instead of a session cookie that
+# dies when the browser closes. Unchecked is the more secure default.
+REMEMBER_ME_REFRESH_TOKEN_LIFETIME = timedelta(days=30)
+
+# Cloudflare Turnstile: conditional CAPTCHA after repeated login failures
+# (Fase 2.3). Dev/test default is Cloudflare's own published "always passes"
+# test secret -- production MUST set a real TURNSTILE_SECRET_KEY, otherwise
+# anyone who crosses the failure threshold is locked out until it's set
+# (fails closed, not silently disabled).
+TURNSTILE_SECRET_KEY = os.environ.get(
+    "TURNSTILE_SECRET_KEY",
+    "" if IS_PRODUCTION else "1x0000000000000000000000000000000AA",
+)
+LOGIN_CAPTCHA_FAILURE_THRESHOLD = get_int_env("LOGIN_CAPTCHA_FAILURE_THRESHOLD", 4)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

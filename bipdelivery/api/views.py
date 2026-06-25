@@ -14,24 +14,41 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed, NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.tokens import RefreshToken, Token
+from rest_framework_simplejwt.utils import datetime_from_epoch
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .bot_engine import build_bot_reply
+from .captcha import verify_turnstile
 from .errors import business_logic_error, not_found_error, validation_error
+from .mfa import (
+    build_mfa_challenge_token,
+    build_provisioning_uri,
+    build_qr_code_data_uri,
+    generate_totp_secret,
+    read_mfa_challenge_payload,
+    verify_totp_code,
+)
 from .models import (
     BotConversation,
     BotMessage,
     Category,
     DeliveryRegion,
+    LoginAttempt,
+    MFABackupCode,
     Product,
     SaleOrder,
     SaleOrderItem,
     Store,
+    StoreMembership,
     StoreSettings,
+    TOTPDevice,
 )
 from .pagination import ProductListPagination, StandardPagination
 from .permissions import (
@@ -68,11 +85,13 @@ from .serializers import (
 )
 from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
+    REFRESH_TOKEN_COOKIE_NAME,
     AuthIpThrottle,
     BotMessageIpThrottle,
     CheckoutIpThrottle,
     CheckoutPhoneThrottle,
     LoginIdentityThrottle,
+    MfaVerifyIpThrottle,
     PasswordResetConfirmIdentityThrottle,
     PasswordResetIdentityThrottle,
     RegistrationIdentityThrottle,
@@ -1377,17 +1396,418 @@ class CheckoutWhatsAppView(APIView):
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 
+REFRESH_TOKEN_COOKIE_PATH = "/api/auth/"
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: bool = False) -> None:
+    """Store the refresh token as an httpOnly cookie, unreachable from page JS.
+
+    Unchecked "remember me" -> no Max-Age at all (a session cookie the
+    browser drops on its own when it fully closes). Checked -> a persistent
+    cookie matching REMEMBER_ME_REFRESH_TOKEN_LIFETIME. The token's own
+    `exp` claim must already match this (see _apply_remember_me) -- a
+    persistent cookie around an expired token would be a no-op.
+    """
+    cookie_kwargs: dict = {
+        "path": REFRESH_TOKEN_COOKIE_PATH,
+        "httponly": True,
+        "secure": settings.IS_PRODUCTION,
+        "samesite": "Strict",
+    }
+    if remember_me:
+        cookie_kwargs["max_age"] = int(settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME.total_seconds())
+
+    response.set_cookie(REFRESH_TOKEN_COOKIE_NAME, refresh_token, **cookie_kwargs)
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(REFRESH_TOKEN_COOKIE_NAME, path=REFRESH_TOKEN_COOKIE_PATH)
+
+
+def _apply_remember_me(refresh: Token, remember_me: bool) -> None:
+    """Stamp the remember_me claim and (re)apply the matching lifetime.
+
+    Needed because SimpleJWT's own rotation (ROTATE_REFRESH_TOKENS=True)
+    calls token.set_exp() with no lifetime argument, which falls back to the
+    *class-level* default (SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"], 1 day) --
+    silently shrinking a 30-day "remembered" session back down on its very
+    first refresh unless every rotation re-stamps the claim and re-applies
+    the lifetime explicitly, like this.
+    """
+    refresh["remember_me"] = remember_me
+    lifetime = (
+        settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME
+        if remember_me
+        else settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+    )
+    refresh.set_exp(lifetime=lifetime)
+
+
+def _sync_outstanding_token_expiry(refresh: Token) -> None:
+    """Keep OutstandingToken.expires_at honest after _apply_remember_me changes exp.
+
+    Purely a bookkeeping/audit-trail concern: the blacklist app only ever
+    checks `jti` membership, never `expires_at`, so a stale value here can't
+    let an expired token through -- but it would show a misleading lifetime
+    in Django Admin if left unsynced.
+    """
+    OutstandingToken.objects.filter(jti=refresh["jti"]).update(
+        expires_at=datetime_from_epoch(int(refresh["exp"])),
+    )
+
+
+def _blacklist_all_outstanding_tokens(user) -> int:
+    """Blacklist every outstanding refresh token for `user`. Returns how many were newly revoked.
+
+    Shared by LogoutAllDevicesView (explicit user request) and
+    PasswordResetConfirmView (changing your password should invalidate any
+    session minted under the old one, including ones an attacker might
+    already be holding).
+    """
+    outstanding = OutstandingToken.objects.filter(user=user)
+    already_blacklisted_jtis = set(
+        BlacklistedToken.objects.filter(token__user=user).values_list("token__jti", flat=True)
+    )
+    newly_blacklisted = [
+        BlacklistedToken(token=token) for token in outstanding if token.jti not in already_blacklisted_jtis
+    ]
+    BlacklistedToken.objects.bulk_create(newly_blacklisted)
+    return len(newly_blacklisted)
+
+
+def _client_ip(request) -> str:
+    """Mirror SimpleRateThrottle.get_ident's proxy-aware IP resolution.
+
+    Can't just instantiate SimpleRateThrottle to call get_ident(): its
+    __init__ requires a `scope`/`rate` (raises ImproperlyConfigured without
+    one), which this helper has no use for.
+    """
+    from rest_framework.settings import api_settings as drf_api_settings
+
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
+    remote_addr = request.META.get("REMOTE_ADDR")
+    num_proxies = drf_api_settings.NUM_PROXIES
+
+    if num_proxies is not None:
+        if num_proxies == 0 or xff is None:
+            return remote_addr
+        addrs = xff.split(",")
+        return addrs[-min(num_proxies, len(addrs))].strip()
+
+    return "".join(xff.split()) if xff else remote_addr
+
+
+def _login_identifier(request) -> str:
+    data = request.data if hasattr(request, "data") else {}
+    if not hasattr(data, "get"):
+        return ""
+    return str(data.get("username") or data.get("email") or "").strip()
+
+
 class LoginTokenObtainPairView(TokenObtainPairView):
-    """JWT login endpoint protected by IP and submitted-identity throttles."""
+    """JWT login endpoint protected by IP and submitted-identity throttles.
+
+    The refresh token is set as an httpOnly cookie and stripped from the
+    JSON body so page JavaScript can never read it. Every attempt -- success,
+    bad credentials, or throttled -- is recorded to LoginAttempt for audit
+    and to feed the conditional CAPTCHA gate.
+    """
 
     serializer_class = StoreScopedTokenObtainPairSerializer
     throttle_classes = [AuthIpThrottle, LoginIdentityThrottle]
 
+    def post(self, request, *args, **kwargs):
+        identifier = _login_identifier(request)
+        remember_me = bool(request.data.get("remember_me")) if hasattr(request.data, "get") else False
+
+        if LoginAttempt.recent_failure_count(identifier) >= settings.LOGIN_CAPTCHA_FAILURE_THRESHOLD:
+            captcha_token = request.data.get("captcha_token") if hasattr(request.data, "get") else None
+            if not verify_turnstile(captcha_token, _client_ip(request)):
+                self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_CAPTCHA_REQUIRED)
+                return validation_error(
+                    "Confirme que voce nao e um robo para continuar.",
+                    details={"requires_captcha": True},
+                )
+
+        try:
+            response = super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_INVALID_CREDENTIALS)
+            raise
+
+        user = User.objects.filter(username__iexact=identifier).first()
+        membership = (
+            StoreMembership.objects.filter(user=user).select_related("store").first()
+            if user is not None
+            else None
+        )
+        store_id = membership.store_id if membership else None
+
+        mfa_device = TOTPDevice.objects.filter(user=user, confirmed=True).first() if user else None
+        if mfa_device is not None:
+            # Password checked out, but a second factor is still owed --
+            # discard the real tokens super().post() already minted and
+            # issue a short-lived challenge instead. Recorded as a distinct
+            # failure_reason so a completed MFA login still shows as two
+            # rows (challenge issued, then a real success/failure) rather
+            # than masquerading as a single successful password check.
+            # remember_me rides along in the challenge so step two can
+            # still honor the choice the user made on the login form.
+            self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_MFA_REQUIRED, user=user, store_id=store_id)
+            return Response(
+                {"mfa_required": True, "mfa_token": build_mfa_challenge_token(user.id, remember_me)},
+                status=status.HTTP_200_OK,
+            )
+
+        refresh_str = response.data.pop("refresh", None)
+        if refresh_str:
+            refresh = RefreshToken(refresh_str)
+            _apply_remember_me(refresh, remember_me)
+            _sync_outstanding_token_expiry(refresh)
+            _set_refresh_cookie(response, str(refresh), remember_me=remember_me)
+
+        self._record(request, identifier, succeeded=True, user=user, store_id=store_id)
+        return response
+
+    def throttled(self, request, wait) -> None:
+        self._record(request, _login_identifier(request), failure_reason=LoginAttempt.FAILURE_THROTTLED)
+        super().throttled(request, wait)
+
+    @staticmethod
+    def _record(request, identifier: str, *, succeeded: bool = False, failure_reason: str = "", user=None, store_id=None) -> None:
+        LoginAttempt.record(
+            identifier=identifier,
+            ip_address=_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            succeeded=succeeded,
+            failure_reason=failure_reason,
+            user=user,
+            store_id=store_id,
+        )
+
 
 class RefreshTokenView(TokenRefreshView):
-    """JWT refresh endpoint protected against retry storms and token replay abuse."""
+    """JWT refresh endpoint protected against retry storms and token replay abuse.
+
+    Reads the refresh token from its httpOnly cookie (never the request
+    body) and rewrites that same cookie when rotation mints a new one.
+    """
 
     throttle_classes = [TokenRefreshIpThrottle, TokenRefreshIdentityThrottle]
+
+    def post(self, request, *args, **kwargs):
+        refresh = request.COOKIES.get(REFRESH_TOKEN_COOKIE_NAME)
+        if not refresh:
+            return validation_error("Sessao expirada. Faca login novamente.")
+
+        # Read remember_me from the incoming token *before* rotation below
+        # mints a fresh one with no memory of it -- ROTATE_REFRESH_TOKENS
+        # resets exp to the global default on every refresh unless each
+        # rotation re-stamps the claim and re-applies the lifetime itself.
+        try:
+            incoming = RefreshToken(refresh)
+            remember_me = bool(incoming.payload.get("remember_me"))
+        except TokenError:
+            remember_me = False
+
+        serializer = self.get_serializer(data={"refresh": refresh})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as error:
+            raise InvalidToken(error.args[0])
+
+        response = Response(serializer.validated_data, status=status.HTTP_200_OK)
+        new_refresh_str = response.data.pop("refresh", None)
+        if new_refresh_str:
+            new_refresh = RefreshToken(new_refresh_str)
+            _apply_remember_me(new_refresh, remember_me)
+            _sync_outstanding_token_expiry(new_refresh)
+            _set_refresh_cookie(response, str(new_refresh), remember_me=remember_me)
+        return response
+
+
+class LogoutView(APIView):
+    """Blacklist the caller's refresh cookie so it can no longer mint new access tokens."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        refresh = request.COOKIES.get(REFRESH_TOKEN_COOKIE_NAME)
+        if not refresh:
+            return validation_error("Nenhuma sessao para encerrar.")
+
+        try:
+            token = RefreshToken(refresh)
+        except TokenError:
+            return validation_error("Token de atualizacao invalido ou expirado.")
+
+        if str(token.payload.get("user_id")) != str(request.user.id):
+            return validation_error("Token de atualizacao invalido ou expirado.")
+
+        token.blacklist()
+
+        response = Response({"message": "Logout realizado com sucesso."}, status=status.HTTP_200_OK)
+        _clear_refresh_cookie(response)
+        return response
+
+
+class LogoutAllDevicesView(APIView):
+    """Blacklist every outstanding refresh token for the caller (logout everywhere).
+
+    Built on the 1.1 blacklist infrastructure: without it, there would be no
+    way to revoke sessions the caller isn't currently holding a token for.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        revoked_count = _blacklist_all_outstanding_tokens(request.user)
+
+        response = Response(
+            {
+                "message": "Sessao encerrada em todos os dispositivos.",
+                "revoked_count": revoked_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+        _clear_refresh_cookie(response)
+        return response
+
+
+class MfaSetupView(APIView):
+    """Generate a new, unconfirmed TOTP secret + QR code for the caller.
+
+    Re-running this overwrites any other unconfirmed device (e.g. an
+    abandoned setup attempt), but refuses to touch an already-confirmed one
+    -- disable first to reconfigure.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        existing = TOTPDevice.objects.filter(user=request.user).first()
+        if existing is not None and existing.confirmed:
+            return validation_error("MFA ja esta ativado. Desative antes de reconfigurar.")
+
+        secret = generate_totp_secret()
+        device, _created = TOTPDevice.objects.update_or_create(
+            user=request.user,
+            defaults={"confirmed": False, "confirmed_at": None},
+        )
+        device.set_secret(secret)
+        device.save(update_fields=["encrypted_secret", "confirmed", "confirmed_at"])
+
+        account_label = request.user.email or request.user.username
+        provisioning_uri = build_provisioning_uri(secret, account_label)
+
+        return Response(
+            {
+                "secret": secret,
+                "provisioning_uri": provisioning_uri,
+                "qr_code": build_qr_code_data_uri(provisioning_uri),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class MfaSetupConfirmView(APIView):
+    """Confirm a pending TOTP device with a live code, activating MFA and issuing backup codes."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        device = TOTPDevice.objects.filter(user=request.user, confirmed=False).first()
+        if device is None:
+            return validation_error("Nenhuma configuracao de MFA pendente. Inicie o setup novamente.")
+
+        code = request.data.get("code") if hasattr(request.data, "get") else None
+        if not verify_totp_code(device.get_secret(), str(code or "")):
+            return validation_error("Codigo invalido. Confira o app autenticador e tente novamente.")
+
+        device.confirmed = True
+        device.confirmed_at = timezone.now()
+        device.save(update_fields=["confirmed", "confirmed_at"])
+
+        backup_codes = MFABackupCode.generate_for_user(request.user)
+
+        return Response(
+            {"message": "MFA ativado com sucesso.", "backup_codes": backup_codes},
+            status=status.HTTP_200_OK,
+        )
+
+
+class MfaDisableView(APIView):
+    """Disable MFA for the caller. Requires re-entering the password as a confirmation step."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        password = request.data.get("password") if hasattr(request.data, "get") else None
+        if not password or not request.user.check_password(password):
+            return validation_error("Senha incorreta.")
+
+        TOTPDevice.objects.filter(user=request.user).delete()
+        MFABackupCode.objects.filter(user=request.user).delete()
+
+        return Response({"message": "MFA desativado."}, status=status.HTTP_200_OK)
+
+
+class MfaVerifyView(APIView):
+    """Second step of login when MFA is enabled: exchange an mfa_token + code for real tokens."""
+
+    permission_classes = []
+    authentication_classes = []
+    throttle_classes = [MfaVerifyIpThrottle]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data if hasattr(request.data, "get") else {}
+        mfa_token = data.get("mfa_token")
+        code = str(data.get("code") or "")
+        backup_code = data.get("backup_code")
+
+        challenge = read_mfa_challenge_payload(mfa_token) if mfa_token else None
+        user_id = challenge.get("user_id") if challenge else None
+        remember_me = bool(challenge.get("remember_me")) if challenge else False
+        user = User.objects.filter(pk=user_id, is_active=True).first() if user_id else None
+        device = TOTPDevice.objects.filter(user=user, confirmed=True).first() if user else None
+
+        if user is None or device is None:
+            return validation_error("Sessao de verificacao invalida ou expirada. Faca login novamente.")
+
+        verified = verify_totp_code(device.get_secret(), code) if code else False
+        if not verified and backup_code:
+            verified = MFABackupCode.consume(user, str(backup_code))
+
+        ip_address = _client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        if not verified:
+            LoginAttempt.record(
+                identifier=user.username,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                succeeded=False,
+                failure_reason=LoginAttempt.FAILURE_MFA_INVALID,
+                user=user,
+            )
+            return validation_error("Codigo invalido.")
+
+        membership = StoreMembership.objects.filter(user=user).select_related("store").first()
+        LoginAttempt.record(
+            identifier=user.username,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            succeeded=True,
+            user=user,
+            store_id=membership.store_id if membership else None,
+        )
+
+        refresh = StoreScopedTokenObtainPairSerializer.get_token(user)
+        _apply_remember_me(refresh, remember_me)
+        _sync_outstanding_token_expiry(refresh)
+        response = Response({"access": str(refresh.access_token)}, status=status.HTTP_200_OK)
+        _set_refresh_cookie(response, str(refresh), remember_me=remember_me)
+        return response
 
 
 class CurrentUserView(APIView):
@@ -1478,10 +1898,19 @@ class PasswordResetConfirmView(APIView):
         user.set_password(serializer.validated_data["password"])
         user.save(update_fields=["password"])
 
-        return Response(
+        # A password reset is exactly the moment a session might have been
+        # compromised (that's plausibly *why* the user is resetting it) --
+        # revoke every existing refresh token so a leaked one stops working
+        # the instant the new password takes effect, not just for the next
+        # legitimate login.
+        _blacklist_all_outstanding_tokens(user)
+
+        response = Response(
             {
                 "message": "Senha redefinida com sucesso. Voce ja pode acessar sua conta.",
                 "email": user.email,
             },
             status=status.HTTP_200_OK,
         )
+        _clear_refresh_cookie(response)
+        return response

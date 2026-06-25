@@ -10,6 +10,10 @@ Validates the complete 401 -> refresh token -> retry flow:
 Critical to prevent user session dropout when access token expires
 but refresh token is still valid.
 
+The refresh token travels exclusively via the httpOnly `refresh_token`
+cookie (never the request body), so every test sets/reads that cookie
+through `self.client.cookies` instead of the POST payload.
+
 Run tests with:
     pytest tests/test_token_refresh_flow.py -v
 """
@@ -30,6 +34,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
 from bipdelivery.api.models import Category, Product  # noqa: E402
+from bipdelivery.api.throttling import REFRESH_TOKEN_COOKIE_NAME  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
@@ -58,15 +63,15 @@ class TokenRefreshFlowTest(TestCase):
             stock_quantity=5,
         )
 
+    def _set_refresh_cookie(self, refresh: str) -> None:
+        self.client.cookies[REFRESH_TOKEN_COOKIE_NAME] = refresh
+
     def test_refresh_token_endpoint_exists_at_correct_path(self) -> None:
         """Validate refresh token endpoint is at /api/auth/token/refresh/."""
-        # Get tokens
         refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
 
-        # Try to refresh at correct endpoint
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(refresh)}, format="json"
-        )
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         # Should succeed
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -74,13 +79,11 @@ class TokenRefreshFlowTest(TestCase):
 
     def test_refresh_token_endpoint_rejects_wrong_path(self) -> None:
         """Validate old incorrect path /token/refresh/ returns 404."""
-        # Get tokens
         refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
 
         # Try old wrong endpoint
-        response: Any = self.client.post(
-            "/token/refresh/", {"refresh": str(refresh)}, format="json"  # Wrong old path
-        )
+        response: Any = self.client.post("/token/refresh/", {}, format="json")  # Wrong old path
 
         # Should fail (404 or 404-like error)
         self.assertIn(
@@ -88,41 +91,35 @@ class TokenRefreshFlowTest(TestCase):
         )
 
     def test_refresh_token_with_valid_refresh_token(self) -> None:
-        """Valid refresh token should return new access token."""
+        """Valid refresh token cookie should return new access token."""
         refresh = RefreshToken.for_user(self.user)
-        old_refresh_str = str(refresh)
+        self._set_refresh_cookie(str(refresh))
 
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": old_refresh_str}, format="json"
-        )
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
-        # New token should be different from old
         self.assertIsNotNone(response.data["access"])
 
     def test_refresh_token_with_invalid_refresh_token(self) -> None:
-        """Invalid refresh token should return 401."""
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": "invalid-token-here"}, format="json"
-        )
+        """Invalid refresh token cookie should return 401."""
+        self._set_refresh_cookie("invalid-token-here")
+
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_refresh_token_with_expired_refresh_token(self) -> None:
-        """Expired refresh token should return 401."""
+        """Expired refresh token cookie should return 401."""
         import datetime
-
-        from rest_framework_simplejwt.tokens import RefreshToken
 
         refresh = RefreshToken.for_user(self.user)
 
         # Manually expire the refresh token by manipulating its exp claim
         refresh.set_exp(lifetime=datetime.timedelta(seconds=-1))
+        self._set_refresh_cookie(str(refresh))
 
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(refresh)}, format="json"
-        )
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         # Should reject expired token
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -145,39 +142,36 @@ class TokenRefreshFlowTest(TestCase):
         /api/auth/token/refresh/ (not /token/refresh/ or other variants)
         """
         refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
 
         # Frontend calls this endpoint
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(refresh)}, format="json"
-        )
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         # Should succeed - this is the only valid endpoint
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
-        self.assertIn("refresh", response.data)
 
-    def test_refresh_returns_both_access_and_refresh_tokens(self) -> None:
-        """Refresh endpoint should return both access and refresh tokens."""
+    def test_refresh_rotates_the_cookie_not_the_body(self) -> None:
+        """Refresh endpoint should rotate the httpOnly cookie, never expose it in JSON."""
         refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
 
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(refresh)}, format="json"
-        )
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Should have both tokens
         self.assertIn("access", response.data)
-        self.assertIn("refresh", response.data)
+        self.assertNotIn("refresh", response.data)
+        self.assertIn(REFRESH_TOKEN_COOKIE_NAME, response.cookies)
+        rotated_cookie = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
+        self.assertTrue(rotated_cookie["httponly"])
+        self.assertEqual(rotated_cookie["samesite"], "Strict")
 
     def test_refreshed_access_token_is_valid(self) -> None:
         """Access token returned from refresh should be usable immediately."""
-        # Get initial tokens
         tokens = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(tokens))
 
-        # Refresh to get new access token
-        refresh_response: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(tokens)}, format="json"
-        )
+        refresh_response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
         new_access_token = refresh_response.data["access"]
@@ -189,49 +183,37 @@ class TokenRefreshFlowTest(TestCase):
         # Should succeed with refreshed token
         self.assertEqual(protected_response.status_code, status.HTTP_200_OK)
 
-    def test_refresh_token_missing_body(self) -> None:
-        """Missing refresh token in request body should return 400."""
-        response: Any = self.client.post(
-            "/api/auth/token/refresh/", {}, format="json"  # Empty body
-        )
+    def test_refresh_token_missing_cookie(self) -> None:
+        """Missing refresh token cookie should return 400."""
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_multiple_refresh_cycles(self) -> None:
-        """Multiple refresh cycles should work sequentially."""
-        # First cycle
+        """Multiple refresh cycles should work sequentially, each rotating the cookie."""
         tokens1 = RefreshToken.for_user(self.user)
-        response1: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(tokens1)}, format="json"
-        )
+        self._set_refresh_cookie(str(tokens1))
+        response1: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
         self.assertEqual(response1.status_code, status.HTTP_200_OK)
 
-        # Second cycle with new tokens
-        tokens2 = RefreshToken.for_user(self.user)
-        response2: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(tokens2)}, format="json"
-        )
+        # The rotated cookie set on the test client is used automatically next.
+        response2: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
 
-        # Third cycle
-        tokens3 = RefreshToken.for_user(self.user)
-        response3: Any = self.client.post(
-            "/api/auth/token/refresh/", {"refresh": str(tokens3)}, format="json"
-        )
+        response3: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
         self.assertEqual(response3.status_code, status.HTTP_200_OK)
 
     def test_refresh_endpoint_requires_post_method(self) -> None:
         """Refresh endpoint should only accept POST requests."""
         refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
 
         # Try GET
         response_get: Any = self.client.get("/api/auth/token/refresh/")
         self.assertEqual(response_get.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         # Try PUT
-        response_put: Any = self.client.put(
-            "/api/auth/token/refresh/", {"refresh": str(refresh)}, format="json"
-        )
+        response_put: Any = self.client.put("/api/auth/token/refresh/", {}, format="json")
         self.assertEqual(response_put.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         # Try DELETE

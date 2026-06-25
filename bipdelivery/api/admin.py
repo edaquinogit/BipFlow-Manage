@@ -4,12 +4,15 @@ from .models import (
     BotMessage,
     Category,
     DeliveryRegion,
+    LoginAttempt,
+    MFABackupCode,
     Product,
     SaleOrder,
     SaleOrderItem,
     Store,
     StoreMembership,
     StoreSettings,
+    TOTPDevice,
 )
 
 
@@ -82,6 +85,51 @@ class StoreMembershipAdmin(admin.ModelAdmin):
 class StoreSettingsAdmin(admin.ModelAdmin):
     list_display = ("id", "whatsapp_phone", "updated_at")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(LoginAttempt)
+class LoginAttemptAdmin(admin.ModelAdmin):
+    list_display = ("identifier", "succeeded", "failure_reason", "ip_address", "user", "created_at")
+    list_filter = ("succeeded", "failure_reason", "created_at")
+    search_fields = ("identifier", "ip_address", "user__username", "user__email")
+    readonly_fields = (
+        "user", "identifier", "ip_address", "user_agent", "succeeded",
+        "failure_reason", "store_id", "created_at",
+    )
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+
+@admin.register(TOTPDevice)
+class TOTPDeviceAdmin(admin.ModelAdmin):
+    list_display = ("user", "confirmed", "created_at", "confirmed_at")
+    list_filter = ("confirmed",)
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("user", "confirmed", "created_at", "confirmed_at")
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+
+@admin.register(MFABackupCode)
+class MFABackupCodeAdmin(admin.ModelAdmin):
+    list_display = ("user", "used_at", "created_at")
+    list_filter = ("used_at",)
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("user", "code_hash", "used_at", "created_at")
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
 
 
 class BotMessageInline(admin.TabularInline):

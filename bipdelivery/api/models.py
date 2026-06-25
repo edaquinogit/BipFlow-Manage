@@ -1,9 +1,13 @@
+import secrets
 import uuid
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
+
+from .crypto import decrypt_secret, encrypt_secret
 
 
 def generate_bot_session_id() -> str:
@@ -550,6 +554,184 @@ class SaleOrder(models.Model):
     def __str__(self) -> str:
         """Return a readable order identifier for admin/debug purposes."""
         return self.order_reference
+
+
+class LoginAttempt(models.Model):
+    """Audit trail of login attempts, success and failure (Fase 2 of the auth-security plan).
+
+    Feeds the conditional CAPTCHA gate (`recent_failure_count`) and gives an
+    admin visibility into credential-stuffing patterns. Retention is the
+    operator's responsibility -- nothing here prunes old rows automatically,
+    so a periodic cleanup job is needed before this grows unbounded under
+    sustained attack traffic.
+    """
+
+    FAILURE_INVALID_CREDENTIALS = "invalid_credentials"
+    FAILURE_THROTTLED = "throttled"
+    FAILURE_CAPTCHA_REQUIRED = "captcha_required"
+    FAILURE_MFA_REQUIRED = "mfa_required"
+    FAILURE_MFA_INVALID = "mfa_invalid"
+    FAILURE_CHOICES = [
+        (FAILURE_INVALID_CREDENTIALS, "Invalid credentials"),
+        (FAILURE_THROTTLED, "Throttled"),
+        (FAILURE_CAPTCHA_REQUIRED, "Captcha required or invalid"),
+        (FAILURE_MFA_REQUIRED, "MFA challenge issued"),
+        (FAILURE_MFA_INVALID, "MFA code invalid"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="login_attempts",
+        help_text="Resolved user, when the submitted identifier matched one. Null for unknown emails.",
+    )
+    identifier = models.CharField(
+        max_length=255,
+        help_text="Normalized (lowercased) submitted username/email.",
+    )
+    ip_address = models.GenericIPAddressField()
+    user_agent = models.CharField(max_length=512, blank=True)
+    succeeded = models.BooleanField(default=False)
+    failure_reason = models.CharField(max_length=32, choices=FAILURE_CHOICES, blank=True)
+    store_id = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["identifier", "created_at"]),
+            models.Index(fields=["ip_address", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        """Return a compact, human-readable summary for admin/debug purposes."""
+        outcome = "ok" if self.succeeded else (self.failure_reason or "failed")
+        return f"{self.identifier} @ {self.created_at:%Y-%m-%d %H:%M} ({outcome})"
+
+    @classmethod
+    def record(
+        cls,
+        *,
+        identifier: str,
+        ip_address: str,
+        user_agent: str = "",
+        succeeded: bool = False,
+        failure_reason: str = "",
+        user=None,
+        store_id: int | None = None,
+    ) -> "LoginAttempt":
+        return cls.objects.create(
+            user=user,
+            identifier=(identifier or "").strip().lower()[:255],
+            ip_address=ip_address,
+            user_agent=(user_agent or "")[:512],
+            succeeded=succeeded,
+            failure_reason=failure_reason,
+            store_id=store_id,
+        )
+
+    @classmethod
+    def recent_failure_count(cls, identifier: str, *, within_minutes: int = 15) -> int:
+        """Count recent consecutive-looking failures, used to gate the CAPTCHA challenge."""
+        normalized = (identifier or "").strip().lower()
+        if not normalized:
+            return 0
+
+        since = timezone.now() - timezone.timedelta(minutes=within_minutes)
+        return cls.objects.filter(
+            identifier=normalized,
+            succeeded=False,
+            created_at__gte=since,
+        ).count()
+
+
+class TOTPDevice(models.Model):
+    """A user's TOTP secret for MFA (Fase 3.1 of the auth-security plan).
+
+    One per user. The secret is encrypted at rest (see crypto.py) since
+    whoever holds it can generate valid codes indefinitely -- unlike a
+    password, there's no hash-only storage option for a shared secret that
+    both sides must reproduce the same codes from.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="totp_device",
+    )
+    encrypted_secret = models.BinaryField()
+    confirmed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        """Return a compact identifier for admin/debug purposes."""
+        state = "confirmed" if self.confirmed else "pending"
+        return f"TOTP device for {self.user_id} ({state})"
+
+    def get_secret(self) -> str:
+        return decrypt_secret(bytes(self.encrypted_secret))
+
+    def set_secret(self, raw_secret: str) -> None:
+        self.encrypted_secret = encrypt_secret(raw_secret)
+
+
+class MFABackupCode(models.Model):
+    """Single-use recovery code for when the user's TOTP device is unavailable.
+
+    Stored as a hash via Django's own password hasher -- the same trusted
+    primitive already used for account passwords -- never in plaintext.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="mfa_backup_codes",
+    )
+    code_hash = models.CharField(max_length=255)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "used_at"])]
+
+    def __str__(self) -> str:
+        """Return a compact identifier for admin/debug purposes."""
+        return f"Backup code for {self.user_id} ({'used' if self.used_at else 'unused'})"
+
+    @staticmethod
+    def _generate_plain_code() -> str:
+        """Return a human-typeable single-use code, e.g. 'AB3K-9XQ2'."""
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I, easy to read aloud
+        raw = "".join(secrets.choice(alphabet) for _ in range(8))
+        return f"{raw[:4]}-{raw[4:]}"
+
+    @classmethod
+    def generate_for_user(cls, user, count: int = 8) -> list[str]:
+        """Replace any existing codes with `count` fresh ones, returning the plaintext once."""
+        cls.objects.filter(user=user).delete()
+        plain_codes = [cls._generate_plain_code() for _ in range(count)]
+        cls.objects.bulk_create(
+            [cls(user=user, code_hash=make_password(code)) for code in plain_codes]
+        )
+        return plain_codes
+
+    @classmethod
+    def consume(cls, user, submitted_code: str) -> bool:
+        """Check `submitted_code` against the user's unused codes, consuming it if it matches."""
+        normalized = submitted_code.strip().upper()
+        if not normalized:
+            return False
+
+        for backup_code in cls.objects.filter(user=user, used_at__isnull=True):
+            if check_password(normalized, backup_code.code_hash):
+                backup_code.used_at = timezone.now()
+                backup_code.save(update_fields=["used_at"])
+                return True
+
+        return False
 
 
 class SaleOrderItem(models.Model):

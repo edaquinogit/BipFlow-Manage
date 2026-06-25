@@ -10,6 +10,11 @@ from typing import Iterable
 
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 
+# The refresh token travels exclusively in this httpOnly cookie (never the
+# request body or localStorage) so it can't be exfiltrated via XSS. Shared
+# with views.py, which sets/reads/clears the cookie itself.
+REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
+
 
 def _hash_cache_identifier(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
@@ -110,6 +115,16 @@ class BotMessageIpThrottle(AnonRateThrottle):
     scope = "bot_message_ip"
 
 
+class MfaVerifyIpThrottle(AnonRateThrottle):
+    """
+    IP-based control for the MFA second-factor verification endpoint --
+    without this, a 6-digit TOTP code (1e6 combinations) is brute-forceable
+    in well under the ~90s validity window once unthrottled.
+    """
+
+    scope = "mfa_verify_ip"
+
+
 class SubmittedFieldThrottle(SimpleRateThrottle):
     """
     Base throttle that keys the rate limit by submitted sensitive fields.
@@ -192,11 +207,22 @@ class TokenRefreshIpThrottle(AnonRateThrottle):
     scope = "auth_token_refresh_ip"
 
 
-class TokenRefreshIdentityThrottle(SubmittedFieldThrottle):
+class TokenRefreshIdentityThrottle(SimpleRateThrottle):
     """
-    Limit repeated refresh attempts for the same submitted refresh token.
+    Limit repeated refresh attempts for the same refresh token.
+
+    The token lives in the httpOnly `refresh_token` cookie, not the request
+    body, so identity is read from there instead of via SubmittedFieldThrottle.
     """
 
     scope = "auth_token_refresh_identity"
-    identity_fields = ("refresh",)
-    lower_identity = False
+
+    def get_cache_key(self, request, view):
+        identifier = request.COOKIES.get(REFRESH_TOKEN_COOKIE_NAME)
+        if not identifier:
+            return None
+
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": _hash_cache_identifier(identifier),
+        }
