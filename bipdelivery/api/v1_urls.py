@@ -11,6 +11,7 @@ from .views import (
     ProductViewSet,
     PublicStoreSettingsView,
     SaleOrderViewSet,
+    StockMovementViewSet,
     StoreSettingsView,
 )
 
@@ -22,6 +23,7 @@ router.register(r"categories", CategoryViewSet, basename="category")
 router.register(r"delivery-regions", DeliveryRegionViewSet, basename="delivery-region")
 router.register(r"sales-orders", SaleOrderViewSet, basename="sales-order")
 router.register(r"bot-conversations", BotConversationViewSet, basename="bot-conversation")
+router.register(r"stock-movements", StockMovementViewSet, basename="stock-movement")
 
 urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador

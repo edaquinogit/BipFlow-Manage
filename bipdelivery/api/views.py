@@ -45,6 +45,7 @@ from .models import (
     Product,
     SaleOrder,
     SaleOrderItem,
+    StockMovement,
     Store,
     StoreMembership,
     StoreSettings,
@@ -79,10 +80,13 @@ from .serializers import (
     SaleOrderSerializer,
     SaleOrderSummarySerializer,
     SaleOrderTimeseriesPointSerializer,
+    StockMovementCreateSerializer,
+    StockMovementSerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
 )
+from .stock import StockMovementError, apply_stock_movement
 from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
     REFRESH_TOKEN_COOKIE_NAME,
@@ -313,6 +317,125 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
             kwargs["partial"] = True
         kwargs["context"] = {"request": self.request}
         return super().get_serializer(*args, **kwargs)
+
+    def perform_create(self, serializer) -> None:
+        """Create the product, then log its starting stock as an audited movement.
+
+        Keeps the StockMovement ledger complete from day one: every unit a
+        product ever has is explained by exactly one movement, including the
+        very first one. A zero starting stock has nothing to explain, so no
+        movement is created for it.
+
+        Builds the StockMovement directly (not via apply_stock_movement(),
+        which applies a *delta* on top of whatever stock already exists in
+        the database) -- the serializer's own save() already persisted the
+        product's starting stock_quantity, so this only needs to record that
+        already-known value as the "entrada inicial", not add to it again.
+        """
+        store = self.get_request_store()
+        product = serializer.save(store=store)
+
+        if product.stock_quantity > 0:
+            StockMovement.objects.create(
+                store=store,
+                product=product,
+                movement_type=StockMovement.TYPE_ENTRADA,
+                quantity=product.stock_quantity,
+                previous_stock=0,
+                new_stock=product.stock_quantity,
+                reason=StockMovement.REASON_ENTRADA_INICIAL,
+                source=StockMovement.SOURCE_MANUAL,
+                performed_by=self.request.user if self.request.user.is_authenticated else None,
+            )
+
+    def perform_update(self, serializer) -> None:
+        """Reject direct stock_quantity edits -- they must go through a movement.
+
+        DRF's read_only_fields can't express "writable on create, locked on
+        update", so the guard lives here instead of on the serializer. This
+        is enforced server-side as a defense against direct API calls; the
+        dashboard UI never sends stock_quantity on update in the first place.
+        """
+        if "stock_quantity" in self.request.data:
+            raise serializers.ValidationError(
+                {
+                    "stock_quantity": (
+                        "Estoque não pode ser editado direto. Use o registro de entrada/saída."
+                    )
+                }
+            )
+        serializer.save()
+
+    @action(detail=True, methods=["get", "post"], url_path="stock-movements")
+    def stock_movements(self, request, pk=None):
+        """
+        GET  /v1/products/{id}/stock-movements/ - paginated movement history
+        POST /v1/products/{id}/stock-movements/ - register a manual entrada/saida
+
+        Nested under the product (rather than a standalone StockMovementViewSet)
+        because every movement in this etapa is always read/written in the
+        context of one specific product, which already resolves store scope
+        and 404s across tenants via get_object()/get_queryset().
+        """
+        product = self.get_object()
+
+        if request.method == "GET":
+            if not has_dashboard_read_access(request.user):
+                # self.permission_denied() (not a bare `raise PermissionDenied`)
+                # so DRF applies the same 401-vs-403 distinction as every other
+                # dashboard-only endpoint in this codebase: 401 when the
+                # request never authenticated at all, 403 once authenticated
+                # but lacking the role (see APIView.permission_denied()).
+                self.permission_denied(
+                    request, message="Voce nao possui permissao para ver o historico de estoque."
+                )
+
+            # Override the viewset's pagination_class (ProductListPagination,
+            # page_size=12 -- picked for the storefront's 3x4 grid) before the
+            # `paginator` property builds and caches it: movement history has
+            # no relation to that grid and should use the generic 20/page
+            # StandardPagination instead.
+            self.pagination_class = StandardPagination
+            queryset = product.stock_movements.select_related("product", "performed_by", "sale_order")
+            page = self.paginate_queryset(queryset)
+            serializer = StockMovementSerializer(
+                page if page is not None else queryset, many=True
+            )
+            if page is not None:
+                return self.get_paginated_response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        if not has_dashboard_write_access(request.user):
+            self.permission_denied(
+                request,
+                message="Voce nao possui permissao para registrar movimentacoes de estoque.",
+            )
+
+        input_serializer = StockMovementCreateSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        validated = input_serializer.validated_data
+
+        try:
+            movement = apply_stock_movement(
+                product_id=product.id,
+                store=self.get_request_store(),
+                movement_type=validated["movement_type"],
+                quantity=validated["quantity"],
+                reason=validated["reason"],
+                performed_by=request.user if request.user.is_authenticated else None,
+                notes=validated.get("notes", ""),
+            )
+        except StockMovementError as exc:
+            return business_logic_error(str(exc))
+
+        product.refresh_from_db()
+        return Response(
+            {
+                "movement": StockMovementSerializer(movement).data,
+                "product": ProductSerializer(product, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class CategoryViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
@@ -871,6 +994,60 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         return Response(data)
 
 
+class StockMovementViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """Store-wide stock movement ledger for the dashboard (Etapa 2).
+
+    Read-only: creating a movement always happens through
+    ProductViewSet.stock_movements (POST), which owns the locking/validation
+    workflow against one specific product -- this viewset only ever lists
+    what that endpoint (and checkout) already wrote, across the whole store.
+    """
+
+    serializer_class = StockMovementSerializer
+    permission_classes = [IsAuthenticated, IsDashboardReadRole]
+    pagination_class = StandardPagination
+
+    def get_base_queryset(self):
+        """Apply the ledger's filters: product, type, source, reason, search, date range."""
+        queryset = StockMovement.objects.select_related("product", "performed_by", "sale_order")
+
+        product_id = self.request.query_params.get("product", "").strip()
+        if product_id:
+            try:
+                queryset = queryset.filter(product_id=int(product_id))
+            except ValueError:
+                pass
+
+        movement_type = self.request.query_params.get("movement_type", "").strip()
+        if movement_type in (StockMovement.TYPE_ENTRADA, StockMovement.TYPE_SAIDA):
+            queryset = queryset.filter(movement_type=movement_type)
+
+        source = self.request.query_params.get("source", "").strip()
+        if source in (StockMovement.SOURCE_MANUAL, StockMovement.SOURCE_VENDA):
+            queryset = queryset.filter(source=source)
+
+        reason = self.request.query_params.get("reason", "").strip()
+        if reason:
+            queryset = queryset.filter(reason=reason)
+
+        search_term = self.request.query_params.get("search", "").strip()
+        if search_term:
+            queryset = queryset.filter(
+                Q(product__name__icontains=search_term) | Q(product__sku__icontains=search_term)
+            )
+
+        # Reuses the same custom-range resolver as SaleOrderViewSet's
+        # summary/breakdown/customers (views.py:587) -- same `?start=&end=`
+        # vocabulary, same timezone-aware day boundaries, no need for a
+        # second date-parsing helper just for this ledger.
+        custom_range = _resolve_custom_range(self.request)
+        if custom_range is not None:
+            start, end, _start_param, _end_param = custom_range
+            queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+
+        return queryset
+
+
 class BotConversationViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """Read-only bot conversation history for authenticated dashboard users."""
 
@@ -1352,6 +1529,31 @@ class CheckoutWhatsAppView(APIView):
                         quantity=item["quantity"],
                         unit_price=item["unit_price"],
                         line_total=item["line_total"],
+                    )
+                    for item in normalized_items
+                ]
+            )
+
+            # The decrement itself already happened above in
+            # _reserve_cart_stock (one bulk_update, inside the same lock) --
+            # this just persists the audit trail for it. Built straight from
+            # data already in memory (no extra SELECT/lock per product):
+            # products_by_id[...].stock_quantity is the post-decrement value,
+            # so previous_stock is reconstructed by adding the quantity back.
+            StockMovement.objects.bulk_create(
+                [
+                    StockMovement(
+                        store=store,
+                        product=products_by_id[item["product_id"]],
+                        movement_type=StockMovement.TYPE_SAIDA,
+                        quantity=item["quantity"],
+                        previous_stock=(
+                            products_by_id[item["product_id"]].stock_quantity + item["quantity"]
+                        ),
+                        new_stock=products_by_id[item["product_id"]].stock_quantity,
+                        reason=StockMovement.REASON_VENDA,
+                        source=StockMovement.SOURCE_VENDA,
+                        sale_order=sale_order,
                     )
                     for item in normalized_items
                 ]

@@ -47,6 +47,7 @@ from bipdelivery.api.models import (  # noqa: E402
     Product,
     SaleOrder,
     SaleOrderItem,
+    StockMovement,
     Store,
     StoreSettings,
 )
@@ -346,15 +347,81 @@ class ProductAPIHealthTest(TestCase):
         self.assertIn("images", response.data)
 
     def test_product_update(self) -> None:
-        """Should update product via PUT endpoint."""
+        """Should update product via PUT endpoint.
+
+        stock_quantity is deliberately left out of this payload: it's no
+        longer editable via the product update endpoint (see
+        test_stock_movements.py) -- stock changes must go through a logged
+        entrada/saida movement instead.
+        """
         self.client.force_authenticate(user=self.user)
-        payload = {"name": "Updated Laptop", "stock_quantity": 8}
+        payload = {"name": "Updated Laptop"}
         response: Any = self.client.put(
             f"/api/v1/products/{self.product.id}/", payload, format="json"  # type: ignore
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["name"], "Updated Laptop")
-        self.assertEqual(response.data["stock_quantity"], 8)
+
+    def test_low_stock_threshold_defaults_to_null(self) -> None:
+        """Unlike stock_quantity, a product with no explicit threshold stays null
+        (the dashboard's default threshold applies client-side, see
+        docs/architecture/stock-movement-evolution.md Etapa 3)."""
+        self.assertIsNone(self.product.low_stock_threshold)
+
+    def test_low_stock_threshold_is_settable_on_create(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        response: Any = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto com limite",
+                "price": "9.90",
+                "category": self.category.id,  # type: ignore[arg-type]
+                "low_stock_threshold": 15,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["low_stock_threshold"], 15)
+
+    def test_low_stock_threshold_is_editable_via_patch_unlike_stock_quantity(self) -> None:
+        """The Etapa 1 lock on stock_quantity must not spill over onto this field --
+        low_stock_threshold is a preference, not an audited quantity."""
+        self.client.force_authenticate(user=self.user)
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"low_stock_threshold": 8},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["low_stock_threshold"], 8)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.low_stock_threshold, 8)
+
+    def test_low_stock_threshold_can_be_cleared_back_to_null(self) -> None:
+        self.product.low_stock_threshold = 8
+        self.product.save(update_fields=["low_stock_threshold"])
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"low_stock_threshold": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["low_stock_threshold"])
+
+    def test_low_stock_threshold_rejects_negative_values(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"low_stock_threshold": -1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @override_settings(MEDIA_ROOT=build_test_media_root())
     def test_product_create_preserves_three_images_in_multipart_payload(self) -> None:
@@ -694,6 +761,25 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 6)
         self.assertTrue(self.product.is_available)
+
+    def test_checkout_creates_a_stock_movement_per_product(self) -> None:
+        """Checkout should leave an auditable saida movement behind the decrement."""
+        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 2}])
+
+        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        movements = list(StockMovement.objects.filter(product=self.product, sale_order=sale_order))
+
+        self.assertEqual(len(movements), 1)
+        movement = movements[0]
+        self.assertEqual(movement.movement_type, StockMovement.TYPE_SAIDA)
+        self.assertEqual(movement.source, StockMovement.SOURCE_VENDA)
+        self.assertEqual(movement.reason, StockMovement.REASON_VENDA)
+        self.assertEqual(movement.quantity, 2)
+        self.assertEqual(movement.previous_stock - movement.quantity, movement.new_stock)
+        self.assertEqual(movement.new_stock, 6)
 
     def test_checkout_links_a_bot_conversation_to_the_resulting_order(self) -> None:
         """A bot_session_id on checkout should mark that conversation as converted."""

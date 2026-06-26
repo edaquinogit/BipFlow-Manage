@@ -120,6 +120,16 @@ class Product(models.Model):
     # Inventory
     stock_quantity = models.PositiveIntegerField(default=0)
     is_available = models.BooleanField(default=True)
+    low_stock_threshold = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Per-product low-stock alert threshold (Etapa 3 of the "
+            "stock-movement evolution). Null means \"use the dashboard's "
+            "default threshold\" -- this is a preference, not an audited "
+            "quantity, so unlike stock_quantity it stays freely editable."
+        ),
+    )
 
     # Media
     image = models.ImageField(upload_to=product_image_upload_to, null=True, blank=True)
@@ -758,3 +768,104 @@ class SaleOrderItem(models.Model):
     def __str__(self) -> str:
         """Return a compact line summary."""
         return f"{self.product_name} x{self.quantity}"
+
+
+class StockMovement(models.Model):
+    """Append-only audit trail for every `Product.stock_quantity` change.
+
+    `Product.stock_quantity` stays the fast, denormalized "current value"
+    column; this table is the ledger that explains every change to it
+    (Etapa 1 of the stock-movement evolution, see
+    docs/architecture/stock-movement-evolution.md). `quantity` is always
+    positive -- direction comes from `movement_type`, never from sign.
+    """
+
+    TYPE_ENTRADA = "entrada"
+    TYPE_SAIDA = "saida"
+    TYPE_CHOICES = [
+        (TYPE_ENTRADA, "Entrada"),
+        (TYPE_SAIDA, "Saída"),
+    ]
+
+    SOURCE_MANUAL = "manual"
+    SOURCE_VENDA = "venda"
+    SOURCE_CHOICES = [
+        (SOURCE_MANUAL, "Manual"),
+        (SOURCE_VENDA, "Venda"),
+    ]
+
+    REASON_COMPRA = "compra"
+    REASON_DEVOLUCAO = "devolucao"
+    REASON_PERDA_AVARIA = "perda_avaria"
+    REASON_AJUSTE_INVENTARIO = "ajuste_inventario"
+    REASON_ENTRADA_INICIAL = "entrada_inicial"
+    REASON_VENDA = "venda"
+    REASON_OUTRO = "outro"
+    REASON_CHOICES = [
+        (REASON_COMPRA, "Compra"),
+        (REASON_DEVOLUCAO, "Devolução"),
+        (REASON_PERDA_AVARIA, "Perda/Avaria"),
+        (REASON_AJUSTE_INVENTARIO, "Ajuste de inventário"),
+        (REASON_ENTRADA_INICIAL, "Entrada inicial"),
+        (REASON_VENDA, "Venda"),
+        (REASON_OUTRO, "Outro"),
+    ]
+
+    # System-generated reasons a human can never pick from the manual
+    # entrada/saida form -- only `apply_stock_movement()` and the checkout
+    # flow are allowed to write these.
+    SYSTEM_ONLY_REASONS = {REASON_ENTRADA_INICIAL, REASON_VENDA}
+
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="stock_movements",
+        default=get_default_store_id,
+        help_text="Tenant that owns this movement.",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="stock_movements",
+    )
+    movement_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    quantity = models.PositiveIntegerField(
+        help_text="Always positive; direction comes from movement_type."
+    )
+    previous_stock = models.PositiveIntegerField()
+    new_stock = models.PositiveIntegerField()
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    sale_order = models.ForeignKey(
+        SaleOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="stock_movements",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="stock_movements",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["store", "product", "created_at"]),
+            models.Index(fields=["store", "created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(new_stock__gte=0),
+                name="stock_movement_new_stock_non_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Return a compact movement summary."""
+        return f"{self.get_movement_type_display()} {self.quantity} - {self.product.name}"

@@ -22,6 +22,7 @@ from .models import (
     ProductGalleryImage,
     SaleOrder,
     SaleOrderItem,
+    StockMovement,
     Store,
     StoreMembership,
     StoreSettings,
@@ -154,6 +155,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "price",
             "size",
             "stock_quantity",
+            "low_stock_threshold",
             "is_available",
             "image",
             "images",
@@ -404,6 +406,70 @@ class ProductSerializer(serializers.ModelSerializer):
             data["image"] = None
 
         return data
+
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    """Read-only representation of a stock movement for history/audit display.
+
+    Used both nested under a product (Etapa 1's per-product history) and by
+    the store-wide ledger (Etapa 2) -- product_name/sku are redundant in the
+    former (the caller already has the product) but let the ledger render a
+    flat table without a second per-row lookup.
+    """
+
+    movement_type_display = serializers.CharField(
+        source="get_movement_type_display", read_only=True
+    )
+    reason_display = serializers.CharField(source="get_reason_display", read_only=True)
+    source_display = serializers.CharField(source="get_source_display", read_only=True)
+    product_name = serializers.ReadOnlyField(source="product.name")
+    product_sku = serializers.ReadOnlyField(source="product.sku")
+    performed_by_username = serializers.ReadOnlyField(source="performed_by.username")
+    sale_order_reference = serializers.ReadOnlyField(source="sale_order.order_reference")
+
+    class Meta:
+        model = StockMovement
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "product_sku",
+            "movement_type",
+            "movement_type_display",
+            "quantity",
+            "previous_stock",
+            "new_stock",
+            "reason",
+            "reason_display",
+            "source",
+            "source_display",
+            "sale_order",
+            "sale_order_reference",
+            "performed_by",
+            "performed_by_username",
+            "notes",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class StockMovementCreateSerializer(serializers.Serializer):
+    """Validates the POST body for a manual stock movement.
+
+    Not a ModelSerializer: the actual write happens through
+    stock.apply_stock_movement(), not serializer.save(), since the mutation
+    needs to lock the product row and compute previous/new stock atomically.
+    """
+
+    movement_type = serializers.ChoiceField(choices=StockMovement.TYPE_CHOICES)
+    quantity = serializers.IntegerField(min_value=1)
+    reason = serializers.ChoiceField(choices=StockMovement.REASON_CHOICES)
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+    def validate_reason(self, value):
+        if value in StockMovement.SYSTEM_ONLY_REASONS:
+            raise serializers.ValidationError("Este motivo é de uso exclusivo do sistema.")
+        return value
 
 
 class DeliveryRegionSerializer(serializers.ModelSerializer):
