@@ -288,6 +288,7 @@ import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { isLowStock } from '@/utils/stockAlerts'
 
 const route = useRoute()
 const router = useRouter()
@@ -507,7 +508,7 @@ const availabilityLabel = computed(() => {
     return 'Indisponivel'
   }
 
-  return product.value.stock_quantity <= 5 ? 'Ultimas unidades' : 'Disponivel'
+  return isLowStock(product.value) ? 'Ultimas unidades' : 'Disponivel'
 })
 
 const availabilityToneClass = computed(() => (

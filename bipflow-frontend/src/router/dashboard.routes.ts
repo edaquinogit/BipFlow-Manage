@@ -8,6 +8,7 @@ export const DashboardRoutes = {
   Layout: 'dashboard.layout',
   Overview: 'dashboard.overview',
   Products: 'dashboard.products',
+  StockMovements: 'dashboard.products.stock-movements',
   Orders: 'dashboard.orders',
   Support: 'dashboard.support',
   SupportConversation: 'dashboard.support.conversation',
@@ -48,6 +49,12 @@ export const dashboardRoutes: RouteRecordRaw[] = [
         name: DashboardRoutes.Products,
         component: () => import(/* webpackChunkName: "dashboard-products" */ '@/views/dashboard/DashboardProductsView.vue'),
         meta: { title: 'Produtos' },
+      },
+      {
+        path: 'produtos/movimentacoes',
+        name: DashboardRoutes.StockMovements,
+        component: () => import(/* webpackChunkName: "dashboard-stock-movements" */ '@/views/dashboard/DashboardStockMovementsView.vue'),
+        meta: { title: 'Historico de estoque' },
       },
       {
         path: 'pedidos',

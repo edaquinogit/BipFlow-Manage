@@ -29,6 +29,7 @@ type ProductFormState = {
   name: string;
   price: number;
   stock_quantity: number;
+  low_stock_threshold: number | null;
   category: ProductFormData['category'] | null | undefined;
   sku: string;
   size: string;
@@ -42,6 +43,7 @@ const createEmptyForm = (): ProductFormState => ({
   name: '',
   price: 0,
   stock_quantity: 0,
+  low_stock_threshold: null,
   category: undefined,
   sku: '',
   size: '',
@@ -86,6 +88,7 @@ const normalizeInitialFormData = (
     name: product.name ?? '',
     price: toNumberOrZero(product.price),
     stock_quantity: Math.trunc(toNumberOrZero(product.stock_quantity)),
+    low_stock_threshold: product.low_stock_threshold ?? null,
     category: resolveCategoryId(product.category),
     sku: product.sku ?? '',
     size: product.size ?? '',
@@ -189,7 +192,9 @@ const submitLabel = computed(() => {
           <ValuationSection
             v-model:price.number="form.price"
             v-model:stock="form.stock_quantity"
+            v-model:low-stock-threshold="form.low_stock_threshold"
             v-model:size="form.size"
+            :is-existing-product="!!props.initialData"
             :errors="errors"
           />
 

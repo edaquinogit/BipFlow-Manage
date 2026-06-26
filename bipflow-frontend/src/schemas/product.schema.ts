@@ -49,6 +49,18 @@ const RequiredCategoryIdSchema = z.preprocess(
   z.coerce.number().int().positive(REQUIRED_CATEGORY_MESSAGE),
 );
 
+// Null means "use the dashboard's default threshold" -- distinct from
+// stock_quantity, an empty/untouched input here must resolve to null, never
+// to 0 (0 is a legitimate explicit choice: "only alert when truly zeroed").
+const LowStockThresholdSchema = z.preprocess(
+  (value) => (value === "" || value === undefined ? null : value),
+  z.coerce
+    .number()
+    .int("Limite deve ser um número inteiro")
+    .nonnegative("Limite não pode ser negativo")
+    .nullable(),
+);
+
 const productBase = {
   name: z
     .string()
@@ -74,6 +86,8 @@ const productBase = {
     .int("Stock must be an integer")
     .nonnegative("Stock cannot be negative")
     .default(0),
+
+  low_stock_threshold: LowStockThresholdSchema,
 
   // Categoria de leitura: suporta ID cru do Django, objeto normalizado ou payload legado sem categoria.
   category: OptionalCategoryReferenceSchema,
@@ -173,6 +187,7 @@ export const createEmptyProduct = (): ProductFormDraft => ({
   name: "",
   price: 0,
   stock_quantity: 0,
+  low_stock_threshold: null,
   category: undefined,
   is_available: true,
   sku: "",

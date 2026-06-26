@@ -5,12 +5,14 @@ import { useCategories } from '@/composables/useCategories';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
+import type { StockMovementInput } from '@/types/stockMovement';
 import { Logger } from '@/services/logger';
 import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productPayload';
 
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
+import StockMovementModal from '@/components/dashboard/product-table/StockMovementModal.vue';
 
 const {
   selectedAssetIds,
@@ -22,6 +24,7 @@ const {
   deleteProduct,
   clearSelection,
   bulkUpdateCategory,
+  adjustStock,
 } = useProducts();
 
 const { categories, fetchCategories } = useCategories();
@@ -34,6 +37,9 @@ const isDeleteModalOpen = ref(false);
 const assetIdToPurge = ref<number | null>(null);
 const isDeletingAction = ref(false);
 const isBulkUpdating = ref(false);
+const isStockModalOpen = ref(false);
+const productToAdjust = ref<Product | null>(null);
+const isAdjustingStock = ref(false);
 
 const getProductStockValue = (product: Product): number => Number(product.stock_quantity ?? 0);
 
@@ -65,7 +71,13 @@ const handleSave = async (payload: Partial<Product>): Promise<void> => {
     const dataToSync = sanitizeDashboardPayload(payload);
 
     if (selectedProduct.value?.id) {
-      await updateProduct(selectedProduct.value.id, dataToSync);
+      // stock_quantity is read-only in the edit form (see ValuationSection's
+      // isExistingProduct) but still lives in `form.value`/`payload` -- drop
+      // it here so a resubmit never trips the backend's "use a stock
+      // movement instead" rejection on a field the UI never let them touch.
+      const { stock_quantity: _stock_quantity, ...updatePayload } = dataToSync as Partial<Product> &
+        Record<string, unknown>;
+      await updateProduct(selectedProduct.value.id, updatePayload);
       success('Produto atualizado com sucesso.');
     } else {
       await createProduct(dataToSync);
@@ -104,6 +116,31 @@ const executeDelete = async (): Promise<void> => {
   }
 };
 
+const openStockModal = (product: Product): void => {
+  productToAdjust.value = product;
+  isStockModalOpen.value = true;
+};
+
+const closeStockModal = (): void => {
+  isStockModalOpen.value = false;
+  productToAdjust.value = null;
+};
+
+const handleStockMovementSubmit = async (payload: StockMovementInput): Promise<void> => {
+  if (!productToAdjust.value?.id) return;
+
+  isAdjustingStock.value = true;
+  try {
+    await adjustStock(productToAdjust.value.id, payload);
+    closeStockModal();
+  } catch (error: unknown) {
+    Logger.error('Stock adjustment failed', { error, productId: productToAdjust.value.id, payload });
+    toastError('Não foi possível registrar a movimentação de estoque.');
+  } finally {
+    isAdjustingStock.value = false;
+  }
+};
+
 const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
   if (selectedAssetIds.value.size === 0) {
     toastError('Selecione pelo menos um produto antes de alterar a categoria.');
@@ -126,6 +163,7 @@ const refreshProducts = (): void => {
   isPanelOpen.value = false;
   selectedProduct.value = null;
   isDeleteModalOpen.value = false;
+  closeStockModal();
   void fetchData();
   void fetchCategories(true);
 };
@@ -181,6 +219,7 @@ useStoreSwitchEffect(refreshProducts);
         @edit="handleEditRequest"
         @delete="openDeleteConfirm"
         @bulk-update-category="handleBulkUpdateCategory"
+        @adjust-stock="openStockModal"
       />
     </section>
 
@@ -200,6 +239,14 @@ useStoreSwitchEffect(refreshProducts);
       :is-loading="isDeletingAction"
       @close="isDeleteModalOpen = false"
       @confirm="executeDelete"
+    />
+
+    <StockMovementModal
+      :show="isStockModalOpen"
+      :product="productToAdjust"
+      :is-submitting="isAdjustingStock"
+      @close="closeStockModal"
+      @submit="handleStockMovementSubmit"
     />
   </div>
 </template>

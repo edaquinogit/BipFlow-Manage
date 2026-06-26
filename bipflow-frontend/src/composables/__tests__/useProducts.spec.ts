@@ -331,6 +331,101 @@ describe("useProducts Composable", () => {
       expect(lowStockProducts.value).toHaveLength(0);
       expect(inventoryStats.value.lowStockCount).toBe(0);
     });
+
+    /**
+     * Etapa 3: a product's own low_stock_threshold overrides the default of
+     * 5 in both directions -- a higher threshold flags it sooner, a lower
+     * (or zero) threshold flags it later/never.
+     */
+    it("should use each product's own low_stock_threshold instead of the default", () => {
+      const { products, outOfStockProducts, lowStockProducts } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Bulk item", stock_quantity: 15, is_available: true, low_stock_threshold: 20 } as any,
+        { id: 2, name: "Default threshold", stock_quantity: 15, is_available: true } as any,
+        { id: 3, name: "Strict threshold", stock_quantity: 1, is_available: true, low_stock_threshold: 0 } as any,
+      ];
+
+      expect(lowStockProducts.value.map((p) => p.id)).toEqual([1]);
+      expect(outOfStockProducts.value).toHaveLength(0);
+    });
+  });
+
+  describe("adjustStock", () => {
+    it("should patch the matching product in state with the server's post-movement values", async () => {
+      const { products, adjustStock } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Produto A", stock_quantity: 10, is_available: true } as any,
+        { id: 2, name: "Produto B", stock_quantity: 5, is_available: true } as any,
+      ];
+
+      vi.spyOn(ProductService, "createStockMovement").mockResolvedValue({
+        movement: { id: 99, movement_type: "entrada", quantity: 5 } as any,
+        product: { id: 1, name: "Produto A", stock_quantity: 15, is_available: true } as any,
+      });
+
+      const movement = await adjustStock(1, {
+        movement_type: "entrada",
+        quantity: 5,
+        reason: "compra",
+      });
+
+      expect(movement.id).toBe(99);
+      expect(products.value.find((p) => p.id === 1)?.stock_quantity).toBe(15);
+      // The untouched product must be left exactly as it was.
+      expect(products.value.find((p) => p.id === 2)?.stock_quantity).toBe(5);
+      expect(mockToast.success).toHaveBeenCalled();
+    });
+
+    it("should leave product state untouched and surface an error on rejection", async () => {
+      const { products, adjustStock, error } = createComposable();
+
+      products.value = [
+        { id: 1, name: "Produto A", stock_quantity: 10, is_available: true } as any,
+      ];
+
+      vi.spyOn(ProductService, "createStockMovement").mockRejectedValue(
+        new Error("Estoque insuficiente.")
+      );
+
+      await expect(
+        adjustStock(1, { movement_type: "saida", quantity: 999, reason: "perda_avaria" })
+      ).rejects.toThrow();
+
+      expect(products.value.find((p) => p.id === 1)?.stock_quantity).toBe(10);
+      expect(error.value).toContain("Failed to adjust stock");
+      expect(mockToast.error).toHaveBeenCalled();
+    });
+  });
+
+  describe("low_stock_threshold payload handling", () => {
+    /**
+     * Etapa 3: null must reach the backend as an explicit empty string (so
+     * DRF clears it back to null), not be silently omitted like every other
+     * null/undefined/"" field in this payload builder -- see the dedicated
+     * branch in _preparePayload() and the live-server verification in
+     * docs/architecture/stock-movement-evolution.md.
+     */
+    it("sends an explicit empty string when clearing the threshold back to null", async () => {
+      const { updateProduct } = createComposable();
+      const serviceSpy = vi.spyOn(ProductService, "update").mockResolvedValue({ id: 5 } as any);
+
+      await updateProduct(5, { name: "Produto", low_stock_threshold: null } as any);
+
+      const sentPayload = serviceSpy.mock.calls[0]?.[1] as FormData;
+      expect(sentPayload.get("low_stock_threshold")).toBe("");
+    });
+
+    it("sends the numeric value, including an explicit 0, when set", async () => {
+      const { updateProduct } = createComposable();
+      const serviceSpy = vi.spyOn(ProductService, "update").mockResolvedValue({ id: 5 } as any);
+
+      await updateProduct(5, { name: "Produto", low_stock_threshold: 0 } as any);
+
+      const sentPayload = serviceSpy.mock.calls[0]?.[1] as FormData;
+      expect(sentPayload.get("low_stock_threshold")).toBe("0");
+    });
   });
 
   afterEach(() => {

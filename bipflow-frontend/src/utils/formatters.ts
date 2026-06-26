@@ -80,6 +80,31 @@ export const formatDateBR = (dateString: string): string => {
 }
 
 /**
+ * Format date and time to Brazilian locale (e.g., "26/06/2026 13:05")
+ *
+ * @param dateString - ISO date string
+ * @returns Formatted date+time string
+ */
+export const formatDateTimeBR = (dateString: string): string => {
+  try {
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('Invalid date')
+    }
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  } catch (_error) {
+    Logger.warn('Invalid date string received by formatDateTimeBR', { dateString })
+    return 'Data inválida'
+  }
+}
+
+/**
  * Format relative time (e.g., "há 2 dias")
  *
  * @param dateString - ISO date string

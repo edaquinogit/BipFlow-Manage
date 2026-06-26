@@ -12,6 +12,7 @@ import type { ProductFilterPayload } from "../types/filters";
 import { filtersToQueryParams } from "../types/filters";
 import type { PaginatedProductsResponse, ProductDetail, ProductFilters } from "../types/product";
 import { PaginatedProductsResponseSchema, ProductDetailSchema } from "../types/product";
+import type { PaginatedStockMovements, StockMovement, StockMovementInput } from "../types/stockMovement";
 
 /**
  * Product Service - Business Logic Layer
@@ -412,6 +413,50 @@ class ProductService {
       };
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Bulk Update Category");
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch paginated stock movement history for a product.
+   */
+  async getStockMovements(productId: number, page = 1): Promise<PaginatedStockMovements> {
+    try {
+      const { data } = await api.get<PaginatedStockMovements>(
+        `${this.endpoint}${productId}/stock-movements/?page=${page}`
+      );
+      return data;
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Get Stock Movements");
+      throw error;
+    }
+  }
+
+  /**
+   * Record a manual stock movement (entrada/saida) for a product.
+   *
+   * @param productId Product ID to adjust
+   * @param payload Movement type, quantity, reason, optional notes
+   * @returns The created movement and the product's post-movement state
+   */
+  async createStockMovement(
+    productId: number,
+    payload: StockMovementInput
+  ): Promise<{ movement: StockMovement; product: AdminProduct }> {
+    try {
+      const { data } = await api.post<unknown>(
+        `${this.endpoint}${productId}/stock-movements/`,
+        payload,
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      const { movement, product } = data as { movement: StockMovement; product: unknown };
+      return {
+        movement,
+        product: ProductSchema.parse(this.normalizeProductRecord(product)),
+      };
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Create Stock Movement");
       throw error;
     }
   }

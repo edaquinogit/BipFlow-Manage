@@ -97,4 +97,20 @@ describe('ProductCard', () => {
     expect(img.attributes('loading')).toBe('lazy')
     expect(img.attributes('alt')).toBe('Imagem do produto Test Product')
   })
+
+  it('shows "Disponivel" when stock is comfortably above the default threshold', () => {
+    expect(wrapper.text()).toContain('Disponivel')
+  })
+
+  it('shows the remaining count when stock is at or below the default threshold (5)', async () => {
+    await wrapper.setProps({ product: { ...mockProduct, stock_quantity: 5 } })
+
+    expect(wrapper.text()).toContain('5 restantes')
+  })
+
+  it('uses the product\'s own low_stock_threshold instead of the default', async () => {
+    await wrapper.setProps({ product: { ...mockProduct, stock_quantity: 15, low_stock_threshold: 20 } })
+
+    expect(wrapper.text()).toContain('15 restantes')
+  })
 })

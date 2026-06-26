@@ -2,11 +2,12 @@
 import ProductTable from '@/components/dashboard/product-table/ProductTableRoot.vue';
 import SearchAndFilterBar from '@/components/dashboard/product-table/SearchAndFilterBar.vue';
 import BulkActionBar from '@/components/dashboard/product-table/ui/BulkActionBar.vue';
-import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/vue/24/outline';
+import { ClockIcon, ExclamationTriangleIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import { useCategories } from '@/composables/useCategories';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useProducts } from '@/composables/useProducts';
+import { DashboardRoutes } from '@/router/dashboard.routes';
 import type { Product } from '@/schemas/product.schema';
 
 /**
@@ -26,6 +27,7 @@ defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'bulk-update-category', categoryId: number): void;
+  (e: 'adjust-stock', product: Product): void;
 }>();
 
 const {
@@ -60,15 +62,26 @@ const { canManageCatalog } = useCurrentUser();
         <p class="text-[10px] text-bip-muted font-bold uppercase mt-2 tracking-[0.4em]">Controle da vitrine em tempo real</p>
       </div>
 
-      <button
-        v-if="canManageCatalog"
-        data-cy="btn-add-product"
-        @click="$emit('open-panel')"
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.98]"
-      >
-        <PlusIcon class="h-4 w-4 stroke-2" />
-        Novo produto
-      </button>
+      <div class="flex items-center gap-3">
+        <RouterLink
+          data-cy="btn-stock-history"
+          :to="{ name: DashboardRoutes.StockMovements }"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-bip-muted transition-all hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+        >
+          <ClockIcon class="h-4 w-4" />
+          Histórico de estoque
+        </RouterLink>
+
+        <button
+          v-if="canManageCatalog"
+          data-cy="btn-add-product"
+          @click="$emit('open-panel')"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.98]"
+        >
+          <PlusIcon class="h-4 w-4 stroke-2" />
+          Novo produto
+        </button>
+      </div>
     </div>
 
     <!-- Search and Filter Bar -->
@@ -108,6 +121,7 @@ const { canManageCatalog } = useCurrentUser();
       @edit="(product) => $emit('edit', product)"
       @toggle-selection="(productId) => toggleSelection(productId)"
       @select-all="selectAll"
+      @adjust-stock="(product) => $emit('adjust-stock', product)"
     />
   </section>
 

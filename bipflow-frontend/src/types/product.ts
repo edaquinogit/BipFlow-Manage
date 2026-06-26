@@ -34,6 +34,7 @@ export interface Product {
   image: string | null
   images?: string[]
   stock_quantity: number
+  low_stock_threshold?: number | null
   is_available: boolean
   created_at: string
 }
@@ -163,6 +164,7 @@ export const ProductSchema = z.object({
   image: z.string().url().nullable(),
   images: z.array(z.string().url()).optional().default([]),
   stock_quantity: z.number(),
+  low_stock_threshold: z.number().nullable().optional(),
   is_available: z.boolean(),
   created_at: z.string(),
 })

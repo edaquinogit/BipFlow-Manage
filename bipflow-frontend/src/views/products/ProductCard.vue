@@ -135,6 +135,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { Product } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { isLowStock } from '@/utils/stockAlerts'
 
 const props = withDefaults(defineProps<{
   product: Product
@@ -184,7 +185,7 @@ const stockStatusLabel = computed(() => {
     return 'Indisponivel'
   }
 
-  if (props.product.stock_quantity <= 5) {
+  if (isLowStock(props.product)) {
     return `${props.product.stock_quantity} restantes`
   }
 

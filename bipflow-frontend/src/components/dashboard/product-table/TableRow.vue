@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ArrowsUpDownIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { formatBRL } from '@/utils/formatters';
+import { getLowStockThreshold } from '@/utils/stockAlerts';
 import ProductAvatar from './ui/ProductAvatar.vue';
 import CategoryBadge from './ui/CategoryBadge.vue';
 
@@ -18,6 +20,7 @@ const emit = defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'toggle-selection', productId: number): void;
+  (e: 'adjust-stock', product: Product): void;
 }>();
 
 const resolvedCategory = computed(() => {
@@ -27,6 +30,8 @@ const resolvedCategory = computed(() => {
 
   return props.product.category;
 });
+
+const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStockThreshold(props.product));
 
 </script>
 
@@ -84,7 +89,7 @@ const resolvedCategory = computed(() => {
       <div class="flex flex-col items-center">
         <span
           class="text-xs font-black font-mono"
-          :class="product.stock_quantity > 5 ? 'text-[#05050A]' : 'text-amber-600'"
+          :class="isLowStockRow ? 'text-amber-600' : 'text-[#05050A]'"
         >
           {{ product.stock_quantity.toString().padStart(2, '0') }}
         </span>
@@ -113,6 +118,14 @@ const resolvedCategory = computed(() => {
 
     <td class="px-6 py-4 text-right">
       <div v-if="canManageCatalog" class="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+        <button
+          @click="emit('adjust-stock', product)"
+          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
+          title="Movimentar estoque"
+        >
+          <ArrowsUpDownIcon class="h-4 w-4" />
+        </button>
+
         <button
           @click="emit('edit', product)"
           class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"

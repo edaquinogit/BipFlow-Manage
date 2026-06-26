@@ -22,7 +22,9 @@ import {
   hasActiveFilters,
   DEFAULT_DEBOUNCE_CONFIG,
 } from "../types/filters";
+import type { StockMovement, StockMovementInput } from "../types/stockMovement";
 import { debounce } from "../utils/debounce";
+import { isLowStock, isOutOfStock } from "../utils/stockAlerts";
 
 // Estado FORA da função para funcionar como singleton (mesmo padrão de
 // useCategories/useCurrentStore): paginas diferentes do dashboard (Visao
@@ -67,10 +69,6 @@ export function useProducts() {
     return Number(stockValue);
   };
 
-  // Limite usado para classificar um produto como "estoque baixo". Produtos
-  // zerados/indisponiveis entram em outOfStockProducts, nao aqui.
-  const LOW_STOCK_THRESHOLD = 5;
-
   /**
    * Convert product data to FormData for multipart uploads.
    *
@@ -88,6 +86,18 @@ export function useProducts() {
     const orderedUploadedImages: Array<{ index: number; value: File }> = [];
 
     Object.entries(data).forEach(([key, value]) => {
+      // low_stock_threshold is nullable by design (null = "use the default
+      // threshold"), unlike every other field here where null/""/undefined
+      // just means "don't touch this field". It must be sent as an explicit
+      // empty string so the backend clears it back to null instead of
+      // silently leaving a stale value in place -- DRF's multipart parsing
+      // already maps '' -> None for nullable fields (verified against the
+      // live dev server), so no backend change is needed for this.
+      if (key === "low_stock_threshold") {
+        formData.append(key, value === null || value === undefined ? "" : String(value));
+        return;
+      }
+
       if (value === null || value === undefined || value === "") return;
 
       // Handle cover image file validation
@@ -214,21 +224,17 @@ export function useProducts() {
   /**
    * Products with zero stock or marked unavailable.
    */
-  const outOfStockProducts = computed(() =>
-    products.value.filter((p) => _getStockValue(p) <= 0 || !p.is_available)
-  );
+  const outOfStockProducts = computed(() => products.value.filter(isOutOfStock));
 
   /**
-   * Products with low but nonzero stock, sorted ascending by remaining quantity
-   * (most critical first). Excludes unavailable products, which already show
-   * up in outOfStockProducts.
+   * Products with low but nonzero stock (per-product low_stock_threshold,
+   * falling back to DEFAULT_LOW_STOCK_THRESHOLD -- see utils/stockAlerts.ts),
+   * sorted ascending by remaining quantity (most critical first). Excludes
+   * unavailable products, which already show up in outOfStockProducts.
    */
   const lowStockProducts = computed(() =>
     products.value
-      .filter((p) => {
-        const stockValue = _getStockValue(p);
-        return stockValue > 0 && stockValue <= LOW_STOCK_THRESHOLD && p.is_available;
-      })
+      .filter(isLowStock)
       .sort((left, right) => _getStockValue(left) - _getStockValue(right))
   );
 
@@ -429,6 +435,57 @@ export function useProducts() {
         })
       );
       toast.error("Nao foi possivel remover o produto. Tente novamente.");
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  /**
+   * Record a manual stock movement (entrada/saida) for a product.
+   *
+   * Patches the matching entry in `products.value` with the server's
+   * post-movement state (stock_quantity/is_available), same pattern as
+   * updateProduct -- keeps outOfStockProducts/lowStockProducts/inventoryStats
+   * reactive with no change needed to those computeds.
+   *
+   * @param id Product ID to adjust
+   * @param payload Movement type, quantity, reason, optional notes
+   * @returns The created movement
+   * @throws Error (after logging) if the movement is rejected (e.g. negative stock)
+   */
+  const adjustStock = async (
+    id: number,
+    payload: StockMovementInput
+  ): Promise<StockMovement> => {
+    loading.value = true;
+    error.value = null;
+    try {
+      const { movement, product: updatedProduct } = await ProductService.createStockMovement(
+        id,
+        payload
+      );
+
+      products.value = products.value.map((p) =>
+        p.id === id ? { ...p, ...updatedProduct } : p
+      );
+      Logger.info(
+        `Stock movement recorded [Product: ${id}, Type: ${payload.movement_type}, Qty: ${payload.quantity}]`
+      );
+      toast.success("Movimentação de estoque registrada com sucesso.");
+      return movement;
+    } catch (err: unknown) {
+      const errorMessage = _extractErrorMessage(err);
+      error.value = `Failed to adjust stock: ${errorMessage}`;
+      Logger.error(
+        "Stock movement failed",
+        buildErrorContext(err as ApplicationError, {
+          errorMessage,
+          productId: id,
+          payload,
+        })
+      );
+      toast.error("Nao foi possivel registrar a movimentacao de estoque.");
       throw err;
     } finally {
       loading.value = false;
@@ -718,6 +775,7 @@ export function useProducts() {
     createProduct,
     updateProduct,
     deleteProduct,
+    adjustStock,
 
     // Search & Filter Actions
     updateFilters,
