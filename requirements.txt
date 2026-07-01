@@ -10,6 +10,7 @@ pyotp==2.10.0
 python-dotenv==1.0.0
 qrcode==8.2
 setuptools==78.0.1
+django-storages[s3]==1.14.4
 
 # Testing
 pytest==7.4.0

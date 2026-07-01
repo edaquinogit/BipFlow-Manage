@@ -232,6 +232,56 @@ for path in [STATIC_ROOT, MEDIA_ROOT, LOGS_ROOT]:
     os.makedirs(path, exist_ok=True)
 
 # ------------------------------------------------------------------------------
+# ☁️ MEDIA STORAGE (Cloudflare R2 / any S3-compatible backend)
+# ------------------------------------------------------------------------------
+# Local disk (MEDIA_ROOT above) is ephemeral on redeploy -- production must
+# point at R2 so uploads (store-scoped product images) survive. Dev/test keep
+# using disk storage untouched when these vars are absent.
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "").strip()
+# Custom domain proxied through Cloudflare (e.g. media.bipflow.com.br) so
+# MEDIA_URL is stable and cacheable instead of the raw r2.cloudflarestorage.com host.
+R2_PUBLIC_DOMAIN = os.environ.get("R2_PUBLIC_DOMAIN", "").strip()
+
+USE_R2_STORAGE = bool(R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME)
+
+if IS_PRODUCTION and not USE_R2_STORAGE:
+    raise ImproperlyConfigured(
+        "R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_BUCKET_NAME must be set in "
+        "production -- disk media does not survive a redeploy."
+    )
+
+if USE_R2_STORAGE:
+    AWS_ACCESS_KEY_ID = R2_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY = R2_SECRET_ACCESS_KEY
+    AWS_STORAGE_BUCKET_NAME = R2_BUCKET_NAME
+    AWS_S3_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    AWS_S3_REGION_NAME = "auto"
+    AWS_S3_ADDRESSING_STYLE = "path"
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_DEFAULT_ACL = None  # R2 does not support canned ACLs
+    AWS_QUERYSTRING_AUTH = False  # serve public URLs, no signed query params
+    AWS_S3_FILE_OVERWRITE = False  # keep Django's -suffix-on-collision behaviour
+
+    if R2_PUBLIC_DOMAIN:
+        AWS_S3_CUSTOM_DOMAIN = R2_PUBLIC_DOMAIN
+        MEDIA_URL = f"https://{R2_PUBLIC_DOMAIN}/"
+    else:
+        MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{R2_BUCKET_NAME}/"
+
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+else:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+
+# ------------------------------------------------------------------------------
 # ðŸ”’ CORS & DRF SECURITY
 # ------------------------------------------------------------------------------
 # Parse CORS allowed origins from environment or use sensible defaults
@@ -268,6 +318,11 @@ if IS_PRODUCTION:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
+    # Docker healthchecks hit the backend container directly over plain HTTP
+    # (no reverse proxy, no X-Forwarded-Proto) -- without this exemption
+    # SECURE_SSL_REDIRECT 302s them to https on a port gunicorn doesn't
+    # terminate TLS on, and the healthcheck times out forever.
+    SECURE_REDIRECT_EXEMPT = [r"^healthz/?$"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
