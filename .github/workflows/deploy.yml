@@ -14,10 +14,6 @@ concurrency:
   group: deploy-main
   cancel-in-progress: false
 
-env:
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
-
 jobs:
   build-and-push:
     if: github.event.workflow_run.conclusion == 'success'
@@ -25,8 +21,21 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      backend_image: ${{ steps.repo.outputs.backend_image }}
+      frontend_image: ${{ steps.repo.outputs.frontend_image }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Compute lowercase image names
+        # GHCR (like all Docker registries) requires all-lowercase image
+        # names; github.repository preserves the repo's actual case
+        # (edaquinogit/BipFlow-Manage), which is not lowercase here.
+        id: repo
+        run: |
+          repo_lower=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "backend_image=ghcr.io/${repo_lower}/backend" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${repo_lower}/frontend" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -43,8 +52,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.BACKEND_IMAGE }}:latest
-            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ steps.repo.outputs.backend_image }}:latest
+            ${{ steps.repo.outputs.backend_image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -57,8 +66,8 @@ jobs:
             VITE_API_URL=/api/
           push: true
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ steps.repo.outputs.frontend_image }}:latest
+            ${{ steps.repo.outputs.frontend_image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -85,4 +94,6 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
           IMAGE_TAG: ${{ github.sha }}
