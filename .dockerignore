@@ -33,7 +33,10 @@ bipdelivery/logs
 *.bak
 *.backup
 
-bipflow-frontend
+# NOTE: bipflow-frontend itself must stay reachable -- both the backend
+# Dockerfile and docker/frontend.Dockerfile build from this same root
+# context, and the frontend image COPYs bipflow-frontend/. The node_modules
+# and dist excludes above already keep the backend build context lean.
 legacy
 cypress
 docs

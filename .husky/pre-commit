@@ -7,7 +7,7 @@ echo "[pre-commit] Checking secrets hygiene..."
 
 staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 
-blocked_env_files="$(printf "%s\n" "$staged_files" | grep -E '(^|/)\.env($|[.][^/]+$)' | grep -Ev '(^|/)\.env\.example$' || true)"
+blocked_env_files="$(printf "%s\n" "$staged_files" | grep -E '(^|/)\.env($|[.][^/]+$)' | grep -Ev '(^|/)\.env(\.[^/]+)*\.example$' || true)"
 if [ -n "$blocked_env_files" ]; then
   echo "[pre-commit] ERROR: refusing to commit environment files:" >&2
   printf "%s\n" "$blocked_env_files" >&2

@@ -10,27 +10,44 @@ x-backend-env: &backend-env
   DJANGO_ENV: production
   DJANGO_DEBUG: "False"
   DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
-  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
-  CSRF_TRUSTED_ORIGINS: ${DOCKER_CSRF_TRUSTED_ORIGINS:-http://localhost:8080}
-  CORS_ALLOWED_ORIGINS: ${DOCKER_CORS_ALLOWED_ORIGINS:-http://localhost:8080}
-  BASE_URL: ${DOCKER_PUBLIC_URL:-http://localhost:8080}
-  FRONTEND_BASE_URL: ${DOCKER_PUBLIC_URL:-http://localhost:8080}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS is required}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?CSRF_TRUSTED_ORIGINS is required}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+  BASE_URL: ${BASE_URL:?BASE_URL is required}
+  FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
   DATABASE_URL: postgresql://${POSTGRES_USER:-bipflow}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-bipflow}
   DATABASE_CONN_MAX_AGE: ${DATABASE_CONN_MAX_AGE:-60}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
   CACHE_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/1
-  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
   DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@bipflow.local}
   WHATSAPP_ORDER_PHONE: ${WHATSAPP_ORDER_PHONE:-}
   ORDER_DELIVERY_FEE: ${ORDER_DELIVERY_FEE:-12.00}
-  DJANGO_BOOTSTRAP_ADMIN_EMAIL: ${DJANGO_BOOTSTRAP_ADMIN_EMAIL:-}
-  DJANGO_BOOTSTRAP_ADMIN_PASSWORD: ${DJANGO_BOOTSTRAP_ADMIN_PASSWORD:-}
-  DJANGO_BOOTSTRAP_ADMIN_ROLE: ${DJANGO_BOOTSTRAP_ADMIN_ROLE:-admin}
+  TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?TURNSTILE_SECRET_KEY is required}
+  # Media persistence: Cloudflare R2 (S3-compatible). Required in production --
+  # see USE_R2_STORAGE / IS_PRODUCTION guard in bipdelivery/core/settings.py.
+  R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
+  R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?R2_ACCESS_KEY_ID is required}
+  R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is required}
+  R2_BUCKET_NAME: ${R2_BUCKET_NAME:?R2_BUCKET_NAME is required}
+  R2_PUBLIC_DOMAIN: ${R2_PUBLIC_DOMAIN:-}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: bipflow_postgres
     environment: *postgres-env
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -39,12 +56,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
+    mem_limit: 512m
     restart: unless-stopped
+    # No published ports: only reachable from other containers on the compose network.
 
   redis:
     image: redis:7-alpine
+    container_name: bipflow_redis
     environment: *redis-env
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\" --maxmemory 128mb --maxmemory-policy allkeys-lru"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -52,17 +73,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
+    mem_limit: 192m
     restart: unless-stopped
 
   backend:
+    image: ${BACKEND_IMAGE:-bipflow-backend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: bipflow_backend
     environment: *backend-env
     volumes:
       - static_data:/app/bipdelivery/staticfiles
-      - media_data:/app/bipdelivery/media
       - backend_logs:/app/bipdelivery/logs
+      # NOTE: no media_data volume mount here -- media goes to R2, not disk.
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,19 +103,23 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    logging: *default-logging
+    mem_limit: 512m
     restart: unless-stopped
 
   frontend:
+    image: ${FRONTEND_IMAGE:-bipflow-frontend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api/}
+    container_name: bipflow_frontend
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      # Bound to loopback only: the host Nginx (Certbot/TLS) proxies to this port.
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     volumes:
       - static_data:/static:ro
-      - media_data:/media:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -99,11 +128,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    logging: *default-logging
+    mem_limit: 128m
     restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
   static_data:
-  media_data:
   backend_logs:

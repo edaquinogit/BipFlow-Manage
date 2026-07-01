@@ -15,6 +15,7 @@ FROM nginx:1.27-alpine
 
 RUN mkdir -p /etc/nginx/snippets
 COPY docker/nginx-proxy-headers.conf /etc/nginx/snippets/proxy-headers.conf
+COPY docker/nginx-http-maps.conf /etc/nginx/conf.d/00-maps.conf
 COPY docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 

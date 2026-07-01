@@ -1,0 +1,58 @@
+# Host-level Nginx (installed directly on the VM via apt, NOT in Docker).
+# Terminates TLS with Certbot and reverse-proxies everything to the
+# Dockerized frontend container, which already proxies /api and /admin to
+# the backend container (see docker/frontend-nginx.conf). This keeps the
+# whole app on a single origin (bipflow.example.com) so SameSite=Strict
+# cookies and CORS both work without special-casing.
+#
+# Install:
+#   sudo cp deploy/nginx-vm.conf.example /etc/nginx/sites-available/bipflow
+#   sudo ln -s /etc/nginx/sites-available/bipflow /etc/nginx/sites-enabled/bipflow
+#   sudo rm -f /etc/nginx/sites-enabled/default
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Then obtain the certificate (see step-by-step in the deploy guide):
+#   sudo certbot --nginx -d bipflow.example.com
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bipflow.example.com;
+
+    # Certbot's HTTP-01 challenge needs plain HTTP to keep working after
+    # renewal hooks run; everything else is redirected to HTTPS.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name bipflow.example.com;
+
+    # Populated by `certbot --nginx` on first run; do not create manually.
+    ssl_certificate     /etc/letsencrypt/live/bipflow.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bipflow.example.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Backend's SECURE_PROXY_SSL_HEADER (settings.py) trusts this header
+        # to know the original request was HTTPS -- required or Django loops
+        # on SECURE_SSL_REDIRECT.
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
