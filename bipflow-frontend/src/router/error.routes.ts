@@ -18,7 +18,7 @@ export const errorRoutes: RouteRecordRaw[] = [
   {
     path: '/403',
     name: ErrorRoutes.Forbidden,
-    component: () => import(/* webpackChunkName: "error-403" */ '@/views/errors/ForbiddenView.vue'),
+    component: () => import('@/views/errors/ForbiddenView.vue'),
     meta: { 
       public: true, 
       title: 'Acesso Negado',
@@ -28,7 +28,7 @@ export const errorRoutes: RouteRecordRaw[] = [
   {
     path: '/500',
     name: ErrorRoutes.ServerError,
-    component: () => import(/* webpackChunkName: "error-500" */ '@/views/errors/ServerErrorView.vue'),
+    component: () => import('@/views/errors/ServerErrorView.vue'),
     meta: { 
       public: true, 
       title: 'Erro no Servidor',
@@ -38,7 +38,7 @@ export const errorRoutes: RouteRecordRaw[] = [
   {
     path: '/:pathMatch(.*)*',
     name: ErrorRoutes.NotFound,
-    component: () => import(/* webpackChunkName: "error-404" */ '@/views/errors/NotFoundView.vue'),
+    component: () => import('@/views/errors/NotFoundView.vue'),
     meta: { 
       public: true, 
       title: 'Página não Encontrada',

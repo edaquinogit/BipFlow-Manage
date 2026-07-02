@@ -43,19 +43,19 @@ export const authRoutes: RouteRecordRaw[] = [
   {
     path: "/login",
     name: AuthRouteNames.Login,
-    component: () => import(/* webpackChunkName: "auth-login" */ "@/views/auth/LoginView.vue"),
+    component: () => import("@/views/auth/LoginView.vue"),
     meta: guestMeta("Entrar")
   },
   {
     path: "/register",
     name: AuthRouteNames.Register,
-    component: () => import(/* webpackChunkName: "auth-register" */ "@/views/auth/RegisterView.vue"),
+    component: () => import("@/views/auth/RegisterView.vue"),
     meta: authTaskMeta("Criar Conta")
   },
   {
     path: "/forgot-password",
     name: AuthRouteNames.ForgotPassword,
-    component: () => import(/* webpackChunkName: "auth-forgot" */ "@/views/auth/ForgotPasswordView.vue"),
+    component: () => import("@/views/auth/ForgotPasswordView.vue"),
     meta: authTaskMeta("Recuperar Senha")
   },
   {
@@ -65,7 +65,7 @@ export const authRoutes: RouteRecordRaw[] = [
      */
     path: "/reset-password/:token?",
     name: AuthRouteNames.ResetPassword,
-    component: () => import(/* webpackChunkName: "auth-reset" */ "@/views/auth/ResetPasswordView.vue"),
+    component: () => import("@/views/auth/ResetPasswordView.vue"),
     props: (route) => ({
       token: (route.params?.token as string) || (route.query?.token as string) || ""
     }),

@@ -20,7 +20,7 @@ export const publicRoutes: RouteRecordRaw[] = [
     path: '/l/:storeSlug/produtos',
     alias: ['/s/:storeSlug/products'],
     name: PublicRoutes.StoreProducts,
-    component: () => import(/* webpackChunkName: "public-products" */ '@/views/products/ProductsView.vue'),
+    component: () => import('@/views/products/ProductsView.vue'),
     meta: {
       title: 'Produtos',
       requiresAuth: false,
@@ -32,7 +32,7 @@ export const publicRoutes: RouteRecordRaw[] = [
     path: '/l/:storeSlug/produtos/:slug',
     alias: ['/s/:storeSlug/products/:slug'],
     name: PublicRoutes.StoreProductDetails,
-    component: () => import(/* webpackChunkName: "public-product-details" */ '@/views/products/ProductDetailView.vue'),
+    component: () => import('@/views/products/ProductDetailView.vue'),
     meta: {
       title: 'Produto',
       requiresAuth: false,
@@ -44,7 +44,7 @@ export const publicRoutes: RouteRecordRaw[] = [
     path: '/produtos',
     alias: ['/products'],
     name: PublicRoutes.Products,
-    component: () => import(/* webpackChunkName: "public-products" */ '@/views/products/ProductsView.vue'),
+    component: () => import('@/views/products/ProductsView.vue'),
     meta: {
       title: 'Produtos',
       requiresAuth: false,
@@ -56,7 +56,7 @@ export const publicRoutes: RouteRecordRaw[] = [
     path: '/produtos/:slug',
     alias: ['/products/:slug'],
     name: PublicRoutes.ProductDetails,
-    component: () => import(/* webpackChunkName: "public-product-details" */ '@/views/products/ProductDetailView.vue'),
+    component: () => import('@/views/products/ProductDetailView.vue'),
     meta: {
       title: 'Produto',
       requiresAuth: false,
