@@ -324,6 +324,16 @@ if IS_PRODUCTION:
     # terminate TLS on, and the healthcheck times out forever.
     SECURE_REDIRECT_EXEMPT = [r"^healthz/?$"]
 
+# Default deploy target is one origin (VM + Nginx proxying /api and /admin),
+# where the refresh-token cookie can stay SameSite=Strict -- the strongest
+# setting, since the browser never needs to send it cross-site at all. Split
+# hosting (e.g. frontend on Cloudflare Pages, backend on Render, different
+# domains) needs SameSite=None or the browser drops the cookie on every
+# cross-origin request, breaking login/refresh entirely. Opt-in only, and
+# only meaningful over HTTPS -- see _set_refresh_cookie in api/views.py.
+BIPFLOW_CROSS_ORIGIN_COOKIES = get_bool_env("BIPFLOW_CROSS_ORIGIN_COOKIES", False)
+REFRESH_COOKIE_SAMESITE = "None" if BIPFLOW_CROSS_ORIGIN_COOKIES else "Strict"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",

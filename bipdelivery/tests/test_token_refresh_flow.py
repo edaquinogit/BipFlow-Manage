@@ -24,7 +24,7 @@ from typing import Any
 import django
 import pytest
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -165,6 +165,23 @@ class TokenRefreshFlowTest(TestCase):
         rotated_cookie = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
         self.assertTrue(rotated_cookie["httponly"])
         self.assertEqual(rotated_cookie["samesite"], "Strict")
+
+    @override_settings(BIPFLOW_CROSS_ORIGIN_COOKIES=True, REFRESH_COOKIE_SAMESITE="None")
+    def test_cross_origin_opt_in_relaxes_samesite_and_forces_secure(self) -> None:
+        """BIPFLOW_CROSS_ORIGIN_COOKIES=True (Render+Pages split deploy) must
+        flip SameSite to None and force Secure -- browsers silently drop a
+        SameSite=None cookie that isn't also Secure, which would otherwise
+        break login with no visible error.
+        """
+        refresh = RefreshToken.for_user(self.user)
+        self._set_refresh_cookie(str(refresh))
+
+        response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rotated_cookie = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
+        self.assertEqual(rotated_cookie["samesite"], "None")
+        self.assertTrue(rotated_cookie["secure"])
 
     def test_refreshed_access_token_is_valid(self) -> None:
         """Access token returned from refresh should be usable immediately."""

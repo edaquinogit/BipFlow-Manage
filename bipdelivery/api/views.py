@@ -1613,8 +1613,10 @@ def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: 
     cookie_kwargs: dict = {
         "path": REFRESH_TOKEN_COOKIE_PATH,
         "httponly": True,
-        "secure": settings.IS_PRODUCTION,
-        "samesite": "Strict",
+        # SameSite=None cookies are rejected by browsers unless Secure is
+        # also set, regardless of IS_PRODUCTION -- see BIPFLOW_CROSS_ORIGIN_COOKIES.
+        "secure": settings.IS_PRODUCTION or settings.BIPFLOW_CROSS_ORIGIN_COOKIES,
+        "samesite": settings.REFRESH_COOKIE_SAMESITE,
     }
     if remember_me:
         cookie_kwargs["max_age"] = int(settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME.total_seconds())

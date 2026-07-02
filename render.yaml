@@ -1,0 +1,80 @@
+# Render Blueprint for the BipFlow backend (Docker web service, free tier).
+# Import: Render Dashboard -> New -> Blueprint -> point at this repo.
+# Render only hosts the backend here -- the frontend is a separate Cloudflare
+# Pages project (static build), and Postgres/Redis are external managed free
+# tiers (Neon, Upstash) rather than Render's own DB add-ons.
+#
+# Env vars marked `sync: false` are secrets/per-environment values Render
+# will prompt for on first deploy and store encrypted -- never committed here.
+services:
+  - type: web
+    name: bipflow-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz/
+    envVars:
+      - key: DJANGO_ENV
+        value: production
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      # Cross-origin split (frontend on Cloudflare Pages, backend here on a
+      # different domain) needs SameSite=None on the refresh cookie -- see
+      # BIPFLOW_CROSS_ORIGIN_COOKIES in bipdelivery/core/settings.py. Leave
+      # unset/False if you ever move both behind one domain (e.g. the VM +
+      # Nginx path in docker-compose.prod.yml) instead.
+      - key: BIPFLOW_CROSS_ORIGIN_COOKIES
+        value: "True"
+      # e.g. bipflow-backend.onrender.com (Render assigns this; fill in
+      # after the first deploy, then redeploy) or a custom domain.
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+      # Full URL(s) of the Cloudflare Pages frontend, e.g.
+      # https://bipflow.pages.dev,https://seudominio.com
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      # Neon connection string (postgresql://...); Neon's free tier includes
+      # `?sslmode=require` in the URL it gives you -- keep it, psycopg honors it.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CONN_MAX_AGE
+        value: "60"
+      # Upstash Redis connection string (rediss://... -- note the double s,
+      # Upstash's free tier is TLS-only).
+      - key: CACHE_URL
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_DOMAIN
+        sync: false
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: DEFAULT_FROM_EMAIL
+        sync: false

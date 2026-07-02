@@ -25,4 +25,8 @@ RUN chmod +x /entrypoint.sh \
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "bipdelivery.core.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60"]
+# Shell form (not exec-form JSON) so ${PORT} expands: PaaS runtimes like
+# Render inject their own PORT and expect the container to bind to it. Falls
+# back to 8000 -- the docker-compose files never set PORT, so that path is
+# unaffected.
+CMD gunicorn bipdelivery.core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 60
