@@ -124,11 +124,12 @@ useStoreSwitchEffect(refresh);
           :value="filters.source ?? ''"
           data-cy="filter-source"
           class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-          @change="updateFilters({ source: (($event.target as HTMLSelectElement).value || undefined) as 'manual' | 'venda' | undefined })"
+          @change="updateFilters({ source: (($event.target as HTMLSelectElement).value || undefined) as 'manual' | 'venda' | 'pdv' | undefined })"
         >
           <option value="">Todas as origens</option>
           <option value="manual">Manual</option>
           <option value="venda">Venda</option>
+          <option value="pdv">PDV</option>
         </select>
       </label>
 

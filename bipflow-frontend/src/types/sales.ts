@@ -10,10 +10,17 @@ export interface SaleOrderItem {
 
 export type SaleOrderStatus = 'prepared' | 'sent' | 'cancelled'
 
+// Etapa 3 of the QR-code stock-exit evolution: which channel the sale came
+// through -- the existing e-commerce/WhatsApp checkout (virtual) or the
+// physical-store PDV (loja_fisica). Mirrors SaleOrder.CHANNEL_CHOICES in
+// bipdelivery/api/models.py.
+export type SaleOrderChannel = 'virtual' | 'loja_fisica'
+
 export interface SaleOrder {
   id: number
   order_reference: string
   status: SaleOrderStatus
+  channel: SaleOrderChannel
   customer_name: string
   customer_phone: string
   customer_email: string
@@ -92,12 +99,21 @@ export interface RegionBreakdown {
   orders_count: number
 }
 
+// Etapa 5 of the QR-code stock-exit evolution: revenue split between the
+// virtual (e-commerce/WhatsApp) and loja_fisica (PDV) channels.
+export interface ChannelBreakdown {
+  channel: SaleOrderChannel
+  revenue_total: string
+  orders_count: number
+}
+
 export interface SaleOrderBreakdown {
   period: SaleOrderSummaryPeriod | 'custom'
   top_products: TopProductBreakdown[]
   by_payment_method: PaymentMethodBreakdown[]
   by_status: StatusBreakdown[]
   by_region: RegionBreakdown[]
+  by_channel: ChannelBreakdown[]
 }
 
 export interface SaleOrderCustomerInsights {

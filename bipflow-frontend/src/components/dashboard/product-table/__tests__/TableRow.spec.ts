@@ -47,3 +47,28 @@ describe('TableRow stock badge', () => {
     expect(wrapper.find('.text-amber-600').exists()).toBe(false)
   })
 })
+
+describe('TableRow public_code', () => {
+  it('renders the auto-generated code when present', () => {
+    const wrapper = mountRow(buildProduct({ public_code: 'ABCD2345' }))
+
+    expect(wrapper.get('[data-cy="product-public-code"]').text()).toBe('#ABCD2345')
+  })
+
+  it('omits the code chip for products created before Etapa 1 (no backfill yet)', () => {
+    const wrapper = mountRow(buildProduct({ public_code: '' }))
+
+    expect(wrapper.find('[data-cy="product-public-code"]').exists()).toBe(false)
+  })
+})
+
+describe('TableRow print-label action (Etapa 2 of the QR-code stock-exit evolution)', () => {
+  it('emits print-label with the product when the QR Code button is clicked', async () => {
+    const product = buildProduct({ public_code: 'ABCD2345' })
+    const wrapper = mountRow(product)
+
+    await wrapper.find('[title="Imprimir etiqueta com QR Code"]').trigger('click')
+
+    expect(wrapper.emitted('print-label')?.at(-1)).toEqual([product])
+  })
+})

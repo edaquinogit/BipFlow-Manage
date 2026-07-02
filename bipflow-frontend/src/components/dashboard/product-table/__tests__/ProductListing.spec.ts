@@ -16,7 +16,7 @@ vi.mock('@/composables/useCurrentUser', () => ({ useCurrentUser: vi.fn() }))
 const ProductTableStub = defineComponent({
   name: 'ProductTableRoot',
   props: ['products', 'activeStore', 'canManageCatalog', 'selectedAssetIds', 'isAllSelected', 'isIndeterminate'],
-  emits: ['delete', 'edit', 'toggle-selection', 'select-all', 'adjust-stock'],
+  emits: ['delete', 'edit', 'toggle-selection', 'select-all', 'adjust-stock', 'print-label'],
   template: '<div class="product-table-stub" />',
 })
 
@@ -129,6 +129,15 @@ describe('ProductListing', () => {
     table.vm.$emit('adjust-stock', { id: 7, name: 'Produto teste' })
 
     expect(wrapper.emitted('adjust-stock')?.at(-1)).toEqual([{ id: 7, name: 'Produto teste' }])
+  })
+
+  it('bubbles print-label up from the product table', () => {
+    const wrapper = mountListing()
+    const table = wrapper.findComponent(ProductTableStub)
+
+    table.vm.$emit('print-label', { id: 7, name: 'Produto teste' })
+
+    expect(wrapper.emitted('print-label')?.at(-1)).toEqual([{ id: 7, name: 'Produto teste' }])
   })
 
   it('calls toggleSelection/selectAll directly instead of emitting them', () => {

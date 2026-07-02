@@ -6,6 +6,7 @@ import RevenueTrendCard from './RevenueTrendCard.vue';
 import TopProductsCard from './TopProductsCard.vue';
 import PaymentBreakdownCard from './PaymentBreakdownCard.vue';
 import RegionBreakdownCard from './RegionBreakdownCard.vue';
+import ChannelBreakdownCard from './ChannelBreakdownCard.vue';
 import CustomerInsightsCard from './CustomerInsightsCard.vue';
 import type {
   SaleOrderBreakdown,
@@ -192,6 +193,7 @@ const updatedAtLabel = computed(() => {
         :is-loading="isLoading"
       />
       <RegionBreakdownCard :regions="breakdown?.by_region ?? []" :is-loading="isLoading" />
+      <ChannelBreakdownCard :by-channel="breakdown?.by_channel ?? []" :is-loading="isLoading" />
       <CustomerInsightsCard :insights="customerInsights" :is-loading="isLoading" />
     </div>
   </section>

@@ -530,8 +530,12 @@ const addToCartLabel = computed(() => {
 
 async function loadProduct(): Promise<void> {
   const slug = typeof route.params.slug === 'string' ? route.params.slug : ''
+  // Etapa 4 of the QR-code stock-exit evolution: a printed QR's deep-link
+  // URL (/l/:storeSlug/p/:code) resolves the product by its public_code
+  // instead of by slug -- same view, different lookup key.
+  const code = typeof route.params.code === 'string' ? route.params.code : ''
 
-  if (!slug) {
+  if (!slug && !code) {
     errorMessage.value = 'Produto invalido.'
     isLoading.value = false
     return
@@ -541,7 +545,9 @@ async function loadProduct(): Promise<void> {
   errorMessage.value = ''
 
   try {
-    product.value = await productService.getPublicBySlug(slug)
+    product.value = code
+      ? await productService.getPublicByCode(code)
+      : await productService.getPublicBySlug(slug)
     activeImage.value = product.value.images?.[0] || product.value.image || FALLBACK_IMAGE_URL
     quantity.value = 1
     isCarouselPaused.value = false
@@ -552,6 +558,7 @@ async function loadProduct(): Promise<void> {
     errorMessage.value = 'Nao encontramos os detalhes deste produto agora.'
     Logger.warn('Failed to load public product detail', {
       slug,
+      code,
       error: error instanceof Error ? error.message : 'unknown_error',
     })
   } finally {
@@ -633,6 +640,19 @@ watch(
     void loadProduct()
   },
   { immediate: true }
+)
+
+// Separate watcher (not merged with the one above) because Vue's watch only
+// re-fires when the *watched* value itself changes -- navigating between
+// two code-anchored products never touches route.params.slug (always
+// undefined on this route), so that watcher alone would miss it.
+watch(
+  () => route.params.code,
+  (code) => {
+    if (typeof code === 'string' && code.trim()) {
+      void loadProduct()
+    }
+  }
 )
 
 watch(

@@ -14,7 +14,9 @@ import { z } from 'zod'
 export const STOCK_MOVEMENT_TYPES = ['entrada', 'saida'] as const
 export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number]
 
-export const STOCK_MOVEMENT_SOURCES = ['manual', 'venda'] as const
+// 'pdv' added by Etapa 3 of the QR-code stock-exit evolution (physical-store
+// point-of-sale checkout, see docs/architecture/qrcode-stock-exit-evolution.md).
+export const STOCK_MOVEMENT_SOURCES = ['manual', 'venda', 'pdv'] as const
 export type StockMovementSource = (typeof STOCK_MOVEMENT_SOURCES)[number]
 
 export const StockMovementSchema = z.object({

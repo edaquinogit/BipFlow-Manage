@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  getChannelLabel,
   getDeliveryMethodLabel,
   getPaymentLabel,
   getSaleStatusLabel,
@@ -27,6 +28,13 @@ describe('getDeliveryMethodLabel', () => {
   it('maps delivery to Delivery and pickup to Retirada', () => {
     expect(getDeliveryMethodLabel('delivery')).toBe('Delivery')
     expect(getDeliveryMethodLabel('pickup')).toBe('Retirada')
+  })
+})
+
+describe('getChannelLabel', () => {
+  it('maps virtual and loja_fisica to Portuguese labels', () => {
+    expect(getChannelLabel('virtual')).toBe('Virtual')
+    expect(getChannelLabel('loja_fisica')).toBe('Loja fisica')
   })
 })
 

@@ -13,6 +13,7 @@ import ProductListing from '@/components/dashboard/product-table/ProductListing.
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 import StockMovementModal from '@/components/dashboard/product-table/StockMovementModal.vue';
+import ProductLabelModal from '@/components/dashboard/product-table/ProductLabelModal.vue';
 
 const {
   selectedAssetIds,
@@ -40,6 +41,8 @@ const isBulkUpdating = ref(false);
 const isStockModalOpen = ref(false);
 const productToAdjust = ref<Product | null>(null);
 const isAdjustingStock = ref(false);
+const isLabelModalOpen = ref(false);
+const productToLabel = ref<Product | null>(null);
 
 const getProductStockValue = (product: Product): number => Number(product.stock_quantity ?? 0);
 
@@ -126,6 +129,16 @@ const closeStockModal = (): void => {
   productToAdjust.value = null;
 };
 
+const openLabelModal = (product: Product): void => {
+  productToLabel.value = product;
+  isLabelModalOpen.value = true;
+};
+
+const closeLabelModal = (): void => {
+  isLabelModalOpen.value = false;
+  productToLabel.value = null;
+};
+
 const handleStockMovementSubmit = async (payload: StockMovementInput): Promise<void> => {
   if (!productToAdjust.value?.id) return;
 
@@ -164,6 +177,7 @@ const refreshProducts = (): void => {
   selectedProduct.value = null;
   isDeleteModalOpen.value = false;
   closeStockModal();
+  closeLabelModal();
   void fetchData();
   void fetchCategories(true);
 };
@@ -220,6 +234,7 @@ useStoreSwitchEffect(refreshProducts);
         @delete="openDeleteConfirm"
         @bulk-update-category="handleBulkUpdateCategory"
         @adjust-stock="openStockModal"
+        @print-label="openLabelModal"
       />
     </section>
 
@@ -247,6 +262,12 @@ useStoreSwitchEffect(refreshProducts);
       :is-submitting="isAdjustingStock"
       @close="closeStockModal"
       @submit="handleStockMovementSubmit"
+    />
+
+    <ProductLabelModal
+      :show="isLabelModalOpen"
+      :product="productToLabel"
+      @close="closeLabelModal"
     />
   </div>
 </template>

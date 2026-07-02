@@ -1,4 +1,4 @@
-import type { SaleOrder, SaleOrderStatus } from '@/types/sales';
+import type { SaleOrder, SaleOrderChannel, SaleOrderStatus } from '@/types/sales';
 
 export const SALE_STATUS_OPTIONS: { value: SaleOrderStatus; label: string }[] = [
   { value: 'prepared', label: 'Novo' },
@@ -33,4 +33,14 @@ export function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): str
 
 export function getDeliveryMethodLabel(deliveryMethod: SaleOrder['delivery_method']): string {
   return deliveryMethod === 'delivery' ? 'Delivery' : 'Retirada';
+}
+
+// Etapa 3/5 of the QR-code stock-exit evolution.
+const CHANNEL_LABELS: Record<SaleOrderChannel, string> = {
+  virtual: 'Virtual',
+  loja_fisica: 'Loja fisica',
+};
+
+export function getChannelLabel(channel: SaleOrderChannel): string {
+  return CHANNEL_LABELS[channel] ?? channel;
 }

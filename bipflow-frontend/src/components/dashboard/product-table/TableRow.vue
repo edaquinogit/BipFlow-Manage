@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowsUpDownIcon } from '@heroicons/vue/24/outline';
+import { ArrowsUpDownIcon, QrCodeIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { formatBRL } from '@/utils/formatters';
 import { getLowStockThreshold } from '@/utils/stockAlerts';
@@ -21,6 +21,7 @@ const emit = defineEmits<{
   (e: 'delete', id: number): void;
   (e: 'toggle-selection', productId: number): void;
   (e: 'adjust-stock', product: Product): void;
+  (e: 'print-label', product: Product): void;
 }>();
 
 const resolvedCategory = computed(() => {
@@ -77,6 +78,13 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
           <span class="text-[9px] text-bip-muted font-mono font-bold tracking-widest uppercase">
             {{ product.sku || 'Sem SKU' }}
           </span>
+          <span
+            v-if="product.public_code"
+            data-cy="product-public-code"
+            class="text-[8px] text-bip-muted/70 font-mono font-semibold tracking-widest uppercase"
+          >
+            #{{ product.public_code }}
+          </span>
         </div>
       </div>
     </td>
@@ -124,6 +132,14 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
           title="Movimentar estoque"
         >
           <ArrowsUpDownIcon class="h-4 w-4" />
+        </button>
+
+        <button
+          @click="emit('print-label', product)"
+          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
+          title="Imprimir etiqueta com QR Code"
+        >
+          <QrCodeIcon class="h-4 w-4" />
         </button>
 
         <button

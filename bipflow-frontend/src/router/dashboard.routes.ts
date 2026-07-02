@@ -9,6 +9,7 @@ export const DashboardRoutes = {
   Overview: 'dashboard.overview',
   Products: 'dashboard.products',
   StockMovements: 'dashboard.products.stock-movements',
+  Pdv: 'dashboard.pdv',
   Orders: 'dashboard.orders',
   Support: 'dashboard.support',
   SupportConversation: 'dashboard.support.conversation',
@@ -55,6 +56,12 @@ export const dashboardRoutes: RouteRecordRaw[] = [
         name: DashboardRoutes.StockMovements,
         component: () => import('@/views/dashboard/DashboardStockMovementsView.vue'),
         meta: { title: 'Historico de estoque' },
+      },
+      {
+        path: 'pdv',
+        name: DashboardRoutes.Pdv,
+        component: () => import('@/views/dashboard/DashboardPdvView.vue'),
+        meta: { title: 'PDV' },
       },
       {
         path: 'pedidos',

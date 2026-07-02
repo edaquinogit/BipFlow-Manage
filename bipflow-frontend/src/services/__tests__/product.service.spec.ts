@@ -165,4 +165,86 @@ describe("ProductService", () => {
     expect(product.size).toBe("Grande");
     expect(product.images).toHaveLength(2);
   });
+
+  it("fetches a public product detail by public_code (Etapa 4 of the QR-code stock-exit evolution)", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        id: 15,
+        name: "Premium Burger",
+        slug: "premium-burger",
+        description: "Burger com blend especial",
+        sku: "BRG-015",
+        price: "32.00",
+        category: 2,
+        category_name: "Lanches",
+        size: "Grande",
+        image: null,
+        images: [],
+        stock_quantity: 9,
+        is_available: true,
+        created_at: "2026-04-20T10:00:00Z",
+      },
+    } as never);
+
+    const product = await ProductService.getPublicByCode("ABCD2345");
+
+    expect(api.get).toHaveBeenCalledWith("v1/products/by-code/ABCD2345/");
+    expect(product.name).toBe("Premium Burger");
+    expect(product.category).toEqual({
+      id: 2,
+      name: "Lanches",
+      slug: null,
+    });
+  });
+
+  it("fetches a product's printable QR Code (Etapa 2 of the QR-code stock-exit evolution)", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        public_code: "ABCD2345",
+        url: "https://loja.bipflow.app/l/loja-b/p/ABCD2345",
+        qr_code: "data:image/png;base64,AAAA",
+      },
+    } as never);
+
+    const label = await ProductService.getQrCode(42);
+
+    expect(api.get).toHaveBeenCalledWith("v1/products/42/qr-code/");
+    expect(label.public_code).toBe("ABCD2345");
+    expect(label.qr_code).toBe("data:image/png;base64,AAAA");
+  });
+
+  it("rejects a QR Code payload that isn't a PNG data URI", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        public_code: "ABCD2345",
+        url: "https://loja.bipflow.app/l/loja-b/p/ABCD2345",
+        qr_code: "not-a-data-uri",
+      },
+    } as never);
+
+    await expect(ProductService.getQrCode(42)).rejects.toBeTruthy();
+  });
+
+  it("resolves a product by its scanned public_code (Etapa 3 of the QR-code stock-exit evolution)", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        id: 7,
+        name: "Coxinha premium",
+        slug: "coxinha-premium",
+        price: "18.50",
+        stock_quantity: 12,
+        is_available: true,
+        public_code: "ABCD2345",
+        category: 2,
+        category_name: "Salgados",
+        created_at: "2026-04-20T10:00:00Z",
+      },
+    } as never);
+
+    const product = await ProductService.getByCode("abcd2345");
+
+    expect(api.get).toHaveBeenCalledWith("v1/products/by-code/abcd2345/");
+    expect(product.id).toBe(7);
+    expect(product.public_code).toBe("ABCD2345");
+  });
 });

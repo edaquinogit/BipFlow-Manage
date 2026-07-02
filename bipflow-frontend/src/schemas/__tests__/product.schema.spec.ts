@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ProductFormSchema } from '../product.schema'
+import { ProductFormSchema, ProductSchema } from '../product.schema'
 
 describe('ProductFormSchema', () => {
   const validPayload = {
@@ -39,5 +39,32 @@ describe('ProductFormSchema', () => {
 
     const fieldErrors = result.error.flatten().fieldErrors
     expect(fieldErrors.category?.[0]).toBe('Please select a classification')
+  })
+})
+
+describe('ProductSchema public_code (Etapa 1 of the QR-code stock-exit evolution)', () => {
+  const basePayload = {
+    id: 1,
+    name: 'Coxinha premium',
+    price: '18.50',
+    stock_quantity: '3',
+    category: { id: 2, name: 'Salgados' },
+    is_available: true,
+  }
+
+  it('accepts a generated public_code from the API response', () => {
+    const result = ProductSchema.safeParse({ ...basePayload, public_code: 'ABCD2345' })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.public_code).toBe('ABCD2345')
+  })
+
+  it('defaults to an empty string for products that predate the backfill', () => {
+    const result = ProductSchema.safeParse(basePayload)
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.public_code).toBe('')
   })
 })

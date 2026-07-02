@@ -6,6 +6,7 @@ import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import {
+  getChannelLabel,
   getDeliveryMethodLabel,
   getPaymentLabel,
   getSaleStatusLabel,
@@ -235,6 +236,14 @@ onMounted(() => {
           </p>
 
           <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-bip-muted">
+            <span
+              class="rounded-full border px-2.5 py-1"
+              :class="sale.channel === 'loja_fisica'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-[#E5E7EB] bg-zinc-50 text-bip-muted'"
+            >
+              {{ getChannelLabel(sale.channel) }}
+            </span>
             <span class="rounded-full border border-[#E5E7EB] bg-zinc-50 px-2.5 py-1">
               {{ getDeliveryMethodLabel(sale.delivery_method) }}
             </span>

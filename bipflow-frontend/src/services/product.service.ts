@@ -13,6 +13,7 @@ import { filtersToQueryParams } from "../types/filters";
 import type { PaginatedProductsResponse, ProductDetail, ProductFilters } from "../types/product";
 import { PaginatedProductsResponseSchema, ProductDetailSchema } from "../types/product";
 import type { PaginatedStockMovements, StockMovement, StockMovementInput } from "../types/stockMovement";
+import { ProductQrCodeSchema, type ProductQrCode } from "../types/productLabel";
 
 /**
  * Product Service - Business Logic Layer
@@ -248,6 +249,25 @@ class ProductService {
     }
   }
 
+  /**
+   * Resolve a product by its auto-generated public_code (Etapa 1 of the
+   * QR-code stock-exit evolution), used by the PDV (Etapa 3) to look up
+   * whatever a cashier scans or types before adding it to the sale cart.
+   *
+   * @throws Error if the code isn't found in the requester's store (404)
+   */
+  async getByCode(code: string): Promise<AdminProduct> {
+    try {
+      const { data } = await api.get<unknown>(
+        `${this.endpoint}by-code/${encodeURIComponent(code)}/`
+      );
+      return ProductSchema.parse(this.normalizeProductRecord(data));
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Get Product By Code");
+      throw error;
+    }
+  }
+
   async getPublicBySlug(slug: string): Promise<ProductDetail> {
     try {
       const { data } = await api.get<unknown>(`${this.endpoint}by-slug/${encodeURIComponent(slug)}/`)
@@ -269,6 +289,40 @@ class ProductService {
       return validation.data
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, 'Fetch Public Product By Slug')
+      throw error
+    }
+  }
+
+  /**
+   * Resolve the public storefront detail payload by public_code (Etapa 4
+   * of the QR-code stock-exit evolution) -- the deep-link URL a printed QR
+   * Code encodes ends in this code, so scanning it with a generic phone
+   * camera lands here. Same public `by-code` endpoint the PDV (Etapa 3)
+   * uses, but validated against the customer-facing ProductDetailSchema
+   * (types/product.ts) instead of the admin ProductSchema, matching
+   * getPublicBySlug's contract.
+   */
+  async getPublicByCode(code: string): Promise<ProductDetail> {
+    try {
+      const { data } = await api.get<unknown>(`${this.endpoint}by-code/${encodeURIComponent(code)}/`)
+      const normalizedData = this.normalizeProductRecord(data)
+      const validation = ProductDetailSchema.safeParse(normalizedData)
+
+      if (!validation.success) {
+        Logger.warn(
+          'Public product detail response validation failed',
+          buildErrorContext(validation.error, {
+            endpoint: `${this.endpoint}by-code/${code}/`,
+            code,
+          })
+        )
+
+        return normalizedData as ProductDetail
+      }
+
+      return validation.data
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, 'Fetch Public Product By Code')
       throw error
     }
   }
@@ -413,6 +467,21 @@ class ProductService {
       };
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Bulk Update Category");
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch the printable QR Code for a product (Etapa 2 of the QR-code
+   * stock-exit evolution): a base64 PNG data URI encoding the public
+   * deep-link URL that also carries the product's public_code.
+   */
+  async getQrCode(productId: number): Promise<ProductQrCode> {
+    try {
+      const { data } = await api.get<unknown>(`${this.endpoint}${productId}/qr-code/`);
+      return ProductQrCodeSchema.parse(data);
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Get Product QR Code");
       throw error;
     }
   }

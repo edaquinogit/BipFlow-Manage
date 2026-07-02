@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowsUpDownIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { ArrowsUpDownIcon, PencilIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { formatBRL } from '@/utils/formatters';
 import { getLowStockThreshold } from '@/utils/stockAlerts';
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   (e: 'delete', id: number): void;
   (e: 'toggle-selection', productId: number): void;
   (e: 'adjust-stock', product: Product): void;
+  (e: 'print-label', product: Product): void;
 }>();
 
 const resolvedCategory = computed(() => {
@@ -107,6 +108,14 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
         >
           <PencilIcon class="h-3.5 w-3.5" />
           Editar
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bip-line text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
+          aria-label="Imprimir etiqueta com QR Code"
+          @click="emit('print-label', product)"
+        >
+          <QrCodeIcon class="h-3.5 w-3.5" />
         </button>
         <button
           type="button"

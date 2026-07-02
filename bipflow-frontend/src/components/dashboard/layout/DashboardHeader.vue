@@ -7,6 +7,7 @@ import {
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
+  QrCodeIcon,
   ReceiptPercentIcon,
   ShoppingBagIcon,
   XMarkIcon,
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 const NAV_ITEMS = [
   { label: 'Visao geral', to: { name: DashboardRoutes.Overview }, icon: ChartBarIcon },
   { label: 'Produtos', to: { name: DashboardRoutes.Products }, icon: ShoppingBagIcon },
+  { label: 'PDV', to: { name: DashboardRoutes.Pdv }, icon: QrCodeIcon },
   { label: 'Pedidos', to: { name: DashboardRoutes.Orders }, icon: ReceiptPercentIcon },
   { label: 'Atendimento', to: { name: DashboardRoutes.Support }, icon: ChatBubbleLeftRightIcon },
   { label: 'Configuracoes', to: { name: DashboardRoutes.Settings }, icon: Cog6ToothIcon },

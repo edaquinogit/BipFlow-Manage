@@ -23,6 +23,7 @@ function buildOrder(overrides: Partial<SaleOrder> = {}): SaleOrder {
     id: 1,
     order_reference: 'BPF-0001',
     status: 'prepared',
+    channel: 'virtual',
     customer_name: 'Cliente Teste',
     customer_phone: '71999990000',
     customer_email: '',
@@ -95,6 +96,18 @@ describe('DashboardOrdersView', () => {
 
     expect(wrapper.text()).toContain('Cliente Teste')
     expect(wrapper.text()).toContain('Novo')
+  })
+
+  it('shows a channel badge distinguishing PDV sales from virtual orders (Etapa 3/5 of the QR-code stock-exit evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(
+      buildResponse([buildOrder({ id: 1, channel: 'loja_fisica' }), buildOrder({ id: 2, channel: 'virtual' })])
+    )
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Loja fisica')
+    expect(wrapper.text()).toContain('Virtual')
   })
 
   it('updates the sale status and reflects the change without refetching', async () => {

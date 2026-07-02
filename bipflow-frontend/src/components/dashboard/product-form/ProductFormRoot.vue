@@ -198,6 +198,7 @@ const submitLabel = computed(() => {
             v-model:category="form.category"
             :categories="categories"
             :errors="errors"
+            :public-code="props.initialData?.public_code"
           />
 
           <ValuationSection

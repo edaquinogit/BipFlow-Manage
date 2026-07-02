@@ -51,7 +51,7 @@ describe('DashboardOverviewView', () => {
     })
     vi.mocked(salesService.timeseries).mockRejectedValue(new Error('network down'))
     vi.mocked(salesService.breakdown).mockResolvedValue({
-      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [], by_channel: [],
     })
     vi.mocked(salesService.customers).mockResolvedValue({
       period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,
@@ -74,7 +74,7 @@ describe('DashboardOverviewView', () => {
     })
     vi.mocked(salesService.timeseries).mockResolvedValue([])
     vi.mocked(salesService.breakdown).mockResolvedValue({
-      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [], by_channel: [],
     })
     vi.mocked(salesService.customers).mockResolvedValue({
       period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,
@@ -98,7 +98,7 @@ describe('DashboardOverviewView', () => {
     })
     vi.mocked(salesService.timeseries).mockResolvedValue([])
     vi.mocked(salesService.breakdown).mockResolvedValue({
-      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [],
+      period: '30d', top_products: [], by_payment_method: [], by_status: [], by_region: [], by_channel: [],
     })
     vi.mocked(salesService.customers).mockResolvedValue({
       period: '30d', new_customers: 0, returning_customers: 0, bot_conversations_count: 0, bot_converted_count: 0, bot_conversion_rate: null,

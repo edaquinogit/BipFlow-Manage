@@ -34,6 +34,7 @@ const emit = defineEmits<{
   (e: 'toggle-selection', productId: number): void;
   (e: 'select-all'): void;
   (e: 'adjust-stock', product: Product): void;
+  (e: 'print-label', product: Product): void;
 }>();
 
 /**
@@ -49,6 +50,7 @@ const onDelete = (id: number) => {
   if (id) emit('delete', id);
 };
 const onAdjustStock = (product: Product) => emit('adjust-stock', product);
+const onPrintLabel = (product: Product) => emit('print-label', product);
 </script>
 
 <template>
@@ -92,6 +94,7 @@ const onAdjustStock = (product: Product) => emit('adjust-stock', product);
         @delete="onDelete"
         @toggle-selection="(productId) => emit('toggle-selection', productId)"
         @adjust-stock="onAdjustStock"
+        @print-label="onPrintLabel"
       />
     </div>
 
@@ -161,6 +164,7 @@ const onAdjustStock = (product: Product) => emit('adjust-stock', product);
             @delete="onDelete"
             @toggle-selection="(productId) => emit('toggle-selection', productId)"
             @adjust-stock="onAdjustStock"
+            @print-label="onPrintLabel"
           />
         </tbody>
       </table>

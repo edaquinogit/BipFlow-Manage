@@ -171,6 +171,18 @@ describe('DashboardStockMovementsView', () => {
     )
   })
 
+  it('offers PDV as a source filter option (Etapa 5 of the QR-code stock-exit evolution)', async () => {
+    vi.mocked(StockMovementService.list).mockResolvedValue(buildResponse([buildMovement({ source: 'pdv' })]))
+
+    const wrapper = mount(DashboardStockMovementsView)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="filter-source"]').setValue('pdv')
+    await flushPromises()
+
+    expect(StockMovementService.list).toHaveBeenLastCalledWith({ source: 'pdv' }, 1, 50)
+  })
+
   it('disables the previous-page button on the first page and enables next when more pages exist', async () => {
     vi.mocked(StockMovementService.list).mockResolvedValue(
       buildResponse([buildMovement()], { total_pages: 2 })
