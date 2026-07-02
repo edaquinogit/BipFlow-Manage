@@ -1680,25 +1680,36 @@ def _blacklist_all_outstanding_tokens(user) -> int:
 
 
 def _client_ip(request) -> str:
-    """Mirror SimpleRateThrottle.get_ident's proxy-aware IP resolution.
+    """Resolve a single, storable client IP from X-Forwarded-For.
 
-    Can't just instantiate SimpleRateThrottle to call get_ident(): its
-    __init__ requires a `scope`/`rate` (raises ImproperlyConfigured without
-    one), which this helper has no use for.
+    Every caller (Turnstile verification, LoginAttempt.ip_address -- a
+    GenericIPAddressField) needs one valid IP, not DRF's raw throttle-ident
+    string. DRF's own SimpleRateThrottle.get_ident(), when NUM_PROXIES is
+    unset, returns the XFF header essentially verbatim (fine for a
+    rate-limit bucket key, which just needs to be a consistent string per
+    requester) -- that broke here the moment Render's multi-hop load
+    balancer showed up: request.data['ip_address'] became a comma-joined
+    string like "203.0.113.1,10.0.0.2", which Postgres rejects outright as
+    an IP. Take the left-most hop instead -- by convention each proxy
+    *appends* to X-Forwarded-For, so the first entry is the original client
+    regardless of how many trusted proxies sit in between. Single-hop/no-XFF
+    deploys (the VM+Nginx path) are unaffected either way.
+
+    Note: like the code this replaced, this still trusts client-supplied
+    X-Forwarded-For content -- a spoofed left-most entry isn't newly
+    possible here, the prior behavior already passed raw XFF content through
+    unchecked. Properly rejecting untrusted hops would need to know the
+    exact trusted-proxy count per deployment target, which isn't available
+    here.
     """
-    from rest_framework.settings import api_settings as drf_api_settings
-
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     remote_addr = request.META.get("REMOTE_ADDR")
-    num_proxies = drf_api_settings.NUM_PROXIES
 
-    if num_proxies is not None:
-        if num_proxies == 0 or xff is None:
-            return remote_addr
-        addrs = xff.split(",")
-        return addrs[-min(num_proxies, len(addrs))].strip()
+    if not xff:
+        return remote_addr
 
-    return "".join(xff.split()) if xff else remote_addr
+    addrs = [addr.strip() for addr in xff.split(",") if addr.strip()]
+    return addrs[0] if addrs else remote_addr
 
 
 def _login_identifier(request) -> str:
