@@ -4,6 +4,7 @@ import type { Product } from '@/schemas/product.schema';
 import type { Store } from '@/types/store';
 import TableEmptyState from './ui/TableEmptyState.vue';
 import TableRow from '@/components/dashboard/product-table/TableRow.vue';
+import TableRowCard from '@/components/dashboard/product-table/TableRowCard.vue';
 
 /**
  * 🛰️ REGISTRY PROPS
@@ -65,7 +66,36 @@ const onAdjustStock = (product: Product) => emit('adjust-stock', product);
       </div>
     </Transition>
 
-    <div class="overflow-x-auto">
+    <div v-if="!hasProducts && !props.isLoading" class="lg:hidden px-6 py-16 text-center">
+      <p class="text-sm font-bold text-[#05050A]">Nenhum produto cadastrado.</p>
+      <p class="mt-1.5 text-xs text-bip-muted">Cadastre o primeiro produto para começar a vender.</p>
+    </div>
+
+    <div v-else-if="props.isLoading && !hasProducts" class="lg:hidden divide-y divide-[#E5E7EB]">
+      <div v-for="i in 3" :key="i" class="flex gap-3 p-4 animate-pulse">
+        <div class="h-11 w-11 shrink-0 rounded-lg bg-zinc-100" />
+        <div class="flex-1 space-y-2">
+          <div class="h-3 w-2/3 rounded bg-zinc-100" />
+          <div class="h-2 w-1/3 rounded bg-zinc-100" />
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="lg:hidden divide-y divide-[#E5E7EB]">
+      <TableRowCard
+        v-for="product in props.products"
+        :key="product.id"
+        :product="product"
+        :can-manage-catalog="props.canManageCatalog"
+        :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"
+        @edit="onEdit"
+        @delete="onDelete"
+        @toggle-selection="(productId) => emit('toggle-selection', productId)"
+        @adjust-stock="onAdjustStock"
+      />
+    </div>
+
+    <div class="hidden overflow-x-auto lg:block">
       <table class="w-full text-left border-collapse table-auto" data-cy="product-table">
         <thead>
           <tr class="bg-zinc-50 text-[10px] uppercase tracking-[0.2em] text-bip-muted font-black border-b border-[#E5E7EB]">
@@ -123,7 +153,7 @@ const onAdjustStock = (product: Product) => emit('adjust-stock', product);
 
           <TableRow
             v-for="product in props.products"
-            :key="product.id || Math.random()"
+            :key="product.id"
             :product="product"
             :can-manage-catalog="props.canManageCatalog"
             :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"

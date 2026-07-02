@@ -61,7 +61,7 @@ const handleConfirm = () => {
   >
     <div
       v-if="hasValidSelection"
-      class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50"
+      class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 transform -translate-x-1/2 z-50"
       :class="getGlowClass(true)"
     >
       <div class="bg-white/95 backdrop-blur-xl border border-[#E5E7EB] rounded-2xl px-6 py-4 shadow-2xl shadow-black/10">

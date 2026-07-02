@@ -72,7 +72,7 @@ onMounted(async () => {
       @logout="handleLogout"
     />
 
-    <div class="fixed bottom-5 left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white/95 px-4 py-3 text-xs shadow-[0_14px_35px_-28px_rgba(5,5,10,0.45)] backdrop-blur-xl sm:flex">
+    <div class="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white/95 px-4 py-3 text-xs shadow-[0_14px_35px_-28px_rgba(5,5,10,0.45)] backdrop-blur-xl sm:flex">
       <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.55)]" />
       <div class="min-w-0">
         <p class="font-black uppercase tracking-[0.18em] text-bip-muted">Loja {{ activeStoreStatusLabel.toLowerCase() }}</p>
