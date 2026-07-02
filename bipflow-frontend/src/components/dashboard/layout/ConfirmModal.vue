@@ -1,22 +1,36 @@
 <script setup lang="ts">
+import { ref, toRef } from 'vue';
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
+import { useDialogA11y } from '@/composables/useDialogA11y';
+import Button from '@/components/ui/Button.vue';
 
-defineProps<{
+const props = defineProps<{
   show: boolean;
   title: string;
   message: string;
   isLoading?: boolean;
 }>();
 
-defineEmits(['close', 'confirm']);
+const emit = defineEmits<{ close: []; confirm: [] }>();
+
+const containerRef = ref<HTMLElement | null>(null);
+const cancelButtonRef = ref<HTMLButtonElement | null>(null);
+
+useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, cancelButtonRef);
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="modal-overlay">
-        
-        <div class="modal-container">
+
+        <div
+          ref="containerRef"
+          class="modal-container"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="title"
+        >
           <div class="alert-line"></div>
 
           <div class="flex flex-col items-center text-center">
@@ -32,19 +46,25 @@ defineEmits(['close', 'confirm']);
             </p>
 
             <div class="flex w-full gap-4">
-              <button
-                @click="$emit('close')"
-                class="flex-1 px-6 py-4 rounded-xl border border-[#E5E7EB] text-[10px] font-black uppercase tracking-widest text-bip-muted hover:bg-zinc-50 transition-all"
+              <Button
+                ref="cancelButtonRef"
+                variant="outline"
+                size="sm"
+                class="flex-1"
+                @click="emit('close')"
               >
                 Cancelar
-              </button>
-              <button
-                @click="$emit('confirm')"
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                class="flex-1"
                 :disabled="isLoading"
-                class="confirm-button"
+                :loading="isLoading"
+                @click="emit('confirm')"
               >
                 {{ isLoading ? 'Processando...' : 'Confirmar exclusão' }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -87,29 +107,6 @@ defineEmits(['close', 'confirm']);
   height: 2px;
   background: linear-gradient(to right, transparent, #d81b60, transparent);
   opacity: 0.5;
-}
-
-.confirm-button {
-  flex: 1;
-  padding: 1rem 1.5rem;
-  border-radius: 0.75rem;
-  background-color: #d81b60;
-  color: white;
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  transition: all 0.3s ease;
-}
-
-.confirm-button:hover:not(:disabled) {
-  background-color: #ad1457;
-  box-shadow: 0 0 20px rgba(216, 27, 96, 0.25);
-}
-
-.confirm-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Transições de Fade */

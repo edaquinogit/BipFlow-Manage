@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { DashboardRoutes } from '@/router/dashboard.routes';
 import ProductAvatar from '@/components/dashboard/product-table/ui/ProductAvatar.vue';
+import { useDialogA11y } from '@/composables/useDialogA11y';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -14,7 +15,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
+const containerRef = ref<HTMLElement | null>(null);
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
+
+useDialogA11y(toRef(props, 'isOpen'), () => emit('close'), containerRef, closeButtonRef);
 
 const totalAlertCount = computed(
   () => props.outOfStockProducts.length + props.lowStockProducts.length
@@ -25,29 +29,6 @@ const productMetaLabel = (product: Product): string => {
   const parts = [categoryName, product.sku].filter((part): part is string => Boolean(part));
   return parts.join(' · ');
 };
-
-const handleKeydown = (event: KeyboardEvent): void => {
-  if (event.key === 'Escape') {
-    emit('close');
-  }
-};
-
-watch(
-  () => props.isOpen,
-  (isOpen) => {
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeydown);
-      void nextTick(() => closeButtonRef.value?.focus());
-    } else {
-      window.removeEventListener('keydown', handleKeydown);
-    }
-  },
-  { immediate: true }
-);
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeydown);
-});
 </script>
 
 <template>
@@ -59,6 +40,7 @@ onBeforeUnmount(() => {
       />
 
       <aside
+        ref="containerRef"
         role="dialog"
         aria-modal="true"
         aria-label="Alertas de estoque"

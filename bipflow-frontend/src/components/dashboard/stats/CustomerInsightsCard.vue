@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { ChatBubbleLeftRightIcon, UserGroupIcon } from '@heroicons/vue/24/outline';
 import type { SaleOrderCustomerInsights } from '@/types/sales';
+import Card from '@/components/ui/Card.vue';
 
 const props = defineProps<{
   insights: SaleOrderCustomerInsights | null;
@@ -32,10 +33,7 @@ const returningShare = computed(() => {
 </script>
 
 <template>
-  <section
-    aria-label="Conversao do bot e perfil de clientes"
-    class="rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]"
-  >
+  <Card aria-label="Conversao do bot e perfil de clientes">
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Conversao e clientes</p>
@@ -76,5 +74,5 @@ const returningShare = computed(() => {
         </p>
       </div>
     </div>
-  </section>
+  </Card>
 </template>

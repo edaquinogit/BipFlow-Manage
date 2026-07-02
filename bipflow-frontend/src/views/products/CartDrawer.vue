@@ -6,7 +6,13 @@
         @click="$emit('close')"
       />
 
-      <aside class="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[#FAFAFA] shadow-2xl">
+      <aside
+        ref="containerRef"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Carrinho de pedido"
+        class="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[#FAFAFA] shadow-2xl"
+      >
         <header class="border-b border-[#E5E7EB] bg-white px-6 py-5">
           <div class="flex items-start justify-between gap-4">
             <div>
@@ -20,6 +26,7 @@
             </div>
 
             <button
+              ref="closeButtonRef"
               type="button"
               class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#D81B60] hover:text-[#D81B60]"
               aria-label="Fechar carrinho"
@@ -62,6 +69,7 @@
                     :src="item.product.image || fallbackImageUrl"
                     :alt="`Imagem do produto ${item.product.name}`"
                     class="h-20 w-20 rounded-lg bg-[#F4F1F3] object-cover"
+                    loading="lazy"
                   />
 
                   <div class="min-w-0 flex-1">
@@ -80,7 +88,7 @@
 
                       <button
                         type="button"
-                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-600"
+                        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-600"
                         :aria-label="`Remover ${item.product.name} do pedido`"
                         @click="$emit('removeItem', item.product.id)"
                       >
@@ -89,10 +97,10 @@
                     </div>
 
                     <div class="mt-4 flex items-center justify-between gap-3">
-                      <div class="inline-flex h-10 items-center rounded-lg border border-[#D1D5DB] bg-white">
+                      <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
                         <button
                           type="button"
-                          class="inline-flex h-9 w-9 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
+                          class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
                           :aria-label="`Diminuir quantidade de ${item.product.name}`"
                           @click="$emit('updateQuantity', item.product.id, item.quantity - 1)"
                         >
@@ -103,7 +111,7 @@
                         </span>
                         <button
                           type="button"
-                          class="inline-flex h-9 w-9 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
+                          class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
                           :aria-label="`Aumentar quantidade de ${item.product.name}`"
                           @click="$emit('updateQuantity', item.product.id, item.quantity + 1)"
                         >
@@ -335,7 +343,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import {
   ChatBubbleBottomCenterTextIcon,
   MinusIcon,
@@ -347,6 +355,7 @@ import {
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { useDialogA11y } from '@/composables/useDialogA11y'
 
 const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
@@ -383,6 +392,11 @@ const emit = defineEmits<{
   updateCustomer: [patch: Partial<CartCustomer>]
   submitOrder: []
 }>()
+
+const containerRef = ref<HTMLElement | null>(null)
+const closeButtonRef = ref<HTMLButtonElement | null>(null)
+
+useDialogA11y(toRef(props, 'isOpen'), () => emit('close'), containerRef, closeButtonRef)
 
 type TextCustomerField =
   | 'fullName'

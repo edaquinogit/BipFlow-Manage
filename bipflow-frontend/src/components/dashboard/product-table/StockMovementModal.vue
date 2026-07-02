@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { ArrowDownIcon, ArrowUpIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { STOCK_MOVEMENT_REASONS, type StockMovementInput, type StockMovementType } from '@/types/stockMovement';
+import { useDialogA11y } from '@/composables/useDialogA11y';
 
 const props = defineProps<{
   show: boolean;
@@ -14,6 +15,11 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'submit', payload: StockMovementInput): void;
 }>();
+
+const containerRef = ref<HTMLElement | null>(null);
+const closeButtonRef = ref<HTMLButtonElement | null>(null);
+
+useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, closeButtonRef);
 
 const movementType = ref<StockMovementType>('entrada');
 const quantity = ref<number>(1);
@@ -85,10 +91,17 @@ const handleSubmit = (): void => {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="modal-overlay">
-        <div class="modal-container">
+        <div
+          ref="containerRef"
+          class="modal-container"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Movimentar estoque"
+        >
           <div class="alert-line"></div>
 
           <button
+            ref="closeButtonRef"
             type="button"
             aria-label="Fechar"
             class="close-button"

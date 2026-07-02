@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { ProductFormSchema, type Product, type ProductFormData } from '@/schemas/product.schema';
 import IdentitySection from '@/components/dashboard/product-form/sections/IdentitySection.vue';
 import ValuationSection from '@/components/dashboard/product-form/sections/ValuationSection.vue';
 import MediaSection from '@/components/dashboard/product-form/sections/MediaSection.vue';
+import { useDialogA11y } from '@/composables/useDialogA11y';
 
 interface Props {
   isOpen: boolean;
@@ -129,6 +130,11 @@ const handleSubmit = async () => {
   }
 };
 
+const containerRef = ref<HTMLElement | null>(null);
+const closeButtonRef = ref<HTMLButtonElement | null>(null);
+
+useDialogA11y(toRef(props, 'isOpen'), () => emit('close'), containerRef, closeButtonRef);
+
 const title = computed(() => props.initialData ? 'Editar produto' : 'Novo produto');
 const subtitle = computed(() => (
   props.initialData ? 'Atualize os dados da vitrine' : 'Cadastre um item para venda'
@@ -151,6 +157,10 @@ const submitLabel = computed(() => {
       />
 
       <aside
+        ref="containerRef"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title"
         class="relative flex w-full max-w-xl flex-col overflow-hidden border-l border-[#E5E7EB] bg-white p-6 shadow-2xl shadow-black/10 sm:p-8"
         data-cy="product-form-panel"
       >
@@ -165,6 +175,7 @@ const submitLabel = computed(() => {
           </div>
 
           <button
+            ref="closeButtonRef"
             type="button"
             data-cy="btn-close-form"
             aria-label="Fechar formulário de produto"

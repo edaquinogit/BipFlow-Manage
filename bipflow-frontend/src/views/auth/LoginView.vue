@@ -8,6 +8,7 @@ import { DashboardRoutes } from '@/router/dashboard.routes'
 import { isAxiosError } from '@/types/errors'
 import AuthShell from '@/components/auth/AuthShell.vue'
 import TurnstileWidget from '@/components/auth/TurnstileWidget.vue'
+import Button from '@/components/ui/Button.vue'
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
@@ -233,17 +234,9 @@ const handleBackToLogin = () => {
         @expired="handleCaptchaExpired"
       />
 
-      <button
-        type="submit"
-        :disabled="!canSubmit"
-        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
-      >
-        <span
-          v-if="isLoading"
-          class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
-        ></span>
+      <Button type="submit" :disabled="!canSubmit" :loading="isLoading">
         {{ isLoading ? 'Entrando...' : 'Entrar' }}
-      </button>
+      </Button>
     </form>
 
     <form v-else @submit.prevent="handleVerifyMfa" class="space-y-5" data-cy="mfa-verify-form">
@@ -263,17 +256,9 @@ const handleBackToLogin = () => {
         />
       </div>
 
-      <button
-        type="submit"
-        :disabled="!canSubmitMfa"
-        class="flex h-11 w-full items-center justify-center rounded-lg bg-bip-rose text-sm font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[#b8154f] disabled:cursor-not-allowed disabled:bg-zinc-300"
-      >
-        <span
-          v-if="isVerifyingMfa"
-          class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
-        ></span>
+      <Button type="submit" :disabled="!canSubmitMfa" :loading="isVerifyingMfa">
         {{ isVerifyingMfa ? 'Verificando...' : 'Verificar' }}
-      </button>
+      </Button>
 
       <div class="flex items-center justify-between text-xs">
         <button

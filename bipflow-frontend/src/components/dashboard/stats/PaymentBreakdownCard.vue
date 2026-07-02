@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import VueApexCharts from 'vue3-apexcharts';
+import { computed, defineAsyncComponent } from 'vue';
 import { CreditCardIcon } from '@heroicons/vue/24/outline';
 import type { PaymentMethodBreakdown, SaleOrderStatus, StatusBreakdown } from '@/types/sales';
 import { formatBRL } from '@/utils/formatters';
+import Card from '@/components/ui/Card.vue';
 
 const props = defineProps<{
   byPaymentMethod: PaymentMethodBreakdown[];
   byStatus: StatusBreakdown[];
   isLoading: boolean;
 }>();
+
+// Deferred: keeps the ~500kB apexcharts bundle off this route's initial
+// paint, since the donut only renders after data has loaded anyway.
+const VueApexCharts = defineAsyncComponent(() => import('vue3-apexcharts'));
 
 const PAYMENT_LABELS: Record<PaymentMethodBreakdown['payment_method'], string> = {
   pix: 'Pix',
@@ -75,7 +79,7 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-  <section aria-label="Formas de pagamento e status dos pedidos" class="rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]">
+  <Card aria-label="Formas de pagamento e status dos pedidos">
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Formas de pagamento</p>
@@ -106,5 +110,5 @@ const chartOptions = computed(() => ({
         {{ STATUS_LABELS[row.status] ?? row.status }}: {{ row.orders_count }}
       </span>
     </div>
-  </section>
+  </Card>
 </template>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import VueApexCharts from 'vue3-apexcharts';
+import { computed, defineAsyncComponent } from 'vue';
 import { ArrowTrendingUpIcon } from '@heroicons/vue/24/outline';
 import type { SaleOrderTimeseriesPoint } from '@/types/sales';
 import { formatBRL } from '@/utils/formatters';
+import Card from '@/components/ui/Card.vue';
 
 const props = defineProps<{
   points: SaleOrderTimeseriesPoint[];
@@ -12,6 +12,10 @@ const props = defineProps<{
   comparisonSamePeriodLastYear?: string | null;
   isLoading: boolean;
 }>();
+
+// Deferred: keeps the ~500kB apexcharts bundle off this route's initial
+// paint, since the chart only renders after data has loaded anyway.
+const VueApexCharts = defineAsyncComponent(() => import('vue3-apexcharts'));
 
 const hasYoyComparison = computed(
   () => props.comparisonSamePeriodLastYear !== null && props.comparisonSamePeriodLastYear !== undefined
@@ -75,10 +79,7 @@ const chartOptions = computed(() => ({
 </script>
 
 <template>
-  <section
-    aria-label="Receita no periodo"
-    class="relative overflow-hidden rounded-[2.5rem] border border-[#E5E7EB] bg-white p-8 shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)]"
-  >
+  <Card aria-label="Receita no periodo" overflow-hidden>
     <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Evolucao de vendas</p>
@@ -126,5 +127,5 @@ const chartOptions = computed(() => ({
     </div>
 
     <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-[#D81B60]/5" />
-  </section>
+  </Card>
 </template>
