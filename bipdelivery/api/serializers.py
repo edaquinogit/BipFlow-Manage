@@ -149,6 +149,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "sku",
+            "public_code",
             "name",
             "slug",
             "description",
@@ -165,7 +166,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "category_name",
             "created_at",
         ]
-        read_only_fields = ["id", "slug", "created_at", "category_name"]
+        read_only_fields = ["id", "public_code", "slug", "created_at", "category_name"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -872,6 +873,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "id",
             "order_reference",
             "status",
+            "channel",
             "customer_name",
             "customer_phone",
             "customer_email",
@@ -955,14 +957,28 @@ class RegionBreakdownSerializer(serializers.Serializer):
     orders_count = serializers.IntegerField()
 
 
+class ChannelBreakdownSerializer(serializers.Serializer):
+    """Revenue share for a single sales channel (virtual vs. loja física) within the period.
+
+    Etapa 5 of the QR-code stock-exit evolution: turns SaleOrder.channel
+    (Etapa 3) into the same kind of dashboard insight by_payment_method
+    already gives for payment methods.
+    """
+
+    channel = serializers.CharField()
+    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    orders_count = serializers.IntegerField()
+
+
 class SaleOrderBreakdownSerializer(serializers.Serializer):
-    """Sales breakdown by product, payment method, region and status for the dashboard."""
+    """Sales breakdown by product, payment method, region, status and channel for the dashboard."""
 
     period = serializers.CharField()
     top_products = TopProductBreakdownSerializer(many=True)
     by_payment_method = PaymentMethodBreakdownSerializer(many=True)
     by_status = StatusBreakdownSerializer(many=True)
     by_region = RegionBreakdownSerializer(many=True)
+    by_channel = ChannelBreakdownSerializer(many=True)
 
 
 class SaleOrderCustomerInsightsSerializer(serializers.Serializer):

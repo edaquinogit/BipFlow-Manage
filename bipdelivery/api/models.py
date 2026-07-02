@@ -3,7 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -13,6 +13,29 @@ from .crypto import decrypt_secret, encrypt_secret
 def generate_bot_session_id() -> str:
     """Return an opaque public identifier for bot conversation continuity."""
     return uuid.uuid4().hex
+
+
+# Etapa 1 of the QR-code stock-exit evolution (see
+# docs/architecture/qrcode-stock-exit-evolution.md): Product.public_code is a
+# system-generated identifier meant to be printed as a QR Code, distinct from
+# `sku` (manual, optional, merchant-controlled).
+PRODUCT_PUBLIC_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O/1/I/L, easy to read aloud
+PRODUCT_PUBLIC_CODE_LENGTH = 8
+PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS = 8
+
+
+def generate_product_public_code() -> str:
+    """Return a random public lookup code for QR-code scanning.
+
+    Same alphabet as MFABackupCode._generate_plain_code(). Uniqueness is
+    enforced per store by unique_product_public_code_per_store;
+    Product._save_with_generated_public_code() retries on a collision rather
+    than trusting a plain existence check, which can't be race-safe against a
+    concurrent insert.
+    """
+    return "".join(
+        secrets.choice(PRODUCT_PUBLIC_CODE_ALPHABET) for _ in range(PRODUCT_PUBLIC_CODE_LENGTH)
+    )
 
 
 def product_image_upload_to(instance: "Product", filename: str) -> str:
@@ -105,6 +128,19 @@ class Product(models.Model):
         null=True,
         help_text="Unique product code (SKU/Barcode)",
     )
+    public_code = models.CharField(
+        max_length=12,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text=(
+            "Auto-generated, immutable lookup code used by QR Code scans "
+            "(PDV and public storefront deep links, see "
+            "docs/architecture/qrcode-stock-exit-evolution.md). Distinct "
+            "from `sku`, which stays a manual, optional field the merchant "
+            "controls."
+        ),
+    )
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=False, blank=True, null=True)
 
@@ -143,11 +179,14 @@ class Product(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["store", "sku"], name="unique_product_sku_per_store"),
             models.UniqueConstraint(fields=["store", "slug"], name="unique_product_slug_per_store"),
+            models.UniqueConstraint(
+                fields=["store", "public_code"], name="unique_product_public_code_per_store"
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
         """
-        Auto-generate slug and manage availability status before saving.
+        Auto-generate slug, public_code and manage availability status before saving.
 
         Generates a unique slug from product name with UUID suffix if not provided.
         Automatically updates is_available based on stock_quantity.
@@ -161,7 +200,36 @@ class Product(models.Model):
 
         # Auto-calculate availability based on stock
         self.is_available = self.stock_quantity > 0
+
+        if not self.public_code:
+            self._save_with_generated_public_code(*args, **kwargs)
+            return
+
         super().save(*args, **kwargs)
+
+    def _save_with_generated_public_code(self, *args, **kwargs) -> None:
+        """Assign a fresh public_code and retry the insert on a rare collision.
+
+        A plain "check then use" query isn't race-safe against a concurrent
+        insert for the same store, so this instead lets
+        unique_product_public_code_per_store reject the save and retries with
+        a new random code. Collisions are astronomically unlikely given the
+        8-character alphabet's ~8.5e11 combinations per store, so this never
+        realistically loops more than once -- but if the IntegrityError turns
+        out to be about a *different* constraint (e.g. a duplicate sku), a
+        new public_code can't fix that, so it's re-raised immediately instead
+        of masking the real conflict behind pointless retries.
+        """
+        for attempt in range(PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS):
+            self.public_code = generate_product_public_code()
+            try:
+                with transaction.atomic():
+                    super().save(*args, **kwargs)
+                return
+            except IntegrityError as exc:
+                is_last_attempt = attempt == PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS - 1
+                if "public_code" not in str(exc) or is_last_attempt:
+                    raise
 
     def __str__(self) -> str:
         """Return product SKU and name as string representation."""
@@ -517,6 +585,18 @@ class SaleOrder(models.Model):
         ("cash", "Cash"),
     ]
 
+    # Etapa 3 of the QR-code stock-exit evolution (see
+    # docs/architecture/qrcode-stock-exit-evolution.md): distinguishes the
+    # existing e-commerce/WhatsApp checkout from the new PDV (physical store,
+    # scanned QR Code). Default is CHANNEL_VIRTUAL so every order created
+    # before this field existed keeps reading as what it always was.
+    CHANNEL_VIRTUAL = "virtual"
+    CHANNEL_LOJA_FISICA = "loja_fisica"
+    CHANNEL_CHOICES = [
+        (CHANNEL_VIRTUAL, "Virtual"),
+        (CHANNEL_LOJA_FISICA, "Loja física"),
+    ]
+
     store = models.ForeignKey(
         "Store",
         on_delete=models.CASCADE,
@@ -526,6 +606,7 @@ class SaleOrder(models.Model):
     )
     order_reference = models.CharField(max_length=32, unique=True, db_index=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED)
+    channel = models.CharField(max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_VIRTUAL)
 
     customer_name = models.CharField(max_length=255)
     customer_phone = models.CharField(max_length=32)
@@ -789,9 +870,11 @@ class StockMovement(models.Model):
 
     SOURCE_MANUAL = "manual"
     SOURCE_VENDA = "venda"
+    SOURCE_PDV = "pdv"
     SOURCE_CHOICES = [
         (SOURCE_MANUAL, "Manual"),
         (SOURCE_VENDA, "Venda"),
+        (SOURCE_PDV, "PDV"),
     ]
 
     REASON_COMPRA = "compra"

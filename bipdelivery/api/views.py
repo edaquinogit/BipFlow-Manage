@@ -52,6 +52,7 @@ from .models import (
     TOTPDevice,
 )
 from .pagination import ProductListPagination, StandardPagination
+from .product_labels import build_product_deep_link_url, build_product_qr_code_data_uri
 from .permissions import (
     AllowAnyReadDashboardWrite,
     DashboardReadWritePermission,
@@ -223,6 +224,53 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(product)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["get"], url_path=r"by-code/(?P<code>[^/]+)")
+    def by_code(self, request, code=None):
+        """
+        Retrieve a product by its auto-generated public_code (Etapa 1 of the
+        QR-code stock-exit evolution).
+
+        Powers QR-code lookups for both channels: the PDV (Etapa 3) resolves
+        a scanned/typed code here before adding it to the sale, and a printed
+        QR's URL (Etapa 2) resolves to a product page the same way `by_slug`
+        does. get_queryset() already scopes the search to the requester's
+        store, so a code from another tenant simply 404s like any other
+        cross-store lookup in this codebase.
+        """
+        normalized_code = (code or "").strip().upper()
+        product = self.get_queryset().filter(public_code=normalized_code).first()
+
+        if product is None:
+            raise NotFound(detail="Produto nao encontrado.")
+
+        serializer = self.get_serializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="qr-code")
+    def qr_code(self, request, pk=None):
+        """Render this product's printable QR Code (Etapa 2 of the QR-code
+        stock-exit evolution).
+
+        Dashboard-only: printing labels is a catalog-management action,
+        unlike the public `by_code` lookup it encodes, which stays open to
+        anyone who scans the printed result.
+        """
+        if not has_dashboard_read_access(request.user):
+            self.permission_denied(
+                request, message="Voce nao possui permissao para gerar o QR Code deste produto."
+            )
+
+        product = self.get_object()
+
+        return Response(
+            {
+                "public_code": product.public_code,
+                "url": build_product_deep_link_url(product),
+                "qr_code": build_product_qr_code_data_uri(product),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["patch"])
     def bulk_update_category(self, request):
         """
@@ -349,12 +397,15 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer) -> None:
-        """Reject direct stock_quantity edits -- they must go through a movement.
+        """Reject direct stock_quantity/public_code edits on update.
 
-        DRF's read_only_fields can't express "writable on create, locked on
-        update", so the guard lives here instead of on the serializer. This
-        is enforced server-side as a defense against direct API calls; the
-        dashboard UI never sends stock_quantity on update in the first place.
+        stock_quantity must go through a movement (Etapa 1 of the
+        stock-movement evolution); public_code is a system-generated,
+        immutable identifier (Etapa 1 of the QR-code stock-exit evolution) --
+        allowing it to be overwritten would invalidate every QR label already
+        printed for that product. read_only_fields already stops public_code
+        from being *persisted* even if sent, but rejecting the request
+        outright surfaces the mistake instead of silently ignoring it.
         """
         if "stock_quantity" in self.request.data:
             raise serializers.ValidationError(
@@ -363,6 +414,10 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
                         "Estoque não pode ser editado direto. Use o registro de entrada/saída."
                     )
                 }
+            )
+        if "public_code" in self.request.data:
+            raise serializers.ValidationError(
+                {"public_code": "O código gerado pelo BipFlow não pode ser alterado."}
             )
         serializer.save()
 
@@ -673,12 +728,20 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     pagination_class = StandardPagination
 
     def get_base_queryset(self):
-        """Return recent sales with optional search and status filters."""
+        """Return recent sales with optional search, status and channel filters."""
         queryset = SaleOrder.objects.prefetch_related("items").all()
 
         status_filter = self.request.query_params.get("status", "").strip()
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+
+        # Etapa 5 of the QR-code stock-exit evolution: lets the dashboard
+        # narrow every aggregate below (summary/timeseries/breakdown/
+        # customers all build on get_queryset()) to just the physical-store
+        # PDV or just the virtual/WhatsApp channel.
+        channel_filter = self.request.query_params.get("channel", "").strip()
+        if channel_filter in (SaleOrder.CHANNEL_VIRTUAL, SaleOrder.CHANNEL_LOJA_FISICA):
+            queryset = queryset.filter(channel=channel_filter)
 
         search_term = self.request.query_params.get("search", "").strip()
         if search_term:
@@ -890,6 +953,15 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             by_status = list(
                 orders.values("status").annotate(orders_count=Count("id")).order_by("status")
             )
+            # Etapa 5 of the QR-code stock-exit evolution: turns
+            # SaleOrder.channel (Etapa 3) into the business-facing
+            # physical-vs-virtual comparison this whole evolution was meant
+            # to enable, the same shape as by_payment_method.
+            by_channel = list(
+                active_orders.values("channel")
+                .annotate(revenue_total=Sum("total"), orders_count=Count("id"))
+                .order_by("-revenue_total")
+            )
 
             region_rows = active_orders.values("delivery_method", "delivery_region_name").annotate(
                 revenue_total=Sum("total"), orders_count=Count("id")
@@ -921,6 +993,7 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     "by_payment_method": by_payment_method,
                     "by_status": by_status,
                     "by_region": by_region,
+                    "by_channel": by_channel,
                 }
             )
             return serializer.data
@@ -1022,8 +1095,13 @@ class StockMovementViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSe
         if movement_type in (StockMovement.TYPE_ENTRADA, StockMovement.TYPE_SAIDA):
             queryset = queryset.filter(movement_type=movement_type)
 
+        # Validated against every known source (not a hardcoded
+        # manual/venda tuple) so a new source -- like SOURCE_PDV, added by
+        # Etapa 3 of the QR-code stock-exit evolution -- is filterable the
+        # moment it exists, instead of ?source=pdv silently matching
+        # nothing being mistaken for "matches every row".
         source = self.request.query_params.get("source", "").strip()
-        if source in (StockMovement.SOURCE_MANUAL, StockMovement.SOURCE_VENDA):
+        if source in dict(StockMovement.SOURCE_CHOICES):
             queryset = queryset.filter(source=source)
 
         reason = self.request.query_params.get("reason", "").strip()

@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .pdv import PdvSaleView
 from .views import (
     BotConversationViewSet,
     BotMessageView,
@@ -29,6 +30,7 @@ urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador
     path("bot/messages/", BotMessageView.as_view(), name="bot-message"),
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
+    path("pdv/sales/", PdvSaleView.as_view(), name="pdv-sale"),
     path("store/current/", CurrentStoreView.as_view(), name="store-current"),
     path("store/mine/", MyStoresView.as_view(), name="store-mine"),
     path("store-settings/public/", PublicStoreSettingsView.as_view(), name="public-store-settings"),
