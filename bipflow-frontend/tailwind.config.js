@@ -6,7 +6,9 @@ export default {
   ],
   theme: {
     extend: {
-      // BipFlow uses Zinc and Indigo palette by default
+      // Brand tokens (bip-black/soft/line/rose/blush/muted) and design
+      // tokens (semantic colors, micro text sizes, card radius/shadow)
+      // live in src/assets/main.css via the Tailwind v4 @theme directive.
     },
   },
   plugins: [],

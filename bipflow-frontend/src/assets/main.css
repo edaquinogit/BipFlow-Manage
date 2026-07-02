@@ -10,6 +10,37 @@
   --color-bip-rose: #d81b60;
   --color-bip-blush: #fce7f3;
   --color-bip-muted: #6b7280;
+
+  /* Semantic state colors, kept off the raw green/red/yellow/blue palette
+     so success/warning/danger/info have one source of truth. */
+  --color-success: #047857;
+  --color-success-soft: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-warning: #b45309;
+  --color-warning-soft: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-danger: #d81b60;
+  --color-danger-soft: #fce7f3;
+  --color-danger-border: #f9a8d4;
+  --color-info: #0369a1;
+  --color-info-soft: #f0f9ff;
+  --color-info-border: #bae6fd;
+
+  /* Micro-label sizes below Tailwind's default text-xs (0.75rem),
+     used by uppercase eyebrow/tag labels across the dashboard. */
+  --text-3xs: 0.5rem;
+  --text-3xs--line-height: 1.2;
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.2;
+
+  /* Named radius for the "premium card" shape, replacing repeated
+     rounded-[2.5rem] arbitrary values scattered across KPI cards. */
+  --radius-card: 2.5rem;
+
+  /* Named elevation, replacing hand-tuned inline box-shadows. */
+  --shadow-card: 0 14px 35px -28px rgba(5, 5, 10, 0.55);
+  --shadow-card-hover: 0 18px 45px -28px rgba(5, 5, 10, 0.65);
+  --shadow-float: 0 18px 60px rgba(15, 23, 42, 0.18);
 }
 
 body {
