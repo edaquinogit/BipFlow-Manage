@@ -102,7 +102,7 @@ useStoreSwitchEffect(() => {
           :href="storeWhatsappTestUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
           aria-label="Abrir WhatsApp configurado"
         >
           <ArrowTopRightOnSquareIcon class="h-4 w-4" />

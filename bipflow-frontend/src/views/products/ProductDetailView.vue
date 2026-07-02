@@ -131,6 +131,7 @@
                   :src="imageUrl"
                   :alt="`Miniatura do produto ${product.name}`"
                   class="h-full w-full object-contain p-1.5"
+                  loading="lazy"
                 />
               </div>
             </button>

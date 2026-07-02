@@ -14,26 +14,26 @@ const toastConfig = {
   success: {
     label: 'Sucesso',
     icon: CheckCircleIcon,
-    accent: 'bg-emerald-500',
-    iconWrap: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+    accent: 'bg-success',
+    iconWrap: 'bg-success-soft text-success ring-success-border',
   },
   error: {
     label: 'Atencao',
     icon: XCircleIcon,
-    accent: 'bg-rose-500',
-    iconWrap: 'bg-rose-50 text-rose-600 ring-rose-100',
+    accent: 'bg-danger',
+    iconWrap: 'bg-danger-soft text-danger ring-danger-border',
   },
   warning: {
     label: 'Aviso',
     icon: ExclamationTriangleIcon,
-    accent: 'bg-amber-500',
-    iconWrap: 'bg-amber-50 text-amber-700 ring-amber-100',
+    accent: 'bg-warning',
+    iconWrap: 'bg-warning-soft text-warning ring-warning-border',
   },
   info: {
     label: 'Informacao',
     icon: InformationCircleIcon,
-    accent: 'bg-sky-500',
-    iconWrap: 'bg-sky-50 text-sky-600 ring-sky-100',
+    accent: 'bg-info',
+    iconWrap: 'bg-info-soft text-info ring-info-border',
   },
 };
 </script>
@@ -80,7 +80,7 @@ const toastConfig = {
 
         <button
           type="button"
-          class="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          class="-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
           :aria-label="`Fechar notificacao: ${toastConfig[toast.type].label}`"
           @click="removeToast(toast.id)"
         >

@@ -81,10 +81,10 @@
       <div class="mt-auto pt-4">
         <div class="grid grid-cols-[auto,minmax(0,1fr)] items-center gap-2">
           <div class="min-w-0">
-            <div class="inline-flex h-10 items-center rounded-lg border border-[#D1D5DB] bg-white">
+            <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
               <button
                 type="button"
-                class="inline-flex h-9 w-9 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
                 :disabled="!product.is_available || quantity <= 1"
                 aria-label="Diminuir quantidade"
                 @click.stop="decrementQuantity"
@@ -96,7 +96,7 @@
               </span>
               <button
                 type="button"
-                class="inline-flex h-9 w-9 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
                 :disabled="!product.is_available || quantity >= product.stock_quantity"
                 aria-label="Aumentar quantidade"
                 @click.stop="incrementQuantity"

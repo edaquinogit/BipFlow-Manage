@@ -65,12 +65,12 @@ function closeMobileNav(): void {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-[#E5E7EB] bg-white/95 backdrop-blur-xl">
-    <div class="mx-auto max-w-7xl px-6 py-4">
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
+  <header class="sticky top-0 z-50 border-b border-bip-line bg-white/95 backdrop-blur-xl">
+    <div class="mx-auto max-w-7xl px-4 py-2.5 sm:px-6">
+      <div class="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-5">
           <div class="flex items-center gap-3">
-            <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+            <div class="flex h-9 w-24 shrink-0 items-center justify-center overflow-hidden">
               <img
                 :src="activeBranding.logoUrl"
                 :alt="activeBranding.name"
@@ -78,30 +78,30 @@ function closeMobileNav(): void {
               />
             </div>
             <div class="flex flex-col">
-              <span class="brand-wordmark brand-wordmark-premium max-w-[18rem] truncate text-lg">
+              <span class="brand-wordmark brand-wordmark-premium max-w-[18rem] truncate text-base">
                 {{ activeBranding.name }}
               </span>
-              <span class="text-[8px] font-bold uppercase tracking-widest text-[#D81B60]">
+              <span class="text-3xs font-bold uppercase tracking-widest text-bip-rose">
                 {{ activeBranding.tagline }}
               </span>
             </div>
           </div>
 
-          <div class="hidden md:block h-8 border-l border-[#E5E7EB] mx-2"></div>
+          <div class="hidden md:block h-6 border-l border-bip-line mx-1"></div>
 
-          <span class="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span class="inline-flex max-w-full items-center gap-2 rounded-full border border-success-border bg-success-soft px-2.5 py-0.5 text-2xs font-black uppercase tracking-widest text-success">
+            <span class="h-1.5 w-1.5 rounded-full bg-success" />
             <span class="truncate">Loja {{ activeBranding.statusLabel.toLowerCase() }} {{ activeStorePathSlug }}</span>
           </span>
         </div>
 
-        <div class="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end xl:w-auto">
-          <label class="relative min-w-0 sm:w-56">
+        <div class="flex w-full min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end xl:w-auto">
+          <label class="relative min-w-0 sm:w-52">
             <span class="sr-only">Selecionar loja ativa</span>
             <select
               :value="activeStoreSlug"
               :disabled="isStoreLoading || stores.length === 0"
-              class="h-11 w-full appearance-none rounded-xl border border-[#D1D5DB] bg-white px-3 pr-9 text-sm font-semibold text-[#05050A] outline-none transition hover:border-[#D81B60]/50 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-60"
+              class="h-9 w-full appearance-none rounded-xl border border-[#D1D5DB] bg-white px-3 pr-9 text-sm font-semibold text-bip-black outline-none transition hover:border-bip-rose/50 focus:border-bip-rose focus:ring-2 focus:ring-bip-blush disabled:cursor-not-allowed disabled:opacity-60"
               @change="handleStoreSelect"
             >
               <option value="" disabled>
@@ -121,7 +121,7 @@ function closeMobileNav(): void {
             :href="storefrontPath"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-bip-line bg-white px-3.5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
             :title="`Abrir ${storefrontPath}`"
             @click="emit('openStore')"
           >
@@ -130,17 +130,17 @@ function closeMobileNav(): void {
           </a>
 
           <div class="flex min-w-0 flex-col items-end">
-            <span class="hidden text-[9px] font-black uppercase tracking-[0.2em] text-bip-muted sm:block">
+            <span class="hidden text-3xs font-black uppercase tracking-[0.2em] text-bip-muted sm:block">
               Operador
             </span>
-            <span class="max-w-[8rem] truncate text-xs font-bold text-[#05050A] sm:max-w-[13rem] sm:text-sm">
+            <span class="max-w-[8rem] truncate text-xs font-bold text-bip-black sm:max-w-[13rem] sm:text-sm">
               {{ welcomeMessage }}
             </span>
           </div>
 
           <button
             type="button"
-            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-all duration-300 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] lg:flex"
+            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-300 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush lg:flex"
             aria-label="Finalizar sessao"
             title="Finalizar sessao"
             @click="emit('logout')"
@@ -150,7 +150,7 @@ function closeMobileNav(): void {
 
           <button
             type="button"
-            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-all duration-300 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] lg:hidden"
+            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-300 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush lg:hidden"
             :aria-expanded="isMobileNavOpen"
             aria-label="Abrir menu de navegacao"
             @click="isMobileNavOpen = !isMobileNavOpen"
@@ -161,14 +161,14 @@ function closeMobileNav(): void {
         </div>
       </div>
 
-      <nav aria-label="Secoes do dashboard" class="mt-4 hidden items-center gap-1 lg:flex">
+      <nav aria-label="Secoes do dashboard" class="mt-2.5 hidden items-center gap-1 lg:flex">
         <RouterLink
           v-for="item in NAV_ITEMS"
           :key="item.label"
           :to="item.to"
-          class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-[#FCE7F3]/60 hover:text-[#05050A]"
-          active-class="bg-[#FCE7F3] text-[#D81B60]"
-          exact-active-class="bg-[#FCE7F3] text-[#D81B60]"
+          class="flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-bip-blush/60 hover:text-bip-black"
+          active-class="bg-bip-blush text-bip-rose"
+          exact-active-class="bg-bip-blush text-bip-rose"
         >
           <component :is="item.icon" class="h-4 w-4" />
           {{ item.label }}
@@ -180,7 +180,7 @@ function closeMobileNav(): void {
       <nav
         v-if="isMobileNavOpen"
         aria-label="Secoes do dashboard (mobile)"
-        class="border-t border-[#E5E7EB] bg-white px-6 py-4 lg:hidden"
+        class="border-t border-bip-line bg-white px-6 py-4 lg:hidden"
       >
         <RouterLink
           v-for="item in NAV_ITEMS"

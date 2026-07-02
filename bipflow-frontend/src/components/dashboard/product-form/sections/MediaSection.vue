@@ -166,7 +166,7 @@ onUnmounted(() => {
         <button
           v-if="slot.removable"
           type="button"
-          class="absolute right-3 top-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-black"
+          class="absolute right-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-black"
           :aria-label="`Remover ${slot.label}`"
           @click.stop="removeImage(slot.key)"
         >

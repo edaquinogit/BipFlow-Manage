@@ -28,7 +28,7 @@
 
           <button
             type="button"
-            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100"
+            class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100"
             aria-label="Fechar atendimento"
             @click="isOpen = false"
           >

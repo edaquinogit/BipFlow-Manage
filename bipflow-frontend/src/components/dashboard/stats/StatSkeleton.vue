@@ -1,13 +1,10 @@
 <template>
-  <div class="h-44 bg-white animate-pulse rounded-[2.5rem] border border-[#E5E7EB] p-8 flex flex-col justify-between">
-    <div class="flex justify-between items-start">
-      <div class="w-14 h-14 bg-zinc-100 rounded-2xl border border-[#E5E7EB]"></div>
-      <div class="w-16 h-6 bg-zinc-100 rounded-full border border-[#E5E7EB]"></div>
+  <div class="h-32 bg-white animate-pulse rounded-card border border-bip-line p-5 flex flex-col justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 bg-zinc-100 rounded-xl border border-bip-line"></div>
+      <div class="w-20 h-2 bg-zinc-100 rounded-full"></div>
     </div>
 
-    <div class="space-y-3">
-      <div class="w-24 h-2 bg-zinc-100 rounded-full"></div>
-      <div class="w-32 h-8 bg-zinc-100 rounded-lg"></div>
-    </div>
+    <div class="w-28 h-8 bg-zinc-100 rounded-lg"></div>
   </div>
 </template>
