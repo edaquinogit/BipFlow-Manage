@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { compressImageFile } from '@/utils/image';
 
 const coverImage = defineModel<string | File | null>('coverImage', { default: null });
 const galleryImages = defineModel<Array<string | File>>('galleryImages', { default: [] });
@@ -13,6 +14,9 @@ defineProps<Props>();
 const coverPreview = ref<string | null>(null);
 const galleryPreviews = ref<string[]>([]);
 const previewUrls = new Set<string>();
+const isCompressingCover = ref(false);
+const isCompressingGallery = ref<boolean[]>([false, false]);
+const imageError = ref<string | null>(null);
 
 function revokePreview(url: string | null): void {
   if (!url || !url.startsWith('blob:')) {
@@ -50,12 +54,13 @@ watch(galleryImages, (newValue) => {
 }, { immediate: true, deep: true });
 
 const allSlots = computed(() => {
-  const slots: Array<{ key: string; label: string; preview: string | null; removable: boolean }> = [
+  const slots: Array<{ key: string; label: string; preview: string | null; removable: boolean; isLoading: boolean }> = [
     {
       key: 'cover',
       label: 'Imagem principal',
       preview: coverPreview.value,
       removable: Boolean(coverImage.value),
+      isLoading: isCompressingCover.value,
     },
   ];
 
@@ -65,13 +70,14 @@ const allSlots = computed(() => {
       label: `Galeria ${index + 2}`,
       preview: galleryPreviews.value[index] || null,
       removable: Boolean(galleryImages.value[index]),
+      isLoading: isCompressingGallery.value[index] || false,
     });
   }
 
   return slots;
 });
 
-function handleCoverChange(event: Event): void {
+async function handleCoverChange(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
 
@@ -79,10 +85,21 @@ function handleCoverChange(event: Event): void {
     return;
   }
 
-  coverImage.value = file;
+  target.value = '';
+  isCompressingCover.value = true;
+  imageError.value = null;
+
+  try {
+    coverImage.value = await compressImageFile(file);
+  } catch (error) {
+    imageError.value = error instanceof Error ? error.message : 'Falha ao processar a imagem.';
+    coverImage.value = null;
+  } finally {
+    isCompressingCover.value = false;
+  }
 }
 
-function handleGalleryChange(index: number, event: Event): void {
+async function handleGalleryChange(index: number, event: Event): Promise<void> {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
 
@@ -90,9 +107,24 @@ function handleGalleryChange(index: number, event: Event): void {
     return;
   }
 
+  target.value = '';
   const nextGallery = [...galleryImages.value];
-  nextGallery[index] = file;
-  galleryImages.value = nextGallery.slice(0, 2);
+  let compressedImage: string | File | null = null;
+
+  isCompressingGallery.value[index] = true;
+  imageError.value = null;
+
+  try {
+    compressedImage = await compressImageFile(file);
+    nextGallery[index] = compressedImage;
+  } catch (error) {
+    imageError.value = error instanceof Error ? error.message : 'Falha ao processar a imagem.';
+    nextGallery.splice(index, 1);
+  } finally {
+    isCompressingGallery.value[index] = false;
+  }
+
+  galleryImages.value = nextGallery.filter((entry): entry is string | File => Boolean(entry)).slice(0, 2);
 }
 
 function removeImage(slotKey: string): void {
@@ -173,6 +205,13 @@ onUnmounted(() => {
           X
         </button>
 
+        <div
+          v-if="slot.isLoading"
+          class="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-black/30 text-[10px] font-black uppercase tracking-[0.3em] text-white"
+        >
+          Processando imagem...
+        </div>
+
         <div class="pointer-events-none z-10 flex flex-col items-center gap-3 px-3 text-center">
           <div
             class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-bip-muted transition-all duration-300 group-hover:bg-[#FCE7F3] group-hover:text-[#D81B60]"
@@ -196,8 +235,8 @@ onUnmounted(() => {
     </div>
 
     <Transition name="slide-up">
-      <p v-if="error" class="text-center text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
-        {{ error }}
+      <p v-if="error || imageError" class="text-center text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
+        {{ imageError || error }}
       </p>
     </Transition>
   </section>

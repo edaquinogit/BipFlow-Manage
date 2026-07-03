@@ -140,7 +140,10 @@ describe('Product Image Upload Flow', () => {
     cy.intercept('GET', API_PATTERNS.products).as('getProducts');
     cy.intercept('GET', API_PATTERNS.categories).as('getCategories');
 
-    // 3. Navigate to the products page (dashboard routes are per-section
+    // 3. Simulate a mobile browser viewport to validate responsive upload UI.
+    cy.viewport('iphone-8');
+
+    // 4. Navigate to the products page (dashboard routes are per-section
     // since the routing split; '/' only redirects to the Overview page
     // and never fetches products/categories at all).
     cy.visitWithAuth('/dashboard/produtos');
