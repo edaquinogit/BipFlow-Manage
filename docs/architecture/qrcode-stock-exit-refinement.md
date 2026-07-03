@@ -109,140 +109,206 @@ de caixa, responsabilização) que hoje não tem resposta na UI, só no banco.
 
 ## 2. Plano de refinamento em etapas verticais
 
-### Etapa R1 — Correções de robustez do próprio PDV (prioridade alta)
+### Etapa R1 — Correções de robustez do próprio PDV ✅ (concluída)
 
-Backend: nenhuma mudança — os dados já existem (`is_available`,
-`stock_quantity`, mensagens de erro específicas); é só consumo pelo
-frontend.
+Backend: nenhuma mudança — os dados já existiam (`is_available`,
+`stock_quantity`, mensagens de erro específicas); foi só consumo pelo
+frontend, como previsto.
 
 Frontend:
 
-- `handleFinalizeSale` passa a extrair e mostrar a mensagem real do
-  backend (`error.response.data.items[0]`, mesmo padrão de
-  `_extractErrorMessage` já usado em `useProducts.ts`), com fallback para
-  a mensagem genérica só quando o backend não retornar nada estruturado.
-- `usePdvCart.addProduct()` rejeita adicionar um produto com
-  `is_available === false` ou `stock_quantity === 0`, e `updateQuantity()`
-  passa a não deixar a quantidade de uma linha ultrapassar
-  `availableStock` (já capturado, nunca usado) — com uma mensagem inline
-  clara ("Estoque disponível: N") em vez de deixar o erro só aparecer no
+- `extractPdvSaleErrorMessage()` (`DashboardPdvView.vue`) extrai a mensagem
+  real do backend (formato DRF `{"campo": ["mensagem"]}`, mesmo padrão
+  observado em `useProducts.ts`) e só cai no texto genérico quando o
+  backend não retorna nada estruturado.
+- `usePdvCart.addProduct()` agora retorna um resultado tipado
+  (`{ok: true} | {ok: false, reason: 'unavailable' | 'exceeds_stock', ...}`)
+  em vez de falhar silenciosamente; `updateQuantity()` faz o mesmo e nunca
+  deixa a quantidade ultrapassar `availableStock`. `DashboardPdvView.vue`
+  usa esse resultado para mostrar uma mensagem específica no momento do
+  scan (`"Estoque insuficiente para X: disponível N."`), não só no
   fechamento da venda.
-- Correção de foco: sempre que qualquer interação no carrinho terminar
-  (mudar quantidade, remover item), refocar o input de scan — mesmo
-  princípio de `focusScanInput()` já usado após um scan, generalizado
-  para todo ponto de interação da tela.
-- `DashboardPdvView.vue` passa a usar `useStoreSwitchEffect()` (mesmo
-  padrão das outras 5 telas do dashboard) para limpar o carrinho ao trocar
-  de loja ativa, com um toast explicando o motivo.
+- Foco do input de scan agora é reafirmado depois de **qualquer** interação
+  no carrinho (`adjustQuantity`, `handleRemoveLine`), não só depois de um
+  scan — `focusScanInput()` virou o chokepoint único para isso.
+- `DashboardPdvView.vue` agora usa `useStoreSwitchEffect()`, limpando o
+  carrinho e avisando o operador quando a loja ativa muda.
 
-Testes: extensão de `usePdvCart.spec.ts` (rejeição de produto indisponível,
-limite de quantidade pelo estoque conhecido), extensão de
-`DashboardPdvView.spec.ts` (mensagem de erro específica exibida, refoco
-após editar quantidade/remover item, limpeza ao trocar de loja).
+Testes: extensão de `usePdvCart.spec.ts` (7 casos novos: rejeição de
+produto indisponível/zerado, rejeição por exceder estoque em scan único e
+agregado, limite ao editar quantidade manualmente) e de
+`DashboardPdvView.spec.ts` (mensagem de erro específica por cenário, refoco
+após editar quantidade/remover item — verificado via `document.activeElement`
+com `attachTo: document.body` —, limpeza do carrinho ao trocar de loja).
 
-**Risco:** baixo — são correções pontuais e isoladas, sem mudança de
-contrato de API.
+**Visível para o usuário final:** sim. **Risco:** baixo, confirmado —
+foram correções pontuais e isoladas, sem mudança de contrato de API.
 
-### Etapa R2 — Fechar o ciclo da venda: confirmação e cancelamento com estorno
+### Etapa R3 — Polish de UX específico do balcão físico ✅ (concluída)
 
-Esta etapa tem uma decisão de produto que precisa ser tomada antes de
-implementar (ver Seção 3): estender o estorno de estoque só para vendas de
-PDV canceladas, ou para qualquer canal.
+Backend: `SaleOrder.performed_by` (novo `ForeignKey` nullable para o
+usuário, migration `0027_saleorder_performed_by.py`), preenchido em
+`PdvSaleView.post()` a partir de `request.user`; `SaleOrderSerializer`
+ganhou `performed_by_username` (mesmo padrão de
+`StockMovementSerializer.performed_by_username`, já existente).
+
+Frontend:
+
+- Badge de estoque baixo no carrinho do PDV, reaproveitando
+  `isLowStock()`/`utils/stockAlerts.ts` sem nenhuma lógica nova.
+- `<input type="number">` substituído por um stepper +/- (`MinusIcon`/
+  `PlusIcon`), com o botão de diminuir desabilitado em quantidade 1 e o de
+  aumentar desabilitado no limite de `availableStock` — nunca deixa a
+  quantidade num estado inválido, ao contrário de um campo numérico livre.
+- **Ajuste em relação ao plano original:** em vez de duplicar o carrinho
+  num layout de cards para mobile (como `TableRowCard.vue` faz para a
+  tabela de produtos), a tabela do carrinho do PDV só ganhou
+  `overflow-x-auto` — ela tem 5 colunas (bem mais estreita que a tabela de
+  produtos, que tem imagem, categoria etc.), então duplicar o layout aqui
+  seria mais código para o mesmo resultado prático. Os alvos de toque do
+  stepper (`h-9 w-9`, 36px) já cobrem a parte que de fato importava em
+  tablet.
+- Badge "Operador: X" no card de cada pedido em `DashboardOrdersView.vue`,
+  só para `channel=loja_fisica` com `performed_by_username` presente.
+
+Testes: extensão de `test_pdv_sales.py` (`performed_by` gravado
+corretamente), `DashboardPdvView.spec.ts` (steppers desabilitados nos
+limites, badge de estoque baixo presente/ausente) e
+`DashboardOrdersView.spec.ts` (badge de operador só aparece para PDV com
+operador conhecido).
+
+**Visível para o usuário final:** sim. **Risco:** baixo, confirmado.
+
+### Etapa R2 — Fechar o ciclo da venda: confirmação e cancelamento com estorno ✅ (concluída)
+
+Decisão da Seção 3 confirmada pelo usuário: **canal-agnóstico**.
 
 Backend:
 
-- Novo endpoint (ex. `POST /v1/sales-orders/{id}/cancel/`, ou estender
-  `update_status` quando o novo status for `cancelled`) que, além de
-  trocar o status, **reverte o estoque de cada item do pedido**: um
-  `StockMovement` de entrada por item (`reason` novo, ex.
-  `venda_cancelada`, `source` preservando o canal original), atômico,
-  reaproveitando o mesmo padrão de lock já usado em `apply_stock_movement`/
-  `PdvSaleView._reserve_stock`. Idempotente: cancelar um pedido já
-  cancelado não deve estornar duas vezes.
-- Guarda-corpo: só permite cancelar pedidos que ainda não foram
-  cancelados; pedidos muito antigos (ex. de outro dia) podem exigir
-  confirmação extra na UI, não necessariamente um bloqueio no backend.
+- Novo `apply_order_cancellation()` em `bipdelivery/api/stock.py` (não em
+  `views.py` — mesma razão de `apply_stock_movement` viver lá: é regra de
+  negócio testável isoladamente, não um detalhe de view). Tranca todos os
+  produtos do pedido (`select_for_update`, ordenado por `id`, mesmo padrão
+  de `PdvSaleView._reserve_stock`), soma de volta a quantidade de cada
+  `SaleOrderItem`, cria um `StockMovement` de entrada por item (`reason=
+  venda_cancelada`, novo choice system-only; `source` reaproveitado do
+  canal original do pedido — `pdv` ou `venda` —, não um valor novo) e só
+  então marca o pedido como cancelado, tudo em uma transação. Idempotente:
+  se o pedido já está cancelado, retorna `[]` sem tocar em nada.
+  Item sem produto (deletado desde a venda, `SET_NULL`) é pulado sem
+  quebrar o resto do estorno.
+- **Sem endpoint novo** — a decisão foi dobrar essa lógica dentro de
+  `SaleOrderViewSet.update_status` (o único lugar que já muda status
+  hoje) em vez de criar `POST /cancel/` ao lado dele. A tela de pedidos já
+  deixava cancelar via o mesmo `<select>` de status genérico; um endpoint
+  novo e separado deixaria esse caminho antigo **sem** o estorno, criando
+  uma forma de cancelar "por acidente" sem devolver estoque. Colocar a
+  regra dentro do único chokepoint que já existe fecha essa brecha.
+- `update_status` agora também chama `invalidate_dashboard_cache()` após
+  qualquer troca de status (não só cancelamento) — outra lacuna
+  pré-existente: o cache de 90s do resumo/breakdown do dashboard nunca
+  era invalidado por uma troca de status, então cancelar um pedido podia
+  deixar o card de receita desatualizado por até 90 segundos.
+- `StockMovement.REASON_VENDA_CANCELADA` (system-only, ao lado de
+  `entrada_inicial`/`venda`) e `SaleOrder.STATUS_CANCELLED`/`STATUS_SENT`
+  (constantes nomeadas, antes só `"cancelled"`/`"sent"` literais) —
+  migration `0028_order_cancellation_reason.py`.
 
 Frontend:
 
-- Tela/modal de confirmação pós-venda no PDV: resumo itemizado, código do
-  pedido, total, forma de pagamento — com opção de imprimir (mesmo padrão
-  de `window.print()` + CSS de impressão já usado em
-  `ProductLabelModal.vue`).
-- Ação "Cancelar venda" em `DashboardOrdersView.vue` (hoje só existe
-  trocar status via `SALE_STATUS_OPTIONS`) que chama o novo endpoint,
-  com confirmação explícita (reaproveitar `ConfirmModal.vue`) explicando
-  que o estoque será devolvido.
+- `PdvSaleReceiptModal.vue`: recibo itemizado após o fechamento da venda
+  (nome, quantidade, preço, total, forma de pagamento), com impressão via
+  `window.print()` — mesmo padrão de CSS de impressão não-scoped de
+  `ProductLabelModal.vue`. Um snapshot da venda (`lastCompletedSale`) é
+  guardado à parte do carrinho, que já limpa imediatamente.
+- `ConfirmModal.vue` ganhou `confirmLabel`/`loadingLabel` opcionais
+  (default preserva o texto usado hoje por `DashboardProductsView.vue`),
+  reaproveitado em `DashboardOrdersView.vue` para confirmar o cancelamento
+  com uma mensagem explícita ("... o estoque de N item(ns) será devolvido
+  automaticamente"), interceptando a seleção de "Cancelado" no `<select>`
+  de status antes de disparar a chamada.
 
-Testes: backend (estorno correto, idempotência, atomicidade, isolamento
-por loja), frontend (tela de confirmação, ação de cancelar, refresh do
-estoque na tabela de produtos após cancelar).
+Testes: `bipdelivery/tests/test_sale_order_cancellation.py` (9 testes:
+estorno em canal virtual e PDV com o `source` correto, múltiplos itens,
+idempotência, produto deletado não quebra, troca de status não-cancelamento
+não estorna, isolamento entre lojas, permissões). Frontend: extensão de
+`DashboardOrdersView.spec.ts` (modal de confirmação intercepta a seleção,
+cancelamento só ocorre após confirmar, nada acontece ao fechar sem
+confirmar) e `DashboardPdvView.spec.ts` (recibo mostra os itens corretos,
+fechar o recibo refoca o scan).
 
-**Risco:** médio — é a primeira vez que o sistema estorna estoque
-automaticamente; exige verificação cuidadosa contra o servidor de
-desenvolvimento real (cancelar uma venda de verdade e conferir o
-`StockMovement` gerado) antes de considerar pronta, no mesmo espírito da
-Etapa 3 da evolução original.
+**Verificado contra o servidor de desenvolvimento real:** venda de PDV real
+com telefone, decremento conferido, cancelamento via `PATCH .../status/`
+conferido restaurando o estoque exato, `StockMovement` de estorno com
+`reason=venda_cancelada`/`source=pdv` correto, segunda tentativa de
+cancelar confirmada como no-op (idempotência), e o `breakdown` por canal
+refletindo a remoção da receita imediatamente (cache invalidado). Dados de
+teste removidos depois.
 
-### Etapa R3 — Polish de UX específico do balcão físico
+**Visível para o usuário final:** sim. **Risco:** médio, como esperado —
+foi a única etapa que precisou de verificação ao vivo cuidadosa antes de
+considerar pronta, no mesmo espírito da Etapa 3 da evolução original.
 
-Frontend apenas:
+### Etapa R4 — Confiança operacional no próprio PDV ✅ (concluída)
 
-- Badge de estoque baixo (reaproveitando `isLowStock`/`getLowStockThreshold`
-  de `utils/stockAlerts.ts`) em cada linha do carrinho do PDV.
-- Substituir o `<input type="number">` cru por um stepper +/- com alvo de
-  toque maior (consistente com o já feito para a tabela de produtos mobile
-  no commit `08c90c7`, "WCAG touch targets").
-- Revisão responsiva da tela de PDV para tablet em retrato (o dispositivo
-  mais realista num balcão): carrinho em cards empilhados abaixo de um
-  certo breakpoint, em vez da tabela larga atual.
-- Exibir o operador (`performed_by`) no card de cada venda de loja física
-  em `DashboardOrdersView.vue` (omitir para vendas virtuais, onde não faz
-  sentido).
+Backend:
 
-Testes: extensão de `DashboardPdvView.spec.ts` (badge de estoque baixo,
-stepper), extensão de `DashboardOrdersView.spec.ts` (operador exibido só
-para `channel=loja_fisica`).
+- `PdvSaleRequestSerializer` ganhou `customer_phone` opcional, passado
+  adiante para `SaleOrder.customer_phone` (antes sempre `""`) —
+  `SaleOrderCustomerInsightsSerializer` já ignorava telefones vazios, então
+  nenhuma mudança foi necessária ali: vendas de PDV com telefone passam a
+  contar para "cliente novo vs. recorrente" automaticamente.
+- `SaleOrderViewSet.get_base_queryset()` já filtrava por `channel` desde a
+  Etapa 5 da evolução original, mas nenhum consumidor no frontend usava
+  isso ainda — `types/sales.ts`/`sales.service.ts` ganharam o parâmetro.
 
-**Risco:** baixo — puramente aditivo e visual.
+Frontend:
 
-### Etapa R4 (opcional) — Confiança operacional no próprio PDV
+- Painel "Últimas vendas" na própria tela de PDV, com as 5 vendas de loja
+  física mais recentes (`salesService.list({channel: 'loja_fisica',
+  pageSize: 5})`), carregado ao montar a tela, ao trocar de loja e depois
+  de cada venda finalizada.
+- **Ajuste em relação ao plano original:** o plano falava em "vendas de
+  hoje" — implementado como "últimas vendas" sem filtro de data, porque
+  filtrar por dia exigiria um novo parâmetro de intervalo em
+  `SaleOrderViewSet` (mais superfície de backend do que esse painel de
+  reasseguramento precisa); mostrar as últimas 5 vendas físicas, ponto,
+  já resolve o objetivo real ("confirmar que a venda que acabei de fazer
+  registrou").
+- Campo opcional "Telefone" no formulário do PDV, ao lado do nome do
+  cliente.
 
-- Painel compacto "últimas vendas de hoje" na própria tela de PDV (últimas
-  3-5 vendas de loja física do dia, com código do pedido e total), para o
-  caixa confirmar que uma venda foi mesmo registrada sem sair da tela.
-- Campo opcional de telefone do cliente no PDV (hoje só nome), para que
-  vendas físicas também alimentem o cálculo de "cliente novo vs.
-  recorrente" (`SaleOrderCustomerInsightsSerializer`), que hoje as ignora
-  silenciosamente (telefone sempre vazio nas vendas de PDV).
+Testes: extensão de `test_pdv_sales.py` (telefone opcional persistido) e
+`DashboardPdvView.spec.ts` (telefone repassado ao payload, painel carrega
+no mount, não aparece sem dados, não busca sem permissão de catálogo,
+atualiza depois de uma venda).
 
-**Risco:** baixo — aditivo, não bloqueia as etapas anteriores.
+**Visível para o usuário final:** sim. **Risco:** baixo, confirmado —
+puramente aditivo.
 
-## 3. Decisão que precisa de definição antes da Etapa R2
+## 3. Decisão tomada antes da Etapa R2
 
-**Cancelamento com estorno de estoque deve valer só para PDV, ou para
-qualquer canal (incluindo WhatsApp)?**
+**Pergunta:** cancelamento com estorno de estoque deveria valer só para
+PDV, ou para qualquer canal (incluindo WhatsApp)?
 
-- A favor de limitar ao PDV: é onde o problema é agudo (erro acontece na
-  hora, todo dia); pedidos de WhatsApp cancelados hoje já convivem sem
-  estorno automático há muito tempo, e mudar esse comportamento é uma
-  decisão de produto maior, com implicações em conciliação que fogem do
-  escopo desta evolução.
-- A favor de valer para os dois: consistência — um pedido cancelado
-  deveria sempre devolver o estoque, independente de como nasceu, e não
-  existe uma razão de negócio real para os dois canais se comportarem
-  diferente nesse ponto.
+**Resposta do usuário:** canal-agnóstico — a opção recomendada neste
+documento. Implementado exatamente assim: `apply_order_cancellation()` não
+tem nenhum branch de canal na decisão de estornar, só na escolha de qual
+`source` gravar no `StockMovement` gerado (para manter a rastreabilidade de
+qual canal originou a venda revertida).
 
-Recomendação: implementar de forma **canal-agnóstica** (o endpoint de
-cancelamento não precisa saber se é PDV ou virtual — só itera os itens do
-pedido), já que o custo de fazer diferente por canal seria maior do que o
-de simplesmente sempre estornar. Mas essa é uma escolha de regra de
-negócio do lojista, não só técnica, e deveria ser confirmada antes de
-implementar a Etapa R2.
+## 4. Ordem executada
 
-## 4. Ordem sugerida
+R1 → R3 → R2 → R4, na ordem sugerida originalmente. Nenhuma reordenação foi
+necessária.
 
-R1 (robustez, baixo risco) → R3 (polish visual, baixo risco, pode ser
-paralelo a R1) → decisão da Seção 3 → R2 (cancelamento com estorno, risco
-médio) → R4 (opcional, quando as anteriores estiverem estáveis em
-produção).
+## 5. Estado da suíte após R1–R4
+
+367 testes backend (pytest) + 293 testes frontend (vitest) verdes,
+`vue-tsc --noEmit`/`eslint`/`ruff` limpos nos arquivos tocados. Duas
+migrations novas (`0027_saleorder_performed_by`,
+`0028_order_cancellation_reason`), nenhuma pendente
+(`makemigrations --check` confirma paridade). Verificado de ponta a ponta
+contra o servidor de desenvolvimento real: venda de PDV com telefone →
+cancelamento → estorno conferido no ledger → idempotência confirmada →
+breakdown por canal refletindo a mudança imediatamente.
