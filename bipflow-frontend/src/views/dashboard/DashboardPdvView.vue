@@ -203,6 +203,7 @@ const handleFinalizeSale = async (): Promise<void> => {
     isReceiptOpen.value = true;
     success(`Venda ${response.order_reference} registrada com sucesso.`);
     resetSale();
+    void loadRecentPdvSales();
   } catch (error: unknown) {
     Logger.error('PDV sale failed', { error });
     toastError(extractPdvSaleErrorMessage(error));
@@ -227,6 +228,13 @@ useStoreSwitchEffect(() => {
     toastWarning('A loja ativa mudou. O carrinho foi limpo para evitar misturar produtos de lojas diferentes.');
   }
   resetSale();
+  void loadRecentPdvSales();
+});
+
+onMounted(() => {
+  if (canManageCatalog.value) {
+    void loadRecentPdvSales();
+  }
 });
 </script>
 
@@ -402,6 +410,26 @@ useStoreSwitchEffect(() => {
         >
           {{ isSubmitting ? 'Registrando...' : 'Finalizar venda' }}
         </button>
+      </section>
+
+      <section v-if="isRecentSalesLoading || recentPdvSales.length > 0" class="rounded-xl border border-[#E5E7EB] bg-white p-6" data-cy="pdv-recent-sales">
+        <h3 class="mb-4 text-sm font-black uppercase tracking-widest text-[#05050A]">
+          Últimas vendas
+        </h3>
+        <div v-if="isRecentSalesLoading" class="space-y-2">
+          <div v-for="i in 3" :key="i" class="h-9 animate-pulse rounded-lg bg-zinc-100" />
+        </div>
+        <ul v-else class="space-y-2">
+          <li
+            v-for="order in recentPdvSales"
+            :key="order.id"
+            data-cy="pdv-recent-sale-row"
+            class="flex items-center justify-between gap-3 rounded-lg border border-[#E5E7EB] bg-zinc-50 px-3 py-2 text-xs"
+          >
+            <span class="min-w-0 truncate font-bold text-[#05050A]">{{ order.order_reference }}</span>
+            <span class="shrink-0 font-mono font-black text-[#D81B60]">{{ formatBRL(order.total) }}</span>
+          </li>
+        </ul>
       </section>
     </template>
 

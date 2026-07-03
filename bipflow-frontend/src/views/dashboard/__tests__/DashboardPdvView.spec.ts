@@ -6,6 +6,7 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect'
 import ProductService from '@/services/product.service'
 import PdvSaleService from '@/services/pdvSale.service'
+import { salesService } from '@/services/sales.service'
 
 vi.mock('@/composables/useCurrentUser', () => ({ useCurrentUser: vi.fn() }))
 vi.mock('@/composables/useStoreSwitchEffect', () => ({ useStoreSwitchEffect: vi.fn() }))
@@ -15,6 +16,13 @@ vi.mock('@/services/product.service', () => ({
 vi.mock('@/services/pdvSale.service', () => ({
   default: { create: vi.fn() },
 }))
+vi.mock('@/services/sales.service', () => ({
+  salesService: { list: vi.fn() },
+}))
+
+function buildEmptySalesResponse() {
+  return { count: 0, next: null, previous: null, page_size: 5, total_pages: 1, results: [] }
+}
 
 function buildAxiosLikeError(data: Record<string, unknown>): Error {
   return Object.assign(new Error('Request failed'), { response: { data }, config: {} })
@@ -36,6 +44,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useCurrentUser).mockReturnValue({ canManageCatalog: ref(true) } as any)
+    vi.mocked(salesService.list).mockResolvedValue(buildEmptySalesResponse())
   })
 
   it('shows a permission notice and hides the scan input without catalog access', () => {
@@ -354,5 +363,82 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
     await flushPromises()
 
     expect(wrapper.find('[data-cy="pdv-cart-empty"]').exists()).toBe(true)
+  })
+
+  it('loads and shows the most recent PDV sales on mount (Etapa R4 of the QR-code stock-exit refinement)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      page_size: 5,
+      total_pages: 1,
+      results: [
+        {
+          id: 1,
+          order_reference: 'PDV-20260702-100000-000000',
+          status: 'prepared',
+          channel: 'loja_fisica',
+          customer_name: 'Cliente balcão',
+          customer_phone: '',
+          customer_email: '',
+          delivery_method: 'pickup',
+          payment_method: 'cash',
+          delivery_region_name: '',
+          performed_by_username: 'caixa1',
+          subtotal: '18.50',
+          delivery_fee: '0.00',
+          total: '18.50',
+          created_at: '2026-07-02T10:00:00Z',
+          item_count: 1,
+          items: [],
+        },
+      ],
+    })
+
+    const wrapper = mountPdvView()
+    await flushPromises()
+
+    expect(salesService.list).toHaveBeenCalledWith({ channel: 'loja_fisica', pageSize: 5 })
+    expect(wrapper.find('[data-cy="pdv-recent-sales"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="pdv-recent-sale-row"]').text()).toContain('PDV-20260702-100000-000000')
+  })
+
+  it('does not show the recent-sales panel when there is nothing to show', async () => {
+    const wrapper = mountPdvView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="pdv-recent-sales"]').exists()).toBe(false)
+  })
+
+  it('does not fetch recent sales without catalog access', async () => {
+    vi.mocked(useCurrentUser).mockReturnValue({ canManageCatalog: ref(false) } as any)
+    mountPdvView()
+    await flushPromises()
+
+    expect(salesService.list).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the recent-sales panel after a sale finalizes', async () => {
+    vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+    vi.mocked(PdvSaleService.create).mockResolvedValue({
+      order_reference: 'PDV-20260702-120000-000000',
+      items: [],
+      subtotal: '18.50',
+      total: '18.50',
+      payment_method: 'pix',
+      created_at: '2026-07-02T12:00:00Z',
+    })
+
+    const wrapper = mountPdvView({ global: { stubs: { teleport: true } } })
+    await flushPromises()
+    expect(salesService.list).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+    await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+    await flushPromises()
+    await wrapper.find('[data-cy="pdv-finalize-sale"]').trigger('click')
+    await flushPromises()
+
+    expect(salesService.list).toHaveBeenCalledTimes(2)
   })
 })

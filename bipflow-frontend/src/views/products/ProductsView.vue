@@ -36,41 +36,7 @@
           </div>
         </div>
 
-        <section class="storefront-panel mt-5 rounded-xl border px-4 py-5 sm:px-6">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div class="max-w-2xl">
-              <div class="flex items-center gap-3">
-                <span class="storefront-brand-line h-px w-10" aria-hidden="true" />
-                <p class="brand-wordmark brand-wordmark-premium text-xl sm:text-2xl">
-                  {{ storeBranding.name }}
-                </p>
-              </div>
-              <h1 class="hero-display-title mt-3 max-w-2xl text-3xl font-semibold text-[#05050A] sm:text-4xl">
-                {{ storefrontHeadline }}
-              </h1>
-              <p class="premium-copy storefront-muted mt-3 max-w-xl text-base leading-7">
-                {{ storefrontDescription }}
-              </p>
-              <span
-                v-if="!storeBranding.isActive"
-                class="mt-4 inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"
-              >
-                Loja {{ storeBranding.statusLabel.toLowerCase() }}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              class="storefront-primary-button inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
-              @click="isCartOpen = true"
-            >
-              <ChatBubbleBottomCenterTextIcon class="h-4 w-4" aria-hidden="true" />
-              Monte seu pedido e finalize pelo WhatsApp
-            </button>
-          </div>
-        </section>
-
-        <div class="storefront-panel mt-4 rounded-xl border p-3">
+        <div class="storefront-panel mt-5 rounded-xl border p-3">
           <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
             <label class="relative min-w-0 flex-1">
               <span class="sr-only">Buscar produtos</span>
@@ -301,7 +267,6 @@ import FloatingCartButton from './FloatingCartButton.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import {
-  ChatBubbleBottomCenterTextIcon,
   MagnifyingGlassIcon,
   ShoppingBagIcon,
 } from '@heroicons/vue/24/outline'
@@ -432,14 +397,6 @@ const displayedProducts = computed(() => {
 })
 
 const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
-
-const storefrontHeadline = computed(() => (
-  storeBranding.value.tagline || `Explore ${storeBranding.value.name}`
-))
-
-const storefrontDescription = computed(() => (
-  `Produtos selecionados por ${storeBranding.value.name} para um pedido simples, registrado e acompanhado pelo WhatsApp.`
-))
 
 const liveRegionMessage = computed(() => {
   if (isInitialLoading.value) {
