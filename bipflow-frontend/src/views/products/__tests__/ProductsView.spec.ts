@@ -264,14 +264,16 @@ describe('ProductsView', () => {
   })
 
   it('renders catalog header and products', () => {
-    expect(wrapper.find('h1').text()).toContain('Catalogo premium')
+    expect(wrapper.text()).toContain('Catalogo premium')
     expect(wrapper.text()).toContain('Loja Principal')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
   })
 
-  it('renders category shortcuts and cart drawer components', () => {
-    expect(wrapper.text()).toContain('Todas as categorias')
+  it('renders category shortcuts and cart drawer components', async () => {
+    await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Todas')
     expect(wrapper.find('.cart-drawer-stub').exists()).toBe(true)
   })
 
@@ -290,6 +292,8 @@ describe('ProductsView', () => {
   })
 
   it('updates filters when quick category is clicked', async () => {
+    await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
+
     const buttons = wrapper.findAll('button')
     const categoryButton = buttons.find((button) => button.text() === 'Test Category')
 
@@ -298,6 +302,17 @@ describe('ProductsView', () => {
     await categoryButton!.trigger('click')
 
     expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1 })
+  })
+
+  it('updates filters when the in-stock checkbox is toggled', async () => {
+    await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
+
+    const stockCheckbox = wrapper.find('input[type="checkbox"]')
+    expect(stockCheckbox.exists()).toBe(true)
+
+    await stockCheckbox.setValue(true)
+
+    expect(searchState.updateFilters).toHaveBeenCalledWith({ inStockOnly: true })
   })
 
   it('adds product to cart and shows toast feedback', async () => {

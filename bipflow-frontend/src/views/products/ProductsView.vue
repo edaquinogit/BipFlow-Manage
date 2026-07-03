@@ -36,8 +36,8 @@
           </div>
         </div>
 
-        <div class="storefront-panel mt-5 rounded-xl border p-3">
-          <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+        <div class="storefront-panel mt-5 rounded-xl border p-3 relative">
+          <div class="flex gap-2 items-center">
             <label class="relative min-w-0 flex-1">
               <span class="sr-only">Buscar produtos</span>
               <MagnifyingGlassIcon
@@ -54,48 +54,115 @@
               />
             </label>
 
-            <label class="block">
-              <span class="sr-only">Ordenacao</span>
-              <select
-                v-model="sortBy"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-              >
-                <option value="featured">Mais relevantes</option>
-                <option value="price-asc">Menor preco</option>
-                <option value="price-desc">Maior preco</option>
-                <option value="name-asc">Nome A-Z</option>
-                <option value="newest">Mais recentes</option>
-              </select>
-            </label>
+            <button
+              type="button"
+              :aria-expanded="isFiltersOpen"
+              aria-label="Abrir filtros"
+              class="group shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D81B60] hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              @click="isFiltersOpen = !isFiltersOpen"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+            </button>
           </div>
 
-          <div class="no-scrollbar mt-3 overflow-x-auto">
-            <div class="flex min-w-max gap-2">
-              <button
-                type="button"
-                class="rounded-full border px-4 py-2 text-sm font-medium transition"
-                :class="!filters.categoryId
-                  ? 'border-[#05050A] bg-[#05050A] text-white'
-                  : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D81B60] hover:text-[#05050A]'"
-                @click="handleQuickCategory(undefined)"
-              >
-                Todas as categorias
-              </button>
+          <!-- Glass Morphism Filters Drawer -->
+          <Transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="opacity-0 translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-200 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-2"
+          >
+            <div v-if="isFiltersOpen" class="absolute left-0 right-0 top-full z-40 mt-2 mx-3 lg:mx-4">
+              <!-- Overlay backdrop -->
+              <div class="fixed inset-0 bg-black/10 backdrop-blur-sm" @click="isFiltersOpen = false" />
 
-              <button
-                v-for="category in categories"
-                :key="category.id"
-                type="button"
-                class="rounded-full border px-4 py-2 text-sm font-medium transition"
-                :class="filters.categoryId === category.id
-                  ? 'border-[#05050A] bg-[#05050A] text-white'
-                  : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D81B60] hover:text-[#05050A]'"
-                @click="handleQuickCategory(category.id)"
-              >
-                {{ category.name }}
-              </button>
+              <!-- Glass panel -->
+              <div class="relative bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl p-4 sm:p-6 max-w-2xl mx-auto">
+                <div class="grid gap-6 sm:grid-cols-2">
+                  <!-- Sort -->
+                  <div>
+                    <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                      Ordenação
+                    </label>
+                    <select
+                      v-model="sortBy"
+                      class="w-full rounded-lg border border-[#D1D5DB] bg-white/50 backdrop-blur px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    >
+                      <option value="featured">Mais relevantes</option>
+                      <option value="price-asc">Menor preço</option>
+                      <option value="price-desc">Maior preço</option>
+                      <option value="name-asc">Nome A-Z</option>
+                      <option value="newest">Mais recentes</option>
+                    </select>
+                  </div>
+
+                  <!-- Stock Filter -->
+                  <div>
+                    <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                      Disponibilidade
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        :checked="filters.inStockOnly"
+                        class="w-4 h-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        @change="handleStockFilterToggle"
+                      />
+                      <span class="text-sm text-[#6B7280]">Em estoque</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="mt-6 pt-6 border-t border-white/20">
+                  <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                    Categorias
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+                      :class="!filters.categoryId
+                        ? 'bg-[#D81B60] text-white shadow-md'
+                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                      @click="handleQuickCategory(undefined)"
+                    >
+                      Todas
+                    </button>
+
+                    <button
+                      v-for="category in categories"
+                      :key="category.id"
+                      type="button"
+                      class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+                      :class="filters.categoryId === category.id
+                        ? 'bg-[#D81B60] text-white shadow-md'
+                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                      @click="handleQuickCategory(category.id)"
+                    >
+                      {{ category.name }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Close button -->
+                <button
+                  type="button"
+                  @click="isFiltersOpen = false"
+                  class="absolute top-3 right-3 text-[#9CA3AF] hover:text-[#D81B60] transition-colors"
+                  aria-label="Fechar filtros"
+                >
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+          </Transition>
         </div>
       </div>
     </header>
@@ -331,6 +398,7 @@ const isCartOpen = ref(false)
 const isSubmittingOrder = ref(false)
 const isDeliveryRegionsLoading = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
+const isFiltersOpen = ref(false)
 
 const initialFilters = parseFiltersFromQuery(route.query)
 const initialPage = parsePageFromQuery(route.query)
@@ -645,6 +713,11 @@ function handleQuickCategory(categoryId: number | undefined): void {
 function handleSearchInput(event: Event): void {
   const target = event.target as HTMLInputElement
   updateFilters({ search: target.value })
+}
+
+function handleStockFilterToggle(event: Event): void {
+  const target = event.target as HTMLInputElement
+  updateFilters({ inStockOnly: target.checked })
 }
 
 function handleClearFilters(): void {
