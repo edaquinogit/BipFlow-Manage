@@ -51,6 +51,15 @@ describe('DashboardHeader', () => {
     expect(options.at(1)?.text()).toBe('Loja A')
   })
 
+  it('renders a polished welcome message with the user name', () => {
+    const wrapper = mountHeader()
+
+    const text = wrapper.text()
+    expect(text).toContain('Ana')
+    expect(text).toContain('O que vamos pedir hoje')
+    expect(text).toMatch(/Boa (tarde|noite|dia)/)
+  })
+
   it('emits selectStore when the store selector changes', async () => {
     const wrapper = mountHeader()
 

@@ -63,6 +63,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(sale_order.store, self.store_b)
         self.assertEqual(sale_order.delivery_method, "pickup")
         self.assertEqual(sale_order.customer_name, "Cliente balcão")
+        # Etapa R3 of the QR-code stock-exit refinement: a PDV sale always
+        # records who rang it up, unlike a public/WhatsApp checkout.
+        self.assertEqual(sale_order.performed_by, self.user_b)
 
         movement = StockMovement.objects.get(product=self.product_b, sale_order=sale_order)
         self.assertEqual(movement.movement_type, StockMovement.TYPE_SAIDA)
@@ -236,3 +239,22 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(sale_order.customer_name, "Maria")
         self.assertEqual(sale_order.notes, "Cliente preferencial")
         self.assertEqual(sale_order.payment_method, "card")
+        self.assertEqual(sale_order.customer_phone, "")
+
+    def test_optional_customer_phone_is_persisted_when_provided(self) -> None:
+        """Etapa R4 of the QR-code stock-exit refinement: capturing the
+        customer's phone at the PDV lets that sale count toward the
+        new-vs-returning customer insight, same as a virtual checkout."""
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [{"public_code": self.product_b.public_code, "quantity": 1}],
+                "payment_method": "cash",
+                "customer_phone": "71999998888",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(sale_order.customer_phone, "71999998888")

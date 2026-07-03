@@ -866,6 +866,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 
     items = SaleOrderItemSerializer(many=True, read_only=True)
     item_count = serializers.SerializerMethodField()
+    performed_by_username = serializers.ReadOnlyField(source="performed_by.username")
 
     class Meta:
         model = SaleOrder
@@ -886,6 +887,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "created_at",
             "item_count",
             "items",
+            "performed_by_username",
         ]
 
     def get_item_count(self, order: SaleOrder) -> int:

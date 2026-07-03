@@ -1,14 +1,56 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
-import { QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { nextTick, onMounted, ref } from 'vue';
+import { MinusIcon, PlusIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import { useCurrentUser } from '@/composables/useCurrentUser';
-import { usePdvCart } from '@/composables/usePdvCart';
+import { usePdvCart, type PdvCartLine } from '@/composables/usePdvCart';
+import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useToast } from '@/composables/useToast';
 import ProductService from '@/services/product.service';
 import PdvSaleService from '@/services/pdvSale.service';
+import { salesService } from '@/services/sales.service';
 import { formatBRL } from '@/utils/formatters';
+import { isLowStock } from '@/utils/stockAlerts';
 import { Logger } from '@/services/logger';
-import { PDV_PAYMENT_METHODS, type PdvPaymentMethod } from '@/types/pdvSale';
+import { isAxiosError } from '@/types/errors';
+import { PDV_PAYMENT_METHODS, type PdvPaymentMethod, type PdvSaleResponse } from '@/types/pdvSale';
+import type { SaleOrder } from '@/types/sales';
+import PdvSaleReceiptModal from '@/components/dashboard/product-table/PdvSaleReceiptModal.vue';
+
+const PDV_GENERIC_SALE_ERROR = 'Não foi possível registrar a venda. Verifique o estoque e tente novamente.';
+
+/**
+ * Etapa R1 of the QR-code stock-exit refinement (see
+ * docs/architecture/qrcode-stock-exit-refinement.md): the backend already
+ * computes a specific, actionable message ("Quantidade solicitada para X
+ * excede o estoque disponível (N)") -- this surfaces it instead of always
+ * showing the same generic toast, which left the cashier with no idea which
+ * item in the cart actually failed.
+ */
+const extractPdvSaleErrorMessage = (error: unknown): string => {
+  if (!isAxiosError(error)) {
+    return PDV_GENERIC_SALE_ERROR;
+  }
+
+  const data = error.response?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return PDV_GENERIC_SALE_ERROR;
+  }
+
+  const fieldErrors = Object.values(data).filter(
+    (value): value is string[] => Array.isArray(value) && value.length > 0
+  );
+  const [firstFieldErrors] = fieldErrors;
+
+  if (fieldErrors.length === 1 && firstFieldErrors?.length === 1) {
+    return firstFieldErrors[0] ?? PDV_GENERIC_SALE_ERROR;
+  }
+
+  if (fieldErrors.length > 0) {
+    return fieldErrors.flat().join(' ');
+  }
+
+  return PDV_GENERIC_SALE_ERROR;
+};
 
 /**
  * Etapa 3 of the QR-code stock-exit evolution (see
@@ -23,7 +65,7 @@ import { PDV_PAYMENT_METHODS, type PdvPaymentMethod } from '@/types/pdvSale';
  * doc's Etapa 3 notes); this v1 covers the primary counter workflow.
  */
 const { canManageCatalog } = useCurrentUser();
-const { success, error: toastError } = useToast();
+const { success, error: toastError, warning: toastWarning } = useToast();
 const cart = usePdvCart();
 
 const scanValue = ref('');
@@ -33,9 +75,34 @@ const isLookingUp = ref(false);
 
 const paymentMethod = ref<PdvPaymentMethod>('pix');
 const customerName = ref('');
+const customerPhone = ref('');
 const notes = ref('');
 const isSubmitting = ref(false);
-const lastOrderReference = ref<string | null>(null);
+
+// Etapa R4 of the QR-code stock-exit refinement: lets the cashier confirm a
+// sale actually registered without leaving the PDV screen. Shows the most
+// recent PDV sales regardless of exact day boundary -- a real "today only"
+// filter would need a new date-range param on SaleOrderViewSet, which is
+// more backend surface than this reassurance panel needs.
+const recentPdvSales = ref<SaleOrder[]>([]);
+const isRecentSalesLoading = ref(false);
+
+const loadRecentPdvSales = async (): Promise<void> => {
+  isRecentSalesLoading.value = true;
+  try {
+    const response = await salesService.list({ channel: 'loja_fisica', pageSize: 5 });
+    recentPdvSales.value = response.results;
+  } catch (error: unknown) {
+    Logger.warn('Failed to load recent PDV sales', { error });
+  } finally {
+    isRecentSalesLoading.value = false;
+  }
+};
+// Etapa R2 of the QR-code stock-exit refinement: a snapshot of the sale just
+// completed, kept separately from the cart (which clears immediately) so
+// the receipt modal has something to show after resetSale() runs.
+const lastCompletedSale = ref<PdvSaleResponse | null>(null);
+const isReceiptOpen = ref(false);
 
 const focusScanInput = (): void => {
   void nextTick(() => scanInputRef.value?.focus());
@@ -52,7 +119,14 @@ const handleScanSubmit = async (): Promise<void> => {
 
   try {
     const product = await ProductService.getByCode(code);
-    cart.addProduct(product);
+    const result = cart.addProduct(product);
+
+    if (!result.ok) {
+      scanError.value =
+        result.reason === 'exceeds_stock'
+          ? `Estoque insuficiente para "${product.name}": disponível ${result.availableStock}.`
+          : `"${product.name}" está indisponível no momento.`;
+    }
   } catch (error: unknown) {
     scanError.value = `Código "${code}" não encontrado.`;
     Logger.warn('PDV code lookup failed', { error, code });
@@ -63,14 +137,46 @@ const handleScanSubmit = async (): Promise<void> => {
   }
 };
 
-const handleQuantityChange = (productId: number, rawValue: string): void => {
-  const quantity = Number.parseInt(rawValue, 10);
-  cart.updateQuantity(productId, Number.isFinite(quantity) ? quantity : 0);
+/**
+ * Etapa R3 of the QR-code stock-exit refinement: a +/- stepper instead of a
+ * raw number input -- bigger, more deliberate touch targets for a tablet at
+ * a counter, and it can never be left in an invalid/empty intermediate
+ * state the way a free-typed number field can.
+ */
+const adjustQuantity = (productId: number, delta: number): void => {
+  const line = cart.lines.value.find((candidate) => candidate.productId === productId);
+  if (!line) {
+    return;
+  }
+
+  const result = cart.updateQuantity(productId, line.quantity + delta);
+  if (!result.ok) {
+    toastWarning(`Quantidade ajustada para o estoque disponível: ${result.availableStock}.`);
+  }
+
+  // The scanner "types" into whatever has focus. Editing a quantity moves
+  // focus away from the scan input (Etapa R1 of the QR-code stock-exit
+  // refinement) -- without this, the next scan would leak its keystrokes
+  // into this quantity field instead of adding a new item.
+  focusScanInput();
+};
+
+const isLineLowStock = (line: PdvCartLine): boolean =>
+  isLowStock({
+    stock_quantity: line.availableStock,
+    is_available: true,
+    low_stock_threshold: line.lowStockThreshold,
+  });
+
+const handleRemoveLine = (productId: number): void => {
+  cart.removeLine(productId);
+  focusScanInput();
 };
 
 const resetSale = (): void => {
   cart.clear();
   customerName.value = '';
+  customerPhone.value = '';
   notes.value = '';
   paymentMethod.value = 'pix';
   scanError.value = null;
@@ -89,19 +195,39 @@ const handleFinalizeSale = async (): Promise<void> => {
       items: cart.toSaleItems(),
       payment_method: paymentMethod.value,
       customer_name: customerName.value.trim() || undefined,
+      customer_phone: customerPhone.value.trim() || undefined,
       notes: notes.value.trim() || undefined,
     });
 
-    lastOrderReference.value = response.order_reference;
+    lastCompletedSale.value = response;
+    isReceiptOpen.value = true;
     success(`Venda ${response.order_reference} registrada com sucesso.`);
     resetSale();
   } catch (error: unknown) {
     Logger.error('PDV sale failed', { error });
-    toastError('Não foi possível registrar a venda. Verifique o estoque e tente novamente.');
+    toastError(extractPdvSaleErrorMessage(error));
   } finally {
     isSubmitting.value = false;
   }
 };
+
+const closeReceipt = (): void => {
+  isReceiptOpen.value = false;
+  lastCompletedSale.value = null;
+  focusScanInput();
+};
+
+// Etapa R1 of the QR-code stock-exit refinement: every other dashboard view
+// resets its own state on an active-store switch (DashboardOrdersView,
+// DashboardOverviewView, DashboardProductsView, DashboardStockMovementsView,
+// DashboardSupportView) -- the PDV screen didn't, so a cart started under
+// one store could be finalized against a different one's products.
+useStoreSwitchEffect(() => {
+  if (!cart.isEmpty.value) {
+    toastWarning('A loja ativa mudou. O carrinho foi limpo para evitar misturar produtos de lojas diferentes.');
+  }
+  resetSale();
+});
 </script>
 
 <template>
@@ -148,47 +274,75 @@ const handleFinalizeSale = async (): Promise<void> => {
           Nenhum item escaneado ainda.
         </div>
 
-        <table v-else class="w-full text-left text-sm" data-cy="pdv-cart-table">
-          <thead>
-            <tr class="text-[10px] uppercase tracking-widest text-bip-muted">
-              <th class="pb-2">Produto</th>
-              <th class="pb-2 text-center">Qtd.</th>
-              <th class="pb-2 text-right">Unitário</th>
-              <th class="pb-2 text-right">Total</th>
-              <th class="pb-2"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[#E5E7EB]">
-            <tr v-for="line in cart.lines.value" :key="line.productId" data-cy="pdv-cart-row">
-              <td class="py-2 font-semibold">{{ line.name }}</td>
-              <td class="py-2 text-center">
-                <input
-                  type="number"
-                  min="1"
-                  :value="line.quantity"
-                  data-cy="pdv-cart-quantity"
-                  class="w-16 rounded-lg border border-[#D1D5DB] px-2 py-1 text-center font-mono text-sm"
-                  @change="handleQuantityChange(line.productId, ($event.target as HTMLInputElement).value)"
-                />
-              </td>
-              <td class="py-2 text-right font-mono">{{ formatBRL(line.unitPrice) }}</td>
-              <td class="py-2 text-right font-mono font-bold">
-                {{ formatBRL(line.unitPrice * line.quantity) }}
-              </td>
-              <td class="py-2 text-right">
-                <button
-                  type="button"
-                  data-cy="pdv-cart-remove"
-                  aria-label="Remover item"
-                  class="text-bip-muted hover:text-[#D81B60]"
-                  @click="cart.removeLine(line.productId)"
-                >
-                  <TrashIcon class="h-4 w-4" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-left text-sm" data-cy="pdv-cart-table">
+            <thead>
+              <tr class="text-[10px] uppercase tracking-widest text-bip-muted">
+                <th class="pb-2">Produto</th>
+                <th class="pb-2 text-center">Qtd.</th>
+                <th class="pb-2 text-right">Unitário</th>
+                <th class="pb-2 text-right">Total</th>
+                <th class="pb-2"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#E5E7EB]">
+              <tr v-for="line in cart.lines.value" :key="line.productId" data-cy="pdv-cart-row">
+                <td class="py-2 font-semibold">
+                  {{ line.name }}
+                  <span
+                    v-if="isLineLowStock(line)"
+                    data-cy="pdv-low-stock-badge"
+                    class="ml-2 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-700"
+                  >
+                    Últimas unidades
+                  </span>
+                </td>
+                <td class="py-2">
+                  <div class="flex items-center justify-center gap-1.5">
+                    <button
+                      type="button"
+                      data-cy="pdv-cart-decrement"
+                      aria-label="Diminuir quantidade"
+                      :disabled="line.quantity <= 1"
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+                      @click="adjustQuantity(line.productId, -1)"
+                    >
+                      <MinusIcon class="h-4 w-4" />
+                    </button>
+                    <span data-cy="pdv-cart-quantity" class="w-6 text-center font-mono text-sm font-black">
+                      {{ line.quantity }}
+                    </span>
+                    <button
+                      type="button"
+                      data-cy="pdv-cart-increment"
+                      aria-label="Aumentar quantidade"
+                      :disabled="line.quantity >= line.availableStock"
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+                      @click="adjustQuantity(line.productId, 1)"
+                    >
+                      <PlusIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+                <td class="py-2 text-right font-mono">{{ formatBRL(line.unitPrice) }}</td>
+                <td class="py-2 text-right font-mono font-bold">
+                  {{ formatBRL(line.unitPrice * line.quantity) }}
+                </td>
+                <td class="py-2 text-right">
+                  <button
+                    type="button"
+                    data-cy="pdv-cart-remove"
+                    aria-label="Remover item"
+                    class="flex h-9 w-9 items-center justify-center text-bip-muted hover:text-[#D81B60]"
+                    @click="handleRemoveLine(line.productId)"
+                  >
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <div v-if="!cart.isEmpty.value" class="mt-4 flex justify-end text-sm font-black">
           <span data-cy="pdv-cart-subtotal">Total: {{ formatBRL(cart.subtotal.value) }}</span>
@@ -224,6 +378,19 @@ const handleFinalizeSale = async (): Promise<void> => {
               placeholder="Nome do cliente"
             />
           </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">
+              Telefone (opcional)
+            </label>
+            <input
+              v-model="customerPhone"
+              type="tel"
+              data-cy="pdv-customer-phone"
+              class="rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-sm"
+              placeholder="Ex.: 71999998888"
+            />
+          </div>
         </div>
 
         <button
@@ -237,5 +404,11 @@ const handleFinalizeSale = async (): Promise<void> => {
         </button>
       </section>
     </template>
+
+    <PdvSaleReceiptModal
+      :show="isReceiptOpen"
+      :sale="lastCompletedSale"
+      @close="closeReceipt"
+    />
   </div>
 </template>

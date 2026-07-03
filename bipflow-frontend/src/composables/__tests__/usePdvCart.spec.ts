@@ -57,6 +57,44 @@ describe('usePdvCart', () => {
     expect(cart.lines.value).toHaveLength(0)
   })
 
+  it('rejects an unavailable product with a specific reason (Etapa R1 of the QR-code stock-exit refinement)', () => {
+    const cart = usePdvCart()
+
+    const result = cart.addProduct(buildProduct({ is_available: false }))
+
+    expect(result).toEqual({ ok: false, reason: 'unavailable' })
+    expect(cart.lines.value).toHaveLength(0)
+  })
+
+  it('rejects a product with zero stock even if is_available is stale-true', () => {
+    const cart = usePdvCart()
+
+    const result = cart.addProduct(buildProduct({ stock_quantity: 0 }))
+
+    expect(result).toEqual({ ok: false, reason: 'unavailable' })
+    expect(cart.lines.value).toHaveLength(0)
+  })
+
+  it('rejects a scan that would exceed the known available stock', () => {
+    const cart = usePdvCart()
+
+    const result = cart.addProduct(buildProduct({ stock_quantity: 3 }), 5)
+
+    expect(result).toEqual({ ok: false, reason: 'exceeds_stock', availableStock: 3 })
+    expect(cart.lines.value).toHaveLength(0)
+  })
+
+  it('rejects a second scan that would push the aggregated quantity past available stock', () => {
+    const cart = usePdvCart()
+    cart.addProduct(buildProduct({ stock_quantity: 3 }), 2)
+
+    const result = cart.addProduct(buildProduct({ stock_quantity: 3 }), 2)
+
+    expect(result).toEqual({ ok: false, reason: 'exceeds_stock', availableStock: 3 })
+    // The first, valid scan must not be rolled back by the second's rejection.
+    expect(cart.lines.value[0]?.quantity).toBe(2)
+  })
+
   it('computes subtotal and item count across multiple lines', () => {
     const cart = usePdvCart()
 
@@ -71,9 +109,20 @@ describe('usePdvCart', () => {
     const cart = usePdvCart()
     cart.addProduct(buildProduct())
 
-    cart.updateQuantity(1, 4)
+    const result = cart.updateQuantity(1, 4)
 
+    expect(result).toEqual({ ok: true })
     expect(cart.lines.value[0]?.quantity).toBe(4)
+  })
+
+  it('caps a manual quantity edit at the available stock and reports it', () => {
+    const cart = usePdvCart()
+    cart.addProduct(buildProduct({ stock_quantity: 3 }))
+
+    const result = cart.updateQuantity(1, 10)
+
+    expect(result).toEqual({ ok: false, reason: 'exceeds_stock', availableStock: 3 })
+    expect(cart.lines.value[0]?.quantity).toBe(3)
   })
 
   it('removes the line when the quantity is set to zero or less', () => {

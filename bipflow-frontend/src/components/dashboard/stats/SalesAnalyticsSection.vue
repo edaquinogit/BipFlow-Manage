@@ -8,6 +8,8 @@ import PaymentBreakdownCard from './PaymentBreakdownCard.vue';
 import RegionBreakdownCard from './RegionBreakdownCard.vue';
 import ChannelBreakdownCard from './ChannelBreakdownCard.vue';
 import CustomerInsightsCard from './CustomerInsightsCard.vue';
+import WhatsAppClicksCard from './WhatsAppClicksCard.vue';
+import WhatsAppFunnelCard from './WhatsAppFunnelCard.vue';
 import type {
   SaleOrderBreakdown,
   SaleOrderCustomerInsights,
@@ -185,16 +187,26 @@ const updatedAtLabel = computed(() => {
       />
     </div>
 
-    <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-      <TopProductsCard :products="breakdown?.top_products ?? []" :is-loading="isLoading" />
-      <PaymentBreakdownCard
-        :by-payment-method="breakdown?.by_payment_method ?? []"
-        :by-status="breakdown?.by_status ?? []"
-        :is-loading="isLoading"
-      />
-      <RegionBreakdownCard :regions="breakdown?.by_region ?? []" :is-loading="isLoading" />
-      <ChannelBreakdownCard :by-channel="breakdown?.by_channel ?? []" :is-loading="isLoading" />
-      <CustomerInsightsCard :insights="customerInsights" :is-loading="isLoading" />
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="grid grid-cols-1 gap-6">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <WhatsAppFunnelCard :insights="customerInsights" :is-loading="isLoading" />
+          <WhatsAppClicksCard :insights="customerInsights" :is-loading="isLoading" />
+        </div>
+
+        <TopProductsCard :products="breakdown?.top_products ?? []" :is-loading="isLoading" />
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <PaymentBreakdownCard
+          :by-payment-method="breakdown?.by_payment_method ?? []"
+          :by-status="breakdown?.by_status ?? []"
+          :is-loading="isLoading"
+        />
+        <RegionBreakdownCard :regions="breakdown?.by_region ?? []" :is-loading="isLoading" />
+        <ChannelBreakdownCard :by-channel="breakdown?.by_channel ?? []" :is-loading="isLoading" />
+        <CustomerInsightsCard :insights="customerInsights" :is-loading="isLoading" />
+      </div>
     </div>
   </section>
 </template>

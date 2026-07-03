@@ -22,6 +22,21 @@ const hasYoyComparison = computed(
 );
 const isPositiveYoyComparison = computed(() => Number(props.comparisonSamePeriodLastYear ?? 0) >= 0);
 
+const dailyTicketAverages = computed(() =>
+  props.points.map((point) => (point.orders_count ? Number(point.revenue) / point.orders_count : 0))
+);
+
+const ticketMovingAverage = computed(() => {
+  const windowSize = 7;
+  const slice = dailyTicketAverages.value.slice(-windowSize);
+  if (!slice.length) {
+    return 0;
+  }
+
+  const sum = slice.reduce((total, dailyAverage) => total + dailyAverage, 0);
+  return Number((sum / slice.length).toFixed(2));
+});
+
 const series = computed(() => [
   {
     name: 'Receita',
@@ -80,25 +95,28 @@ const chartOptions = computed(() => ({
 
 <template>
   <Card aria-label="Receita no periodo" overflow-hidden>
-    <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
+    <div class="relative z-10 grid gap-4 md:flex md:items-center md:justify-between">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Evolucao de vendas</p>
         <h3 class="mt-2 text-2xl font-black italic tracking-tighter text-[#05050A]">Receita no periodo</h3>
       </div>
 
-      <div class="flex items-center gap-4 text-right">
-        <div>
+      <div class="grid gap-4 sm:grid-flow-col sm:grid-cols-3 sm:text-right">
+        <div class="min-w-[120px]">
           <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Pedidos</p>
           <p class="text-xl font-black text-[#05050A]">{{ ordersCount }}</p>
         </div>
-        <div class="h-8 w-px bg-[#E5E7EB]" />
-        <div>
+        <div class="min-w-[120px]">
           <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Ticket medio</p>
           <p class="text-xl font-black text-[#05050A]">{{ formatBRL(averageTicket) }}</p>
         </div>
-        <template v-if="hasYoyComparison">
-          <div class="h-8 w-px bg-[#E5E7EB]" />
-          <div>
+        <div class="min-w-[120px]">
+          <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Ticket medio 7D</p>
+          <p class="text-xl font-black text-[#05050A]">{{ formatBRL(ticketMovingAverage.toFixed(2)) }}</p>
+        </div>
+        <template v-if="hasYoyComparison" class="sm:col-span-3">
+          <div class="h-8 w-px bg-[#E5E7EB] md:mx-auto" />
+          <div class="min-w-[120px]">
             <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Vs ano anterior</p>
             <p
               class="text-xl font-black"
@@ -111,8 +129,8 @@ const chartOptions = computed(() => ({
       </div>
     </div>
 
-    <div class="relative z-10 mt-8">
-      <div v-if="isLoading" aria-live="polite" class="h-64 animate-pulse rounded-2xl bg-zinc-100">
+    <div class="relative z-10 mt-6">
+      <div v-if="isLoading" aria-live="polite" class="h-56 sm:h-64 animate-pulse rounded-2xl bg-zinc-100">
         <span class="sr-only">Carregando grafico de receita</span>
       </div>
       <div

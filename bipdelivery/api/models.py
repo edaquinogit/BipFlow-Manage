@@ -568,10 +568,12 @@ class SaleOrder(models.Model):
     """Persisted checkout record used by the management dashboard."""
 
     STATUS_PREPARED = "prepared"
+    STATUS_SENT = "sent"
+    STATUS_CANCELLED = "cancelled"
     STATUS_CHOICES = [
         (STATUS_PREPARED, "Prepared"),
-        ("sent", "Sent"),
-        ("cancelled", "Cancelled"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_CANCELLED, "Cancelled"),
     ]
 
     DELIVERY_CHOICES = [
@@ -607,6 +609,19 @@ class SaleOrder(models.Model):
     order_reference = models.CharField(max_length=32, unique=True, db_index=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED)
     channel = models.CharField(max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_VIRTUAL)
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sale_orders",
+        help_text=(
+            "Etapa R3 of the QR-code stock-exit refinement: the dashboard "
+            "operator who rang up this sale, when there is one -- always "
+            "set for a PDV sale, always null for a public/WhatsApp "
+            "checkout, which has no authenticated staff involved."
+        ),
+    )
 
     customer_name = models.CharField(max_length=255)
     customer_phone = models.CharField(max_length=32)
@@ -883,6 +898,7 @@ class StockMovement(models.Model):
     REASON_AJUSTE_INVENTARIO = "ajuste_inventario"
     REASON_ENTRADA_INICIAL = "entrada_inicial"
     REASON_VENDA = "venda"
+    REASON_VENDA_CANCELADA = "venda_cancelada"
     REASON_OUTRO = "outro"
     REASON_CHOICES = [
         (REASON_COMPRA, "Compra"),
@@ -891,13 +907,15 @@ class StockMovement(models.Model):
         (REASON_AJUSTE_INVENTARIO, "Ajuste de inventário"),
         (REASON_ENTRADA_INICIAL, "Entrada inicial"),
         (REASON_VENDA, "Venda"),
+        (REASON_VENDA_CANCELADA, "Venda cancelada"),
         (REASON_OUTRO, "Outro"),
     ]
 
     # System-generated reasons a human can never pick from the manual
-    # entrada/saida form -- only `apply_stock_movement()` and the checkout
-    # flow are allowed to write these.
-    SYSTEM_ONLY_REASONS = {REASON_ENTRADA_INICIAL, REASON_VENDA}
+    # entrada/saida form -- only `apply_stock_movement()`, the checkout flow
+    # and `apply_order_cancellation()` (Etapa R2 of the QR-code stock-exit
+    # refinement, see bipdelivery/api/stock.py) are allowed to write these.
+    SYSTEM_ONLY_REASONS = {REASON_ENTRADA_INICIAL, REASON_VENDA, REASON_VENDA_CANCELADA}
 
     store = models.ForeignKey(
         "Store",

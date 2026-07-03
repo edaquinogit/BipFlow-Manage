@@ -5,7 +5,7 @@
  * Resolve: Erros de seletor no Cypress e consistência de Tipagem.
  */
 
-// 1. Desabilitamos a herança automática para que o 'name' e 'data-cy' 
+// 1. Desabilitamos a herança automática para que o 'name' e 'data-cy'
 // não fiquem presos na DIV externa, mas sim no INPUT real.
 defineOptions({
   inheritAttrs: false
@@ -36,7 +36,8 @@ defineEmits(['update:modelValue']);
         :value="modelValue"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         :placeholder="placeholder"
-        class="w-full bg-white border border-[#D1D5DB] rounded-xl px-4 py-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] transition-all placeholder:text-bip-muted/70"
+        class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-[16px] leading-6 text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] active:translate-y-0"
+        style="font-size: 16px;"
         :class="{ 'border-[#D81B60]/50 bg-[#FCE7F3]': error }"
       />
     </div>

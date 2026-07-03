@@ -14,7 +14,25 @@ export interface PdvCartLine {
   unitPrice: number;
   quantity: number;
   availableStock: number;
+  lowStockThreshold: number | null;
 }
+
+/**
+ * Etapa R1 of the QR-code stock-exit refinement (see
+ * docs/architecture/qrcode-stock-exit-refinement.md): scanning/typing a
+ * quantity that the product can't cover is rejected here, at the moment it
+ * happens, instead of only surfacing as a batch failure when the whole sale
+ * is finalized (bipdelivery/api/pdv.py still re-validates at that point too
+ * -- this is optimistic client-side feedback, not a replacement for it).
+ */
+export type PdvCartAddResult =
+  | { ok: true }
+  | { ok: false; reason: "unavailable" }
+  | { ok: false; reason: "exceeds_stock"; availableStock: number };
+
+export type PdvCartQuantityResult =
+  | { ok: true }
+  | { ok: false; reason: "exceeds_stock"; availableStock: number };
 
 export function usePdvCart() {
   const lines = ref<PdvCartLine[]>([]);
@@ -25,15 +43,22 @@ export function usePdvCart() {
    * row -- the same "aggregate by code" behavior the backend itself applies
    * (bipdelivery/api/pdv.py's _aggregate_quantities()).
    */
-  const addProduct = (product: Product, quantity = 1): void => {
-    if (!product.id || !product.public_code) {
-      return;
+  const addProduct = (product: Product, quantity = 1): PdvCartAddResult => {
+    if (!product.id || !product.public_code || !product.is_available || product.stock_quantity <= 0) {
+      return { ok: false, reason: "unavailable" };
     }
 
     const existingLine = lines.value.find((line) => line.productId === product.id);
+    const nextQuantity = (existingLine?.quantity ?? 0) + quantity;
+
+    if (nextQuantity > product.stock_quantity) {
+      return { ok: false, reason: "exceeds_stock", availableStock: product.stock_quantity };
+    }
+
     if (existingLine) {
-      existingLine.quantity += quantity;
-      return;
+      existingLine.quantity = nextQuantity;
+      existingLine.availableStock = product.stock_quantity;
+      return { ok: true };
     }
 
     lines.value = [
@@ -45,19 +70,40 @@ export function usePdvCart() {
         unitPrice: Number(product.price),
         quantity,
         availableStock: product.stock_quantity,
+        lowStockThreshold: product.low_stock_threshold ?? null,
       },
     ];
+    return { ok: true };
   };
 
-  const updateQuantity = (productId: number, quantity: number): void => {
+  /**
+   * Update a line's quantity directly (manual correction in the cart table).
+   * Caps at the product's last-known available stock -- a client-side
+   * courtesy, not the source of truth: the finalize call still re-validates
+   * against the real, current stock under a row lock.
+   */
+  const updateQuantity = (productId: number, quantity: number): PdvCartQuantityResult => {
     if (quantity <= 0) {
       removeLine(productId);
-      return;
+      return { ok: true };
     }
 
-    lines.value = lines.value.map((line) =>
-      line.productId === productId ? { ...line, quantity } : line
+    const line = lines.value.find((candidate) => candidate.productId === productId);
+    if (!line) {
+      return { ok: true };
+    }
+
+    if (quantity > line.availableStock) {
+      lines.value = lines.value.map((candidate) =>
+        candidate.productId === productId ? { ...candidate, quantity: line.availableStock } : candidate
+      );
+      return { ok: false, reason: "exceeds_stock", availableStock: line.availableStock };
+    }
+
+    lines.value = lines.value.map((candidate) =>
+      candidate.productId === productId ? { ...candidate, quantity } : candidate
     );
+    return { ok: true };
   };
 
   const removeLine = (productId: number): void => {

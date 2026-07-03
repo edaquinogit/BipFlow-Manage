@@ -23,6 +23,7 @@ import { Logger } from '@/services/logger';
 import { salesService } from '@/services/sales.service';
 import { useDebounceFn } from '@/utils/debounce';
 import { formatBRL } from '@/utils/formatters';
+import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 
 const { canManageCatalog } = useCurrentUser();
 const { success, error: toastError } = useToast();
@@ -32,6 +33,22 @@ const { data: salesHistory, isLoading: isSalesLoading, error: salesError, run: r
 );
 const recentSales = computed(() => salesHistory.value?.results ?? []);
 const updatingSaleOrderId = ref<number | null>(null);
+
+// Etapa R2 of the QR-code stock-exit refinement (see
+// docs/architecture/qrcode-stock-exit-refinement.md): cancelling now
+// restocks every item automatically (bipdelivery/api/stock.py's
+// apply_order_cancellation()) -- a real, semi-irreversible side effect that
+// didn't exist before, so it gets its own confirmation instead of firing
+// immediately like every other status transition.
+const orderPendingCancellation = ref<SaleOrder | null>(null);
+const isCancelConfirmOpen = computed(() => orderPendingCancellation.value !== null);
+const cancelConfirmMessage = computed(() => {
+  const order = orderPendingCancellation.value;
+  if (!order) {
+    return '';
+  }
+  return `O pedido ${order.order_reference} sera cancelado e o estoque de ${order.item_count} item(ns) sera devolvido automaticamente. Essa acao nao pode ser desfeita.`;
+});
 
 const salesSearchTerm = ref('');
 const salesStatusFilter = ref<'all' | SaleOrderStatus>('all');
@@ -146,7 +163,26 @@ function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
     return;
   }
 
+  if (nextStatus === 'cancelled') {
+    orderPendingCancellation.value = sale;
+    return;
+  }
+
   void handleUpdateSaleStatus(sale.id, nextStatus);
+}
+
+function closeCancelConfirm(): void {
+  orderPendingCancellation.value = null;
+}
+
+async function confirmCancellation(): Promise<void> {
+  const order = orderPendingCancellation.value;
+  if (!order) {
+    return;
+  }
+
+  await handleUpdateSaleStatus(order.id, 'cancelled');
+  orderPendingCancellation.value = null;
 }
 
 onMounted(() => {
@@ -244,6 +280,13 @@ onMounted(() => {
             >
               {{ getChannelLabel(sale.channel) }}
             </span>
+            <span
+              v-if="sale.channel === 'loja_fisica' && sale.performed_by_username"
+              data-cy="sale-operator-badge"
+              class="rounded-full border border-[#E5E7EB] bg-zinc-50 px-2.5 py-1"
+            >
+              Operador: {{ sale.performed_by_username }}
+            </span>
             <span class="rounded-full border border-[#E5E7EB] bg-zinc-50 px-2.5 py-1">
               {{ getDeliveryMethodLabel(sale.delivery_method) }}
             </span>
@@ -304,5 +347,16 @@ onMounted(() => {
         </article>
       </template>
     </div>
+
+    <ConfirmModal
+      :show="isCancelConfirmOpen"
+      title="Cancelar pedido?"
+      :message="cancelConfirmMessage"
+      confirm-label="Confirmar cancelamento"
+      loading-label="Cancelando..."
+      :is-loading="orderPendingCancellation !== null && updatingSaleOrderId === orderPendingCancellation.id"
+      @close="closeCancelConfirm"
+      @confirm="confirmCancellation"
+    />
   </div>
 </template>

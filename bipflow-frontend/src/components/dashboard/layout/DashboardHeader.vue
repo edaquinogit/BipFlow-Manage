@@ -49,9 +49,11 @@ const NAV_ITEMS = [
 
 const isMobileNavOpen = ref(false);
 
-const welcomeMessage = computed(() => (
-  props.userName ? `Bem-vindo, ${props.userName}` : 'Bem-vindo'
-));
+const welcomeMessage = computed(() => {
+  const greeting = new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+
+  return props.userName ? `${greeting}, ${props.userName}! O que vamos pedir hoje?` : `${greeting}! O que vamos pedir hoje?`;
+});
 
 const activeBranding = computed(() => buildStoreBranding(props.selectedStore));
 
@@ -81,7 +83,7 @@ function closeMobileNav(): void {
             :href="storefrontPath"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-bip-line bg-white px-3.5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-bip-line bg-white px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0"
             :title="`Abrir ${storefrontPath}`"
             @click="emit('openStore')"
           >
@@ -90,17 +92,17 @@ function closeMobileNav(): void {
           </a>
 
           <div class="flex min-w-0 flex-col items-end">
-            <span class="hidden text-3xs font-black uppercase tracking-[0.2em] text-bip-muted sm:block">
+            <span class="hidden text-3xs font-black uppercase tracking-[0.24em] text-bip-muted sm:block">
               Operador
             </span>
-            <span class="max-w-[8rem] truncate text-xs font-bold text-bip-black sm:max-w-[13rem] sm:text-sm">
+            <span class="max-w-[8rem] truncate text-[clamp(0.75rem,0.7rem+0.25vw,0.95rem)] font-semibold leading-tight text-bip-black sm:max-w-[13rem]">
               {{ welcomeMessage }}
             </span>
           </div>
 
           <button
             type="button"
-            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-300 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush lg:flex"
+            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:flex"
             aria-label="Finalizar sessao"
             title="Finalizar sessao"
             @click="emit('logout')"
@@ -110,7 +112,7 @@ function closeMobileNav(): void {
 
           <button
             type="button"
-            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-300 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush lg:hidden"
+            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:hidden"
             :aria-expanded="isMobileNavOpen"
             aria-label="Abrir menu de navegacao"
             @click="isMobileNavOpen = !isMobileNavOpen"

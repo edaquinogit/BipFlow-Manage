@@ -57,6 +57,14 @@ class PdvSaleRequestSerializer(serializers.Serializer):
     customer_name = serializers.CharField(
         required=False, allow_blank=True, max_length=255, default=""
     )
+    # Optional (Etapa R4 of the QR-code stock-exit refinement): capturing it
+    # lets a PDV sale feed the same new-vs-returning customer insight
+    # (SaleOrderCustomerInsightsSerializer) the virtual channel already gets
+    # for free from its required checkout phone -- today every PDV sale has
+    # customer_phone="" and is silently excluded from that metric.
+    customer_phone = serializers.CharField(
+        required=False, allow_blank=True, max_length=32, default=""
+    )
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
 
     def validate_items(self, value):
@@ -195,6 +203,7 @@ class PdvSaleView(APIView):
 
         order_reference = timezone.localtime().strftime("PDV-%Y%m%d-%H%M%S-%f")
         customer_name = validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
+        customer_phone = validated.get("customer_phone", "").strip()
         notes = validated.get("notes", "").strip()
 
         with transaction.atomic():
@@ -207,8 +216,9 @@ class PdvSaleView(APIView):
                 store=store,
                 order_reference=order_reference,
                 channel=SaleOrder.CHANNEL_LOJA_FISICA,
+                performed_by=request.user if request.user.is_authenticated else None,
                 customer_name=customer_name,
-                customer_phone="",
+                customer_phone=customer_phone,
                 delivery_method="pickup",
                 payment_method=validated["payment_method"],
                 notes=notes,

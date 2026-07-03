@@ -30,6 +30,7 @@ function buildOrder(overrides: Partial<SaleOrder> = {}): SaleOrder {
     delivery_method: 'pickup',
     payment_method: 'pix',
     delivery_region_name: '',
+    performed_by_username: null,
     subtotal: '50.00',
     delivery_fee: '0.00',
     total: '50.00',
@@ -110,6 +111,23 @@ describe('DashboardOrdersView', () => {
     expect(wrapper.text()).toContain('Virtual')
   })
 
+  it('shows the operator badge only for PDV sales with a known operator (Etapa R3 of the QR-code stock-exit refinement)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(
+      buildResponse([
+        buildOrder({ id: 1, channel: 'loja_fisica', performed_by_username: 'caixa1' }),
+        buildOrder({ id: 2, channel: 'loja_fisica', performed_by_username: null }),
+        buildOrder({ id: 3, channel: 'virtual', performed_by_username: 'caixa1' }),
+      ])
+    )
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    const badges = wrapper.findAll('[data-cy="sale-operator-badge"]')
+    expect(badges).toHaveLength(1)
+    expect(badges[0]?.text()).toContain('caixa1')
+  })
+
   it('updates the sale status and reflects the change without refetching', async () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
     vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrder({ status: 'sent' }))
@@ -124,5 +142,58 @@ describe('DashboardOrdersView', () => {
     expect(salesService.updateStatus).toHaveBeenCalledWith(1, 'sent')
     expect(toastState.success).toHaveBeenCalledWith('Status do pedido atualizado.')
     expect(salesService.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks for confirmation instead of cancelling immediately (Etapa R2 of the QR-code stock-exit refinement)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ item_count: 2 })]))
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    const statusSelect = wrapper.find('article select')
+    await statusSelect.setValue('cancelled')
+    await flushPromises()
+
+    // The cancellation itself must not fire until the confirmation is accepted.
+    expect(salesService.updateStatus).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Cancelar pedido?')
+    expect(wrapper.text()).toContain('estoque de 2 item(ns) sera devolvido')
+  })
+
+  it('cancels the order only after the confirmation is accepted', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+    vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrder({ status: 'cancelled' }))
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('article select').setValue('cancelled')
+    await flushPromises()
+
+    const confirmButton = wrapper.findAll('button').find((button) => button.text().includes('Confirmar cancelamento'))
+    expect(confirmButton).toBeTruthy()
+    await confirmButton!.trigger('click')
+    await flushPromises()
+
+    expect(salesService.updateStatus).toHaveBeenCalledWith(1, 'cancelled')
+    expect(toastState.success).toHaveBeenCalledWith('Status do pedido atualizado.')
+  })
+
+  it('does not cancel the order when the confirmation is dismissed', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('article select').setValue('cancelled')
+    await flushPromises()
+
+    const cancelButton = wrapper.findAll('button').find((button) => button.text().includes('Cancelar') && !button.text().includes('cancelamento'))
+    expect(cancelButton).toBeTruthy()
+    await cancelButton!.trigger('click')
+    await flushPromises()
+
+    expect(salesService.updateStatus).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Cancelar pedido?')
   })
 })

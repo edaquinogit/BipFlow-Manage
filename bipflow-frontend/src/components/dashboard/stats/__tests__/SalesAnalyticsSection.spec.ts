@@ -126,6 +126,20 @@ describe('SalesAnalyticsSection', () => {
     expect(wrapper.emitted('update:custom-range')).toBeUndefined()
   })
 
+  it('uses a mobile-first responsive grid for dashboard cards', () => {
+    const wrapper = mountSection()
+
+    const outerGrid = wrapper
+      .findAll('div')
+      .find((node) => node.classes().includes('grid') && node.classes().includes('lg:grid-cols-2'))
+    const rightGrid = wrapper
+      .findAll('div')
+      .find((node) => node.classes().includes('grid') && node.classes().includes('md:grid-cols-2'))
+
+    expect(outerGrid).toBeTruthy()
+    expect(rightGrid).toBeTruthy()
+  })
+
   it('clears the date inputs when the applied custom range is reset', async () => {
     const wrapper = mountSection({ period: 'custom', customRange: { start: '2026-06-01', end: '2026-06-10' } })
 

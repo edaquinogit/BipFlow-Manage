@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
@@ -11,7 +11,6 @@ import DashboardHeader from '@/components/dashboard/layout/DashboardHeader.vue';
 const {
   stores,
   selectedStore,
-  branding: storeBranding,
   storefrontPath,
   loading: isCurrentStoreLoading,
   error: currentStoreError,
@@ -21,14 +20,6 @@ const {
 const { currentUserName, fetchCurrentUser } = useCurrentUser();
 const { success } = useToast();
 const router = useRouter();
-
-const activeStoreBadgeLabel = computed(() => (
-  selectedStore.value ? storeBranding.value.name : 'Carregando loja'
-));
-const activeStoreSlug = computed(() => (
-  storeBranding.value.slug ? `/${storeBranding.value.slug}` : ''
-));
-const activeStoreStatusLabel = computed(() => storeBranding.value.statusLabel);
 
 const handleSelectStore = (storeSlug: string): void => {
   if (storeSlug === selectedStore.value?.slug) {
@@ -72,16 +63,6 @@ onMounted(async () => {
       @logout="handleLogout"
     />
 
-    <div class="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-5 z-40 hidden max-w-[18rem] items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white/95 px-4 py-3 text-xs shadow-[0_14px_35px_-28px_rgba(5,5,10,0.45)] backdrop-blur-xl sm:flex">
-      <span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.55)]" />
-      <div class="min-w-0">
-        <p class="font-black uppercase tracking-[0.18em] text-bip-muted">Loja {{ activeStoreStatusLabel.toLowerCase() }}</p>
-        <p class="mt-1 truncate font-semibold text-[#05050A]">
-          {{ activeStoreBadgeLabel }}
-          <span class="font-normal text-bip-muted">{{ activeStoreSlug }}</span>
-        </p>
-      </div>
-    </div>
 
     <div
       v-if="currentStoreError"

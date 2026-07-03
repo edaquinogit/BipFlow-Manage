@@ -14,7 +14,7 @@ from __future__ import annotations
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Product, StockMovement, Store
+from .models import Product, SaleOrder, StockMovement, Store
 
 
 class StockMovementError(Exception):
@@ -80,3 +80,87 @@ def apply_stock_movement(
             performed_by=performed_by,
             notes=notes,
         )
+
+
+def apply_order_cancellation(
+    *, order: SaleOrder, store: Store, performed_by=None
+) -> list[StockMovement]:
+    """Cancel `order` and restock every item it originally decremented.
+
+    Etapa R2 of the QR-code stock-exit refinement (see
+    docs/architecture/qrcode-stock-exit-refinement.md): cancelling a sale
+    never used to touch stock at all, in either channel -- a WhatsApp order
+    rarely gets cancelled after the fact, but a PDV sale can, every day, from
+    an ordinary cashier mistake (wrong item, double-tap on "finalizar"). This
+    is deliberately channel-agnostic: it restocks a cancelled order the same
+    way regardless of whether it came from the storefront or the PDV,
+    because there is no real business reason for the two channels to behave
+    differently here.
+
+    Idempotent: cancelling an already-cancelled order is a no-op (returns an
+    empty list) instead of restocking twice. Locks every affected product row
+    (ordered by id, same deadlock-free pattern as
+    CheckoutWhatsAppView._lock_cart_products and PdvSaleView._lock_products)
+    before mutating any of them.
+    """
+    if order.status == SaleOrder.STATUS_CANCELLED:
+        return []
+
+    with transaction.atomic():
+        items = list(order.items.all())
+        product_ids = sorted({item.product_id for item in items if item.product_id})
+        products_by_id = {
+            product.id: product
+            for product in Product.objects.select_for_update()
+            .filter(id__in=product_ids, store=store)
+            .order_by("id")
+        }
+
+        timestamp = timezone.now()
+        source = (
+            StockMovement.SOURCE_PDV
+            if order.channel == SaleOrder.CHANNEL_LOJA_FISICA
+            else StockMovement.SOURCE_VENDA
+        )
+        movements = []
+
+        for item in items:
+            product = products_by_id.get(item.product_id)
+            if product is None:
+                # The product was deleted since the sale; nothing left to
+                # restock for this line, but the rest of the order still
+                # gets cancelled and restocked normally.
+                continue
+
+            previous_stock = product.stock_quantity
+            product.stock_quantity += item.quantity
+            product.is_available = product.stock_quantity > 0
+            product.updated_at = timestamp
+
+            movements.append(
+                StockMovement(
+                    store=store,
+                    product=product,
+                    movement_type=StockMovement.TYPE_ENTRADA,
+                    quantity=item.quantity,
+                    previous_stock=previous_stock,
+                    new_stock=product.stock_quantity,
+                    reason=StockMovement.REASON_VENDA_CANCELADA,
+                    source=source,
+                    sale_order=order,
+                    performed_by=performed_by,
+                )
+            )
+
+        if products_by_id:
+            Product.objects.bulk_update(
+                list(products_by_id.values()), ["stock_quantity", "is_available", "updated_at"]
+            )
+
+        if movements:
+            StockMovement.objects.bulk_create(movements)
+
+        order.status = SaleOrder.STATUS_CANCELLED
+        order.save(update_fields=["status", "updated_at"])
+
+    return movements

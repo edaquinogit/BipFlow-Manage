@@ -27,6 +27,10 @@ export interface SaleOrder {
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
   delivery_region_name: string
+  // Etapa R3 of the QR-code stock-exit refinement: who rang up the sale.
+  // Always null for a virtual/WhatsApp order (no authenticated staff
+  // involved in a public checkout).
+  performed_by_username: string | null
   subtotal: string
   delivery_fee: string
   total: string
@@ -48,6 +52,11 @@ export interface SaleOrderFilters {
   status?: SaleOrderStatus
   search?: string
   pageSize?: number
+  // Etapa 5 of the QR-code stock-exit evolution already added this filter
+  // on the backend (SaleOrderViewSet.get_base_queryset()); Etapa R4 of the
+  // refinement is the first frontend caller (the PDV's "ultimas vendas"
+  // panel, DashboardPdvView.vue).
+  channel?: SaleOrderChannel
 }
 
 export type SaleOrderSummaryPeriod = 'today' | '7d' | '30d' | '90d' | 'month'
@@ -123,4 +132,8 @@ export interface SaleOrderCustomerInsights {
   bot_conversations_count: number
   bot_converted_count: number
   bot_conversion_rate: string | null
+  whatsapp_clicks?: number | null
+  whatsapp_conversion_rate?: string | null
+  whatsapp_converted_orders?: number | null
+  average_whatsapp_response_time_seconds?: number | null
 }

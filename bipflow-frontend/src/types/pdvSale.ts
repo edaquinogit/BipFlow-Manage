@@ -19,6 +19,10 @@ export interface PdvSaleRequestPayload {
   items: PdvSaleItemPayload[]
   payment_method: PdvPaymentMethod
   customer_name?: string
+  // Etapa R4 of the QR-code stock-exit refinement: optional, but capturing
+  // it lets a PDV sale count toward the new-vs-returning customer insight
+  // the same way a virtual checkout's required phone already does.
+  customer_phone?: string
   notes?: string
 }
 

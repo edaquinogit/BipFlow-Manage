@@ -87,7 +87,7 @@ from .serializers import (
     StoreSerializer,
     StoreSettingsSerializer,
 )
-from .stock import StockMovementError, apply_stock_movement
+from .stock import StockMovementError, apply_order_cancellation, apply_stock_movement
 from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
     REFRESH_TOKEN_COOKIE_NAME,
@@ -769,7 +769,16 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["patch"], url_path="status")
     def update_status(self, request, pk=None):
-        """Allow dashboard operators to update the operational order status."""
+        """Allow dashboard operators to update the operational order status.
+
+        Cancelling (any status -> "cancelled") atomically restocks every
+        item the order originally decremented, regardless of channel (Etapa
+        R2 of the QR-code stock-exit refinement) -- apply_order_cancellation()
+        is the single chokepoint for that, so there is no way to cancel an
+        order through this endpoint without the stock reversal happening
+        too. Idempotent: re-selecting "cancelled" on an already-cancelled
+        order is a no-op, not a double restock.
+        """
         if not has_dashboard_write_access(request.user):
             raise PermissionDenied("Voce nao possui permissao para alterar pedidos.")
 
@@ -779,8 +788,17 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         next_status = serializer.validated_data["status"]
         if order.status != next_status:
-            order.status = next_status
-            order.save(update_fields=["status", "updated_at"])
+            if next_status == SaleOrder.STATUS_CANCELLED:
+                apply_order_cancellation(
+                    order=order,
+                    store=self.get_request_store(),
+                    performed_by=request.user if request.user.is_authenticated else None,
+                )
+            else:
+                order.status = next_status
+                order.save(update_fields=["status", "updated_at"])
+
+            invalidate_dashboard_cache(self.get_request_store().id)
 
         return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 

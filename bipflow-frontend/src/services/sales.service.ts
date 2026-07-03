@@ -37,6 +37,10 @@ export const salesService = {
       params.search = filters.search.trim()
     }
 
+    if (filters.channel) {
+      params.channel = filters.channel
+    }
+
     const response = await api.get<PaginatedSalesOrdersResponse>('v1/sales-orders/', { params })
     return response.data
   },

@@ -4,12 +4,17 @@ import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 import Button from '@/components/ui/Button.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   show: boolean;
   title: string;
   message: string;
   isLoading?: boolean;
-}>();
+  confirmLabel?: string;
+  loadingLabel?: string;
+}>(), {
+  confirmLabel: 'Confirmar exclusão',
+  loadingLabel: 'Processando...',
+});
 
 const emit = defineEmits<{ close: []; confirm: [] }>();
 
@@ -63,7 +68,7 @@ useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, cancelBut
                 :loading="isLoading"
                 @click="emit('confirm')"
               >
-                {{ isLoading ? 'Processando...' : 'Confirmar exclusão' }}
+                {{ isLoading ? loadingLabel : confirmLabel }}
               </Button>
             </div>
           </div>

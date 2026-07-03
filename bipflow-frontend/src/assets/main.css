@@ -43,8 +43,52 @@
   --shadow-float: 0 18px 60px rgba(15, 23, 42, 0.18);
 }
 
+html {
+  color-scheme: light;
+  font-size: 16px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   @apply bg-[#FAFAFA] text-[#05050A] antialiased;
+  font-size: clamp(0.95rem, 0.9rem + 0.2vw, 1rem);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+  min-height: 44px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 .brand-wordmark {
