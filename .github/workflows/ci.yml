@@ -91,3 +91,58 @@ jobs:
           tags: bipflow-backend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  docker-build-frontend:
+    name: Docker build (Frontend image)
+    # deploy.yml builds and pushes this same image straight to GHCR right
+    # after CI goes green -- nothing else in CI ever built it, so a broken
+    # docker/frontend.Dockerfile only surfaced at deploy time (see the
+    # "fix broken frontend Docker build" commit). This job builds and boots
+    # it here instead, so a bad frontend image fails the PR, not the deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/frontend.Dockerfile
+          build-args: |
+            VITE_API_URL=/api/
+          push: false
+          load: true
+          tags: bipflow-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Smoke test frontend container
+        run: |
+          # frontend-nginx.conf proxy_passes to the "backend" hostname, and
+          # nginx resolves upstream hostnames at startup -- with no such
+          # host it refuses to boot at all ("host not found in upstream").
+          # In docker-compose.prod.yml that name is the real backend
+          # service; here a do-nothing placeholder on the same network is
+          # enough to satisfy the DNS lookup so nginx can start.
+          docker network create smoke-net
+          docker run -d --name backend --network smoke-net alpine:3.20 sleep 3600
+          docker run -d --name frontend-smoke --network smoke-net -p 8080:80 bipflow-frontend:ci
+          for i in $(seq 1 10); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              echo "frontend container is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend container never became healthy" >&2
+          docker logs frontend-smoke
+          exit 1
+
+      - name: Stop smoke containers
+        if: always()
+        run: |
+          docker rm -f frontend-smoke backend
+          docker network rm smoke-net
