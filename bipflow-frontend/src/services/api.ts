@@ -10,12 +10,14 @@ interface TokenRefreshPayload {
 /**
  * 🏷️ BIPFLOW: IMMUTABLE CONFIG
  *
- * Fallback must match whatever hostname the page itself is opened with
- * (localhost, not 127.0.0.1): the refresh_token cookie is SameSite=Strict,
- * and browsers treat those as different sites, silently dropping the cookie
- * on a mismatch.
+ * Relative on purpose: vite.config.ts proxies /api to the Django dev server,
+ * so this resolves against whatever origin the page was opened with
+ * (localhost, 127.0.0.1, or a LAN IP from a phone) instead of hardcoding one
+ * -- an absolute http://localhost:8000/... fallback breaks both on a phone
+ * (localhost there means the phone itself) and the old SameSite=Strict
+ * refresh-token cookie (localhost/127.0.0.1 count as different sites).
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/";
 
 /**
  * 🚨 Environment Validation
