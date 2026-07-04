@@ -92,7 +92,13 @@ ALLOWED_HOSTS = get_env_list("DJANGO_ALLOWED_HOSTS")
 
 if not ALLOWED_HOSTS:
     if not IS_PRODUCTION:
-        ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+        # Wildcard, not just 127.0.0.1/localhost: the Vite dev proxy (see
+        # vite.config.ts) forwards requests with their original Host header
+        # unchanged, so opening the frontend from a phone on the same Wi-Fi
+        # (via Vite's --host 0.0.0.0 LAN address) makes Django see that LAN
+        # IP as the Host -- which can't be predicted/hardcoded here. Fine in
+        # dev only; production still requires an explicit, validated list.
+        ALLOWED_HOSTS = ["*"]
     else:
         raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must be defined in production.")
 
