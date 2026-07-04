@@ -7,7 +7,7 @@ x-redis-env: &redis-env
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
 
 x-backend-env: &backend-env
-  DJANGO_ENV: production
+  DJANGO_ENV: ${DJANGO_ENV:-development}
   DJANGO_DEBUG: "False"
   DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
   DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend}
