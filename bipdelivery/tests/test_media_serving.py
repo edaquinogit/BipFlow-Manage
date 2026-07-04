@@ -18,6 +18,7 @@ Run with:
 import os
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 from django.conf import settings
@@ -263,6 +264,42 @@ def test_absolute_image_url_format(api_client, authenticated_user, test_category
     assert (
         "/media/products/" in image_url
     ), f"Image URL should include '/media/products/' path, got: {image_url}"
+
+
+@pytest.mark.django_db
+@pytest.mark.skipif(settings.USE_R2_STORAGE, reason="Media is served by R2, not Django, in this config")
+def test_uploaded_image_is_actually_servable(api_client, authenticated_user, test_category, mock_image):
+    """
+    Regression guard: the API returning a well-formed absolute image URL is
+    not enough -- Django must actually serve that URL with a 200 and image
+    bytes. This 404'd whenever DJANGO_DEBUG=False (the project's own dev
+    default, see .env.example), because django.conf.urls.static.static()
+    no-ops internally whenever DEBUG is False, no matter what condition it's
+    wrapped in from urls.py -- fixed there by registering the serving view
+    directly instead of going through that helper.
+    """
+    api_client.force_authenticate(user=authenticated_user)
+
+    create_url = "/api/v1/products/"
+    data = {
+        "name": "Servable Image Product",
+        "price": "10.00",
+        "stock_quantity": 1,
+        "is_available": True,
+        "category": test_category.id,
+        "image": mock_image(),
+    }
+    response = api_client.post(create_url, data, format="multipart")
+    assert response.status_code == status.HTTP_201_CREATED
+
+    image_path = urlparse(response.data["image"]).path
+
+    media_response = api_client.get(image_path)
+    assert media_response.status_code == status.HTTP_200_OK, (
+        f"Expected the image URL returned by the API to actually be servable, "
+        f"got {media_response.status_code} for {image_path}"
+    )
+    assert media_response["Content-Type"].startswith("image/")
 
 
 # Cleanup helper (for manual file cleanup if needed)
