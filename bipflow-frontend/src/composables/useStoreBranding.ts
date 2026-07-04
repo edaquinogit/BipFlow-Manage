@@ -50,7 +50,7 @@ export function buildStoreBranding(store: Store | null | undefined): StoreBrandi
   const status = store?.status ?? (isActive ? 'active' : 'inactive')
 
   return {
-    name: sanitizeText(store?.name, 'BipFlow'),
+    name: sanitizeText(store?.name, 'Boutique Fitness'),
     slug: sanitizeText(store?.slug, ''),
     logoUrl: sanitizeText(store?.logo_url, FALLBACK_LOGO_URL),
     tagline: sanitizeText(store?.tagline, 'Catalogo online'),

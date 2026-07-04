@@ -291,7 +291,7 @@ describe('ProductsView', () => {
     expect(wrapper.findComponent(CartDrawerStub).props('isOpen')).toBe(true)
   })
 
-  it('updates filters when quick category is clicked', async () => {
+  it('stages a quick category pick without applying it until Salvar is clicked', async () => {
     await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
 
     const buttons = wrapper.findAll('button')
@@ -301,10 +301,15 @@ describe('ProductsView', () => {
 
     await categoryButton!.trigger('click')
 
-    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1 })
+    expect(searchState.updateFilters).not.toHaveBeenCalled()
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Salvar')
+    await saveButton!.trigger('click')
+
+    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1, inStockOnly: false })
   })
 
-  it('updates filters when the in-stock checkbox is toggled', async () => {
+  it('stages the in-stock checkbox without applying it until Salvar is clicked', async () => {
     await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
 
     const stockCheckbox = wrapper.find('input[type="checkbox"]')
@@ -312,7 +317,43 @@ describe('ProductsView', () => {
 
     await stockCheckbox.setValue(true)
 
-    expect(searchState.updateFilters).toHaveBeenCalledWith({ inStockOnly: true })
+    expect(searchState.updateFilters).not.toHaveBeenCalled()
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Salvar')
+    await saveButton!.trigger('click')
+
+    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: undefined, inStockOnly: true })
+  })
+
+  it('only changes page when the pagination widget is clicked, not on its own', async () => {
+    // Pagination is click-driven only -- no scroll/IntersectionObserver
+    // auto-load fighting the widget for control of `page`/`products`.
+    searchState.totalPages.value = 3
+    await nextTick()
+
+    await wrapper.findComponent(ProductPaginationStub).vm.$emit('go-to-page', 2)
+    expect(searchState.goToPage).toHaveBeenCalledWith(2)
+
+    await wrapper.findComponent(ProductPaginationStub).vm.$emit('next-page')
+    expect(searchState.nextPage).toHaveBeenCalled()
+
+    await wrapper.findComponent(ProductPaginationStub).vm.$emit('previous-page')
+    expect(searchState.previousPage).toHaveBeenCalled()
+
+    searchState.totalPages.value = 1
+  })
+
+  it('discards staged filter changes when Cancelar is clicked', async () => {
+    await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
+
+    const stockCheckbox = wrapper.find('input[type="checkbox"]')
+    await stockCheckbox.setValue(true)
+
+    const cancelButton = wrapper.findAll('button').find((button) => button.text() === 'Cancelar')
+    await cancelButton!.trigger('click')
+
+    expect(searchState.updateFilters).not.toHaveBeenCalled()
+    expect(wrapper.find('[aria-label="Abrir filtros"]').attributes('aria-expanded')).toBe('false')
   })
 
   it('adds product to cart and shows toast feedback', async () => {

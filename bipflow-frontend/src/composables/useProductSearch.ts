@@ -16,7 +16,6 @@ export interface UseProductSearchReturn {
   products: Ref<Product[]>
   isLoading: Ref<boolean>
   isInitialLoading: Ref<boolean>
-  isLoadingMore: Ref<boolean>
   error: Ref<string | null>
   page: Ref<number>
   pageSize: Ref<number>
@@ -32,7 +31,7 @@ export interface UseProductSearchReturn {
   updateFilters: (newFilters: Partial<ProductFilters>) => void
   clearFilters: () => void
   goToPage: (pageNumber: number) => void
-  nextPage: (append?: boolean) => void
+  nextPage: () => void
   previousPage: () => void
   resetSearch: () => void
 }
@@ -61,7 +60,6 @@ export const useProductSearch = (
   const products = ref<Product[]>([])
   const isLoading = ref(false)
   const isInitialLoading = ref(false)
-  const isLoadingMore = ref(false)
   const error = ref<string | null>(null)
   const page = ref(Math.max(1, initialPage))
   const pageSize = ref(initialPageSize)
@@ -98,23 +96,19 @@ export const useProductSearch = (
   const isCacheValid = (timestamp: number): boolean =>
     Date.now() - timestamp < cacheDuration
 
-  const updateStateFromResponse = (
-    response: PaginatedProductsResponse,
-    append = false
-  ): void => {
-    products.value = append ? [...products.value, ...response.results] : response.results
+  const updateStateFromResponse = (response: PaginatedProductsResponse): void => {
+    products.value = response.results
     totalCount.value = response.count
     totalPages.value = response.total_pages
   }
 
-  const fetchProductsInternal = async (append = false): Promise<void> => {
-    if (isInitialLoading.value || isLoadingMore.value) {
+  const fetchProductsInternal = async (): Promise<void> => {
+    if (isInitialLoading.value) {
       return
     }
 
     isLoading.value = true
-    isInitialLoading.value = !append
-    isLoadingMore.value = append
+    isInitialLoading.value = true
     error.value = null
 
     const requestId = ++lastIssuedRequest
@@ -125,12 +119,10 @@ export const useProductSearch = (
       Logger.debug('Using cached public products response', {
         cacheKey,
         page: page.value,
-        append,
       })
-      updateStateFromResponse(cached.data, append)
+      updateStateFromResponse(cached.data)
       isLoading.value = false
       isInitialLoading.value = false
-      isLoadingMore.value = false
       return
     }
 
@@ -146,28 +138,21 @@ export const useProductSearch = (
         timestamp: Date.now(),
       })
 
-      updateStateFromResponse(response, append)
+      updateStateFromResponse(response)
       Logger.debug('Public products fetched successfully', {
         page: page.value,
         resultCount: response.results.length,
         totalCount: response.count,
-        append,
       })
     } catch (err) {
-      if (append) {
-        page.value = Math.max(1, page.value - 1)
-      }
-
       error.value = err instanceof Error ? err.message : 'Erro ao carregar produtos'
       Logger.error('Public product fetch failed', {
-        append,
         page: page.value,
         error: error.value,
       })
     } finally {
       isLoading.value = false
       isInitialLoading.value = false
-      isLoadingMore.value = false
     }
   }
 
@@ -216,13 +201,13 @@ export const useProductSearch = (
     void fetchProductsInternal()
   }
 
-  const nextPage = (append = false): void => {
+  const nextPage = (): void => {
     if (!hasNextPage.value || isLoading.value) {
       return
     }
 
     page.value += 1
-    void fetchProductsInternal(append)
+    void fetchProductsInternal()
   }
 
   const previousPage = (): void => {
@@ -257,7 +242,6 @@ export const useProductSearch = (
     products,
     isLoading,
     isInitialLoading,
-    isLoadingMore,
     error,
     page,
     pageSize,

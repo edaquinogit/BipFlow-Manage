@@ -58,20 +58,30 @@
           </button>
 
           <!-- Page numbers -->
-          <button
-            type="button"
-            v-for="pageNum in visiblePages"
-            :key="pageNum"
-            @click="goToPage(pageNum)"
-            class="relative inline-flex items-center px-4 py-2 text-sm font-semibold transition-colors"
-            :class="pageNum === currentPage
-              ? 'z-10 bg-[#05050A] text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81B60]'
-              : 'text-[#05050A] ring-1 ring-inset ring-[#D1D5DB] hover:bg-white hover:text-[#D81B60] focus:z-20 focus:outline-offset-0'"
-            :aria-label="`Ir para página ${pageNum}`"
-            :aria-current="pageNum === currentPage ? 'page' : undefined"
-          >
-            {{ pageNum }}
-          </button>
+          <template v-for="(item, index) in visiblePages">
+            <span
+              v-if="item === ELLIPSIS"
+              :key="`ellipsis-${index}`"
+              class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9CA3AF] ring-1 ring-inset ring-[#D1D5DB]"
+              aria-hidden="true"
+            >
+              &hellip;
+            </span>
+            <button
+              v-else
+              :key="`page-${index}`"
+              type="button"
+              @click="goToPage(item)"
+              class="relative inline-flex items-center px-4 py-2 text-sm font-semibold transition-colors"
+              :class="item === currentPage
+                ? 'z-10 bg-[#05050A] text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81B60]'
+                : 'text-[#05050A] ring-1 ring-inset ring-[#D1D5DB] hover:bg-white hover:text-[#D81B60] focus:z-20 focus:outline-offset-0'"
+              :aria-label="`Ir para página ${item}`"
+              :aria-current="item === currentPage ? 'page' : undefined"
+            >
+              {{ item }}
+            </button>
+          </template>
 
           <!-- Next button -->
           <button
@@ -95,6 +105,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { buildVisiblePages, ELLIPSIS } from './paginationRange'
+import type { PaginationItem } from './paginationRange'
 
 // Props
 const props = defineProps<{
@@ -113,34 +125,9 @@ const emit = defineEmits<{
 }>()
 
 // Computed
-const visiblePages = computed(() => {
-  const current = props.currentPage
-  const total = props.totalPages
-  const delta = 2 // Number of pages to show on each side of current page
-  const range = []
-  const rangeWithDots = []
-
-  // Calculate range
-  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
-    range.push(i)
-  }
-
-  if (current - delta > 2) {
-    rangeWithDots.push(1, '...')
-  } else {
-    rangeWithDots.push(1)
-  }
-
-  rangeWithDots.push(...range)
-
-  if (current + delta < total - 1) {
-    rangeWithDots.push('...', total)
-  } else if (total > 1) {
-    rangeWithDots.push(total)
-  }
-
-  return rangeWithDots.filter(item => typeof item === 'number') as number[]
-})
+const visiblePages = computed<PaginationItem[]>(() =>
+  buildVisiblePages(props.currentPage, props.totalPages)
+)
 
 // Methods
 const goToPage = (page: number) => {

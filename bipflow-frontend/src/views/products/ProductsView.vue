@@ -47,7 +47,7 @@
               <input
                 :value="filters.search"
                 type="search"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3]"
                 placeholder="Buscar produto"
                 aria-label="Buscar produtos por nome"
                 @input="handleSearchInput"
@@ -58,8 +58,8 @@
               type="button"
               :aria-expanded="isFiltersOpen"
               aria-label="Abrir filtros"
-              class="group shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D81B60] hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
-              @click="isFiltersOpen = !isFiltersOpen"
+              class="group shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              @click="toggleFilters"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -108,7 +108,7 @@
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        :checked="filters.inStockOnly"
+                        :checked="draftInStockOnly"
                         class="w-4 h-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                         @change="handleStockFilterToggle"
                       />
@@ -126,7 +126,7 @@
                     <button
                       type="button"
                       class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
-                      :class="!filters.categoryId
+                      :class="!draftCategoryId
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
                       @click="handleQuickCategory(undefined)"
@@ -139,7 +139,7 @@
                       :key="category.id"
                       type="button"
                       class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
-                      :class="filters.categoryId === category.id
+                      :class="draftCategoryId === category.id
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
                       @click="handleQuickCategory(category.id)"
@@ -147,6 +147,24 @@
                       {{ category.name }}
                     </button>
                   </div>
+                </div>
+
+                <!-- Save / Cancel -->
+                <div class="mt-6 flex items-center justify-end gap-3 border-t border-white/20 pt-4">
+                  <button
+                    type="button"
+                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-lg border bg-white px-4 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                    @click="handleCancelFilters"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                    @click="handleSaveFilters"
+                  >
+                    Salvar
+                  </button>
                 </div>
 
                 <!-- Close button -->
@@ -268,22 +286,6 @@
         </button>
       </div>
 
-      <div
-        v-if="products.length > 0 && isLoadingMore"
-        class="mt-10 flex items-center justify-center gap-3 text-sm text-[#6B7280]"
-        aria-live="polite"
-      >
-        <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#D81B60]" />
-        Carregando mais produtos...
-      </div>
-
-      <div
-        v-if="products.length > 0 && hasNextPage"
-        ref="loadMoreTrigger"
-        class="mt-4 h-1 w-full"
-        aria-hidden="true"
-      />
-
       <div v-if="totalPages > 1" class="mt-8">
         <ProductPagination
           :current-page="page"
@@ -322,15 +324,22 @@
       @update-customer="updateCustomer"
       @submit-order="handleSubmitOrder"
     />
+
+    <IntroSplash
+      :visible="showIntro"
+      :is-backend-ready="isBackendReady"
+      @dismiss="dismissIntro"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryValue } from 'vue-router'
 import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
+import IntroSplash from './IntroSplash.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import {
@@ -339,6 +348,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useStoreBranding } from '@/composables/useStoreBranding'
 import { useToast } from '@/composables/useToast'
@@ -390,7 +400,13 @@ if (routeStoreSlug) {
 const toast = useToast()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
-const loadMoreTrigger = ref<HTMLDivElement | null>(null)
+const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
+// Two independent fetches gate the intro's loading state: store/categories/etc
+// (awaited directly below) and the product list, which useProductSearch kicks
+// off on its own -- tracked via the isInitialLoading transition instead.
+const isCoreDataReady = ref(false)
+const isProductsReady = ref(false)
+const isBackendReady = computed(() => isCoreDataReady.value && isProductsReady.value)
 const categories = ref<Category[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
@@ -399,6 +415,8 @@ const isSubmittingOrder = ref(false)
 const isDeliveryRegionsLoading = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
 const isFiltersOpen = ref(false)
+const draftCategoryId = ref<number | undefined>(undefined)
+const draftInStockOnly = ref(false)
 
 const initialFilters = parseFiltersFromQuery(route.query)
 const initialPage = parsePageFromQuery(route.query)
@@ -407,7 +425,6 @@ const {
   products,
   isLoading,
   isInitialLoading,
-  isLoadingMore,
   error,
   page,
   totalPages,
@@ -442,7 +459,6 @@ const {
   getProductQuantity,
 } = useCart()
 
-let loadMoreObserver: IntersectionObserver | null = null
 let isSyncingRouteState = false
 
 const displayedProducts = computed(() => {
@@ -469,10 +485,6 @@ const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
 const liveRegionMessage = computed(() => {
   if (isInitialLoading.value) {
     return 'Carregando produtos.'
-  }
-
-  if (isLoadingMore.value) {
-    return 'Carregando mais produtos.'
   }
 
   if (error.value) {
@@ -597,40 +609,6 @@ async function loadDeliveryRegions(): Promise<void> {
   }
 }
 
-function connectLoadMoreObserver(): void {
-  if (!loadMoreTrigger.value) {
-    return
-  }
-
-  loadMoreObserver = new IntersectionObserver(
-    (entries) => {
-      const [entry] = entries
-
-      if (
-        !entry?.isIntersecting ||
-        isInitialLoading.value ||
-        isLoadingMore.value ||
-        !hasNextPage.value
-      ) {
-        return
-      }
-
-      nextPage(true)
-    },
-    {
-      rootMargin: '200px 0px',
-      threshold: 0.1,
-    }
-  )
-
-  loadMoreObserver.observe(loadMoreTrigger.value)
-}
-
-function disconnectLoadMoreObserver(): void {
-  loadMoreObserver?.disconnect()
-  loadMoreObserver = null
-}
-
 watch(
   () => [
     filters.value.search,
@@ -671,24 +649,28 @@ watch(
 
 watch(
   () => route.params?.storeSlug,
-  (storeSlug) => {
+  async (storeSlug) => {
     if (typeof storeSlug === 'string' && storeSlug.trim()) {
       setSelectedStoreSlug(storeSlug)
-      void Promise.allSettled([
+      isCoreDataReady.value = false
+      isProductsReady.value = false
+      await Promise.allSettled([
         fetchCurrentStore(true),
         loadCategories(),
         loadDeliveryRegions(),
         loadStoreSettings(),
         fetchProducts(),
       ])
+      isCoreDataReady.value = true
+      isProductsReady.value = true
     }
   }
 )
 
-watch(loadMoreTrigger, async () => {
-  disconnectLoadMoreObserver()
-  await nextTick()
-  connectLoadMoreObserver()
+watch(isInitialLoading, (loading, wasLoading) => {
+  if (wasLoading && !loading) {
+    isProductsReady.value = true
+  }
 })
 
 onMounted(async () => {
@@ -698,16 +680,26 @@ onMounted(async () => {
     loadDeliveryRegions(),
     loadStoreSettings(),
   ])
-  await nextTick()
-  connectLoadMoreObserver()
+  isCoreDataReady.value = true
 })
 
-onBeforeUnmount(() => {
-  disconnectLoadMoreObserver()
-})
+function openFilters(): void {
+  draftCategoryId.value = filters.value.categoryId
+  draftInStockOnly.value = filters.value.inStockOnly ?? false
+  isFiltersOpen.value = true
+}
+
+function toggleFilters(): void {
+  if (isFiltersOpen.value) {
+    isFiltersOpen.value = false
+    return
+  }
+
+  openFilters()
+}
 
 function handleQuickCategory(categoryId: number | undefined): void {
-  updateFilters({ categoryId })
+  draftCategoryId.value = categoryId
 }
 
 function handleSearchInput(event: Event): void {
@@ -717,7 +709,19 @@ function handleSearchInput(event: Event): void {
 
 function handleStockFilterToggle(event: Event): void {
   const target = event.target as HTMLInputElement
-  updateFilters({ inStockOnly: target.checked })
+  draftInStockOnly.value = target.checked
+}
+
+function handleSaveFilters(): void {
+  updateFilters({
+    categoryId: draftCategoryId.value,
+    inStockOnly: draftInStockOnly.value,
+  })
+  isFiltersOpen.value = false
+}
+
+function handleCancelFilters(): void {
+  isFiltersOpen.value = false
 }
 
 function handleClearFilters(): void {
