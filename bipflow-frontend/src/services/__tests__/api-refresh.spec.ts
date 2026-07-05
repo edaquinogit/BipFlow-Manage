@@ -7,6 +7,8 @@ type RetriableConfig = {
   url?: string;
   headers?: Record<string, string>;
   _retry?: boolean;
+  _retriedAfterTimeout?: boolean;
+  timeout?: number;
 };
 
 type RejectedInterceptor = (error: {
@@ -61,6 +63,15 @@ function getRejectedInterceptor(): RejectedInterceptor {
 function unauthorizedError(config: RetriableConfig) {
   return {
     response: { status: 401 },
+    config,
+  };
+}
+
+function timeoutError(config: RetriableConfig) {
+  // A real axios timeout has no `response` at all (the request never got a
+  // reply), and is identified by `code === "ECONNABORTED"`.
+  return {
+    code: "ECONNABORTED",
     config,
   };
 }
@@ -147,5 +158,52 @@ describe("API token refresh interceptor", () => {
     ).rejects.toThrow("refresh failed");
 
     expect(tokenStore.getAccessToken()).toBeNull();
+  });
+});
+
+describe("API cold-start retry interceptor", () => {
+  beforeEach(() => {
+    axiosMocks.apiInstance.mockClear();
+  });
+
+  it("retries a timed-out GET once with a longer timeout", async () => {
+    const originalRequest: RetriableConfig = {
+      method: "get",
+      url: "v1/products/",
+    };
+
+    await getRejectedInterceptor()(timeoutError(originalRequest));
+
+    expect(axiosMocks.apiInstance).toHaveBeenCalledTimes(1);
+    expect(axiosMocks.apiInstance).toHaveBeenCalledWith(originalRequest);
+    expect(originalRequest._retriedAfterTimeout).toBe(true);
+    expect(originalRequest.timeout).toBe(45000);
+  });
+
+  it("does not retry a GET a second time (no infinite retry loop)", async () => {
+    const originalRequest: RetriableConfig = {
+      method: "get",
+      url: "v1/products/",
+      _retriedAfterTimeout: true,
+    };
+
+    await expect(
+      getRejectedInterceptor()(timeoutError(originalRequest))
+    ).rejects.toBeDefined();
+
+    expect(axiosMocks.apiInstance).not.toHaveBeenCalled();
+  });
+
+  it("never retries a timed-out POST -- the original request may have already completed server-side", async () => {
+    const originalRequest: RetriableConfig = {
+      method: "post",
+      url: "v1/products/",
+    };
+
+    await expect(
+      getRejectedInterceptor()(timeoutError(originalRequest))
+    ).rejects.toBeDefined();
+
+    expect(axiosMocks.apiInstance).not.toHaveBeenCalled();
   });
 });

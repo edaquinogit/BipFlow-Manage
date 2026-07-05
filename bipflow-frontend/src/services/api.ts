@@ -147,7 +147,10 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+      _retriedAfterTimeout?: boolean;
+    };
 
     // Clean up failed request tracking
     const requestId = `${originalRequest.method?.toUpperCase()}_${originalRequest.url}`;
@@ -156,6 +159,29 @@ api.interceptors.response.use(
         pendingRequests.delete(id);
       }
     });
+
+    // 0. Cold-start resilience: the production backend (Render free tier)
+    // spins down after inactivity and can take 50s+ to wake up, longer than
+    // the 15s default timeout -- a GET that times out on a cold instance
+    // has a good chance the instance is awake by the time we retry, so give
+    // it one retry with a much longer timeout instead of failing outright.
+    // Restricted to GET: retrying a timed-out POST/PATCH/DELETE is unsafe,
+    // since the original request may have already completed server-side
+    // (e.g. a duplicate product create).
+    const isTimeout = error.code === "ECONNABORTED";
+    const isRetriableMethod = originalRequest.method?.toLowerCase() === "get";
+    if (isTimeout && isRetriableMethod && !originalRequest._retriedAfterTimeout) {
+      originalRequest._retriedAfterTimeout = true;
+      originalRequest.timeout = 45000;
+
+      if (import.meta.env.DEV) {
+        Logger.warn("Request timed out, retrying once with a longer timeout", {
+          url: originalRequest.url,
+        });
+      }
+
+      return api(originalRequest);
+    }
 
     // 1. Session Expiration Protocol (401) - IMPROVED
     if (error.response?.status === 401 && !originalRequest._retry) {
