@@ -35,9 +35,13 @@ export function useCurrentStore() {
   const branding = computed(() => buildStoreBranding(selectedStore.value));
 
   const fetchCurrentStore = async (force = false) => {
-    const isCacheValid =
-      lastFetched.value && Date.now() - lastFetched.value < 300000;
-    if (!force && store.value && isCacheValid) return;
+    const isCacheFresh = Boolean(
+      lastFetched.value && Date.now() - lastFetched.value < 300000
+    );
+    const doesCacheMatchRequestedSlug =
+      !selectedStoreSlug.value || store.value?.slug === selectedStoreSlug.value;
+
+    if (!force && store.value && isCacheFresh && doesCacheMatchRequestedSlug) return;
 
     loading.value = true;
     error.value = null;

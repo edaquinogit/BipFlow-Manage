@@ -52,7 +52,7 @@
         :aria-label="`Abrir detalhes de ${product.name}`"
         @click="handleOpenDetails"
       >
-        <h3 class="line-clamp-2 min-h-[3.05rem] text-[14px] font-semibold leading-[1.35] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-12 min-[390px]:text-[15px] min-[390px]:leading-6 sm:text-lg sm:leading-7">
+        <h3 class="line-clamp-2 min-h-[2.85rem] text-[13px] font-semibold leading-[1.32] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-[3.05rem] min-[390px]:text-[14px] min-[390px]:leading-[1.35] sm:min-h-12 sm:text-lg sm:leading-7">
           {{ product.name }}
         </h3>
       </button>
