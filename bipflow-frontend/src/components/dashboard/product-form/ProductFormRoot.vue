@@ -11,11 +11,13 @@ interface Props {
   isOpen: boolean;
   initialData?: Product | null;
   categories: Array<{ id: number; name: string }>;
+  isSaving?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialData: null,
   categories: () => [],
+  isSaving: false,
 });
 
 const emit = defineEmits<{
@@ -25,6 +27,12 @@ const emit = defineEmits<{
 
 const isSubmitting = ref(false);
 const errors = ref<Record<string, string[]>>({});
+
+// isSubmitting only covers local validation; the parent's isSaving spans the
+// full async save (including the network round-trip), which can take much
+// longer -- combine both so the button stays disabled/spinning for the
+// entire operation instead of re-enabling the instant `save` is emitted.
+const isBusy = computed(() => isSubmitting.value || props.isSaving);
 
 type ProductFormState = {
   name: string;
@@ -110,6 +118,14 @@ watch(() => props.isOpen, (isVisible) => {
 }, { immediate: true });
 
 const handleSubmit = async () => {
+  // Defense in depth: the submit button is already :disabled="isBusy", but
+  // an implicit form submission (e.g. Enter in a text field) isn't always
+  // blocked by a disabled button the same way a click is -- guard here too
+  // so a save already in flight can never be double-submitted.
+  if (isBusy.value) {
+    return;
+  }
+
   isSubmitting.value = true;
   errors.value = {};
 
@@ -140,7 +156,7 @@ const subtitle = computed(() => (
   props.initialData ? 'Atualize os dados da vitrine' : 'Cadastre um item para venda'
 ));
 const submitLabel = computed(() => {
-  if (isSubmitting.value) {
+  if (isBusy.value) {
     return 'Salvando...';
   }
 
@@ -222,10 +238,10 @@ const submitLabel = computed(() => {
             form="product-registry-form"
             type="submit"
             data-cy="btn-submit-product"
-            :disabled="isSubmitting"
+            :disabled="isBusy"
             class="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span v-if="isSubmitting" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span v-if="isBusy" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             <CheckIcon v-else class="h-4 w-4" />
             <span>{{ submitLabel }}</span>
           </button>

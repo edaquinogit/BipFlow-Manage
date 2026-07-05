@@ -81,13 +81,14 @@ const handleSave = async (payload: Partial<Product>): Promise<void> => {
       const { stock_quantity: _stock_quantity, ...updatePayload } = dataToSync as Partial<Product> &
         Record<string, unknown>;
       await updateProduct(selectedProduct.value.id, updatePayload);
-      success('Produto atualizado com sucesso.');
     } else {
       await createProduct(dataToSync);
-      success('Produto criado com sucesso.');
     }
 
-    await fetchData();
+    // createProduct/updateProduct already splice the server's response into
+    // `products.value` (and already show their own success toast) -- a full
+    // refetch here was a second, redundant round-trip on every single save,
+    // doubling exposure to a slow/cold backend for no benefit.
     handleClosePanel();
   } catch {
     toastError('Não foi possível salvar o produto. Tente novamente.');

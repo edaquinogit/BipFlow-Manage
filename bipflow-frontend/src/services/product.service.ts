@@ -350,8 +350,14 @@ class ProductService {
       // it to `undefined` removes the JSON default and lets axios generate
       // the correct "multipart/form-data; boundary=..." header for the
       // FormData body.
+      // Product saves fan out into up to 3 sequential image uploads to R2 on
+      // the backend (cover + 2 gallery images) before the response returns,
+      // and the free-tier host can also be cold-starting (50s+) -- the
+      // shared instance's 15s default is tuned for plain JSON reads/writes
+      // and isn't enough here.
       const { data } = await api.post<unknown>(this.endpoint, payload, {
         headers: { "Content-Type": undefined },
+        timeout: 60000,
       });
 
       return ProductSchema.parse(this.normalizeProductRecord(data));
@@ -383,6 +389,9 @@ class ProductService {
       // "application/json", which must be explicitly unset (not just
       // omitted) for FormData so axios can generate its own boundary-aware
       // Content-Type header instead.
+      // Same reasoning as create(): up to 3 sequential R2 uploads server-side
+      // plus a possible free-tier cold start can comfortably exceed the
+      // shared instance's 15s default.
       const { data } = await api.patch<unknown>(
         `${this.endpoint}${id}/`,
         productData,
@@ -390,6 +399,7 @@ class ProductService {
           headers: {
             "Content-Type": isFormData ? undefined : "application/json",
           },
+          timeout: 60000,
         }
       );
 
