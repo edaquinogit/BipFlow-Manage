@@ -57,7 +57,10 @@ describe('DashboardHeader', () => {
     const text = wrapper.text()
     expect(text).toContain('Ana')
     expect(text).toContain('O que vamos pedir hoje')
-    expect(text).toMatch(/Boa (tarde|noite|dia)/)
+    // The greeting is "Bom dia" (masculine "dia"), not "Boa dia" -- this
+    // used to only match the latter, so it passed or failed depending on
+    // what time of day (and which timezone) the suite happened to run in.
+    expect(text).toMatch(/Bom dia|Boa tarde|Boa noite/)
   })
 
   it('emits selectStore when the store selector changes', async () => {
