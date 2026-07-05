@@ -109,27 +109,32 @@ const updatedAtLabel = computed(() => {
         <h2 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">Performance da loja</h2>
       </div>
 
-      <div class="flex items-center gap-3">
-        <span v-if="updatedAtLabel" class="text-[10px] font-bold uppercase tracking-widest text-bip-muted">
+      <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+        <span
+          v-if="updatedAtLabel"
+          class="hidden shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-bip-muted sm:inline"
+        >
           {{ updatedAtLabel }}
         </span>
         <button
           type="button"
           aria-label="Atualizar analise de vendas"
-          class="rounded-full border border-[#E5E7EB] bg-white p-2 text-bip-muted transition-colors hover:text-[#05050A] disabled:cursor-not-allowed disabled:opacity-50"
+          class="shrink-0 rounded-full border border-[#E5E7EB] bg-white p-2 text-bip-muted transition-colors hover:text-[#05050A] disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="isLoading"
           @click="emit('refresh')"
         >
           <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
         </button>
-        <PeriodSwitcher
-          :model-value="period"
-          :options="PERIOD_OPTIONS"
-          @update:model-value="emit('update:period', $event)"
-        />
+        <div class="min-w-0 flex-1 sm:flex-none">
+          <PeriodSwitcher
+            :model-value="period"
+            :options="PERIOD_OPTIONS"
+            @update:model-value="emit('update:period', $event)"
+          />
+        </div>
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-bip-muted transition-colors hover:text-[#05050A]"
+          class="flex shrink-0 items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-bip-muted transition-colors hover:text-[#05050A]"
           @click="emit('export')"
         >
           <ArrowDownTrayIcon class="h-3.5 w-3.5" />
