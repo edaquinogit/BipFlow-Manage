@@ -1,4 +1,5 @@
-from datetime import datetime, time as time_of_day, timedelta
+from datetime import datetime, timedelta
+from datetime import time as time_of_day
 from decimal import Decimal
 from typing import NamedTuple, Optional
 from urllib.parse import quote
@@ -9,8 +10,8 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.db.models.functions import TruncDate
 from django.db.models.deletion import ProtectedError
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -26,7 +27,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .bot_engine import build_bot_reply
 from .captcha import verify_turnstile
-from .errors import business_logic_error, not_found_error, validation_error
+from .errors import business_logic_error, not_found_error, permission_denied_error, validation_error
 from .mfa import (
     build_mfa_challenge_token,
     build_provisioning_uri,
@@ -52,7 +53,6 @@ from .models import (
     TOTPDevice,
 )
 from .pagination import ProductListPagination, StandardPagination
-from .product_labels import build_product_deep_link_url, build_product_qr_code_data_uri
 from .permissions import (
     AllowAnyReadDashboardWrite,
     DashboardReadWritePermission,
@@ -60,6 +60,7 @@ from .permissions import (
     has_dashboard_read_access,
     has_dashboard_write_access,
 )
+from .product_labels import build_product_deep_link_url, build_product_qr_code_data_uri
 from .serializers import (
     BotConversationDetailSerializer,
     BotConversationSummarySerializer,
@@ -77,12 +78,13 @@ from .serializers import (
     RegisterUserSerializer,
     SaleOrderBreakdownSerializer,
     SaleOrderCustomerInsightsSerializer,
-    SaleOrderStatusUpdateSerializer,
     SaleOrderSerializer,
+    SaleOrderStatusUpdateSerializer,
     SaleOrderSummarySerializer,
     SaleOrderTimeseriesPointSerializer,
     StockMovementCreateSerializer,
     StockMovementSerializer,
+    StoreRenameSerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
@@ -1270,6 +1272,36 @@ class MyStoresView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+class MyStoreDetailView(APIView):
+    """Rename one of the authenticated user's own stores (Etapa 4).
+
+    Only owner/manager memberships on *this specific store* may rename it --
+    `has_dashboard_write_access` alone isn't store-scoped, so a manager of
+    store A shouldn't be able to rename store B just because they hold a
+    write role somewhere.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        store = Store.objects.filter(slug=kwargs["slug"]).first()
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+
+        can_rename = store.memberships.filter(
+            user=request.user, role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER)
+        ).exists()
+        if not can_rename:
+            return permission_denied_error("Voce nao possui permissao para renomear esta loja.")
+
+        serializer = StoreRenameSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        store.name = serializer.validated_data["name"]
+        store.save(update_fields=["name", "updated_at"])
+
+        return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
 class BotMessageView(APIView):
     """Handle the public rule-based bot MVP without external AI services."""
 
@@ -2142,11 +2174,23 @@ class RegisterUserView(APIView):
         serializer = RegisterUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        context = serializer.validated_data.get(
+            "registration_context", RegisterUserSerializer.CONTEXT_DASHBOARD_OWNER
+        )
+
+        if context == RegisterUserSerializer.CONTEXT_STOREFRONT_CUSTOMER:
+            message = "Conta de cliente criada com sucesso."
+            profile_kind = "customer"
+        else:
+            message = "Cadastro realizado com sucesso. Voce ja pode acessar sua conta."
+            profile_kind = "dashboard_owner"
 
         return Response(
             {
-                "message": "Cadastro realizado com sucesso. Voce ja pode acessar sua conta.",
+                "message": message,
                 "email": user.email,
+                "profile_kind": profile_kind,
+                "registration_context": context,
             },
             status=status.HTTP_201_CREATED,
         )

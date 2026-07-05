@@ -63,9 +63,9 @@ function closeMobileNav(): void {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-bip-line bg-white/95 backdrop-blur-xl">
-    <div class="mx-auto max-w-7xl px-4 py-2.5 sm:px-6">
-      <div class="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+  <header class="sticky top-0 z-50 border-b border-bip-line bg-white/95 shadow-[0_8px_30px_-24px_rgba(5,5,10,0.35)] backdrop-blur-xl">
+    <div class="mx-auto max-w-7xl px-4 py-3.5 sm:px-6">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div class="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-5">
           <DashboardHeaderBranding :branding="activeBranding" />
 
@@ -83,7 +83,7 @@ function closeMobileNav(): void {
             :href="storefrontPath"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-bip-line bg-white px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-bip-rose/20 bg-bip-blush/60 px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-rose transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0"
             :title="`Abrir ${storefrontPath}`"
             @click="emit('openStore')"
           >
@@ -91,7 +91,7 @@ function closeMobileNav(): void {
             Ver vitrine
           </a>
 
-          <div class="flex min-w-0 flex-col items-end">
+          <div class="flex min-w-0 flex-col items-end rounded-xl border border-bip-line bg-bip-soft/60 px-3.5 py-1.5">
             <span class="hidden text-3xs font-black uppercase tracking-[0.24em] text-bip-muted sm:block">
               Operador
             </span>

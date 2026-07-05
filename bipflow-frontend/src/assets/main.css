@@ -4,6 +4,9 @@
 @source "../**/*.{vue,ts}";
 
 @theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+
   --color-bip-black: #05050a;
   --color-bip-soft: #fafafa;
   --color-bip-line: #e5e7eb;
@@ -57,6 +60,7 @@ html {
 
 body {
   @apply bg-[#FAFAFA] text-[#05050A] antialiased;
+  font-family: var(--font-sans);
   font-size: clamp(0.95rem, 0.9rem + 0.2vw, 1rem);
   line-height: 1.6;
   min-height: 100vh;
@@ -96,7 +100,7 @@ a {
 }
 
 .brand-wordmark {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1;
@@ -117,7 +121,7 @@ a {
 }
 
 .hero-display-title {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
   letter-spacing: 0;
   line-height: 0.98;
 }

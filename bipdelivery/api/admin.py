@@ -1,8 +1,10 @@
 from django.contrib import admin
+
 from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerProfile,
     DeliveryRegion,
     LoginAttempt,
     MFABackupCode,
@@ -79,6 +81,13 @@ class StoreMembershipAdmin(admin.ModelAdmin):
     list_display = ("id", "store", "user", "role")
     list_filter = ("role", "store")
     search_fields = ("user__username", "user__email")
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(admin.ModelAdmin):
+    list_display = ("id", "store", "user", "full_name", "phone")
+    list_filter = ("store",)
+    search_fields = ("user__username", "user__email", "full_name", "phone")
 
 
 @admin.register(StoreSettings)

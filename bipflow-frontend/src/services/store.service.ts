@@ -18,4 +18,10 @@ export const storeService = {
     const response = await api.post<Store>('v1/store/mine/', { name })
     return response.data
   },
+
+  /** Rename a store the authenticated user owns or manages. */
+  async rename(slug: string, name: string): Promise<Store> {
+    const response = await api.patch<Store>(`v1/store/mine/${slug}/`, { name })
+    return response.data
+  },
 }

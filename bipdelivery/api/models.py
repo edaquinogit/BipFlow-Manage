@@ -420,6 +420,37 @@ class StoreMembership(models.Model):
         return f"{self.user_id} @ {self.store_id} ({self.role})"
 
 
+class CustomerProfile(models.Model):
+    """Storefront customer identity scoped to a single store.
+
+    Keeps customer onboarding separate from dashboard memberships: a customer
+    can have an authenticated account for ordering and order history without
+    gaining dashboard access to catalog/settings resources.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="customer_profiles",
+    )
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="customer_profiles",
+    )
+    full_name = models.CharField(max_length=160, blank=True)
+    phone = models.CharField(max_length=32, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "store")
+        ordering = ["store_id", "user_id"]
+
+    def __str__(self) -> str:
+        """Return a compact customer profile identifier for admin/debug purposes."""
+        return f"customer:{self.user_id} @ {self.store_id}"
+
+
 class StoreSettings(models.Model):
     """Singleton operational settings controlled from the dashboard."""
 

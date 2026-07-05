@@ -5,7 +5,7 @@
       :value="selectedStore?.slug ?? ''"
       @change="handleStoreSelect"
       :disabled="isStoreLoading || stores.length === 0"
-      class="h-10 w-full rounded-xl border border-bip-line bg-white px-3 pr-9 text-sm font-semibold text-bip-black outline-none transition hover:border-bip-rose/50 focus:border-bip-rose focus:ring-2 focus:ring-bip-blush disabled:cursor-not-allowed disabled:opacity-60 sm:w-48"
+      class="h-11 w-full rounded-xl border border-bip-line bg-white px-3 pr-9 text-sm font-semibold text-bip-black outline-none transition hover:border-bip-rose/50 focus:border-bip-rose focus:ring-2 focus:ring-bip-blush disabled:cursor-not-allowed disabled:opacity-60 sm:w-48"
     >
       <option value="" disabled>
         {{ isStoreLoading ? 'Carregando loja...' : 'Selecione a loja' }}

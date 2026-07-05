@@ -17,6 +17,7 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerProfile,
     DeliveryRegion,
     Product,
     ProductGalleryImage,
@@ -45,6 +46,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     can_access_dashboard = serializers.SerializerMethodField()
     can_manage_catalog = serializers.SerializerMethodField()
     mfa_enabled = serializers.SerializerMethodField()
+    profile_kinds = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -61,6 +63,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "can_access_dashboard",
             "can_manage_catalog",
             "mfa_enabled",
+            "profile_kinds",
         ]
         read_only_fields = fields
 
@@ -90,6 +93,23 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     def get_mfa_enabled(self, user: User) -> bool:
         """Expose whether a confirmed TOTP device is active for this account."""
         return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+
+    def get_profile_kinds(self, user: User) -> list[str]:
+        """Return a coarse-grained profile map for frontend routing decisions."""
+        kinds: list[str] = []
+
+        if user.is_staff or user.is_superuser:
+            kinds.append("platform_admin")
+
+        if user.store_memberships.filter(role=StoreMembership.ROLE_OWNER).exists():
+            kinds.append("dashboard_owner")
+        elif user.store_memberships.exists():
+            kinds.append("dashboard_member")
+
+        if user.customer_profiles.exists():
+            kinds.append("customer")
+
+        return kinds
 
 
 class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -516,6 +536,18 @@ class StoreSerializer(serializers.ModelSerializer):
 
     def get_status(self, store: Store) -> str:
         return "active" if store.is_active else "inactive"
+
+
+class StoreRenameSerializer(serializers.Serializer):
+    """Validate a store rename request (Etapa 4: owners can fix a store's name)."""
+
+    name = serializers.CharField(max_length=120, trim_whitespace=True)
+
+    def validate_name(self, value: str) -> str:
+        normalized_name = value.strip()
+        if len(normalized_name) < 2:
+            raise serializers.ValidationError("Informe um nome de loja com pelo menos 2 caracteres.")
+        return normalized_name
 
 
 class PublicStoreSettingsSerializer(serializers.ModelSerializer):
@@ -1003,10 +1035,25 @@ class RegisterUserSerializer(serializers.Serializer):
     Django group first.
     """
 
+    CONTEXT_DASHBOARD_OWNER = "dashboard_owner"
+    CONTEXT_STOREFRONT_CUSTOMER = "storefront_customer"
+    CONTEXT_CHOICES = (
+        (CONTEXT_DASHBOARD_OWNER, "Dashboard owner"),
+        (CONTEXT_STOREFRONT_CUSTOMER, "Storefront customer"),
+    )
+
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
     confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
-    store_name = serializers.CharField(max_length=120, trim_whitespace=True)
+    registration_context = serializers.ChoiceField(
+        choices=CONTEXT_CHOICES,
+        required=False,
+        default=CONTEXT_DASHBOARD_OWNER,
+    )
+    store_name = serializers.CharField(max_length=120, trim_whitespace=True, required=False)
+    store_slug = serializers.SlugField(required=False)
+    full_name = serializers.CharField(max_length=160, trim_whitespace=True, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=32, trim_whitespace=True, required=False, allow_blank=True)
 
     def validate_store_name(self, value: str) -> str:
         normalized_name = value.strip()
@@ -1041,12 +1088,32 @@ class RegisterUserSerializer(serializers.Serializer):
         except DjangoValidationError as error:
             raise serializers.ValidationError({"password": list(error.messages)}) from error
 
+        context = attrs.get("registration_context", self.CONTEXT_DASHBOARD_OWNER)
+
+        if context == self.CONTEXT_DASHBOARD_OWNER:
+            store_name = (attrs.get("store_name") or "").strip()
+            if not store_name:
+                raise serializers.ValidationError({"store_name": "Informe o nome da sua loja."})
+            attrs["store_name"] = store_name
+
+        if context == self.CONTEXT_STOREFRONT_CUSTOMER:
+            store_slug = (attrs.get("store_slug") or "").strip().lower()
+            if not store_slug:
+                raise serializers.ValidationError({"store_slug": "Informe a loja para criar o perfil de cliente."})
+
+            store = Store.objects.filter(slug=store_slug, is_active=True).first()
+            if store is None:
+                raise serializers.ValidationError({"store_slug": "Loja nao encontrada ou inativa."})
+
+            attrs["store_slug"] = store_slug
+            attrs["resolved_store"] = store
+
         return attrs
 
     def create(self, validated_data):
         email = validated_data["email"]
         password = validated_data["password"]
-        store_name = validated_data["store_name"]
+        context = validated_data.get("registration_context", self.CONTEXT_DASHBOARD_OWNER)
 
         with transaction.atomic():
             user = User.objects.create_user(
@@ -1055,7 +1122,25 @@ class RegisterUserSerializer(serializers.Serializer):
                 password=password,
                 is_active=True,
             )
-            Store.create_for_owner(name=store_name, owner=user)
+
+            full_name = str(validated_data.get("full_name") or "").strip()
+            if full_name:
+                parts = full_name.split(maxsplit=1)
+                user.first_name = parts[0]
+                user.last_name = parts[1] if len(parts) > 1 else ""
+                user.save(update_fields=["first_name", "last_name"])
+
+            if context == self.CONTEXT_DASHBOARD_OWNER:
+                store_name = validated_data["store_name"]
+                Store.create_for_owner(name=store_name, owner=user)
+            else:
+                store = validated_data["resolved_store"]
+                CustomerProfile.objects.create(
+                    user=user,
+                    store=store,
+                    full_name=full_name,
+                    phone=str(validated_data.get("phone") or "").strip(),
+                )
 
         return user
 

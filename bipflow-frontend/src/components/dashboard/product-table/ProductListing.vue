@@ -57,7 +57,7 @@ const { canManageCatalog } = useCurrentUser();
 
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-[#D81B60] pl-6">
       <div>
-        <h3 class="text-3xl font-black text-[#05050A] italic uppercase tracking-tighter leading-none">
+        <h3 class="hero-display-title text-3xl font-black text-[#05050A] italic uppercase tracking-tighter leading-none">
           Produtos ativos
         </h3>
         <p class="text-[10px] text-bip-muted font-bold uppercase mt-2 tracking-[0.4em]">Controle da vitrine em tempo real</p>
@@ -67,7 +67,7 @@ const { canManageCatalog } = useCurrentUser();
         <RouterLink
           data-cy="btn-stock-history"
           :to="{ name: DashboardRoutes.StockMovements }"
-          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-bip-muted transition-all hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-bip-muted shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
         >
           <ClockIcon class="h-4 w-4" />
           Histórico de estoque

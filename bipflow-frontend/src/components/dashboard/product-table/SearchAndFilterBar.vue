@@ -2,10 +2,10 @@
 import { computed, ref, watch } from 'vue';
 import {
   CheckIcon,
+  FunnelIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   XMarkIcon,
-  ChevronDownIcon,
 } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { useCategories } from '@/composables/useCategories';
@@ -35,8 +35,7 @@ const { addCategory } = useCategories();
 const toast = useToast();
 
 const localFilters = ref<FilterState>({ ...props.filters });
-const isCategoryDropdownOpen = ref(false);
-const isAvailabilityDropdownOpen = ref(false);
+const isFiltersOpen = ref(false);
 const showNewCategoryModal = ref(false);
 const newCategoryName = ref('');
 const isCreatingCategory = ref(false);
@@ -129,23 +128,15 @@ function clearSearch(): void {
   emitFilters({ search: '' });
 }
 
-function toggleCategoryDropdown(): void {
-  isAvailabilityDropdownOpen.value = false;
-  isCategoryDropdownOpen.value = !isCategoryDropdownOpen.value;
-}
-
-function toggleAvailabilityDropdown(): void {
-  isCategoryDropdownOpen.value = false;
-  isAvailabilityDropdownOpen.value = !isAvailabilityDropdownOpen.value;
+function toggleFiltersDrawer(): void {
+  isFiltersOpen.value = !isFiltersOpen.value;
 }
 
 function selectCategory(categoryId: string | number | null): void {
-  isCategoryDropdownOpen.value = false;
   emitFilters({ categoryId });
 }
 
 function selectAvailability(inStock: boolean | null): void {
-  isAvailabilityDropdownOpen.value = false;
   emitFilters({ inStock });
 }
 
@@ -178,11 +169,6 @@ function removeFilter(type: 'search' | 'category' | 'availability' | 'price'): v
     case 'price':
       emitFilters({ minPrice: null, maxPrice: null });
   }
-}
-
-function closeDropdowns(): void {
-  isCategoryDropdownOpen.value = false;
-  isAvailabilityDropdownOpen.value = false;
 }
 
 async function createNewCategory(): Promise<void> {
@@ -221,242 +207,260 @@ function cancelNewCategory(): void {
 <template>
   <div class="sticky top-24 z-40 overflow-visible">
     <div
-      class="relative overflow-visible rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-2xl shadow-black/5"
+      class="relative flex items-center gap-2"
       data-cy="search-filter-bar"
-      @click="closeDropdowns"
     >
-      <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
-        <label class="relative block min-w-0 flex-1">
-          <span class="sr-only">Buscar produtos</span>
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-            <MagnifyingGlassIcon class="h-4 w-4 text-bip-muted" />
-          </div>
-
-          <input
-            :value="localFilters.search"
-            type="text"
-            placeholder="Buscar por nome, SKU ou descrição"
-            data-cy="search-input"
-            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white py-3 pl-11 pr-10 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-            @input="handleSearchInput"
-          />
-
-          <button
-            v-if="localFilters.search"
-            type="button"
-            class="absolute inset-y-0 right-0 flex items-center pr-4 text-bip-muted transition hover:text-[#05050A]"
-            aria-label="Limpar busca"
-            @click.stop="clearSearch"
-          >
-            <XMarkIcon class="h-4 w-4" />
-          </button>
-        </label>
-
-        <div v-if="isSearching" class="inline-flex h-11 items-center gap-2 rounded-lg border border-[#E5E7EB] px-4 text-sm text-bip-muted">
-          <span class="h-2 w-2 animate-pulse rounded-full bg-[#D81B60]" />
-          Buscando
+      <label class="relative block min-w-0 flex-1">
+        <span class="sr-only">Buscar produtos</span>
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+          <MagnifyingGlassIcon class="h-4 w-4 text-bip-muted" />
         </div>
 
-        <div v-if="categories.length > 0" class="relative min-w-[11rem]">
-          <button
-            type="button"
-            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#D1D5DB] bg-white px-4 text-left text-sm text-[#05050A] transition hover:border-[#D81B60]/40 focus:border-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
-            :aria-expanded="isCategoryDropdownOpen"
-            @click.stop="toggleCategoryDropdown"
-          >
-            <span class="truncate">{{ getCategoryName(localFilters.categoryId) }}</span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-bip-muted transition-transform" :class="{ 'rotate-180': isCategoryDropdownOpen }" />
-          </button>
-
-          <div
-            v-if="isCategoryDropdownOpen"
-            class="absolute left-0 z-[80] mt-2 w-64 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white p-1 shadow-2xl shadow-black/10 ring-1 ring-black/5"
-            role="listbox"
-          >
-            <div class="flex items-center justify-between px-3 py-2">
-              <span class="text-xs font-medium text-bip-muted">Categorias</span>
-              <span v-if="categories.length" class="text-xs text-bip-muted">
-                {{ categories.length }}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              class="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-[#05050A] transition hover:bg-zinc-50"
-              @click.stop="showNewCategoryModal = true; isCategoryDropdownOpen = false"
-            >
-              <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#E5E7EB] bg-zinc-50 text-bip-muted">
-                <PlusIcon class="h-4 w-4" />
-              </span>
-              <span class="min-w-0">
-                <span class="block truncate font-medium">Nova categoria</span>
-                <span class="block truncate text-xs text-bip-muted">Criar e aplicar filtro</span>
-              </span>
-            </button>
-
-            <div class="my-1 h-px bg-[#E5E7EB]" />
-
-            <div class="filter-popover-scroll max-h-64 overflow-y-auto pr-1">
-              <button
-                type="button"
-                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
-                :class="!localFilters.categoryId ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
-                :aria-selected="!localFilters.categoryId"
-                @click.stop="selectCategory(null)"
-              >
-                <span class="truncate">Todas as categorias</span>
-                <CheckIcon v-if="!localFilters.categoryId" class="h-4 w-4 shrink-0 text-[#D81B60]" />
-              </button>
-
-              <button
-                v-for="category in categories"
-                :key="category.id"
-                type="button"
-                class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
-                :class="localFilters.categoryId === category.id ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
-                :aria-selected="localFilters.categoryId === category.id"
-                @click.stop="selectCategory(category.id)"
-              >
-                <span class="truncate">{{ category.name }}</span>
-                <CheckIcon v-if="localFilters.categoryId === category.id" class="h-4 w-4 shrink-0 text-[#D81B60]" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="relative min-w-[9.5rem]">
-          <button
-            type="button"
-            class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#D1D5DB] bg-white px-4 text-left text-sm text-[#05050A] transition hover:border-[#D81B60]/40 focus:border-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
-            :aria-expanded="isAvailabilityDropdownOpen"
-            @click.stop="toggleAvailabilityDropdown"
-          >
-            <span class="truncate">{{ getAvailabilityText(localFilters.inStock) }}</span>
-            <ChevronDownIcon class="h-4 w-4 shrink-0 text-bip-muted transition-transform" :class="{ 'rotate-180': isAvailabilityDropdownOpen }" />
-          </button>
-
-          <div
-            v-if="isAvailabilityDropdownOpen"
-            class="absolute right-0 z-[80] mt-2 w-52 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white p-1 shadow-2xl shadow-black/10 ring-1 ring-black/5"
-            role="listbox"
-          >
-            <div class="px-3 py-2 text-xs font-medium text-bip-muted">
-              Disponibilidade
-            </div>
-
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
-              :class="localFilters.inStock === null ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
-              :aria-selected="localFilters.inStock === null"
-              @click.stop="selectAvailability(null)"
-            >
-              <span>Todos os itens</span>
-              <CheckIcon v-if="localFilters.inStock === null" class="h-4 w-4 shrink-0 text-[#D81B60]" />
-            </button>
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
-              :class="localFilters.inStock === true ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
-              :aria-selected="localFilters.inStock === true"
-              @click.stop="selectAvailability(true)"
-            >
-              <span>Em estoque</span>
-              <CheckIcon v-if="localFilters.inStock === true" class="h-4 w-4 shrink-0 text-[#D81B60]" />
-            </button>
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50"
-              :class="localFilters.inStock === false ? 'bg-[#FCE7F3] text-[#05050A]' : 'text-bip-muted hover:text-[#05050A]'"
-              :aria-selected="localFilters.inStock === false"
-              @click.stop="selectAvailability(false)"
-            >
-              <span>Sem estoque</span>
-              <CheckIcon v-if="localFilters.inStock === false" class="h-4 w-4 shrink-0 text-[#D81B60]" />
-            </button>
-          </div>
-        </div>
-
-        <div v-if="showPriceControls" class="grid grid-cols-2 gap-2 lg:w-52">
-          <label class="block">
-            <span class="sr-only">Preço minimo</span>
-            <input
-              :value="localFilters.minPrice ?? ''"
-              type="number"
-              min="0"
-              step="0.01"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-              placeholder="Min."
-              @input="handleMinPriceInput"
-            />
-          </label>
-          <label class="block">
-            <span class="sr-only">Preço maximo</span>
-            <input
-              :value="localFilters.maxPrice ?? ''"
-              type="number"
-              min="0"
-              step="0.01"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-              placeholder="Max."
-              @input="handleMaxPriceInput"
-            />
-          </label>
-        </div>
+        <input
+          :value="localFilters.search"
+          type="text"
+          placeholder="Buscar por nome, SKU ou descrição"
+          data-cy="search-input"
+          class="h-11 w-full rounded-full border border-transparent bg-[#F4F1F3] py-3 pl-11 pr-10 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3]"
+          @input="handleSearchInput"
+        />
 
         <button
-          v-if="hasAnyActiveFilters"
+          v-if="localFilters.search"
           type="button"
-          data-cy="btn-clear-filters"
-          class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] px-4 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#05050A]"
-          @click.stop="handleClearFilters"
+          class="absolute inset-y-0 right-0 flex items-center pr-4 text-bip-muted transition hover:text-[#05050A]"
+          aria-label="Limpar busca"
+          @click="clearSearch"
         >
           <XMarkIcon class="h-4 w-4" />
-          Limpar
         </button>
+      </label>
+
+      <span
+        v-if="isSearching"
+        class="hidden shrink-0 items-center gap-2 rounded-full bg-[#F4F1F3] px-3 py-2 text-xs text-bip-muted sm:inline-flex"
+      >
+        <span class="h-2 w-2 animate-pulse rounded-full bg-[#D81B60]" />
+        Buscando
+      </span>
+
+      <button
+        v-if="hasAnyActiveFilters"
+        type="button"
+        data-cy="btn-clear-filters"
+        class="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-bip-muted transition hover:text-[#D81B60] sm:inline-flex"
+        @click="handleClearFilters"
+      >
+        <XMarkIcon class="h-3.5 w-3.5" />
+        Limpar
+      </button>
+
+      <button
+        type="button"
+        :aria-expanded="isFiltersOpen"
+        aria-label="Abrir filtros"
+        class="group relative shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+        @click="toggleFiltersDrawer"
+      >
+        <FunnelIcon class="h-5 w-5" />
+        <span
+          v-if="hasAnyActiveFilters"
+          class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#D81B60] ring-2 ring-white"
+        />
+      </button>
+    </div>
+
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-2"
+    >
+      <div v-if="isFiltersOpen" class="absolute left-0 right-0 top-full z-40 mt-2">
+        <div class="fixed inset-0 bg-black/10 backdrop-blur-sm" @click="isFiltersOpen = false" />
+
+        <div class="relative ml-auto w-full max-w-2xl rounded-2xl border border-white/40 bg-white/80 p-4 shadow-2xl shadow-black/10 backdrop-blur-xl sm:p-6">
+          <button
+            type="button"
+            class="absolute right-3 top-3 text-bip-muted transition hover:text-[#D81B60]"
+            aria-label="Fechar filtros"
+            @click="isFiltersOpen = false"
+          >
+            <XMarkIcon class="h-5 w-5" />
+          </button>
+
+          <div class="grid gap-6 sm:grid-cols-2">
+            <div>
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <span class="text-xs font-black uppercase tracking-[0.16em] text-bip-muted">Categorias</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 text-xs font-semibold text-[#D81B60] hover:underline"
+                  @click="showNewCategoryModal = true"
+                >
+                  <PlusIcon class="h-3.5 w-3.5" />
+                  Nova
+                </button>
+              </div>
+
+              <div class="filter-popover-scroll max-h-48 space-y-1 overflow-y-auto rounded-xl border border-[#D1D5DB]/60 bg-white/50 p-1.5 backdrop-blur">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
+                  :class="!localFilters.categoryId ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                  :aria-selected="!localFilters.categoryId"
+                  @click="selectCategory(null)"
+                >
+                  <span class="truncate">Todas as categorias</span>
+                  <CheckIcon v-if="!localFilters.categoryId" class="h-4 w-4 shrink-0" />
+                </button>
+
+                <button
+                  v-for="category in categories"
+                  :key="category.id"
+                  type="button"
+                  class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
+                  :class="localFilters.categoryId === category.id ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                  :aria-selected="localFilters.categoryId === category.id"
+                  @click="selectCategory(category.id)"
+                >
+                  <span class="truncate">{{ category.name }}</span>
+                  <CheckIcon v-if="localFilters.categoryId === category.id" class="h-4 w-4 shrink-0" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <span class="mb-3 block text-xs font-black uppercase tracking-[0.16em] text-bip-muted">Disponibilidade</span>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
+                  :class="localFilters.inStock === null
+                    ? 'bg-[#D81B60] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                  @click="selectAvailability(null)"
+                >
+                  Todos os itens
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
+                  :class="localFilters.inStock === true
+                    ? 'bg-[#D81B60] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                  @click="selectAvailability(true)"
+                >
+                  Em estoque
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
+                  :class="localFilters.inStock === false
+                    ? 'bg-[#D81B60] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                  @click="selectAvailability(false)"
+                >
+                  Sem estoque
+                </button>
+              </div>
+
+              <div v-if="showPriceControls" class="mt-6">
+                <span class="mb-3 block text-xs font-black uppercase tracking-[0.16em] text-bip-muted">Faixa de preço</span>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="block">
+                    <span class="sr-only">Preço minimo</span>
+                    <input
+                      :value="localFilters.minPrice ?? ''"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Min."
+                      @input="handleMinPriceInput"
+                    />
+                  </label>
+                  <label class="block">
+                    <span class="sr-only">Preço maximo</span>
+                    <input
+                      :value="localFilters.maxPrice ?? ''"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Max."
+                      @input="handleMaxPriceInput"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 flex items-center justify-end gap-3 border-t border-white/40 pt-4">
+            <button
+              v-if="hasAnyActiveFilters"
+              type="button"
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#05050A]"
+              @click="handleClearFilters"
+            >
+              <XMarkIcon class="h-4 w-4" />
+              Limpar filtros
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-10 items-center justify-center rounded-lg bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-[0_12px_28px_-18px_rgba(216,27,96,0.8)] transition hover:bg-[#D81B60]/90"
+              @click="isFiltersOpen = false"
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
       </div>
+    </Transition>
 
-      <div v-if="activeFilterSummary.length > 0" class="mt-3 flex flex-wrap gap-2">
-        <button
-          v-if="localFilters.search.trim()"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
-          @click.stop="removeFilter('search')"
-        >
-          {{ activeFilterSummary.find((item) => item.startsWith('Busca:')) }}
-          <XMarkIcon class="h-3 w-3" />
-        </button>
+    <div v-if="activeFilterSummary.length > 0" class="mt-3 flex flex-wrap gap-2">
+      <button
+        v-if="localFilters.search.trim()"
+        type="button"
+        class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
+        @click="removeFilter('search')"
+      >
+        {{ activeFilterSummary.find((item) => item.startsWith('Busca:')) }}
+        <XMarkIcon class="h-3 w-3" />
+      </button>
 
-        <button
-          v-if="localFilters.categoryId"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
-          @click.stop="removeFilter('category')"
-        >
-          {{ getCategoryName(localFilters.categoryId) }}
-          <XMarkIcon class="h-3 w-3" />
-        </button>
+      <button
+        v-if="localFilters.categoryId"
+        type="button"
+        class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
+        @click="removeFilter('category')"
+      >
+        {{ getCategoryName(localFilters.categoryId) }}
+        <XMarkIcon class="h-3 w-3" />
+      </button>
 
-        <button
-          v-if="localFilters.inStock !== null"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
-          @click.stop="removeFilter('availability')"
-        >
-          {{ getAvailabilityText(localFilters.inStock) }}
-          <XMarkIcon class="h-3 w-3" />
-        </button>
+      <button
+        v-if="localFilters.inStock !== null"
+        type="button"
+        class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
+        @click="removeFilter('availability')"
+      >
+        {{ getAvailabilityText(localFilters.inStock) }}
+        <XMarkIcon class="h-3 w-3" />
+      </button>
 
-        <button
-          v-if="localFilters.minPrice !== null || localFilters.maxPrice !== null"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
-          @click.stop="removeFilter('price')"
-        >
-          {{ formatPriceRange() }}
-          <XMarkIcon class="h-3 w-3" />
-        </button>
-      </div>
+      <button
+        v-if="localFilters.minPrice !== null || localFilters.maxPrice !== null"
+        type="button"
+        class="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-zinc-50 px-3 py-1.5 text-xs text-bip-muted"
+        @click="removeFilter('price')"
+      >
+        {{ formatPriceRange() }}
+        <XMarkIcon class="h-3 w-3" />
+      </button>
     </div>
 
     <div

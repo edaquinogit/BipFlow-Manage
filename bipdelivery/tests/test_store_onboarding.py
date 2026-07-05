@@ -20,7 +20,14 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Category, Product, Store, StoreMembership, product_image_upload_to
+from bipdelivery.api.models import (
+    Category,
+    CustomerProfile,
+    Product,
+    Store,
+    StoreMembership,
+    product_image_upload_to,
+)
 
 User = get_user_model()
 
@@ -38,6 +45,18 @@ class RegistrationCreatesStoreTest(TestCase):
             "store_name": "Pizzaria da Nova Loja",
         }
         payload.update(overrides)
+        return self.client.post("/api/auth/register/", payload, format="json")
+
+    def _register_customer(self, *, email: str = "customer@example.com", store_slug: str = "default"):
+        payload = {
+            "email": email,
+            "password": "SenhaForte123",
+            "confirm_password": "SenhaForte123",
+            "registration_context": "storefront_customer",
+            "store_slug": store_slug,
+            "full_name": "Cliente Loja",
+            "phone": "11999999999",
+        }
         return self.client.post("/api/auth/register/", payload, format="json")
 
     def test_registration_creates_a_store_owned_by_the_new_user(self) -> None:
@@ -103,6 +122,29 @@ class RegistrationCreatesStoreTest(TestCase):
         self.assertEqual(product_response.status_code, status.HTTP_201_CREATED, msg=product_response.data)
         created = Product.objects.get(id=product_response.data["id"])
         self.assertEqual(created.store_id, store.id)
+
+    def test_storefront_customer_registration_creates_customer_profile_only(self) -> None:
+        store = Store.get_default()
+
+        response = self._register_customer(store_slug=store.slug)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email="customer@example.com")
+        self.assertFalse(StoreMembership.objects.filter(user=user).exists())
+        self.assertTrue(CustomerProfile.objects.filter(user=user, store=store).exists())
+        self.assertEqual(response.data["profile_kind"], "customer")
+
+    def test_storefront_customer_cannot_access_dashboard(self) -> None:
+        store = Store.get_default()
+        self._register_customer(store_slug=store.slug)
+        user = User.objects.get(email="customer@example.com")
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["can_access_dashboard"])
+        self.assertIn("customer", response.data["profile_kinds"])
 
 
 class StoreSwitchSecurityTest(TestCase):
@@ -175,6 +217,41 @@ class MyStoresEndpointTest(TestCase):
         response = APIClient().get("/api/v1/store/mine/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_owner_can_rename_their_store(self) -> None:
+        response = self.client.patch(
+            f"/api/v1/store/mine/{self.store_a.slug}/", {"name": "Boutique Fitness"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.name, "Boutique Fitness")
+
+    def test_viewer_role_cannot_rename_the_store(self) -> None:
+        response = self.client.patch(
+            f"/api/v1/store/mine/{self.store_b.slug}/", {"name": "Nome Indevido"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.store_b.refresh_from_db()
+        self.assertEqual(self.store_b.name, "Loja B")
+
+    def test_user_without_membership_cannot_rename_the_store(self) -> None:
+        response = self.client.patch(
+            f"/api/v1/store/mine/{self.other_store.slug}/", {"name": "Nome Indevido"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_rename_rejects_blank_name(self) -> None:
+        response = self.client.patch(f"/api/v1/store/mine/{self.store_a.slug}/", {"name": "  "}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rename_unknown_store_returns_404(self) -> None:
+        response = self.client.patch("/api/v1/store/mine/does-not-exist/", {"name": "Qualquer"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class ProductImageUploadPathTest(TestCase):

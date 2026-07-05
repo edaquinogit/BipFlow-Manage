@@ -47,6 +47,16 @@ export const authRoutes: RouteRecordRaw[] = [
     meta: guestMeta("Entrar")
   },
   {
+    path: "/l/:storeSlug/login",
+    component: () => import("@/views/auth/LoginView.vue"),
+    meta: guestMeta("Entrar")
+  },
+  {
+    path: "/s/:storeSlug/login",
+    component: () => import("@/views/auth/LoginView.vue"),
+    meta: guestMeta("Entrar")
+  },
+  {
     path: "/register",
     name: AuthRouteNames.Register,
     component: () => import("@/views/auth/RegisterView.vue"),

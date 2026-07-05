@@ -41,6 +41,10 @@ let refreshRequest: Promise<TokenRefreshPayload> | null = null;
  */
 const pendingRequests = new Map<string, AbortController>();
 
+function isPublicStorefrontPath(pathname: string): boolean {
+  return pathname.startsWith('/l/') || pathname.startsWith('/s/') || pathname.startsWith('/produtos');
+}
+
 function refreshAuthTokens(): Promise<TokenRefreshPayload> {
   if (!refreshRequest) {
     // Separate instance: the refresh token rides the httpOnly cookie
@@ -268,7 +272,7 @@ function handleAuthFailure() {
   const currentPath = window.location.pathname;
   const isAlreadyOnLogin = currentPath === '/login' || currentPath.startsWith('/login');
 
-  if (!isAlreadyOnLogin) {
+  if (!isAlreadyOnLogin && !isPublicStorefrontPath(currentPath)) {
     if (import.meta.env.DEV) {
       Logger.info("Redirecting to login page");
     }
@@ -278,7 +282,7 @@ function handleAuthFailure() {
     window.location.href = "/login?reason=session_expired";
   } else {
     if (import.meta.env.DEV) {
-      Logger.debug("Already on login page, no redirect needed");
+      Logger.debug("Skipping login redirect on public storefront or login page");
     }
   }
 
