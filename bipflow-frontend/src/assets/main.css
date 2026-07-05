@@ -49,6 +49,10 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Blocks the double-tap-to-zoom gesture outright -- the viewport meta's
+     maximum-scale/user-scalable alone isn't consistently honored by every
+     mobile browser (notably some Android WebViews). */
+  touch-action: manipulation;
 }
 
 body {
