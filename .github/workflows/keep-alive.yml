@@ -1,0 +1,26 @@
+name: Keep backend warm
+
+# Production backend (Render free tier) spins down after ~15 minutes of
+# inactivity and can take 50s+ to wake back up -- longer than the frontend's
+# request timeouts, so the first visitor after any idle stretch sees failed
+# requests (see the storefront timeout reports on 2026-07-05). Neon's free
+# Postgres branch has its own, shorter auto-suspend on top of that.
+#
+# Pinging a real (DB-backed) public endpoint often enough keeps both awake
+# so nobody ever hits a cold start. This is a stopgap, not a fix: the real
+# fix is a paid Render instance (no spin-down) -- revisit if/when that's
+# worth the recurring cost.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping a DB-backed public endpoint
+        run: |
+          curl -sf --max-time 55 "https://bipflow-backend.onrender.com/api/v1/store/current/" > /dev/null \
+            && echo "Backend responded" \
+            || echo "::warning::Keep-alive ping failed or timed out"
