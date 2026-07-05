@@ -52,14 +52,14 @@
         :aria-label="`Abrir detalhes de ${product.name}`"
         @click="handleOpenDetails"
       >
-        <h3 class="line-clamp-2 min-h-[2.85rem] text-[13px] font-semibold leading-[1.32] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-[3.05rem] min-[390px]:text-[14px] min-[390px]:leading-[1.35] sm:min-h-12 sm:text-lg sm:leading-7">
+        <h3 class="line-clamp-2 min-h-[2.85rem] text-[13px] font-semibold leading-[1.32] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-[3.05rem] min-[390px]:text-[14px] min-[390px]:leading-[1.35] sm:min-h-[2.9rem] sm:text-[15px] sm:leading-[1.45] lg:min-h-[3rem] lg:text-base lg:leading-[1.5]">
           {{ product.name }}
         </h3>
       </button>
 
       <div class="mt-3.5 flex items-end justify-between gap-2.5 min-[390px]:mt-4 min-[390px]:gap-3">
         <div>
-          <span class="block text-[1.15rem] font-semibold tracking-[-0.02em] text-[#05050A] min-[390px]:text-xl sm:text-2xl">
+          <span class="block text-[1.12rem] font-semibold tracking-[-0.015em] text-[#05050A] min-[390px]:text-[1.22rem] sm:text-[1.36rem] lg:text-[1.28rem] xl:text-[1.34rem]">
             {{ formatBRL(product.price) }}
           </span>
           <p class="mt-1 text-[12px] text-slate-500 min-[390px]:text-sm">
@@ -69,7 +69,7 @@
 
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#6B7280] transition hover:text-[#D81B60] sm:text-xs"
+          class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B7280] transition hover:text-[#D81B60] sm:text-[11px]"
           :aria-label="`Ver descricao e detalhes de ${product.name}`"
           @click="handleOpenDetails"
         >
