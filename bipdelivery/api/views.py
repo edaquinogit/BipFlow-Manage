@@ -1732,11 +1732,16 @@ REFRESH_TOKEN_COOKIE_PATH = "/api/auth/"
 def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: bool = False) -> None:
     """Store the refresh token as an httpOnly cookie, unreachable from page JS.
 
-    Unchecked "remember me" -> no Max-Age at all (a session cookie the
-    browser drops on its own when it fully closes). Checked -> a persistent
-    cookie matching REMEMBER_ME_REFRESH_TOKEN_LIFETIME. The token's own
-    `exp` claim must already match this (see _apply_remember_me) -- a
-    persistent cookie around an expired token would be a no-op.
+    Always carries a real Max-Age matching the token's own `exp` (see
+    _apply_remember_me) -- unchecked "remember me" -> REFRESH_TOKEN_LIFETIME
+    (1 day), checked -> REMEMBER_ME_REFRESH_TOKEN_LIFETIME (30 days). A
+    Max-Age-less session cookie was tried here previously, but mobile OSes
+    routinely kill a backgrounded browser tab's process under memory
+    pressure -- indistinguishable, from the cookie store's point of view,
+    from "the browser closed" -- which silently logged mobile users out on
+    every reload despite their refresh token still being valid server-side.
+    The JWT's own expiry already bounds the session; the cookie's storage
+    persistence doesn't need to be shorter than that too.
     """
     cookie_kwargs: dict = {
         "path": REFRESH_TOKEN_COOKIE_PATH,
@@ -1745,9 +1750,12 @@ def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: 
         # also set, regardless of IS_PRODUCTION -- see BIPFLOW_CROSS_ORIGIN_COOKIES.
         "secure": settings.IS_PRODUCTION or settings.BIPFLOW_CROSS_ORIGIN_COOKIES,
         "samesite": settings.REFRESH_COOKIE_SAMESITE,
+        "max_age": int((
+            settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME
+            if remember_me
+            else settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+        ).total_seconds()),
     }
-    if remember_me:
-        cookie_kwargs["max_age"] = int(settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME.total_seconds())
 
     response.set_cookie(REFRESH_TOKEN_COOKIE_NAME, refresh_token, **cookie_kwargs)
 

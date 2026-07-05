@@ -2,11 +2,11 @@
 "Remember Me" Tests (Fase 3.3)
 
 Validates that the refresh cookie/token's persistence actually follows the
-remember_me choice end-to-end: unchecked means a session cookie (no
-Max-Age) around the normal 1-day token; checked means a persistent cookie
-(Max-Age set) around a 30-day token -- and that choice survives rotation
-(SimpleJWT's own rotation resets exp to the global default unless each
-hop re-applies it, which is exactly the bug this suite guards against).
+remember_me choice end-to-end: unchecked means a cookie Max-Age matching
+the normal 1-day token; checked means a Max-Age matching a 30-day token --
+and that choice survives rotation (SimpleJWT's own rotation resets exp to
+the global default unless each hop re-applies it, which is exactly the bug
+this suite guards against).
 
 Run tests with:
     pytest bipdelivery/tests/test_remember_me.py -v
@@ -42,14 +42,15 @@ class RememberMeLoginTest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(username="remember-me@example.com", password="testpass123")
 
-    def test_unchecked_remember_me_issues_a_session_cookie(self) -> None:
+    def test_unchecked_remember_me_issues_a_cookie_matching_the_token_lifetime(self) -> None:
         response: Any = self.client.post(
             "/api/auth/token/",
             {"username": self.user.username, "password": "testpass123"},
             format="json",
         )
         cookie = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
-        self.assertEqual(cookie["max-age"], "")
+        expected_seconds = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+        self.assertEqual(int(cookie["max-age"]), expected_seconds)
 
     def test_checked_remember_me_issues_a_persistent_cookie(self) -> None:
         response: Any = self.client.post(
@@ -97,7 +98,7 @@ class RememberMeLoginTest(TestCase):
         self.assertGreater(rotated_token["exp"] - rotated_token["iat"], one_day_seconds)
         self.assertTrue(rotated_token["remember_me"])
 
-    def test_without_remember_me_rotation_stays_a_session_cookie(self) -> None:
+    def test_without_remember_me_rotation_keeps_the_token_lifetime_cookie(self) -> None:
         login_response: Any = self.client.post(
             "/api/auth/token/",
             {"username": self.user.username, "password": "testpass123"},
@@ -106,7 +107,10 @@ class RememberMeLoginTest(TestCase):
         self.client.cookies[REFRESH_TOKEN_COOKIE_NAME] = login_response.cookies[REFRESH_TOKEN_COOKIE_NAME].value
 
         refresh_response: Any = self.client.post("/api/auth/token/refresh/", {}, format="json")
-        self.assertEqual(refresh_response.cookies[REFRESH_TOKEN_COOKIE_NAME]["max-age"], "")
+        expected_seconds = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+        self.assertEqual(
+            int(refresh_response.cookies[REFRESH_TOKEN_COOKIE_NAME]["max-age"]), expected_seconds
+        )
 
 
 class RememberMeMfaTest(TestCase):
@@ -141,7 +145,7 @@ class RememberMeMfaTest(TestCase):
         expected_seconds = int(settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME.total_seconds())
         self.assertEqual(int(cookie["max-age"]), expected_seconds)
 
-    def test_without_remember_me_the_mfa_challenge_stays_a_session_cookie(self) -> None:
+    def test_without_remember_me_the_mfa_challenge_issues_a_token_lifetime_cookie(self) -> None:
         login_response: Any = self.client.post(
             "/api/auth/token/",
             {"username": self.user.username, "password": "testpass123"},
@@ -154,7 +158,10 @@ class RememberMeMfaTest(TestCase):
             {"mfa_token": mfa_token, "code": pyotp.TOTP(self.secret).now()},
             format="json",
         )
-        self.assertEqual(verify_response.cookies[REFRESH_TOKEN_COOKIE_NAME]["max-age"], "")
+        expected_seconds = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+        self.assertEqual(
+            int(verify_response.cookies[REFRESH_TOKEN_COOKIE_NAME]["max-age"]), expected_seconds
+        )
 
     def test_tampering_with_the_challenge_token_cannot_forge_remember_me(self) -> None:
         """A user can't hand-craft a challenge token claiming remember_me to get a longer session."""

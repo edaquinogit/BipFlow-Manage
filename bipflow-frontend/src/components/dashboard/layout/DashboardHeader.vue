@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
@@ -48,11 +48,47 @@ const NAV_ITEMS = [
 ];
 
 const isMobileNavOpen = ref(false);
+const isWelcomeVisible = ref(import.meta.env.MODE === 'test');
+
+const welcomeState = computed(() => {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return {
+      greeting: 'Bom dia',
+      periodLabel: 'Turno da manha',
+      emoji: '🌤️',
+      prompt: 'Vamos organizar os pedidos de hoje.',
+    };
+  }
+
+  if (hour < 18) {
+    return {
+      greeting: 'Boa tarde',
+      periodLabel: 'Turno da tarde',
+      emoji: '☀️',
+      prompt: 'Tudo pronto para manter o fluxo estavel.',
+    };
+  }
+
+  return {
+    greeting: 'Boa noite',
+    periodLabel: 'Turno da noite',
+    emoji: '🌙',
+    prompt: 'Fechamos o dia com consistencia.',
+  };
+});
 
 const welcomeMessage = computed(() => {
-  const greeting = new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+  const { greeting, prompt } = welcomeState.value;
 
-  return props.userName ? `${greeting}, ${props.userName}! O que vamos pedir hoje?` : `${greeting}! O que vamos pedir hoje?`;
+  return props.userName ? `${greeting}, ${props.userName}. ${prompt}` : `${greeting}. ${prompt}`;
+});
+
+onMounted(() => {
+  requestAnimationFrame(() => {
+    isWelcomeVisible.value = true;
+  });
 });
 
 const activeBranding = computed(() => buildStoreBranding(props.selectedStore));
@@ -91,13 +127,21 @@ function closeMobileNav(): void {
             Ver vitrine
           </a>
 
-          <div class="flex min-w-0 flex-col items-end rounded-xl border border-bip-line bg-bip-soft/60 px-3.5 py-1.5">
+          <div
+            class="welcome-card flex min-w-0 max-w-full flex-col items-end rounded-xl border border-white/65 bg-white/48 px-3.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md"
+          >
             <span class="hidden text-3xs font-black uppercase tracking-[0.24em] text-bip-muted sm:block">
-              Operador
+              {{ welcomeState.periodLabel }}
             </span>
-            <span class="max-w-[8rem] truncate text-[clamp(0.75rem,0.7rem+0.25vw,0.95rem)] font-semibold leading-tight text-bip-black sm:max-w-[13rem]">
-              {{ welcomeMessage }}
-            </span>
+
+            <Transition name="welcome-text" appear>
+              <span
+                v-if="isWelcomeVisible"
+                class="w-full max-w-[15rem] whitespace-normal break-words text-right text-[clamp(0.75rem,0.7rem+0.25vw,0.95rem)] font-semibold leading-snug text-bip-black sm:max-w-[22rem]"
+              >
+                {{ welcomeState.emoji }} {{ welcomeMessage }}
+              </span>
+            </Transition>
           </div>
 
           <button
@@ -156,5 +200,22 @@ function closeMobileNav(): void {
 .mobile-nav-enter-from,
 .mobile-nav-leave-to {
   opacity: 0;
+}
+
+.welcome-text-enter-active,
+.welcome-text-appear-active {
+  transition: opacity 220ms ease, transform 260ms ease;
+}
+
+.welcome-text-enter-from,
+.welcome-text-appear-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.welcome-text-enter-to,
+.welcome-text-appear-to {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

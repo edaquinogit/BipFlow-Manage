@@ -1,27 +1,32 @@
 <template>
-  <label class="relative block min-w-0 sm:w-48">
-    <span class="sr-only">Selecionar loja ativa</span>
-    <select
-      :value="selectedStore?.slug ?? ''"
-      @change="handleStoreSelect"
-      :disabled="isStoreLoading || stores.length === 0"
-      class="h-11 w-full rounded-xl border border-bip-line bg-white px-3 pr-9 text-sm font-semibold text-bip-black outline-none transition hover:border-bip-rose/50 focus:border-bip-rose focus:ring-2 focus:ring-bip-blush disabled:cursor-not-allowed disabled:opacity-60 sm:w-48"
-    >
-      <option value="" disabled>
-        {{ isStoreLoading ? 'Carregando loja...' : 'Selecione a loja' }}
-      </option>
-      <option
-        v-for="store in stores"
-        :key="store.id"
-        :value="store.slug"
+  <div class="store-select-glass min-w-0 rounded-xl border border-white/65 bg-white/46 px-2.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md sm:w-52">
+    <label class="relative block min-w-0">
+      <span class="mb-1 block text-3xs font-black uppercase tracking-[0.22em] text-bip-muted">
+        Loja ativa
+      </span>
+      <span class="sr-only">Selecionar loja ativa</span>
+      <select
+        :value="selectedStore?.slug ?? ''"
+        @change="handleStoreSelect"
+        :disabled="isStoreLoading || stores.length === 0"
+        class="h-10 w-full rounded-lg border border-bip-line/70 bg-white/75 px-3 pr-9 text-sm font-semibold text-bip-black outline-none transition hover:border-bip-rose/45 focus:border-bip-rose focus:ring-2 focus:ring-bip-blush/70 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {{ store.name }}
-      </option>
-    </select>
-    <span class="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-bip-muted">
-      ▾
-    </span>
-  </label>
+        <option value="" disabled>
+          {{ isStoreLoading ? 'Carregando loja...' : 'Selecione a loja' }}
+        </option>
+        <option
+          v-for="store in stores"
+          :key="store.id"
+          :value="store.slug"
+        >
+          {{ store.name }}
+        </option>
+      </select>
+      <span class="pointer-events-none absolute inset-y-0 right-3 top-5 inline-flex items-center text-bip-muted">
+        ▾
+      </span>
+    </label>
+  </div>
 </template>
 
 <script setup lang="ts">
