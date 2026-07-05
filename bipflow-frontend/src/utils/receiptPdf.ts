@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import type { ReceiptData } from '@/types/receipt';
 import type { ReceiptPaperFormat, Store } from '@/types/store';
 import { getPaymentLabel } from '@/constants/saleOrder';
-import { formatBRL, formatDateTimeBR } from '@/utils/formatters';
+import { formatBRL, formatDateTimeBR, formatWhatsAppPhone } from '@/utils/formatters';
 
 /**
  * PDV receipt PDF/email evolution: generates an actual PDF file for the PDV
@@ -66,16 +66,37 @@ function layoutReceipt(
     });
   };
 
+  // Unlike writeLine(), puts a left-aligned and a right-aligned bit of text
+  // on the SAME row (e.g. "R$ 18,50 cada" ... "R$ 37,00") instead of
+  // stacking them on separate lines -- mirrors the on-screen receipt's
+  // flex row (unit price under the product name, line total on the right).
+  const writeRow = (left: string, right: string, options: WriteOptions = {}): void => {
+    doc.setFont('helvetica', options.bold ? 'bold' : 'normal');
+    doc.setFontSize(options.size ?? DEFAULT_FONT_SIZE_PT);
+    if (draw) {
+      doc.text(left, MARGIN_MM, y, { align: 'left' });
+      doc.text(right, width - MARGIN_MM, y, { align: 'right' });
+    }
+    y += LINE_HEIGHT_MM;
+  };
+
   if (store?.name) {
     writeLine(store.name, { bold: true, center: true });
   }
+  if (store?.whatsapp_phone) {
+    writeLine(formatWhatsAppPhone(store.whatsapp_phone), { center: true, size: SMALL_FONT_SIZE_PT });
+  }
+  writeLine('Cupom não fiscal', { center: true, size: SMALL_FONT_SIZE_PT });
+  y += 1;
   writeLine(sale.order_reference, { center: true, size: SMALL_FONT_SIZE_PT });
   writeLine(formatDateTimeBR(sale.created_at), { center: true, size: SMALL_FONT_SIZE_PT });
   y += 2;
 
   sale.items.forEach((item) => {
     writeLine(`${item.quantity}x ${item.product_name}`);
-    writeLine(formatBRL(item.line_total), { right: true });
+    writeRow(`${formatBRL(item.unit_price)} cada`, formatBRL(item.line_total), {
+      size: SMALL_FONT_SIZE_PT,
+    });
   });
 
   y += 1;
@@ -86,6 +107,9 @@ function layoutReceipt(
     y += 2;
     writeLine(store.receipt_exchange_policy, { center: true, size: SMALL_FONT_SIZE_PT });
   }
+
+  y += 2;
+  writeLine('Obrigado pela preferência!', { center: true, size: SMALL_FONT_SIZE_PT });
 
   return y + MARGIN_MM;
 }

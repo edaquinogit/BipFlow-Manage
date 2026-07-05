@@ -3,11 +3,10 @@ import { computed, ref, toRef } from 'vue';
 import { ArrowDownTrayIcon, EnvelopeIcon, PrinterIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { ReceiptData } from '@/types/receipt';
 import { getPaymentLabel } from '@/constants/saleOrder';
-import { formatBRL, formatDateTimeBR } from '@/utils/formatters';
+import { formatBRL, formatDateTimeBR, formatWhatsAppPhone } from '@/utils/formatters';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 import { useCurrentStore } from '@/composables/useCurrentStore';
-import { buildReceiptPdf, buildReceiptPdfBase64 } from '@/utils/receiptPdf';
-import PdvSaleService from '@/services/pdvSale.service';
+import { buildReceiptPdf } from '@/utils/receiptPdf';
 import { Logger } from '@/services/logger';
 
 /**
@@ -55,12 +54,17 @@ const handleDownloadPdf = (): void => {
   buildReceiptPdf(props.sale, selectedStore.value).save(`recibo-${props.sale.order_reference}.pdf`);
 };
 
-// PDV receipt PDF/email evolution: the same client-built PDF (Etapa E2)
-// gets relayed to the backend as a base64 attachment (bipdelivery/api/pdv.py's
-// PdvReceiptEmailView) instead of being downloaded.
+/**
+ * Envio por e-mail via Gmail: em vez de depender do backend enviar o
+ * e-mail (bipdelivery/api/pdv.py's PdvReceiptEmailView, que exige um SMTP
+ * de verdade configurado -- muitas lojas pequenas não têm um e-mail
+ * transacional próprio), "Enviar" baixa o PDF do recibo e abre uma janela
+ * de composição do Gmail já preenchida com destinatário/assunto/corpo. O
+ * navegador não permite anexar um arquivo automaticamente por segurança,
+ * então o corpo do e-mail já orienta o lojista a anexar o PDF baixado.
+ */
 const isEmailFormOpen = ref(false);
 const emailDraft = ref('');
-const isSendingEmail = ref(false);
 const emailError = ref<string | null>(null);
 const emailSentMessage = ref<string | null>(null);
 
@@ -76,9 +80,9 @@ const closeEmailForm = (): void => {
   emailError.value = null;
 };
 
-const handleSendEmail = async (): Promise<void> => {
+const handleSendEmail = (): void => {
   const sale = props.sale;
-  if (!sale || isSendingEmail.value) {
+  if (!sale) {
     return;
   }
 
@@ -88,19 +92,30 @@ const handleSendEmail = async (): Promise<void> => {
     return;
   }
 
-  isSendingEmail.value = true;
   emailError.value = null;
 
   try {
-    const pdfBase64 = buildReceiptPdfBase64(sale, selectedStore.value);
-    await PdvSaleService.sendReceiptEmail(sale.order_reference, email, pdfBase64);
-    emailSentMessage.value = `Recibo enviado para ${email}.`;
+    buildReceiptPdf(sale, selectedStore.value).save(`recibo-${sale.order_reference}.pdf`);
+
+    const subject = `Recibo da compra ${sale.order_reference}`;
+    const body =
+      `Olá! Segue o recibo da sua compra ${sale.order_reference}.\n\n` +
+      'O arquivo PDF do recibo acabou de ser baixado neste computador -- anexe-o a este e-mail antes de enviar.';
+    const gmailComposeUrl =
+      'https://mail.google.com/mail/?view=cm&fs=1' +
+      `&to=${encodeURIComponent(email)}` +
+      `&su=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
+    window.open(gmailComposeUrl, '_blank', 'noopener,noreferrer');
+
+    emailSentMessage.value = `PDF baixado. Anexe-o na aba do Gmail que abrimos para ${email} e envie por lá.`;
     isEmailFormOpen.value = false;
   } catch (error: unknown) {
-    Logger.error('Failed to send PDV receipt email', { error, orderReference: sale.order_reference });
-    emailError.value = 'Não foi possível enviar o recibo por e-mail. Tente novamente.';
-  } finally {
-    isSendingEmail.value = false;
+    Logger.error('Failed to prepare PDV receipt email via Gmail', {
+      error,
+      orderReference: sale.order_reference,
+    });
+    emailError.value = 'Não foi possível preparar o recibo para envio. Tente novamente.';
   }
 };
 </script>
@@ -134,9 +149,15 @@ const handleSendEmail = async (): Promise<void> => {
           </p>
 
           <div class="receipt-printable" :class="paperFormatClass" data-cy="pdv-receipt">
-            <div v-if="selectedStore" class="mb-2 text-center">
+            <div v-if="selectedStore" class="mb-1 text-center">
               <p class="text-sm font-black uppercase text-[#05050A]">{{ selectedStore.name }}</p>
+              <p v-if="selectedStore.whatsapp_phone" class="text-[10px] text-bip-muted">
+                {{ formatWhatsAppPhone(selectedStore.whatsapp_phone) }}
+              </p>
             </div>
+            <p class="mb-2 text-center text-[9px] font-bold uppercase tracking-[0.15em] text-bip-muted">
+              Cupom não fiscal
+            </p>
 
             <div class="mb-2 flex items-center justify-between text-[11px] text-bip-muted">
               <span data-cy="pdv-receipt-order-reference">{{ sale.order_reference }}</span>
@@ -150,8 +171,13 @@ const handleSendEmail = async (): Promise<void> => {
                 class="flex items-baseline justify-between gap-3 text-sm"
                 data-cy="pdv-receipt-item"
               >
-                <span class="min-w-0 truncate font-semibold text-[#05050A]">
-                  {{ item.quantity }}x {{ item.product_name }}
+                <span class="min-w-0">
+                  <span class="block truncate font-semibold text-[#05050A]">
+                    {{ item.quantity }}x {{ item.product_name }}
+                  </span>
+                  <span class="block text-[10px] text-bip-muted">
+                    {{ formatBRL(item.unit_price) }} cada
+                  </span>
                 </span>
                 <span class="shrink-0 font-mono text-[#05050A]">{{ formatBRL(item.line_total) }}</span>
               </li>
@@ -159,7 +185,7 @@ const handleSendEmail = async (): Promise<void> => {
 
             <div class="mt-4 flex items-center justify-between border-t border-dashed border-[#D1D5DB] pt-3 text-sm font-black">
               <span>Total</span>
-              <span data-cy="pdv-receipt-total">{{ formatBRL(sale.total) }}</span>
+              <span data-cy="pdv-receipt-total" class="font-mono">{{ formatBRL(sale.total) }}</span>
             </div>
             <p class="mt-1 text-xs text-bip-muted">
               Pagamento: {{ getPaymentLabel(sale.payment_method as 'pix' | 'card' | 'cash') }}
@@ -171,6 +197,10 @@ const handleSendEmail = async (): Promise<void> => {
               class="mt-4 border-t border-dashed border-[#D1D5DB] pt-3 text-center text-[10px] leading-4 text-bip-muted"
             >
               {{ selectedStore.receipt_exchange_policy }}
+            </p>
+
+            <p class="mt-3 text-center text-[10px] font-bold text-bip-muted">
+              Obrigado pela preferência!
             </p>
           </div>
 
@@ -215,6 +245,10 @@ const handleSendEmail = async (): Promise<void> => {
                 placeholder="cliente@exemplo.com"
               />
             </label>
+            <p class="text-[10px] text-bip-muted">
+              Ao enviar, o PDF do recibo é baixado e o Gmail abre em outra aba já preenchido --
+              é só anexar o arquivo baixado e enviar.
+            </p>
             <p v-if="emailError" data-cy="receipt-email-error" class="text-xs font-semibold text-[#D81B60]">
               {{ emailError }}
             </p>
@@ -226,10 +260,9 @@ const handleSendEmail = async (): Promise<void> => {
                 type="button"
                 data-cy="btn-send-receipt-email"
                 class="confirm-button"
-                :disabled="isSendingEmail"
                 @click="handleSendEmail"
               >
-                {{ isSendingEmail ? 'Enviando...' : 'Enviar' }}
+                Enviar
               </button>
             </div>
           </div>

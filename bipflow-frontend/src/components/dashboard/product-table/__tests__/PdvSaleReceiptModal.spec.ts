@@ -3,18 +3,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import PdvSaleReceiptModal from '../PdvSaleReceiptModal.vue'
 import { useCurrentStore } from '@/composables/useCurrentStore'
-import { buildReceiptPdf, buildReceiptPdfBase64 } from '@/utils/receiptPdf'
-import PdvSaleService from '@/services/pdvSale.service'
+import { buildReceiptPdf } from '@/utils/receiptPdf'
 import type { PdvSaleResponse } from '@/types/pdvSale'
 import type { Store } from '@/types/store'
 
 vi.mock('@/composables/useCurrentStore', () => ({ useCurrentStore: vi.fn() }))
 vi.mock('@/utils/receiptPdf', () => ({
   buildReceiptPdf: vi.fn(),
-  buildReceiptPdfBase64: vi.fn(),
-}))
-vi.mock('@/services/pdvSale.service', () => ({
-  default: { sendReceiptEmail: vi.fn() },
 }))
 
 function buildStore(overrides: Partial<Store> = {}): Store {
@@ -164,28 +159,33 @@ describe('PdvSaleReceiptModal (PDV receipt refinement: store info, exchange poli
       ).toBe('cliente@example.com')
     })
 
-    it('builds the PDF and sends it to the entered email', async () => {
-      vi.mocked(buildReceiptPdfBase64).mockReturnValue('JVBERi0xLjQ=')
-      vi.mocked(PdvSaleService.sendReceiptEmail).mockResolvedValue(undefined)
+    it('downloads the PDF and opens a Gmail compose tab pre-filled with the entered email', async () => {
+      const saveSpy = vi.fn()
+      vi.mocked(buildReceiptPdf).mockReturnValue({ save: saveSpy } as any)
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
       const sale = buildSale()
 
       const wrapper = mountModal(sale)
       await wrapper.find('[data-cy="btn-open-receipt-email"]').trigger('click')
       await wrapper.find('[data-cy="receipt-email-input"]').setValue('cliente@example.com')
       await wrapper.find('[data-cy="btn-send-receipt-email"]').trigger('click')
-      await flushPromises()
 
-      expect(buildReceiptPdfBase64).toHaveBeenCalledWith(sale, buildStore())
-      expect(PdvSaleService.sendReceiptEmail).toHaveBeenCalledWith(
-        sale.order_reference,
-        'cliente@example.com',
-        'JVBERi0xLjQ='
-      )
+      expect(buildReceiptPdf).toHaveBeenCalledWith(sale, buildStore())
+      expect(saveSpy).toHaveBeenCalledWith(`recibo-${sale.order_reference}.pdf`)
+      expect(openSpy).toHaveBeenCalledTimes(1)
+      const [gmailUrl, target, features] = openSpy.mock.calls[0]!
+      expect(gmailUrl).toContain('https://mail.google.com/mail/')
+      expect(gmailUrl).toContain(`to=${encodeURIComponent('cliente@example.com')}`)
+      expect(gmailUrl).toContain(encodeURIComponent(sale.order_reference))
+      expect(target).toBe('_blank')
+      expect(features).toContain('noopener')
+
       expect(wrapper.find('[data-cy="receipt-email-sent"]').text()).toContain('cliente@example.com')
       expect(wrapper.find('[data-cy="receipt-email-input"]').exists()).toBe(false)
     })
 
     it('shows a validation message when trying to send with no email', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
       const wrapper = mountModal()
 
       await wrapper.find('[data-cy="btn-open-receipt-email"]').trigger('click')
@@ -193,31 +193,34 @@ describe('PdvSaleReceiptModal (PDV receipt refinement: store info, exchange poli
       await wrapper.find('[data-cy="btn-send-receipt-email"]').trigger('click')
 
       expect(wrapper.find('[data-cy="receipt-email-error"]').exists()).toBe(true)
-      expect(PdvSaleService.sendReceiptEmail).not.toHaveBeenCalled()
+      expect(openSpy).not.toHaveBeenCalled()
     })
 
-    it('shows an error message when the send fails', async () => {
-      vi.mocked(buildReceiptPdfBase64).mockReturnValue('JVBERi0xLjQ=')
-      vi.mocked(PdvSaleService.sendReceiptEmail).mockRejectedValue(new Error('network down'))
+    it('shows an error message when preparing the PDF fails', async () => {
+      vi.mocked(buildReceiptPdf).mockImplementation(() => {
+        throw new Error('pdf generation failed')
+      })
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
 
       const wrapper = mountModal()
       await wrapper.find('[data-cy="btn-open-receipt-email"]').trigger('click')
       await wrapper.find('[data-cy="receipt-email-input"]').setValue('cliente@example.com')
       await wrapper.find('[data-cy="btn-send-receipt-email"]').trigger('click')
-      await flushPromises()
 
       expect(wrapper.find('[data-cy="receipt-email-error"]').exists()).toBe(true)
       expect(wrapper.find('[data-cy="receipt-email-sent"]').exists()).toBe(false)
+      expect(openSpy).not.toHaveBeenCalled()
     })
 
     it('closes the email form on cancel without sending', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
       const wrapper = mountModal()
 
       await wrapper.find('[data-cy="btn-open-receipt-email"]').trigger('click')
       await wrapper.findAll('.cancel-button').at(-1)!.trigger('click')
 
       expect(wrapper.find('[data-cy="receipt-email-input"]').exists()).toBe(false)
-      expect(PdvSaleService.sendReceiptEmail).not.toHaveBeenCalled()
+      expect(openSpy).not.toHaveBeenCalled()
     })
   })
 })

@@ -370,7 +370,7 @@ onBeforeUnmount(() => {
         <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">
           Escanear ou digitar código
         </label>
-        <div class="mt-2 flex gap-2">
+        <div class="mt-2 flex flex-col gap-2 sm:flex-row">
           <input
             ref="scanInputRef"
             v-model="scanValue"
@@ -386,10 +386,11 @@ onBeforeUnmount(() => {
             type="button"
             data-cy="pdv-open-camera-scanner"
             aria-label="Escanear com a câmera"
-            class="flex h-[3.125rem] w-[3.125rem] shrink-0 items-center justify-center rounded-xl border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60]"
+            class="flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-[#D1D5DB] text-sm font-bold uppercase tracking-wide text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] active:scale-[0.98] sm:h-[3.125rem] sm:w-[3.125rem]"
             @click="openCameraScanner"
           >
-            <CameraIcon class="h-5 w-5" />
+            <CameraIcon class="h-5 w-5 shrink-0" />
+            <span class="sm:hidden">Escanear com a câmera</span>
           </button>
         </div>
         <p

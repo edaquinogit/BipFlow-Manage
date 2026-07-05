@@ -157,8 +157,8 @@ watch(
 
 .close-button {
   display: flex;
-  height: 2.25rem;
-  width: 2.25rem;
+  height: 2.75rem;
+  width: 2.75rem;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
