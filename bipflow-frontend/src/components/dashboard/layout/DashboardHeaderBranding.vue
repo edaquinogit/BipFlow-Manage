@@ -30,5 +30,5 @@ interface HeaderBranding {
   tagline: string
 }
 
-const props = defineProps<{ branding: HeaderBranding }>();
+defineProps<{ branding: HeaderBranding }>();
 </script>

@@ -34,7 +34,7 @@
 import { ArrowLeftOnRectangleIcon } from '@heroicons/vue/24/outline';
 import type { RouteLocationRaw } from 'vue-router';
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   items: Array<{ label: string; to: RouteLocationRaw; icon: any }>;
   isOpen: boolean;
 }>(), {

@@ -114,7 +114,7 @@ const chartOptions = computed(() => ({
           <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Ticket medio 7D</p>
           <p class="text-xl font-black text-[#05050A]">{{ formatBRL(ticketMovingAverage.toFixed(2)) }}</p>
         </div>
-        <template v-if="hasYoyComparison" class="sm:col-span-3">
+        <template v-if="hasYoyComparison">
           <div class="h-8 w-px bg-[#E5E7EB] md:mx-auto" />
           <div class="min-w-[120px]">
             <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Vs ano anterior</p>

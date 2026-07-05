@@ -27,7 +27,7 @@
 <script setup lang="ts">
 import type { Store } from '@/types/store';
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   stores: Store[];
   selectedStore?: Store | null;
   isStoreLoading: boolean;
