@@ -1,5 +1,5 @@
 import api from './api'
-import type { Store } from '@/types/store'
+import type { Store, StoreReceiptSettingsPayload } from '@/types/store'
 
 export const storeService = {
   async getCurrent(): Promise<Store> {
@@ -22,6 +22,12 @@ export const storeService = {
   /** Rename a store the authenticated user owns or manages. */
   async rename(slug: string, name: string): Promise<Store> {
     const response = await api.patch<Store>(`v1/store/mine/${slug}/`, { name })
+    return response.data
+  },
+
+  /** Update a store's PDV receipt settings (exchange policy + paper format). */
+  async updateReceiptSettings(slug: string, payload: StoreReceiptSettingsPayload): Promise<Store> {
+    const response = await api.patch<Store>(`v1/store/mine/${slug}/receipt-settings/`, payload)
     return response.data
   },
 }

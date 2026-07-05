@@ -1,5 +1,7 @@
 export type StoreStatus = 'active' | 'inactive'
 
+export type ReceiptPaperFormat = '58mm' | '80mm' | 'a4'
+
 export interface StoreTheme {
   primary?: string | null
   accent?: string | null
@@ -19,4 +21,11 @@ export interface Store {
   theme?: StoreTheme | null
   is_active: boolean
   status?: StoreStatus
+  receipt_exchange_policy: string
+  receipt_paper_format: ReceiptPaperFormat
+}
+
+export interface StoreReceiptSettingsPayload {
+  receipt_exchange_policy?: string
+  receipt_paper_format?: ReceiptPaperFormat
 }

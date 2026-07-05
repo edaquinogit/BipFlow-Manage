@@ -36,6 +36,8 @@
     "@heroicons/vue": "^2.2.0",
     "apexcharts": "^5.15.2",
     "axios": "^1.14.0",
+    "jspdf": "^4.2.1",
+    "qr-scanner": "^1.4.2",
     "vue": "^3.5.0",
     "vue-router": "^4.6.4",
     "vue3-apexcharts": "^1.11.1",

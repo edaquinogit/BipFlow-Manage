@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref, toRef } from 'vue';
-import { PrinterIcon, XMarkIcon } from '@heroicons/vue/24/outline';
-import type { PdvSaleResponse } from '@/types/pdvSale';
+import { computed, ref, toRef } from 'vue';
+import { ArrowDownTrayIcon, EnvelopeIcon, PrinterIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import type { ReceiptData } from '@/types/receipt';
 import { getPaymentLabel } from '@/constants/saleOrder';
-import { formatBRL } from '@/utils/formatters';
+import { formatBRL, formatDateTimeBR } from '@/utils/formatters';
 import { useDialogA11y } from '@/composables/useDialogA11y';
+import { useCurrentStore } from '@/composables/useCurrentStore';
+import { buildReceiptPdf, buildReceiptPdfBase64 } from '@/utils/receiptPdf';
+import PdvSaleService from '@/services/pdvSale.service';
+import { Logger } from '@/services/logger';
 
 /**
  * Etapa R2 of the QR-code stock-exit refinement (see
@@ -12,10 +16,17 @@ import { useDialogA11y } from '@/composables/useDialogA11y';
  * screen after a PDV sale finalizes -- until now the only feedback was a
  * toast that disappears in a few seconds, with no itemized record on
  * screen for the cashier (or the customer) to check.
+ *
+ * PDV receipt refinement (store name/date/exchange-policy/paper-format):
+ * `sale.order_reference` used to render outside `.receipt-printable`, so
+ * the printed receipt never actually showed which order it was -- fixed by
+ * moving it inside. Store info comes from `useCurrentStore()` (already a
+ * reactive singleton fed by StoreSerializer), not a prop, since this modal
+ * only ever renders for the currently active store's own PDV.
  */
 const props = defineProps<{
   show: boolean;
-  sale: PdvSaleResponse | null;
+  sale: ReceiptData | null;
 }>();
 
 const emit = defineEmits<{
@@ -27,8 +38,70 @@ const closeButtonRef = ref<HTMLButtonElement | null>(null);
 
 useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, closeButtonRef);
 
+const { selectedStore } = useCurrentStore();
+
+const paperFormatClass = computed(() => (
+  `format-${selectedStore.value?.receipt_paper_format ?? '80mm'}`
+));
+
 const handlePrint = (): void => {
   window.print();
+};
+
+const handleDownloadPdf = (): void => {
+  if (!props.sale) {
+    return;
+  }
+  buildReceiptPdf(props.sale, selectedStore.value).save(`recibo-${props.sale.order_reference}.pdf`);
+};
+
+// PDV receipt PDF/email evolution: the same client-built PDF (Etapa E2)
+// gets relayed to the backend as a base64 attachment (bipdelivery/api/pdv.py's
+// PdvReceiptEmailView) instead of being downloaded.
+const isEmailFormOpen = ref(false);
+const emailDraft = ref('');
+const isSendingEmail = ref(false);
+const emailError = ref<string | null>(null);
+const emailSentMessage = ref<string | null>(null);
+
+const openEmailForm = (): void => {
+  emailDraft.value = props.sale?.customer_email ?? '';
+  emailError.value = null;
+  emailSentMessage.value = null;
+  isEmailFormOpen.value = true;
+};
+
+const closeEmailForm = (): void => {
+  isEmailFormOpen.value = false;
+  emailError.value = null;
+};
+
+const handleSendEmail = async (): Promise<void> => {
+  const sale = props.sale;
+  if (!sale || isSendingEmail.value) {
+    return;
+  }
+
+  const email = emailDraft.value.trim();
+  if (!email) {
+    emailError.value = 'Informe um e-mail.';
+    return;
+  }
+
+  isSendingEmail.value = true;
+  emailError.value = null;
+
+  try {
+    const pdfBase64 = buildReceiptPdfBase64(sale, selectedStore.value);
+    await PdvSaleService.sendReceiptEmail(sale.order_reference, email, pdfBase64);
+    emailSentMessage.value = `Recibo enviado para ${email}.`;
+    isEmailFormOpen.value = false;
+  } catch (error: unknown) {
+    Logger.error('Failed to send PDV receipt email', { error, orderReference: sale.order_reference });
+    emailError.value = 'Não foi possível enviar o recibo por e-mail. Tente novamente.';
+  } finally {
+    isSendingEmail.value = false;
+  }
 };
 </script>
 
@@ -56,15 +129,24 @@ const handlePrint = (): void => {
           <h3 class="text-xl font-black text-[#05050A] italic uppercase tracking-tighter mb-1">
             Venda registrada
           </h3>
-          <p class="text-[10px] text-bip-muted font-bold uppercase tracking-[0.2em] mb-6" data-cy="pdv-receipt-order-reference">
+          <p class="text-[10px] text-bip-muted font-bold uppercase tracking-[0.2em] mb-6 no-print">
             {{ sale.order_reference }}
           </p>
 
-          <div class="receipt-printable" data-cy="pdv-receipt">
-            <ul class="space-y-2">
+          <div class="receipt-printable" :class="paperFormatClass" data-cy="pdv-receipt">
+            <div v-if="selectedStore" class="mb-2 text-center">
+              <p class="text-sm font-black uppercase text-[#05050A]">{{ selectedStore.name }}</p>
+            </div>
+
+            <div class="mb-2 flex items-center justify-between text-[11px] text-bip-muted">
+              <span data-cy="pdv-receipt-order-reference">{{ sale.order_reference }}</span>
+              <span>{{ formatDateTimeBR(sale.created_at) }}</span>
+            </div>
+
+            <ul class="space-y-2 border-t border-dashed border-[#D1D5DB] pt-2">
               <li
-                v-for="item in sale.items"
-                :key="item.product_id"
+                v-for="(item, index) in sale.items"
+                :key="item.product_id ?? index"
                 class="flex items-baseline justify-between gap-3 text-sm"
                 data-cy="pdv-receipt-item"
               >
@@ -82,17 +164,83 @@ const handlePrint = (): void => {
             <p class="mt-1 text-xs text-bip-muted">
               Pagamento: {{ getPaymentLabel(sale.payment_method as 'pix' | 'card' | 'cash') }}
             </p>
+
+            <p
+              v-if="selectedStore?.receipt_exchange_policy"
+              data-cy="pdv-receipt-exchange-policy"
+              class="mt-4 border-t border-dashed border-[#D1D5DB] pt-3 text-center text-[10px] leading-4 text-bip-muted"
+            >
+              {{ selectedStore.receipt_exchange_policy }}
+            </p>
           </div>
 
-          <div class="flex w-full gap-4 mt-7 no-print">
+          <div class="flex w-full flex-wrap gap-3 mt-7 no-print">
             <button type="button" class="cancel-button" @click="emit('close')">
               Fechar
+            </button>
+            <button
+              type="button"
+              data-cy="btn-download-receipt-pdf"
+              class="cancel-button"
+              @click="handleDownloadPdf"
+            >
+              <ArrowDownTrayIcon class="mr-1.5 inline h-4 w-4" />
+              Baixar PDF
+            </button>
+            <button
+              type="button"
+              data-cy="btn-open-receipt-email"
+              class="cancel-button"
+              @click="openEmailForm"
+            >
+              <EnvelopeIcon class="mr-1.5 inline h-4 w-4" />
+              Enviar por e-mail
             </button>
             <button type="button" data-cy="btn-print-receipt" class="confirm-button" @click="handlePrint">
               <PrinterIcon class="mr-1.5 inline h-4 w-4" />
               Imprimir
             </button>
           </div>
+
+          <div v-if="isEmailFormOpen" class="mt-4 w-full space-y-2 no-print">
+            <label class="block">
+              <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">
+                E-mail do cliente
+              </span>
+              <input
+                v-model="emailDraft"
+                type="email"
+                data-cy="receipt-email-input"
+                class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                placeholder="cliente@exemplo.com"
+              />
+            </label>
+            <p v-if="emailError" data-cy="receipt-email-error" class="text-xs font-semibold text-[#D81B60]">
+              {{ emailError }}
+            </p>
+            <div class="flex gap-3">
+              <button type="button" class="cancel-button" @click="closeEmailForm">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                data-cy="btn-send-receipt-email"
+                class="confirm-button"
+                :disabled="isSendingEmail"
+                @click="handleSendEmail"
+              >
+                {{ isSendingEmail ? 'Enviando...' : 'Enviar' }}
+              </button>
+            </div>
+          </div>
+
+          <p
+            v-if="emailSentMessage"
+            data-cy="receipt-email-sent"
+            class="mt-3 text-center text-xs font-semibold text-emerald-700 no-print"
+          >
+            {{ emailSentMessage }}
+          </p>
         </div>
       </div>
     </Transition>
@@ -214,6 +362,21 @@ const handlePrint = (): void => {
     top: 2rem;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  /* PDV receipt print-format presets (store-configurable, see
+     ReceiptSettingsTab.vue): the two dominant thermal receipt-roll widths
+     in Brazilian retail, plus a plain-sheet width for a regular printer. */
+  .receipt-printable.format-58mm {
+    width: 58mm;
+  }
+
+  .receipt-printable.format-80mm {
+    width: 80mm;
+  }
+
+  .receipt-printable.format-a4 {
+    width: 190mm;
   }
 
   .no-print {

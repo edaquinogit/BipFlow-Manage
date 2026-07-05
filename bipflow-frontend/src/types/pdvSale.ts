@@ -23,6 +23,9 @@ export interface PdvSaleRequestPayload {
   // it lets a PDV sale count toward the new-vs-returning customer insight
   // the same way a virtual checkout's required phone already does.
   customer_phone?: string
+  // PDV receipt PDF/email evolution: optional, lets the cashier email the
+  // printed receipt right after the sale finalizes.
+  customer_email?: string
   notes?: string
 }
 
@@ -42,6 +45,7 @@ export const PdvSaleResponseSchema = z.object({
   total: z.union([z.string(), z.number()]).transform((value) => String(value)),
   payment_method: z.string(),
   created_at: z.string(),
+  customer_email: z.string().optional().default(''),
 })
 
 export type PdvSaleResponse = z.infer<typeof PdvSaleResponseSchema>

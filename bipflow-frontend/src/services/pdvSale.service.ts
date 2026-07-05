@@ -31,6 +31,25 @@ class PdvSaleService {
     }
   }
 
+  /**
+   * PDV receipt PDF/email evolution: relays an already-built receipt PDF
+   * (see utils/receiptPdf.ts) to the backend, which emails it to `email` as
+   * an attachment. `orderReference` scopes the request to a real sale the
+   * requester's store owns (bipdelivery/api/pdv.py's PdvReceiptEmailView).
+   */
+  async sendReceiptEmail(orderReference: string, email: string, pdfBase64: string): Promise<void> {
+    try {
+      await api.post<unknown>(
+        `${this.endpoint}${encodeURIComponent(orderReference)}/receipt-email/`,
+        { email, pdf_base64: pdfBase64 },
+        { headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Send PDV Receipt Email");
+      throw error;
+    }
+  }
+
   private handleError(error: ApplicationError, context: string): void {
     if (isZodError(error)) {
       Logger.error(

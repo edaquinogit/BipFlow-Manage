@@ -15,6 +15,7 @@ export interface PdvCartLine {
   quantity: number;
   availableStock: number;
   lowStockThreshold: number | null;
+  imageUrl: string | null;
 }
 
 /**
@@ -71,6 +72,7 @@ export function usePdvCart() {
         quantity,
         availableStock: product.stock_quantity,
         lowStockThreshold: product.low_stock_threshold ?? null,
+        imageUrl: product.image_url ?? null,
       },
     ];
     return { ok: true };

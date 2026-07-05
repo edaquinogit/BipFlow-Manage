@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import DashboardPdvView from '../DashboardPdvView.vue'
@@ -19,6 +19,21 @@ vi.mock('@/services/pdvSale.service', () => ({
 vi.mock('@/services/sales.service', () => ({
   salesService: { list: vi.fn() },
 }))
+// Etapa C2 of the PDV camera-scanner evolution: DashboardPdvView.spec.ts
+// only needs to prove the camera decode is wired into the same lookup path
+// as the text input -- PdvCameraScannerModal.vue's own camera lifecycle
+// (permissions, qr-scanner) is already covered by
+// PdvCameraScannerModal.spec.ts and usePdvCameraScanner.spec.ts, so it's
+// stubbed here to a thin component that exposes `show`/`feedback` and lets
+// the test emit `decode`/`close` directly.
+vi.mock('@/components/dashboard/product-table/PdvCameraScannerModal.vue', () => ({
+  default: {
+    name: 'PdvCameraScannerModal',
+    props: ['show', 'feedback'],
+    emits: ['close', 'decode'],
+    template: '<div v-if="show" data-cy="pdv-camera-scanner-stub">{{ feedback?.message }}</div>',
+  },
+}))
 
 function buildEmptySalesResponse() {
   return { count: 0, next: null, previous: null, page_size: 5, total_pages: 1, results: [] }
@@ -38,7 +53,23 @@ const scannedProduct = {
   public_code: 'ABCD2345',
 }
 
-const mountPdvView = (options: Parameters<typeof mount>[1] = {}) => mount(DashboardPdvView, options)
+// Etapa C3 of the PDV camera-scanner evolution added a window-level
+// keydown listener (Ctrl+Enter/Esc shortcuts), so an unmounted wrapper now
+// leaks a real event listener onto the shared jsdom `window` instead of
+// being harmlessly garbage-collected -- tracking every mount here and
+// unmounting them all after each test keeps that listener from piling up
+// across the ~30 other tests in this file that don't call wrapper.unmount()
+// themselves.
+const activeWrappers: Array<ReturnType<typeof mount>> = []
+const mountPdvView = (options: Parameters<typeof mount>[1] = {}) => {
+  const wrapper = mount(DashboardPdvView, options)
+  activeWrappers.push(wrapper)
+  return wrapper
+}
+
+afterEach(() => {
+  activeWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+})
 
 describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () => {
   beforeEach(() => {
@@ -139,6 +170,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       total: '18.50',
       payment_method: 'pix',
       created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
     })
 
     const wrapper = mountPdvView()
@@ -168,6 +200,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       total: '18.50',
       payment_method: 'pix',
       created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
     })
 
     const wrapper = mountPdvView()
@@ -181,6 +214,32 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
 
     expect(PdvSaleService.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer_phone: '71999998888' })
+    )
+  })
+
+  it('passes the optional customer email through to the sale payload (PDV receipt PDF/email evolution)', async () => {
+    vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+    vi.mocked(PdvSaleService.create).mockResolvedValue({
+      order_reference: 'PDV-20260702-120000-000000',
+      items: [],
+      subtotal: '18.50',
+      total: '18.50',
+      payment_method: 'pix',
+      created_at: '2026-07-02T12:00:00Z',
+      customer_email: 'cliente@example.com',
+    })
+
+    const wrapper = mountPdvView()
+    await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+    await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+    await flushPromises()
+    await wrapper.find('[data-cy="pdv-customer-email"]').setValue('cliente@example.com')
+
+    await wrapper.find('[data-cy="pdv-finalize-sale"]').trigger('click')
+    await flushPromises()
+
+    expect(PdvSaleService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_email: 'cliente@example.com' })
     )
   })
 
@@ -202,6 +261,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       total: '18.50',
       payment_method: 'pix',
       created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
     })
 
     const wrapper = mountPdvView({ global: { stubs: { teleport: true } } })
@@ -226,6 +286,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       total: '18.50',
       payment_method: 'pix',
       created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
     })
 
     const wrapper = mountPdvView({ global: { stubs: { teleport: true } }, attachTo: document.body })
@@ -427,6 +488,7 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       total: '18.50',
       payment_method: 'pix',
       created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
     })
 
     const wrapper = mountPdvView({ global: { stubs: { teleport: true } } })
@@ -440,5 +502,215 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
     await flushPromises()
 
     expect(salesService.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens a past sale\'s receipt from "Últimas vendas" (PDV receipt PDF/email evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      page_size: 5,
+      total_pages: 1,
+      results: [
+        {
+          id: 1,
+          order_reference: 'PDV-20260702-100000-000000',
+          status: 'prepared',
+          channel: 'loja_fisica',
+          customer_name: 'Cliente balcão',
+          customer_phone: '',
+          customer_email: 'cliente@example.com',
+          delivery_method: 'pickup',
+          payment_method: 'cash',
+          delivery_region_name: '',
+          performed_by_username: 'caixa1',
+          subtotal: '18.50',
+          delivery_fee: '0.00',
+          total: '18.50',
+          created_at: '2026-07-02T10:00:00Z',
+          item_count: 1,
+          items: [
+            {
+              id: 1,
+              product_id: 7,
+              product_name: 'Coxinha premium',
+              sku: '',
+              quantity: 1,
+              unit_price: '18.50',
+              line_total: '18.50',
+            },
+          ],
+        },
+      ],
+    })
+
+    const wrapper = mountPdvView({ global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('[data-cy="pdv-recent-sale-view-receipt"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="pdv-receipt-order-reference"]').text()).toBe(
+      'PDV-20260702-100000-000000'
+    )
+    expect(wrapper.find('[data-cy="pdv-receipt-item"]').text()).toContain('Coxinha premium')
+    expect(wrapper.find('[data-cy="pdv-receipt-total"]').text()).toContain('18,50')
+  })
+
+  describe('camera scanner (Etapa C2 of the PDV camera-scanner evolution)', () => {
+    it('opens the camera scanner modal when the camera button is clicked', async () => {
+      const wrapper = mountPdvView()
+
+      expect(wrapper.find('[data-cy="pdv-camera-scanner-stub"]').exists()).toBe(false)
+      await wrapper.find('[data-cy="pdv-open-camera-scanner"]').trigger('click')
+
+      expect(wrapper.find('[data-cy="pdv-camera-scanner-stub"]').exists()).toBe(true)
+    })
+
+    it('extracts the public_code from a decoded deep-link URL and adds the product to the cart', async () => {
+      vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+      const wrapper = mountPdvView()
+
+      await wrapper.find('[data-cy="pdv-open-camera-scanner"]').trigger('click')
+      await wrapper
+        .findComponent({ name: 'PdvCameraScannerModal' })
+        .vm.$emit('decode', 'https://app.bipflow.com/l/minha-loja/p/ABCD2345')
+      await flushPromises()
+
+      expect(ProductService.getByCode).toHaveBeenCalledWith('ABCD2345')
+      expect(wrapper.find('[data-cy="pdv-cart-row"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Coxinha premium')
+    })
+
+    it('surfaces a not-found message as camera feedback for an unknown code', async () => {
+      vi.mocked(ProductService.getByCode).mockRejectedValue(new Error('not found'))
+      const wrapper = mountPdvView()
+
+      await wrapper.find('[data-cy="pdv-open-camera-scanner"]').trigger('click')
+      await wrapper
+        .findComponent({ name: 'PdvCameraScannerModal' })
+        .vm.$emit('decode', 'https://app.bipflow.com/l/minha-loja/p/NOPE1234')
+      await flushPromises()
+
+      expect(wrapper.find('[data-cy="pdv-camera-scanner-stub"]').text()).toContain(
+        'Código "NOPE1234" não encontrado.'
+      )
+      expect(wrapper.find('[data-cy="pdv-cart-empty"]').exists()).toBe(true)
+    })
+
+    it('closes the modal and refocuses the scan input on close', async () => {
+      const wrapper = mountPdvView({ attachTo: document.body })
+
+      await wrapper.find('[data-cy="pdv-open-camera-scanner"]').trigger('click')
+      await wrapper.findComponent({ name: 'PdvCameraScannerModal' }).vm.$emit('close')
+      await flushPromises()
+
+      expect(wrapper.find('[data-cy="pdv-camera-scanner-stub"]').exists()).toBe(false)
+      expect(document.activeElement).toBe(wrapper.find('[data-cy="pdv-scan-input"]').element)
+      wrapper.unmount()
+    })
+  })
+
+  describe('professional refinement pass (Etapa C3 of the PDV camera-scanner evolution)', () => {
+    it('shows a prominent total card with the item count', async () => {
+      vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+      const wrapper = mountPdvView()
+
+      await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+      await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+      await flushPromises()
+
+      expect(wrapper.find('[data-cy="pdv-total-card"]').exists()).toBe(true)
+      expect(wrapper.find('[data-cy="pdv-cart-subtotal"]').text()).toContain('18,50')
+      expect(wrapper.find('[data-cy="pdv-total-card"]').text()).toContain('1 item')
+    })
+
+    it('shows the product image in the cart row when available, and a fallback icon otherwise', async () => {
+      vi.mocked(ProductService.getByCode).mockResolvedValue({
+        ...scannedProduct,
+        image_url: 'https://cdn.bipflow.app/produtos/coxinha.jpg',
+      } as any)
+      const wrapper = mountPdvView()
+
+      await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+      await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+      await flushPromises()
+
+      expect(wrapper.find('[data-cy="pdv-cart-item-image"]').attributes('src')).toBe(
+        'https://cdn.bipflow.app/produtos/coxinha.jpg'
+      )
+    })
+
+    it('does not render a product image when the product has none', async () => {
+      vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+      const wrapper = mountPdvView()
+
+      await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+      await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+      await flushPromises()
+
+      expect(wrapper.find('[data-cy="pdv-cart-item-image"]').exists()).toBe(false)
+    })
+
+    it('finalizes the sale on Ctrl+Enter when the cart is not empty', async () => {
+      vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+      vi.mocked(PdvSaleService.create).mockResolvedValue({
+        order_reference: 'PDV-20260702-120000-000000',
+        items: [],
+        subtotal: '18.50',
+        total: '18.50',
+        payment_method: 'pix',
+        created_at: '2026-07-02T12:00:00Z',
+        customer_email: '',
+      })
+      const wrapper = mountPdvView({ global: { stubs: { teleport: true } } })
+
+      await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+      await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+      await flushPromises()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }))
+      await flushPromises()
+
+      expect(PdvSaleService.create).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+    })
+
+    it('does not finalize on Ctrl+Enter with an empty cart', async () => {
+      const wrapper = mountPdvView()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }))
+      await flushPromises()
+
+      expect(PdvSaleService.create).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    it('clears the scan field on Escape while it is focused', async () => {
+      const wrapper = mountPdvView({ attachTo: document.body })
+      const input = wrapper.find('[data-cy="pdv-scan-input"]')
+      await input.setValue('AB')
+      ;(input.element as HTMLInputElement).focus()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect((input.element as HTMLInputElement).value).toBe('')
+      wrapper.unmount()
+    })
+
+    it('does not clear the scan field on Escape while the camera scanner is open', async () => {
+      const wrapper = mountPdvView({ attachTo: document.body })
+      const input = wrapper.find('[data-cy="pdv-scan-input"]')
+      await input.setValue('AB')
+      ;(input.element as HTMLInputElement).focus()
+      await wrapper.find('[data-cy="pdv-open-camera-scanner"]').trigger('click')
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await flushPromises()
+
+      expect((input.element as HTMLInputElement).value).toBe('AB')
+      wrapper.unmount()
+    })
   })
 })

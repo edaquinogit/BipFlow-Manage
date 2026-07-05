@@ -68,4 +68,33 @@ describe("PdvSaleService", () => {
       })
     ).rejects.toBeTruthy();
   });
+
+  describe("sendReceiptEmail", () => {
+    it("posts the email and base64 PDF to the order's receipt-email endpoint", async () => {
+      vi.mocked(api.post).mockResolvedValue({ data: { sent: true } } as never);
+
+      await PdvSaleService.sendReceiptEmail(
+        "PDV-20260702-120000-000000",
+        "cliente@example.com",
+        "JVBERi0xLjQ="
+      );
+
+      expect(api.post).toHaveBeenCalledWith(
+        "v1/pdv/sales/PDV-20260702-120000-000000/receipt-email/",
+        { email: "cliente@example.com", pdf_base64: "JVBERi0xLjQ=" },
+        { headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    it("propagates a rejection from the backend (e.g. invalid email)", async () => {
+      vi.mocked(api.post).mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 400, data: { email: ["Insira um endereço de email válido."] } },
+      });
+
+      await expect(
+        PdvSaleService.sendReceiptEmail("PDV-20260702-120000-000000", "not-an-email", "JVBERi0xLjQ=")
+      ).rejects.toBeTruthy();
+    });
+  });
 });
