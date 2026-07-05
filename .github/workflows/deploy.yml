@@ -1,14 +1,17 @@
 name: Deploy
 
-# Runs only after CI (backend + frontend + docker-build) is green on main.
-# Builds both images once here (not on the free-tier VM, which is too small
-# to build them fast), pushes to GHCR, then has the VM pull + restart.
-
+# Manual only. Production today is Render (backend) + Cloudflare Pages
+# (frontend) + R2 (media), which deploy themselves straight from GitHub --
+# this VM path (SSH + docker-compose.prod.yml) isn't part of that anymore.
+# It used to auto-run via workflow_run once CI went green on main, but with
+# no VM behind DEPLOY_HOST/DEPLOY_USER/DEPLOY_SSH_KEY it just failed on
+# every single push (every "deploy" job run failed at the SSH step -- see
+# the Actions history). Kept as a manual trigger in case the VM path is
+# ever needed again; delete this workflow (and docker-compose.prod.yml,
+# deploy/nginx-vm.conf.example) outright if it's confirmed permanently
+# retired instead.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-main
@@ -16,7 +19,6 @@ concurrency:
 
 jobs:
   build-and-push:
-    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
