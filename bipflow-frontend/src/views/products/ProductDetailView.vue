@@ -1,34 +1,34 @@
 <template>
   <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
     <header class="storefront-header border-b">
-      <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+      <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
           type="button"
-          class="storefront-outline-button inline-flex h-10 w-fit items-center gap-2 rounded-lg border bg-white px-4 text-sm font-semibold transition"
+          class="storefront-outline-button inline-flex h-10 w-fit items-center gap-2 rounded-xl border bg-white px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition min-[390px]:text-xs"
           @click="goBackToCatalog"
         >
           <ArrowLeftIcon class="h-4 w-4" aria-hidden="true" />
           Voltar ao catalogo
         </button>
 
-        <div class="flex items-center gap-3">
-          <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+        <div class="flex items-center gap-2.5 min-[390px]:gap-3">
+          <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
             <img
               :src="storeBranding.logoUrl"
               :alt="storeBranding.name"
               class="h-full w-full object-contain"
             />
           </div>
-          <div>
-            <p class="brand-wordmark brand-wordmark-premium text-lg">{{ storeBranding.name }}</p>
-            <p class="storefront-muted text-xs">{{ storeBranding.tagline }}</p>
+          <div class="min-w-0">
+            <p class="brand-wordmark brand-wordmark-premium truncate text-base min-[390px]:text-lg">{{ storeBranding.name }}</p>
+            <p class="storefront-muted truncate text-[11px] min-[390px]:text-xs">{{ storeBranding.tagline }}</p>
           </div>
         </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 lg:px-8">
-      <div v-if="isLoading" class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+    <main class="mx-auto max-w-7xl px-4 py-6 pb-24 min-[390px]:py-8 sm:px-6 lg:px-8">
+      <div v-if="isLoading" class="grid gap-6 min-[390px]:gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
         <div class="animate-pulse">
           <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
         </div>
@@ -73,10 +73,10 @@
         </div>
       </div>
 
-      <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
-        <section class="min-w-0 space-y-4">
+      <div v-else class="grid gap-6 min-[390px]:gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+        <section class="min-w-0 space-y-3.5 min-[390px]:space-y-4">
           <div
-            class="w-full overflow-hidden rounded-lg bg-[#F4F1F3]"
+            class="w-full overflow-hidden rounded-[1.15rem] bg-[#F4F1F3] min-[390px]:rounded-lg"
             @mouseenter="pauseCarousel"
             @mouseleave="resumeCarousel"
           >
@@ -93,7 +93,7 @@
                   :key="activeImageSource"
                   :src="activeImageSource"
                   :alt="`Imagem do produto ${product.name}`"
-                  class="h-full w-full select-none object-contain p-5 sm:p-8"
+                  class="h-full w-full select-none object-contain p-4 min-[390px]:p-5 sm:p-8"
                   loading="eager"
                   draggable="false"
                   @error="handleImageError"
@@ -114,12 +114,12 @@
             </div>
           </div>
 
-          <div v-if="productImages.length > 1" class="flex gap-3 overflow-x-auto pb-1">
+          <div v-if="productImages.length > 1" class="flex gap-2.5 overflow-x-auto pb-1 min-[390px]:gap-3">
             <button
               v-for="imageUrl in productImages"
               :key="imageUrl"
               type="button"
-                class="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-white transition sm:h-24 sm:w-24"
+                class="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-[1rem] border bg-white transition min-[390px]:h-20 min-[390px]:w-20 min-[390px]:rounded-lg sm:h-24 sm:w-24"
               :class="imageUrl === activeImageSource
                 ? 'border-[#D81B60]'
                 : 'border-[#E5E7EB] hover:border-[#D81B60]'"
@@ -140,31 +140,55 @@
 
         <aside class="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <section class="w-full max-w-full">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-[#D81B60]">
+            <div class="flex flex-wrap items-center justify-between gap-2.5 min-[390px]:gap-3">
+              <p class="text-xs font-bold uppercase tracking-[0.16em] text-[#D81B60] min-[390px]:text-sm min-[390px]:normal-case min-[390px]:tracking-normal">
                 {{ product.category.name }}
               </p>
-              <span
-                class="rounded-full px-3 py-1 text-xs font-semibold"
-                :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
-              >
-                {{ availabilityLabel }}
-              </span>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-10 min-[390px]:w-10"
+                  :class="isShareCopied
+                    ? 'border-[#D81B60] bg-[#D81B60] text-white shadow-[0_12px_24px_-18px_rgba(216,27,96,0.6)]'
+                    : 'storefront-outline-button hover:border-[#D81B60] hover:text-[#D81B60]'"
+                  :aria-label="isShareCopied ? 'Link do produto copiado' : 'Compartilhar produto'"
+                  :title="isShareCopied ? 'Link copiado' : 'Compartilhar produto'"
+                  @click="void handleShareProduct()"
+                >
+                  <CheckIcon
+                    v-if="isShareCopied"
+                    class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]"
+                    aria-hidden="true"
+                  />
+                  <ShareIcon
+                    v-else
+                    class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]"
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <span
+                  class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] min-[390px]:text-xs"
+                  :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
+                >
+                  {{ availabilityLabel }}
+                </span>
+              </div>
             </div>
 
-            <h1 class="mt-3 text-3xl font-semibold leading-tight text-[#05050A] sm:text-4xl">
+            <h1 class="mt-2.5 text-[1.8rem] font-semibold leading-[1.05] text-[#05050A] min-[390px]:mt-3 min-[390px]:text-3xl sm:text-4xl">
               {{ product.name }}
             </h1>
 
-            <p class="mt-5 text-3xl font-semibold text-[#05050A]">
+            <p class="mt-4 text-[1.9rem] font-semibold tracking-[-0.03em] text-[#05050A] min-[390px]:mt-5 min-[390px]:text-3xl">
               {{ formatBRL(product.price) }}
             </p>
 
-            <p class="mt-3 text-sm leading-6 text-slate-600">
+            <p class="mt-3 text-[13px] leading-6 text-slate-600 min-[390px]:text-sm">
               {{ productDescription }}
             </p>
 
-            <dl class="mt-6 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-sm text-[#6B7280]">
+            <dl class="mt-5 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-[13px] text-[#6B7280] min-[390px]:mt-6 min-[390px]:text-sm">
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Tamanho</dt>
                 <dd class="text-right font-semibold text-[#05050A]">{{ product.size || 'Sob consulta' }}</dd>
@@ -181,34 +205,34 @@
               </div>
             </dl>
 
-            <div class="mt-6 border-t border-[#E5E7EB] pt-5">
-              <div class="flex flex-col gap-4">
-                <div class="flex items-center justify-between gap-4">
+            <div class="mt-5 border-t border-[#E5E7EB] pt-4 min-[390px]:mt-6 min-[390px]:pt-5">
+              <div class="flex flex-col gap-3.5 min-[390px]:gap-4">
+                <div class="flex items-center justify-between gap-3 min-[390px]:gap-4">
                   <div>
                     <p class="text-sm font-semibold text-[#05050A]">
                       Quantidade
                     </p>
-                    <p class="mt-1 text-sm text-slate-600">
+                    <p class="mt-1 text-[13px] text-slate-600 min-[390px]:text-sm">
                       {{ cartQuantity > 0 ? `${cartQuantity} ja no pedido` : 'Selecione e confirme em um toque.' }}
                     </p>
                   </div>
 
-                  <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
+                  <div class="inline-flex h-11 items-center rounded-[0.95rem] border border-[#D8DDE5] bg-white shadow-[0_12px_28px_-24px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl">
                     <button
                       type="button"
-                      class="inline-flex h-10 w-10 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                      class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
                       :disabled="!product.is_available || quantity <= 1"
                       aria-label="Diminuir quantidade"
                       @click="decrementQuantity"
                     >
                       <MinusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
-                    <span class="min-w-10 text-center text-sm font-semibold text-[#05050A]">
+                    <span class="min-w-8 text-center text-[15px] font-semibold text-[#05050A] min-[390px]:min-w-11 min-[390px]:text-base">
                       {{ quantity }}
                     </span>
                     <button
                       type="button"
-                      class="inline-flex h-10 w-10 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                      class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
                       :disabled="!product.is_available || quantity >= product.stock_quantity"
                       aria-label="Aumentar quantidade"
                       @click="incrementQuantity"
@@ -220,14 +244,14 @@
 
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                  class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm"
                   :class="product.is_available
-                    ? 'bg-[#05050A] text-white hover:bg-[#D81B60]'
+                    ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]'
                     : 'cursor-not-allowed bg-slate-200 text-slate-500'"
                   :disabled="!product.is_available"
                   @click="handleAddToCart"
                 >
-                  <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
+                  <ShoppingBagIcon class="h-5 w-5 shrink-0" aria-hidden="true" />
                   {{ addToCartLabel }}
                 </button>
               </div>
@@ -268,9 +292,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   ArrowLeftIcon,
+  CheckIcon,
   MinusIcon,
   PlusIcon,
   ShoppingBagIcon,
+  ShareIcon,
 } from '@heroicons/vue/24/outline'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
@@ -323,10 +349,12 @@ const errorMessage = ref('')
 const quantity = ref(1)
 const slideTransitionName = ref('carousel-slide-next')
 const isCarouselPaused = ref(false)
+const isShareCopied = ref(false)
 const pointerStartX = ref<number | null>(null)
 const pointerDeltaX = ref(0)
 const activePointerId = ref<number | null>(null)
 let carouselInterval: ReturnType<typeof setInterval> | null = null
+let shareFeedbackTimeout: ReturnType<typeof setTimeout> | null = null
 
 const {
   items,
@@ -527,6 +555,99 @@ const addToCartLabel = computed(() => {
 
   return 'Adicionar ao pedido'
 })
+
+function getProductShareUrl(): string {
+  if (typeof window !== 'undefined' && window.location.href) {
+    return window.location.href
+  }
+
+  return ''
+}
+
+function isShareAbortError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'name' in error
+    && error.name === 'AbortError'
+}
+
+function clearShareCopiedFeedback(): void {
+  if (shareFeedbackTimeout) {
+    clearTimeout(shareFeedbackTimeout)
+    shareFeedbackTimeout = null
+  }
+
+  isShareCopied.value = false
+}
+
+function showShareCopiedFeedback(): void {
+  clearShareCopiedFeedback()
+  isShareCopied.value = true
+  shareFeedbackTimeout = setTimeout(() => {
+    isShareCopied.value = false
+    shareFeedbackTimeout = null
+  }, 2200)
+}
+
+async function copyProductShareUrl(shareUrl: string): Promise<boolean> {
+  if (!navigator.clipboard?.writeText) {
+    return false
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareUrl)
+    showShareCopiedFeedback()
+    toast.success('Link do produto copiado.')
+    return true
+  } catch (error) {
+    Logger.warn('Failed to copy public product share URL', {
+      shareUrl,
+      error: error instanceof Error ? error.message : 'unknown_error',
+    })
+    return false
+  }
+}
+
+async function handleShareProduct(): Promise<void> {
+  if (!product.value) {
+    return
+  }
+
+  const shareUrl = getProductShareUrl()
+
+  if (!shareUrl) {
+    toast.error('Nao foi possivel compartilhar o link agora.')
+    return
+  }
+
+  const sharePayload = {
+    title: product.value.name,
+    text: `${product.value.name} • ${formatBRL(product.value.price)}`,
+    url: shareUrl,
+  }
+
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share(sharePayload)
+      return
+    } catch (error) {
+      if (isShareAbortError(error)) {
+        return
+      }
+
+      Logger.warn('Native public product share failed, falling back to clipboard', {
+        shareUrl,
+        error: error instanceof Error ? error.message : 'unknown_error',
+      })
+    }
+  }
+
+  const copied = await copyProductShareUrl(shareUrl)
+
+  if (!copied) {
+    toast.error('Nao foi possivel compartilhar o link agora.')
+  }
+}
 
 async function loadProduct(): Promise<void> {
   const slug = typeof route.params.slug === 'string' ? route.params.slug : ''
@@ -755,6 +876,7 @@ async function handleSubmitOrder(): Promise<void> {
 
 onBeforeUnmount(() => {
   stopCarousel()
+  clearShareCopiedFeedback()
 })
 </script>
 

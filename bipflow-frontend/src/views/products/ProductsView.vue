@@ -1,26 +1,26 @@
 <template>
   <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
     <header class="storefront-header border-b">
-      <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex items-center gap-3">
-            <div class="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden">
+      <div class="mx-auto max-w-7xl px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-3 min-[390px]:gap-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-2.5 min-[390px]:gap-3">
+            <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
               <img
                 :src="storeBranding.logoUrl"
                 :alt="storeBranding.name"
                 class="h-full w-full object-contain"
               />
             </div>
-            <div>
-              <p class="brand-wordmark brand-wordmark-premium text-xl">{{ storeBranding.name }}</p>
-              <p class="storefront-muted text-sm">{{ storeBranding.tagline }}</p>
+            <div class="min-w-0">
+              <p class="brand-wordmark brand-wordmark-premium truncate text-lg min-[390px]:text-xl">{{ storeBranding.name }}</p>
+              <p class="storefront-muted truncate text-xs min-[390px]:text-sm">{{ storeBranding.tagline }}</p>
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
             <button
               type="button"
-              class="inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 text-[11px] font-bold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
                 : 'storefront-outline-button bg-white'"
@@ -28,16 +28,16 @@
             >
               <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
               <span>Pedido</span>
-              <span :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'">
+              <span class="whitespace-nowrap" :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'">
                 {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
               </span>
-              <span class="font-semibold">{{ formatBRL(subtotal) }}</span>
+              <span class="whitespace-nowrap font-bold">{{ formatBRL(subtotal) }}</span>
             </button>
           </div>
         </div>
 
-        <div class="storefront-panel mt-5 rounded-xl border p-3 relative">
-          <div class="flex gap-2 items-center">
+        <div class="storefront-panel relative mt-4 rounded-[1.15rem] border p-2.5 min-[390px]:mt-5 min-[390px]:rounded-xl min-[390px]:p-3">
+          <div class="flex items-center gap-2">
             <label class="relative min-w-0 flex-1">
               <span class="sr-only">Buscar produtos</span>
               <MagnifyingGlassIcon
@@ -47,7 +47,7 @@
               <input
                 :value="filters.search"
                 type="search"
-                class="h-11 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-10 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11"
                 placeholder="Buscar produto"
                 aria-label="Buscar produtos por nome"
                 @input="handleSearchInput"
@@ -58,7 +58,7 @@
               type="button"
               :aria-expanded="isFiltersOpen"
               aria-label="Abrir filtros"
-              class="group shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              class="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11 min-[390px]:w-11"
               @click="toggleFilters"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,21 +76,21 @@
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 translate-y-2"
           >
-            <div v-if="isFiltersOpen" class="absolute left-0 right-0 top-full z-40 mt-2 mx-3 lg:mx-4">
+            <div v-if="isFiltersOpen" class="absolute left-0 right-0 top-full z-40 mx-2.5 mt-2 min-[390px]:mx-3 lg:mx-4">
               <!-- Overlay backdrop -->
               <div class="fixed inset-0 bg-black/10 backdrop-blur-sm" @click="isFiltersOpen = false" />
 
               <!-- Glass panel -->
-              <div class="relative bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl p-4 sm:p-6 max-w-2xl mx-auto">
-                <div class="grid gap-6 sm:grid-cols-2">
+              <div class="relative mx-auto max-w-2xl rounded-[1.35rem] border border-white/40 bg-white/80 p-3.5 shadow-2xl backdrop-blur-xl min-[390px]:rounded-2xl min-[390px]:p-4 sm:p-6">
+                <div class="grid gap-4 min-[390px]:gap-6 sm:grid-cols-2">
                   <!-- Sort -->
                   <div>
-                    <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
                       Ordenação
                     </label>
                     <select
                       v-model="sortBy"
-                      class="w-full rounded-lg border border-[#D1D5DB] bg-white/50 backdrop-blur px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="w-full rounded-xl border border-[#D1D5DB] bg-white/50 px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                     >
                       <option value="featured">Mais relevantes</option>
                       <option value="price-asc">Menor preço</option>
@@ -102,7 +102,7 @@
 
                   <!-- Stock Filter -->
                   <div>
-                    <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
                       Disponibilidade
                     </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer">
@@ -118,14 +118,14 @@
                 </div>
 
                 <!-- Categories -->
-                <div class="mt-6 pt-6 border-t border-white/20">
-                  <label class="block text-xs font-black uppercase tracking-[0.16em] text-[#6B7280] mb-3">
+                <div class="mt-5 border-t border-white/20 pt-5 min-[390px]:mt-6 min-[390px]:pt-6">
+                  <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
                     Categorias
                   </label>
-                  <div class="flex flex-wrap gap-2">
+                  <div class="flex flex-wrap gap-1.5 min-[390px]:gap-2">
                     <button
                       type="button"
-                      class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200"
                       :class="!draftCategoryId
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
@@ -138,7 +138,7 @@
                       v-for="category in categories"
                       :key="category.id"
                       type="button"
-                      class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200"
                       :class="draftCategoryId === category.id
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
@@ -150,17 +150,17 @@
                 </div>
 
                 <!-- Save / Cancel -->
-                <div class="mt-6 flex items-center justify-end gap-3 border-t border-white/20 pt-4">
+                <div class="mt-5 flex items-center justify-end gap-2.5 border-t border-white/20 pt-4 min-[390px]:mt-6 min-[390px]:gap-3">
                   <button
                     type="button"
-                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-lg border bg-white px-4 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
                     @click="handleCancelFilters"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
-                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
                     @click="handleSaveFilters"
                   >
                     Salvar
@@ -191,7 +191,7 @@
     >
       <p class="sr-only" aria-live="polite">{{ liveRegionMessage }}</p>
 
-      <div class="mb-6 flex items-center justify-between gap-4 text-sm text-[#6B7280]">
+      <div class="mb-5 flex flex-col gap-2 text-sm text-[#6B7280] min-[390px]:mb-6 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between min-[390px]:gap-4">
         <p>{{ showingRange }}</p>
         <button
           v-if="filters.search || filters.categoryId"
@@ -246,7 +246,7 @@
 
       <div
         v-else-if="displayedProducts.length > 0"
-        class="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4"
+        class="grid grid-cols-2 gap-x-2.5 gap-y-5 min-[390px]:gap-x-3 min-[390px]:gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4"
       >
         <ProductCard
           v-for="product in displayedProducts"

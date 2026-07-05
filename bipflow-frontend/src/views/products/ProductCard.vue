@@ -1,6 +1,6 @@
 <template>
   <article
-    class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_14px_35px_-28px_rgba(5,5,10,0.55)] transition hover:-translate-y-0.5 hover:border-[#D81B60]/40"
+    class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-[#E9D7DF] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF9FB_100%)] shadow-[0_18px_40px_-30px_rgba(5,5,10,0.6)] transition duration-300 hover:-translate-y-1 hover:border-[#D81B60]/45 hover:shadow-[0_24px_60px_-34px_rgba(216,27,96,0.32)] min-[390px]:rounded-2xl"
     :class="{ 'opacity-75': !product.is_available }"
   >
     <button
@@ -45,31 +45,31 @@
       </div>
     </button>
 
-    <div class="flex flex-1 flex-col p-3 sm:p-4">
+    <div class="flex flex-1 flex-col p-3.5 min-[390px]:p-4 sm:p-5">
       <button
         type="button"
         class="w-full text-left"
         :aria-label="`Abrir detalhes de ${product.name}`"
         @click="handleOpenDetails"
       >
-        <h3 class="line-clamp-2 min-h-11 text-sm font-semibold leading-5 text-[#05050A] transition-colors group-hover:text-[#D81B60] sm:text-base sm:leading-6">
+        <h3 class="line-clamp-2 min-h-[3.05rem] text-[14px] font-semibold leading-[1.35] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-12 min-[390px]:text-[15px] min-[390px]:leading-6 sm:text-lg sm:leading-7">
           {{ product.name }}
         </h3>
       </button>
 
-      <div class="mt-3 flex items-end justify-between gap-3">
+      <div class="mt-3.5 flex items-end justify-between gap-2.5 min-[390px]:mt-4 min-[390px]:gap-3">
         <div>
-          <span class="block text-lg font-semibold text-[#05050A] sm:text-xl">
+          <span class="block text-[1.15rem] font-semibold tracking-[-0.02em] text-[#05050A] min-[390px]:text-xl sm:text-2xl">
             {{ formatBRL(product.price) }}
           </span>
-          <p class="mt-1 text-xs text-slate-500">
+          <p class="mt-1 text-[12px] text-slate-500 min-[390px]:text-sm">
             {{ stockStatusLabel }}
           </p>
         </div>
 
         <button
           type="button"
-          class="inline-flex items-center gap-1 text-xs font-semibold text-[#6B7280] transition hover:text-[#D81B60] sm:text-sm"
+          class="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#6B7280] transition hover:text-[#D81B60] sm:text-xs"
           :aria-label="`Ver descricao e detalhes de ${product.name}`"
           @click="handleOpenDetails"
         >
@@ -78,25 +78,25 @@
         </button>
       </div>
 
-      <div class="mt-auto pt-4">
-        <div class="grid grid-cols-[auto,minmax(0,1fr)] items-center gap-2">
+      <div class="mt-auto pt-3.5 min-[390px]:pt-4">
+        <div class="grid grid-cols-[auto,minmax(0,1fr)] items-center gap-1.5 min-[390px]:gap-2">
           <div class="min-w-0">
-            <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
+            <div class="inline-flex h-11 items-center rounded-[0.95rem] border border-[#D8DDE5] bg-white/95 shadow-[0_10px_24px_-22px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl">
               <button
                 type="button"
-                class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
                 :disabled="!product.is_available || quantity <= 1"
                 aria-label="Diminuir quantidade"
                 @click.stop="decrementQuantity"
               >
                 <MinusIcon class="h-4 w-4" aria-hidden="true" />
               </button>
-              <span class="min-w-9 text-center text-sm font-semibold text-[#05050A]">
+              <span class="min-w-8 text-center text-[15px] font-semibold text-[#05050A] min-[390px]:min-w-10 min-[390px]:text-base">
                 {{ quantity }}
               </span>
               <button
                 type="button"
-                class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+                class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
                 :disabled="!product.is_available || quantity >= product.stock_quantity"
                 aria-label="Aumentar quantidade"
                 @click.stop="incrementQuantity"
@@ -108,16 +108,17 @@
 
           <button
             type="button"
-            class="inline-flex h-10 min-w-0 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] sm:text-sm"
+            class="inline-flex h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[0.95rem] px-2 text-[8px] font-bold uppercase leading-none tracking-[0.04em] shadow-[0_14px_30px_-22px_rgba(5,5,10,0.7)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-12 min-[390px]:gap-1.5 min-[390px]:rounded-xl min-[390px]:px-2.5 min-[390px]:text-[8px] min-[390px]:tracking-[0.05em] min-[480px]:gap-2 min-[480px]:px-3 min-[480px]:text-[9px] min-[480px]:tracking-[0.08em] sm:px-4 sm:text-[11px] sm:tracking-[0.1em]"
             :class="product.is_available
-              ? 'bg-[#05050A] text-white hover:bg-[#D81B60]'
+              ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_36px_-24px_rgba(216,27,96,0.65)]'
               : 'cursor-not-allowed bg-slate-200 text-slate-500'"
             :disabled="!product.is_available"
             @click.stop="handleAddToCart"
           >
-            <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
-            <span class="hidden min-[390px]:inline">{{ addToCartLabel }}</span>
-            <span class="min-[390px]:hidden">Adicionar</span>
+            <ShoppingBagIcon class="h-3.5 w-3.5 shrink-0 min-[390px]:h-4 min-[390px]:w-4 min-[480px]:h-4.5 min-[480px]:w-4.5" aria-hidden="true" />
+            <span class="hidden truncate whitespace-nowrap sm:inline">{{ addToCartLabel }}</span>
+            <span class="hidden truncate whitespace-nowrap min-[390px]:inline sm:hidden">{{ mediumAddToCartLabel }}</span>
+            <span class="truncate whitespace-nowrap min-[390px]:hidden">{{ compactAddToCartLabel }}</span>
           </button>
         </div>
       </div>
@@ -202,6 +203,30 @@ const addToCartLabel = computed(() => {
   }
 
   return 'Adicionar ao pedido'
+})
+
+const mediumAddToCartLabel = computed(() => {
+  if (!props.product.is_available) {
+    return 'Indisp.'
+  }
+
+  if (quantity.value > 1) {
+    return `+${quantity.value}`
+  }
+
+  return 'Carrinho'
+})
+
+const compactAddToCartLabel = computed(() => {
+  if (!props.product.is_available) {
+    return 'Indisp.'
+  }
+
+  if (quantity.value > 1) {
+    return `+${quantity.value}`
+  }
+
+  return 'Comprar'
 })
 
 const handleImageError = (event: Event) => {
