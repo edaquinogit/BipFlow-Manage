@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowsUpDownIcon, PencilIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { PencilIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { formatBRL } from '@/utils/formatters';
 import { getLowStockThreshold } from '@/utils/stockAlerts';
@@ -17,7 +17,6 @@ const emit = defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'toggle-selection', productId: number): void;
-  (e: 'adjust-stock', product: Product): void;
   (e: 'print-label', product: Product): void;
 }>();
 
@@ -93,14 +92,6 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
       </div>
 
       <div v-if="canManageCatalog" class="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          class="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-bip-line text-2xs font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
-          @click="emit('adjust-stock', product)"
-        >
-          <ArrowsUpDownIcon class="h-3.5 w-3.5" />
-          Estoque
-        </button>
         <button
           type="button"
           class="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-bip-line text-2xs font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"

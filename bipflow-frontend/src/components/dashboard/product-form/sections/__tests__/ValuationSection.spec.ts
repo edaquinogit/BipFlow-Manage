@@ -41,7 +41,6 @@ describe('ValuationSection', () => {
         stock: 0,
         size: '',
         errors: {},
-        isExistingProduct: false,
       },
     })
 
@@ -50,21 +49,19 @@ describe('ValuationSection', () => {
     ).toBe(false)
   })
 
-  it('locks the stock input and shows a hint when editing an existing product', () => {
+  it('keeps the stock input editable when editing an existing product', () => {
     const wrapper = mount(ValuationSection, {
       props: {
         price: 12.5,
         stock: 4,
         size: '',
         errors: {},
-        isExistingProduct: true,
       },
     })
 
     expect(
       (wrapper.find('[data-cy="input-product-stock"]').element as HTMLInputElement).disabled
-    ).toBe(true)
-    expect(wrapper.text()).toContain('Movimentar estoque')
+    ).toBe(false)
   })
 
   it('emits null (not 0) when the low-stock threshold input is cleared', async () => {
@@ -107,7 +104,6 @@ describe('ValuationSection', () => {
         lowStockThreshold: 8,
         size: '',
         errors: {},
-        isExistingProduct: true,
       },
     })
 

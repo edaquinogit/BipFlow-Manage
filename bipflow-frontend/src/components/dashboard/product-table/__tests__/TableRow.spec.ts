@@ -63,6 +63,12 @@ describe('TableRow public_code', () => {
 })
 
 describe('TableRow print-label action (Etapa 2 of the QR-code stock-exit evolution)', () => {
+  it('does not render a dedicated stock-movement action anymore', () => {
+    const wrapper = mountRow(buildProduct())
+
+    expect(wrapper.find('[title="Movimentar estoque"]').exists()).toBe(false)
+  })
+
   it('emits print-label with the product when the QR Code button is clicked', async () => {
     const product = buildProduct({ public_code: 'ABCD2345' })
     const wrapper = mountRow(product)

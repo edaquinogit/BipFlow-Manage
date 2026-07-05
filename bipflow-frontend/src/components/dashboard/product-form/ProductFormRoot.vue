@@ -222,7 +222,6 @@ const submitLabel = computed(() => {
             v-model:stock="form.stock_quantity"
             v-model:low-stock-threshold="form.low_stock_threshold"
             v-model:size="form.size"
-            :is-existing-product="!!props.initialData"
             :errors="errors"
           />
 

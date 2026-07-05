@@ -27,7 +27,6 @@ defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'bulk-update-category', categoryId: number): void;
-  (e: 'adjust-stock', product: Product): void;
   (e: 'print-label', product: Product): void;
 }>();
 
@@ -122,7 +121,6 @@ const { canManageCatalog } = useCurrentUser();
       @edit="(product) => $emit('edit', product)"
       @toggle-selection="(productId) => toggleSelection(productId)"
       @select-all="selectAll"
-      @adjust-stock="(product) => $emit('adjust-stock', product)"
       @print-label="(product) => $emit('print-label', product)"
     />
   </section>

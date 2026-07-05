@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ArrowsUpDownIcon, QrCodeIcon } from '@heroicons/vue/24/outline';
+import { QrCodeIcon } from '@heroicons/vue/24/outline';
 import type { Product } from '@/schemas/product.schema';
 import { formatBRL } from '@/utils/formatters';
 import { getLowStockThreshold } from '@/utils/stockAlerts';
@@ -20,7 +20,6 @@ const emit = defineEmits<{
   (e: 'edit', product: Product): void;
   (e: 'delete', id: number): void;
   (e: 'toggle-selection', productId: number): void;
-  (e: 'adjust-stock', product: Product): void;
   (e: 'print-label', product: Product): void;
 }>();
 
@@ -126,14 +125,6 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
 
     <td class="px-6 py-4 text-right">
       <div v-if="canManageCatalog" class="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-        <button
-          @click="emit('adjust-stock', product)"
-          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
-          title="Movimentar estoque"
-        >
-          <ArrowsUpDownIcon class="h-4 w-4" />
-        </button>
-
         <button
           @click="emit('print-label', product)"
           class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"

@@ -42,10 +42,9 @@ const size = defineModel<string>('size', { default: '' });
 
 interface Props {
   errors: Record<string, string[]>;
-  isExistingProduct?: boolean;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 </script>
 
 <template>
@@ -92,14 +91,10 @@ const props = defineProps<Props>();
           name="stock_quantity"
           data-cy="input-product-stock"
           min="0"
-          :disabled="props.isExistingProduct"
-          class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 font-mono text-sm text-[#05050A] outline-none transition-all focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:border-[#E5E7EB] disabled:bg-zinc-50 disabled:text-bip-muted"
+          class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 font-mono text-sm text-[#05050A] outline-none transition-all focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
           placeholder="0"
         />
-        <p v-if="props.isExistingProduct" class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
-          Use "Movimentar estoque" na tabela para ajustar a quantidade.
-        </p>
-        <p v-else-if="errors.stock_quantity" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
+        <p v-if="errors.stock_quantity" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
           {{ errors.stock_quantity[0] }}
         </p>
       </div>

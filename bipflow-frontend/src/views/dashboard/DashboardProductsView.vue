@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useProducts } from '@/composables/useProducts';
 import { useCategories } from '@/composables/useCategories';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
@@ -12,13 +12,10 @@ import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productP
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
-import StockMovementModal from '@/components/dashboard/product-table/StockMovementModal.vue';
 import ProductLabelModal from '@/components/dashboard/product-table/ProductLabelModal.vue';
 
 const {
   selectedAssetIds,
-  outOfStockProducts,
-  lowStockProducts,
   fetchData,
   createProduct,
   updateProduct,
@@ -38,19 +35,27 @@ const isDeleteModalOpen = ref(false);
 const assetIdToPurge = ref<number | null>(null);
 const isDeletingAction = ref(false);
 const isBulkUpdating = ref(false);
-const isStockModalOpen = ref(false);
-const productToAdjust = ref<Product | null>(null);
-const isAdjustingStock = ref(false);
 const isLabelModalOpen = ref(false);
 const productToLabel = ref<Product | null>(null);
 
-const getProductStockValue = (product: Product): number => Number(product.stock_quantity ?? 0);
+const buildStockAdjustmentPayload = (
+  originalProduct: Product,
+  nextStockQuantity: number
+): StockMovementInput | null => {
+  const currentStockQuantity = Number(originalProduct.stock_quantity ?? 0);
+  const stockDifference = nextStockQuantity - currentStockQuantity;
 
-// A secao "Produtos em atencao" e um resumo compacto; o limite de 5 e
-// apenas uma escolha de apresentacao desta view (a lista completa fica
-// disponivel via useProducts() para quem precisar dela, ex: StockAlertDrawer).
-const outOfStockPreview = computed(() => outOfStockProducts.value.slice(0, 5));
-const lowStockPreview = computed(() => lowStockProducts.value.slice(0, 5));
+  if (stockDifference === 0) {
+    return null;
+  }
+
+  return {
+    movement_type: stockDifference > 0 ? 'entrada' : 'saida',
+    quantity: Math.abs(stockDifference),
+    reason: 'ajuste_inventario',
+    notes: 'Ajuste realizado ao salvar a edicao do produto.',
+  };
+};
 
 const handleOpenNewPanel = (): void => {
   selectedProduct.value = null;
@@ -74,13 +79,18 @@ const handleSave = async (payload: Partial<Product>): Promise<void> => {
     const dataToSync = sanitizeDashboardPayload(payload);
 
     if (selectedProduct.value?.id) {
-      // stock_quantity is read-only in the edit form (see ValuationSection's
-      // isExistingProduct) but still lives in `form.value`/`payload` -- drop
-      // it here so a resubmit never trips the backend's "use a stock
-      // movement instead" rejection on a field the UI never let them touch.
+      const stockAdjustmentPayload = buildStockAdjustmentPayload(
+        selectedProduct.value,
+        Number(dataToSync.stock_quantity ?? 0)
+      );
       const { stock_quantity: _stock_quantity, ...updatePayload } = dataToSync as Partial<Product> &
         Record<string, unknown>;
+
       await updateProduct(selectedProduct.value.id, updatePayload);
+
+      if (stockAdjustmentPayload) {
+        await adjustStock(selectedProduct.value.id, stockAdjustmentPayload);
+      }
     } else {
       await createProduct(dataToSync);
     }
@@ -120,16 +130,6 @@ const executeDelete = async (): Promise<void> => {
   }
 };
 
-const openStockModal = (product: Product): void => {
-  productToAdjust.value = product;
-  isStockModalOpen.value = true;
-};
-
-const closeStockModal = (): void => {
-  isStockModalOpen.value = false;
-  productToAdjust.value = null;
-};
-
 const openLabelModal = (product: Product): void => {
   productToLabel.value = product;
   isLabelModalOpen.value = true;
@@ -138,21 +138,6 @@ const openLabelModal = (product: Product): void => {
 const closeLabelModal = (): void => {
   isLabelModalOpen.value = false;
   productToLabel.value = null;
-};
-
-const handleStockMovementSubmit = async (payload: StockMovementInput): Promise<void> => {
-  if (!productToAdjust.value?.id) return;
-
-  isAdjustingStock.value = true;
-  try {
-    await adjustStock(productToAdjust.value.id, payload);
-    closeStockModal();
-  } catch (error: unknown) {
-    Logger.error('Stock adjustment failed', { error, productId: productToAdjust.value.id, payload });
-    toastError('Não foi possível registrar a movimentação de estoque.');
-  } finally {
-    isAdjustingStock.value = false;
-  }
 };
 
 const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
@@ -177,7 +162,6 @@ const refreshProducts = (): void => {
   isPanelOpen.value = false;
   selectedProduct.value = null;
   isDeleteModalOpen.value = false;
-  closeStockModal();
   closeLabelModal();
   void fetchData();
   void fetchCategories(true);
@@ -189,44 +173,6 @@ useStoreSwitchEffect(refreshProducts);
 
 <template>
   <div class="space-y-10">
-    <section v-if="outOfStockProducts.length > 0 || lowStockProducts.length > 0" class="space-y-3">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Inventário</p>
-          <h2 class="mt-1 text-sm font-black uppercase tracking-widest text-[#05050A]">Produtos em atenção</h2>
-        </div>
-        <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
-          {{ outOfStockProducts.length + lowStockProducts.length }}
-        </span>
-      </div>
-
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <article
-          v-for="product in outOfStockPreview"
-          :key="`out-${product.id ?? product.name}`"
-          class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4"
-        >
-          <div class="flex items-center justify-between gap-4">
-            <p class="min-w-0 truncate text-sm font-bold text-[#05050A]">{{ product.name }}</p>
-            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-[#D81B60]">zerado</span>
-          </div>
-        </article>
-
-        <article
-          v-for="product in lowStockPreview"
-          :key="`low-${product.id ?? product.name}`"
-          class="rounded-lg border border-amber-200 bg-amber-50 p-4"
-        >
-          <div class="flex items-center justify-between gap-4">
-            <p class="min-w-0 truncate text-sm font-bold text-[#05050A]">{{ product.name }}</p>
-            <span class="shrink-0 text-xs font-black uppercase tracking-widest text-amber-700">
-              {{ getProductStockValue(product) }} un.
-            </span>
-          </div>
-        </article>
-      </div>
-    </section>
-
     <section id="dashboard-products">
       <ProductListing
         :is-bulk-updating="isBulkUpdating"
@@ -234,7 +180,6 @@ useStoreSwitchEffect(refreshProducts);
         @edit="handleEditRequest"
         @delete="openDeleteConfirm"
         @bulk-update-category="handleBulkUpdateCategory"
-        @adjust-stock="openStockModal"
         @print-label="openLabelModal"
       />
     </section>
@@ -255,14 +200,6 @@ useStoreSwitchEffect(refreshProducts);
       :is-loading="isDeletingAction"
       @close="isDeleteModalOpen = false"
       @confirm="executeDelete"
-    />
-
-    <StockMovementModal
-      :show="isStockModalOpen"
-      :product="productToAdjust"
-      :is-submitting="isAdjustingStock"
-      @close="closeStockModal"
-      @submit="handleStockMovementSubmit"
     />
 
     <ProductLabelModal
