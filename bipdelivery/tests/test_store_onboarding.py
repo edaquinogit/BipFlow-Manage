@@ -254,6 +254,101 @@ class MyStoresEndpointTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
+class StoreReceiptSettingsEndpointTest(TestCase):
+    """PDV receipt settings (exchange policy + print paper format) -- a
+    dedicated endpoint that mirrors MyStoreDetailView's slug + membership
+    permission story exactly, so these tests follow the same shape as
+    MyStoresEndpointTest's rename tests above.
+    """
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(username="receipt_owner", password="testpass123")
+        StoreMembership.objects.create(store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER)
+        StoreMembership.objects.create(store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER)
+
+        self.other_store = Store.objects.create(name="Loja C", slug="loja-c")
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user, token={"store_id": self.store_a.id})
+
+    def _url(self, slug: str) -> str:
+        return f"/api/v1/store/mine/{slug}/receipt-settings/"
+
+    def test_owner_can_update_both_fields(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {"receipt_exchange_policy": "Trocas em ate 15 dias.", "receipt_paper_format": "58mm"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.receipt_exchange_policy, "Trocas em ate 15 dias.")
+        self.assertEqual(self.store_a.receipt_paper_format, "58mm")
+
+    def test_partial_update_only_touches_the_field_sent(self) -> None:
+        self.store_a.receipt_paper_format = Store.RECEIPT_PAPER_FORMAT_A4
+        self.store_a.save(update_fields=["receipt_paper_format"])
+
+        response = self.client.patch(
+            self._url(self.store_a.slug), {"receipt_exchange_policy": "Trocas em ate 30 dias."}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.receipt_exchange_policy, "Trocas em ate 30 dias.")
+        self.assertEqual(self.store_a.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_A4)
+
+    def test_blank_exchange_policy_is_allowed(self) -> None:
+        """Blank means the printed receipt shows no policy line at all."""
+        response = self.client.patch(
+            self._url(self.store_a.slug), {"receipt_exchange_policy": ""}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.receipt_exchange_policy, "")
+
+    def test_invalid_paper_format_is_rejected(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug), {"receipt_paper_format": "letter"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_viewer_role_cannot_update_receipt_settings(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_b.slug), {"receipt_paper_format": "58mm"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.store_b.refresh_from_db()
+        self.assertEqual(self.store_b.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_80MM)
+
+    def test_user_without_membership_cannot_update_receipt_settings(self) -> None:
+        response = self.client.patch(
+            self._url(self.other_store.slug), {"receipt_paper_format": "58mm"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unknown_store_returns_404(self) -> None:
+        response = self.client.patch(
+            "/api/v1/store/mine/does-not-exist/receipt-settings/", {"receipt_paper_format": "58mm"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_requires_authentication(self) -> None:
+        response = APIClient().patch(
+            self._url(self.store_a.slug), {"receipt_paper_format": "58mm"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class ProductImageUploadPathTest(TestCase):
     """Etapa 4: media paths are scoped by store_id, not shared across tenants."""
 

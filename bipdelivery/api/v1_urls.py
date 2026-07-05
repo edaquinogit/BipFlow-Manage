@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .pdv import PdvSaleView
+from .pdv import PdvReceiptEmailView, PdvSaleView
 from .views import (
     BotConversationViewSet,
     BotMessageView,
@@ -14,6 +14,7 @@ from .views import (
     PublicStoreSettingsView,
     SaleOrderViewSet,
     StockMovementViewSet,
+    StoreReceiptSettingsView,
     StoreSettingsView,
 )
 
@@ -32,9 +33,19 @@ urlpatterns = [
     path("bot/messages/", BotMessageView.as_view(), name="bot-message"),
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
     path("pdv/sales/", PdvSaleView.as_view(), name="pdv-sale"),
+    path(
+        "pdv/sales/<str:order_reference>/receipt-email/",
+        PdvReceiptEmailView.as_view(),
+        name="pdv-sale-receipt-email",
+    ),
     path("store/current/", CurrentStoreView.as_view(), name="store-current"),
     path("store/mine/", MyStoresView.as_view(), name="store-mine"),
     path("store/mine/<slug:slug>/", MyStoreDetailView.as_view(), name="store-mine-detail"),
+    path(
+        "store/mine/<slug:slug>/receipt-settings/",
+        StoreReceiptSettingsView.as_view(),
+        name="store-mine-receipt-settings",
+    ),
     path("store-settings/public/", PublicStoreSettingsView.as_view(), name="public-store-settings"),
     path("store-settings/", StoreSettingsView.as_view(), name="store-settings"),
     path("", include(router.urls)),

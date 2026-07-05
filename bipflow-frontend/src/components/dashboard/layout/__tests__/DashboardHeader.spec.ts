@@ -9,6 +9,8 @@ const stores = [
     slug: 'loja-a',
     whatsapp_phone: '5511999999999',
     is_active: true,
+    receipt_exchange_policy: '',
+    receipt_paper_format: '80mm' as const,
   },
   {
     id: 2,
@@ -16,6 +18,8 @@ const stores = [
     slug: 'loja-b',
     whatsapp_phone: '5511888888888',
     is_active: false,
+    receipt_exchange_policy: '',
+    receipt_paper_format: '80mm' as const,
   },
 ]
 

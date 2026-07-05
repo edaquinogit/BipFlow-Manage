@@ -115,6 +115,17 @@ class BotMessageIpThrottle(AnonRateThrottle):
     scope = "bot_message_ip"
 
 
+class PdvReceiptEmailThrottle(UserRateThrottle):
+    """
+    Limit how often a dashboard user can trigger a PDV receipt email send --
+    this endpoint accepts an arbitrary destination address, so without a
+    limit a compromised/malicious dashboard account could turn it into a
+    mail-spam relay riding on the app's own SMTP reputation.
+    """
+
+    scope = "pdv_receipt_email"
+
+
 class MfaVerifyIpThrottle(AnonRateThrottle):
     """
     IP-based control for the MFA second-factor verification endpoint --

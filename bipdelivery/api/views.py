@@ -84,6 +84,7 @@ from .serializers import (
     SaleOrderTimeseriesPointSerializer,
     StockMovementCreateSerializer,
     StockMovementSerializer,
+    StoreReceiptSettingsSerializer,
     StoreRenameSerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
@@ -1298,6 +1299,49 @@ class MyStoreDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         store.name = serializer.validated_data["name"]
         store.save(update_fields=["name", "updated_at"])
+
+        return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
+class StoreReceiptSettingsView(APIView):
+    """Update one of the authenticated user's own stores' PDV receipt
+    settings (exchange policy text + print paper format).
+
+    A dedicated endpoint rather than folding this into MyStoreDetailView:
+    that view's serializer/permission story is specifically about renaming,
+    already tested end to end, and unrelated in purpose to receipt
+    formatting -- same reasoning that keeps bipdelivery/api/pdv.py separate
+    from the WhatsApp checkout view. Permission check is identical to
+    MyStoreDetailView's (owner/manager membership on *this specific* store).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        store = Store.objects.filter(slug=kwargs["slug"]).first()
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+
+        can_edit = store.memberships.filter(
+            user=request.user, role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER)
+        ).exists()
+        if not can_edit:
+            return permission_denied_error(
+                "Voce nao possui permissao para editar as configuracoes de recibo desta loja."
+            )
+
+        serializer = StoreReceiptSettingsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        update_fields = ["updated_at"]
+        if "receipt_exchange_policy" in validated:
+            store.receipt_exchange_policy = validated["receipt_exchange_policy"]
+            update_fields.append("receipt_exchange_policy")
+        if "receipt_paper_format" in validated:
+            store.receipt_paper_format = validated["receipt_paper_format"]
+            update_fields.append("receipt_paper_format")
+        store.save(update_fields=update_fields)
 
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
 

@@ -310,6 +310,22 @@ class Store(models.Model):
 
     DEFAULT_SLUG = "default"
 
+    # PDV receipt print-format presets (see docs/architecture/
+    # pdv-camera-scanner-refinement.md's receipt/print-format follow-up):
+    # the two dominant thermal receipt-roll widths in Brazilian retail, plus
+    # a plain-sheet fallback for stores printing on a regular printer.
+    RECEIPT_PAPER_FORMAT_58MM = "58mm"
+    RECEIPT_PAPER_FORMAT_80MM = "80mm"
+    RECEIPT_PAPER_FORMAT_A4 = "a4"
+    RECEIPT_PAPER_FORMAT_CHOICES = [
+        (RECEIPT_PAPER_FORMAT_58MM, "Bobina 58mm"),
+        (RECEIPT_PAPER_FORMAT_80MM, "Bobina 80mm"),
+        (RECEIPT_PAPER_FORMAT_A4, "Folha A4"),
+    ]
+    DEFAULT_RECEIPT_EXCHANGE_POLICY = (
+        "Trocas e devoluções em até 7 dias mediante apresentação deste comprovante."
+    )
+
     name = models.CharField(max_length=120)
     slug = models.SlugField(unique=True)
     logo_url = models.URLField(max_length=500, blank=True)
@@ -317,6 +333,17 @@ class Store(models.Model):
     whatsapp_phone = models.CharField(max_length=32, blank=True)
     theme = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
+    # Etapa PDV receipt refinement: store-level, editable per store (blank
+    # means "don't show a policy line on the printed receipt at all") --
+    # deliberately not a hardcoded "7 dias" string in the frontend template.
+    receipt_exchange_policy = models.CharField(
+        max_length=280, blank=True, default=DEFAULT_RECEIPT_EXCHANGE_POLICY
+    )
+    receipt_paper_format = models.CharField(
+        max_length=10,
+        choices=RECEIPT_PAPER_FORMAT_CHOICES,
+        default=RECEIPT_PAPER_FORMAT_80MM,
+    )
     # Nullable: data migrations run before any user exists in a fresh
     # database (seed_dashboard_roles runs after migrate), so a NOT NULL FK
     # would break `manage.py migrate` on first deploy. Etapa 4 (onboarding)

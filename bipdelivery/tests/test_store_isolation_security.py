@@ -26,6 +26,13 @@ PUBLIC_STORE_FIELDS = {
     "theme",
     "is_active",
     "status",
+    # PDV receipt settings: same public-info tier as tagline/whatsapp_phone
+    # above (a return policy and a printer paper-format preference are not
+    # sensitive) -- added to StoreSerializer for the PDV receipt/print-format
+    # feature (exchange-policy text + paper-size presets shown on the
+    # printed sale receipt).
+    "receipt_exchange_policy",
+    "receipt_paper_format",
 }
 
 

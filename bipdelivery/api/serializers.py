@@ -531,6 +531,8 @@ class StoreSerializer(serializers.ModelSerializer):
             "theme",
             "is_active",
             "status",
+            "receipt_exchange_policy",
+            "receipt_paper_format",
         ]
         read_only_fields = fields
 
@@ -548,6 +550,23 @@ class StoreRenameSerializer(serializers.Serializer):
         if len(normalized_name) < 2:
             raise serializers.ValidationError("Informe um nome de loja com pelo menos 2 caracteres.")
         return normalized_name
+
+
+class StoreReceiptSettingsSerializer(serializers.Serializer):
+    """Validate a PDV receipt settings update (exchange policy + print format).
+
+    Both fields are optional so the dashboard's "Recibo" settings tab can
+    send just the one field the merchant edited -- a blank
+    `receipt_exchange_policy` is a valid, meaningful value (it means "don't
+    show a policy line on the printed receipt at all"), not an omission.
+    """
+
+    receipt_exchange_policy = serializers.CharField(
+        max_length=280, required=False, allow_blank=True, trim_whitespace=True
+    )
+    receipt_paper_format = serializers.ChoiceField(
+        choices=Store.RECEIPT_PAPER_FORMAT_CHOICES, required=False
+    )
 
 
 class PublicStoreSettingsSerializer(serializers.ModelSerializer):
