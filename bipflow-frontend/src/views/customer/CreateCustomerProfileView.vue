@@ -98,6 +98,10 @@ function redirectAfterSuccess(): void {
   )
 }
 
+async function handleOpenCreateProfileForm(): Promise<void> {
+  await authService.logout(route.fullPath)
+}
+
 async function handleSubmit(): Promise<void> {
   validationHint.value = ''
   errorMessage.value = ''
@@ -175,13 +179,22 @@ onMounted(async () => {
           Hoje só é possível criar um perfil novo com um email ainda não cadastrado. Fale com a loja
           se precisar de ajuda para comprar por aqui com a conta atual.
         </p>
-        <button
-          type="button"
-          class="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
-          @click="redirectAfterSuccess"
-        >
-          Voltar para a loja
-        </button>
+        <div class="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <button
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
+            @click="handleOpenCreateProfileForm"
+          >
+            Criar perfil com outro email
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-11 items-center justify-center rounded-lg border border-amber-300 bg-white px-5 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:bg-amber-100"
+            @click="redirectAfterSuccess"
+          >
+            Voltar para a loja
+          </button>
+        </div>
       </div>
 
       <template v-else>

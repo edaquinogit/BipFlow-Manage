@@ -171,7 +171,7 @@ export const authService = {
    * access token and redirects, even if the revocation call fails (offline,
    * already-expired access token, etc.) so the user is never stuck logged in.
    */
-  async logout(): Promise<void> {
+  async logout(redirectTo = "/login"): Promise<void> {
     try {
       await api.post("auth/logout/");
     } catch (error) {
@@ -183,7 +183,7 @@ export const authService = {
     tokenStore.clearAccessToken();
     sessionStorage.clear();
     Logger.info("User logged out");
-    window.location.href = "/login";
+    window.location.href = redirectTo;
   },
 
   /**

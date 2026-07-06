@@ -1,6 +1,6 @@
 
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { authRoutes, AuthRouteNames } from './auth.routes'
+import { authRoutes, AuthRouteNames, customerLoginPath } from './auth.routes'
 import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
 import { errorRoutes } from './error.routes'
 import { publicRoutes } from './public.routes'
@@ -67,6 +67,17 @@ router.beforeEach(async (to) => {
     return {
       name: AuthRouteNames.Login,
       query: { redirect: to.fullPath, reason: 'auth_required' }
+    }
+  }
+
+  // 1.1. Conta do cliente da vitrine: exige autenticação, mas redireciona
+  // para o login do cliente da loja atual, nunca para o painel admin.
+  if (to.meta.requiresCustomerAuth && !isLogged) {
+    const storeSlug = typeof to.params.storeSlug === 'string' ? to.params.storeSlug : ''
+
+    return {
+      path: customerLoginPath(storeSlug),
+      query: { redirect: to.fullPath, reason: 'customer_auth_required' }
     }
   }
 

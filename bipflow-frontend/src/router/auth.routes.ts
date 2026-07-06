@@ -129,17 +129,17 @@ export const authRoutes: RouteRecordRaw[] = [
     path: "/l/:storeSlug/conta",
     name: AuthRouteNames.CustomerAccount,
     component: () => import("@/views/customer/CustomerAccountView.vue"),
-    meta: { public: true, title: "Minha conta", module: "auth", requiresAuth: true }
+    meta: { public: true, title: "Minha conta", module: "auth", requiresCustomerAuth: true }
   },
   {
     path: "/s/:storeSlug/conta",
     component: () => import("@/views/customer/CustomerAccountView.vue"),
-    meta: { public: true, title: "Minha conta", module: "auth", requiresAuth: true }
+    meta: { public: true, title: "Minha conta", module: "auth", requiresCustomerAuth: true }
   },
   {
     path: "/conta",
     component: () => import("@/views/customer/CustomerAccountView.vue"),
-    meta: { public: true, title: "Minha conta", module: "auth", requiresAuth: true }
+    meta: { public: true, title: "Minha conta", module: "auth", requiresCustomerAuth: true }
   },
   {
     path: "/forgot-password",
