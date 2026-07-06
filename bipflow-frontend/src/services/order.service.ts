@@ -6,7 +6,35 @@ import type {
   CheckoutPayload,
   CheckoutResponse,
 } from '@/types/product'
+import { isAxiosError } from '@/types/errors'
 import { formatBRL } from '@/utils/formatters'
+
+/**
+ * CheckoutWhatsAppView returns a distinct `code` for the two gate failures
+ * a customer can still hit even after useCheckoutProfileGate's own check
+ * (a stale cached profile check, or a profile missing its address) --
+ * surfacing them specifically beats the generic "try again" toast, since
+ * both are self-service fixable by the customer.
+ */
+export function extractCheckoutErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const data = error.response?.data as { code?: string; detail?: string } | undefined
+
+    if (data?.code === 'profile_address_incomplete') {
+      return 'Complete seu endereco no perfil antes de finalizar uma entrega.'
+    }
+
+    if (data?.code === 'customer_profile_required') {
+      return 'Crie seu perfil para finalizar o pedido.'
+    }
+
+    if (typeof data?.detail === 'string') {
+      return data.detail
+    }
+  }
+
+  return 'Nao foi possivel registrar o pedido agora. Revise os dados e tente novamente.'
+}
 
 function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): CheckoutPayload {
   const payload: CheckoutPayload = {
@@ -15,15 +43,9 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
       quantity: item.quantity,
     })),
     customer: {
-      full_name: customer.fullName.trim(),
-      phone: customer.phone.trim(),
-      email: customer.email.trim(),
       delivery_method: customer.deliveryMethod,
       payment_method: customer.paymentMethod,
       delivery_region_id: customer.deliveryRegionId,
-      address: customer.address.trim(),
-      neighborhood: customer.neighborhood.trim(),
-      city: customer.city.trim(),
       notes: customer.notes.trim(),
     },
   }

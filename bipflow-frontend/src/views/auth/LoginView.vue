@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { BoltIcon, Square3Stack3DIcon, ChatBubbleLeftRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
 import { AuthRouteNames } from '@/router/auth.routes'
@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button.vue'
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
 
 const router = useRouter()
+const route = useRoute()
 const isLoading = ref(false)
 const errorMessage = ref('')
 // Separate from errorMessage on purpose: this is a reminder to finish
@@ -84,7 +85,7 @@ const handleLogin = async () => {
       return
     }
 
-    router.push({ name: DashboardRoutes.Overview })
+    goToPostLoginDestination()
   } catch (error) {
     if (isAxiosError(error)) {
       const status = error.response?.status
@@ -127,7 +128,7 @@ const handleVerifyMfa = async () => {
       mfa_token: mfaToken.value,
       ...(useBackupCode.value ? { backup_code: mfaCode.value.trim() } : { code: mfaCode.value.trim() }),
     })
-    router.push({ name: DashboardRoutes.Overview })
+    goToPostLoginDestination()
   } catch (error) {
     errorMessage.value = isAxiosError(error) && error.response?.status === 429
       ? 'Muitas tentativas. Aguarde um momento e tente novamente.'
@@ -137,6 +138,32 @@ const handleVerifyMfa = async () => {
   } finally {
     isVerifyingMfa.value = false
   }
+}
+
+/**
+ * Where to send the user after a successful login/MFA verification.
+ *
+ * Etapa 2 of docs/architecture/customer-profile-checkout-evolution.md:
+ * this view is reused verbatim at the storefront login routes
+ * (/l/:storeSlug/login), so a storefront customer logging in there must
+ * NOT land in the dashboard they have no membership for. The router
+ * guard's requiresAuth redirect already sets `?redirect=`, and the
+ * storefront's "Entrar" link does the same -- honor it when present,
+ * otherwise fall back to the dashboard (the only case before this fix).
+ */
+const postLoginRedirectTarget = computed(() => {
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect ? redirect : null
+})
+
+const goToPostLoginDestination = () => {
+  const redirect = postLoginRedirectTarget.value
+  if (redirect) {
+    router.push(redirect)
+    return
+  }
+
+  router.push({ name: DashboardRoutes.Overview })
 }
 
 const handleBackToLogin = () => {

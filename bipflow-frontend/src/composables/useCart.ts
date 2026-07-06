@@ -16,17 +16,11 @@ function storeScopedStorageKey(suffix: 'items' | 'customer'): string {
 }
 
 const defaultCustomer: CartCustomer = {
-  fullName: '',
-  phone: '',
-  email: '',
   deliveryMethod: 'delivery',
   paymentMethod: 'pix',
   deliveryRegionId: null,
   deliveryRegionName: '',
   deliveryRegionFee: 0,
-  address: '',
-  neighborhood: '',
-  city: '',
   notes: '',
 }
 

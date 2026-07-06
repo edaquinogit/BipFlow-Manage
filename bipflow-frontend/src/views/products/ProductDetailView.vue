@@ -11,18 +11,22 @@
           Voltar ao catalogo
         </button>
 
-        <div class="flex items-center gap-2.5 min-[390px]:gap-3">
-          <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
-            <img
-              :src="storeBranding.logoUrl"
-              :alt="storeBranding.name"
-              class="h-full w-full object-contain"
-            />
+        <div class="flex items-center justify-between gap-2.5 min-[390px]:gap-3">
+          <div class="flex min-w-0 items-center gap-2.5 min-[390px]:gap-3">
+            <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
+              <img
+                :src="storeBranding.logoUrl"
+                :alt="storeBranding.name"
+                class="h-full w-full object-contain"
+              />
+            </div>
+            <div class="min-w-0">
+              <p class="brand-wordmark brand-wordmark-premium truncate text-base min-[390px]:text-lg">{{ storeBranding.name }}</p>
+              <p class="storefront-muted truncate text-[11px] min-[390px]:text-xs">{{ storeBranding.tagline }}</p>
+            </div>
           </div>
-          <div class="min-w-0">
-            <p class="brand-wordmark brand-wordmark-premium truncate text-base min-[390px]:text-lg">{{ storeBranding.name }}</p>
-            <p class="storefront-muted truncate text-[11px] min-[390px]:text-xs">{{ storeBranding.tagline }}</p>
-          </div>
+
+          <CustomerProfileMenuButton />
         </div>
       </div>
     </header>
@@ -300,15 +304,17 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
+import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
+import { useCheckoutProfileGate } from '@/composables/useCheckoutProfileGate'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useStoreBranding } from '@/composables/useStoreBranding'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
-import { orderService } from '@/services/order.service'
+import { extractCheckoutErrorMessage, orderService } from '@/services/order.service'
 import productService from '@/services/product.service'
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
@@ -324,6 +330,7 @@ if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
 const toast = useToast()
+const { ensureCustomerProfile } = useCheckoutProfileGate()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
 
@@ -845,6 +852,10 @@ async function handleSubmitOrder(): Promise<void> {
     return
   }
 
+  if (!(await ensureCustomerProfile())) {
+    return
+  }
+
   isSubmittingOrder.value = true
 
   try {
@@ -868,7 +879,7 @@ async function handleSubmitOrder(): Promise<void> {
     Logger.warn('Failed to register WhatsApp checkout from product detail', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    toast.error('Nao foi possivel registrar o pedido agora. Revise os dados e tente novamente.')
+    toast.error(extractCheckoutErrorMessage(error))
   } finally {
     isSubmittingOrder.value = false
   }

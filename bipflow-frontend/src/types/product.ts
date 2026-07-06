@@ -68,18 +68,16 @@ export interface CartItem {
   quantity: number
 }
 
+// Etapa 1 of docs/architecture/customer-profile-checkout-evolution.md:
+// identity/address (name, phone, email, address, neighborhood, city) moved
+// to CustomerProfile -- only the choices that still vary per order live
+// here now. See types/customer.ts for the profile shape.
 export interface CartCustomer {
-  fullName: string
-  phone: string
-  email: string
   deliveryMethod: 'delivery' | 'pickup'
   paymentMethod: 'pix' | 'card' | 'cash'
   deliveryRegionId: number | null
   deliveryRegionName: string
   deliveryRegionFee: number
-  address: string
-  neighborhood: string
-  city: string
   notes: string
 }
 
@@ -89,15 +87,9 @@ export interface CheckoutPayloadItem {
 }
 
 export interface CheckoutPayloadCustomer {
-  full_name: string
-  phone: string
-  email: string
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
   delivery_region_id: number | null
-  address: string
-  neighborhood: string
-  city: string
   notes: string
 }
 
@@ -116,12 +108,27 @@ export interface CheckoutResponseItem {
   line_total: string
 }
 
+// Unlike CheckoutPayloadCustomer, the response still carries identity/
+// address -- it's just read from the customer's profile server-side now,
+// not submitted in the request.
+export interface CheckoutResponseCustomer {
+  full_name: string
+  phone: string
+  email: string
+  delivery_method: 'delivery' | 'pickup'
+  payment_method: 'pix' | 'card' | 'cash'
+  delivery_region_id: number | null
+  delivery_region_name?: string
+  address: string
+  neighborhood: string
+  city: string
+  notes: string
+}
+
 export interface CheckoutResponse {
   order_reference: string
   items: CheckoutResponseItem[]
-  customer: CheckoutPayloadCustomer & {
-    delivery_region_name?: string
-  }
+  customer: CheckoutResponseCustomer
   subtotal: string
   delivery_fee: string
   total: string

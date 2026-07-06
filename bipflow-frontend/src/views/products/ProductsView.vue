@@ -17,9 +17,12 @@
             </div>
           </div>
 
-          <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div class="flex items-center gap-2.5 sm:flex-row">
+            <CustomerProfileMenuButton />
+
             <button
               type="button"
+              data-cy="open-cart-button"
               class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 text-[11px] font-bold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
@@ -338,6 +341,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryValue } from 'vue-router'
 import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
+import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import IntroSplash from './IntroSplash.vue'
 import ProductCard from './ProductCard.vue'
@@ -347,6 +351,7 @@ import {
   ShoppingBagIcon,
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
+import { useCheckoutProfileGate } from '@/composables/useCheckoutProfileGate'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
@@ -356,7 +361,7 @@ import type { Category } from '@/schemas/category.schema'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
-import { orderService } from '@/services/order.service'
+import { extractCheckoutErrorMessage, orderService } from '@/services/order.service'
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
@@ -398,6 +403,7 @@ if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
 const toast = useToast()
+const { ensureCustomerProfile } = useCheckoutProfileGate()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
 const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
@@ -768,6 +774,10 @@ async function handleSubmitOrder(): Promise<void> {
     return
   }
 
+  if (!(await ensureCustomerProfile())) {
+    return
+  }
+
   isSubmittingOrder.value = true
 
   try {
@@ -791,7 +801,7 @@ async function handleSubmitOrder(): Promise<void> {
     Logger.warn('Failed to register WhatsApp checkout', {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
-    toast.error('Nao foi possivel registrar o pedido agora. Revise os dados e tente novamente.')
+    toast.error(extractCheckoutErrorMessage(error))
   } finally {
     isSubmittingOrder.value = false
   }

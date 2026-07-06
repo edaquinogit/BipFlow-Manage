@@ -19,8 +19,20 @@ export interface CurrentUser {
   can_manage_catalog: boolean;
   mfa_enabled: boolean;
 }
-export interface RegisterPayload { email: string; password: string; confirm_password: string; store_name: string; }
-export interface RegisterResponse { message: string; email: string; }
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  confirm_password: string;
+  registration_context?: 'dashboard_owner' | 'storefront_customer';
+  store_name?: string;
+  store_slug?: string;
+  full_name?: string;
+  phone?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+}
+export interface RegisterResponse { message: string; email: string; profile_kind?: string; registration_context?: string; }
 export interface RequestResetPayload { email: string; }
 export interface RequestResetResponse { message: string; email: string; }
 export interface ConfirmResetPayload { uid: string; token: string; password: string; confirm_password: string; }

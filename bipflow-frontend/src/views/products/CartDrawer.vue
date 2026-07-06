@@ -135,51 +135,6 @@
             </div>
 
             <div class="grid gap-4">
-              <label class="block">
-                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                  Nome
-                </span>
-                <input
-                  :value="customer.fullName"
-                  type="text"
-                  autocomplete="name"
-                  class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                  placeholder="Seu nome"
-                  @input="handleTextField('fullName', $event)"
-                />
-              </label>
-
-              <div class="grid gap-4 sm:grid-cols-2">
-                <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                    WhatsApp
-                  </span>
-                  <input
-                    :value="customer.phone"
-                    type="tel"
-                    inputmode="tel"
-                    autocomplete="tel"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    placeholder="+55 71 99999-9999"
-                    @input="handleTextField('phone', $event)"
-                  />
-                </label>
-
-                <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                    Email
-                  </span>
-                  <input
-                    :value="customer.email"
-                    type="email"
-                    autocomplete="email"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    placeholder="Opcional"
-                    @input="handleTextField('email', $event)"
-                  />
-                </label>
-              </div>
-
               <div class="grid gap-4 sm:grid-cols-2">
                 <label class="block">
                   <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
@@ -235,49 +190,12 @@
                   </select>
                 </label>
 
-                <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                    Endereco
-                  </span>
-                  <input
-                    :value="customer.address"
-                    type="text"
-                    autocomplete="street-address"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    placeholder="Rua, numero e complemento"
-                    @input="handleTextField('address', $event)"
-                  />
-                </label>
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                      Bairro
-                    </span>
-                    <input
-                      :value="customer.neighborhood"
-                      type="text"
-                      autocomplete="address-level3"
-                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                      placeholder="Bairro"
-                      @input="handleTextField('neighborhood', $event)"
-                    />
-                  </label>
-
-                  <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-                      Cidade
-                    </span>
-                    <input
-                      :value="customer.city"
-                      type="text"
-                      autocomplete="address-level2"
-                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                      placeholder="Cidade"
-                      @input="handleTextField('city', $event)"
-                    />
-                  </label>
-                </div>
+                <p class="text-xs leading-5 text-[#6B7280]">
+                  Entregamos no endereço salvo no seu perfil.
+                  <RouterLink :to="accountRoute" class="font-semibold text-[#D81B60] hover:underline">
+                    Editar endereço
+                  </RouterLink>
+                </p>
               </template>
 
               <label class="block">
@@ -289,7 +207,7 @@
                   rows="3"
                   class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                   placeholder="Tamanho, referencia ou combinados do pedido"
-                  @input="handleTextField('notes', $event)"
+                  @input="handleNotesInput"
                 />
               </label>
             </div>
@@ -329,6 +247,7 @@
 
           <button
             type="button"
+            data-cy="checkout-submit-button"
             class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#05050A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
             :disabled="!canSubmitCheckout"
             @click="$emit('submitOrder')"
@@ -344,6 +263,7 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   ChatBubbleBottomCenterTextIcon,
   MinusIcon,
@@ -352,6 +272,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import { customerAccountPath } from '@/router/auth.routes'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
@@ -398,14 +319,11 @@ const closeButtonRef = ref<HTMLButtonElement | null>(null)
 
 useDialogA11y(toRef(props, 'isOpen'), () => emit('close'), containerRef, closeButtonRef)
 
-type TextCustomerField =
-  | 'fullName'
-  | 'phone'
-  | 'email'
-  | 'address'
-  | 'neighborhood'
-  | 'city'
-  | 'notes'
+const route = useRoute()
+const accountRoute = computed(() => {
+  const storeSlug = typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+  return { path: customerAccountPath(storeSlug) }
+})
 
 const deliveryRegionPlaceholder = computed(() => {
   if (props.isDeliveryRegionsLoading) {
@@ -417,37 +335,17 @@ const deliveryRegionPlaceholder = computed(() => {
     : 'Combinar entrega com a loja'
 })
 
-const normalizedPhone = computed(() => props.customer.phone.replace(/\D/g, ''))
-
 const checkoutValidationMessage = computed(() => {
   if (props.itemCount === 0) {
     return 'Adicione ao menos um item ao pedido.'
   }
 
-  if (!props.customer.fullName.trim()) {
-    return 'Informe seu nome para registrar o pedido.'
-  }
-
-  if (normalizedPhone.value.length < 10) {
-    return 'Informe um WhatsApp com DDD.'
-  }
-
-  if (props.customer.deliveryMethod === 'delivery') {
-    if (props.deliveryRegions.length > 0 && !props.customer.deliveryRegionId) {
-      return 'Selecione a regiao de entrega.'
-    }
-
-    if (!props.customer.address.trim()) {
-      return 'Informe o endereco de entrega.'
-    }
-
-    if (!props.customer.neighborhood.trim()) {
-      return 'Informe o bairro de entrega.'
-    }
-
-    if (!props.customer.city.trim()) {
-      return 'Informe a cidade de entrega.'
-    }
+  if (
+    props.customer.deliveryMethod === 'delivery'
+    && props.deliveryRegions.length > 0
+    && !props.customer.deliveryRegionId
+  ) {
+    return 'Selecione a regiao de entrega.'
   }
 
   return ''
@@ -471,9 +369,9 @@ function getInputValue(event: Event): string {
   return (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value
 }
 
-function handleTextField(field: TextCustomerField, event: Event): void {
+function handleNotesInput(event: Event): void {
   emit('updateCustomer', {
-    [field]: getInputValue(event),
+    notes: getInputValue(event),
   })
 }
 
@@ -487,9 +385,6 @@ function handleDeliveryMethodChange(event: Event): void {
           deliveryRegionId: null,
           deliveryRegionName: '',
           deliveryRegionFee: 0,
-          address: '',
-          neighborhood: '',
-          city: '',
         }
       : {}),
   })

@@ -108,6 +108,7 @@
 
           <button
             type="button"
+            data-cy="add-to-cart-button"
             class="inline-flex h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[0.95rem] px-2 text-[8px] font-bold uppercase leading-none tracking-[0.04em] shadow-[0_14px_30px_-22px_rgba(5,5,10,0.7)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-12 min-[390px]:gap-1.5 min-[390px]:rounded-xl min-[390px]:px-2.5 min-[390px]:text-[8px] min-[390px]:tracking-[0.05em] min-[480px]:gap-2 min-[480px]:px-3 min-[480px]:text-[9px] min-[480px]:tracking-[0.08em] sm:px-4 sm:text-[11px] sm:tracking-[0.1em]"
             :class="product.is_available
               ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_36px_-24px_rgba(216,27,96,0.65)]'

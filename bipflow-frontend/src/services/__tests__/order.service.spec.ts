@@ -28,17 +28,11 @@ const buildProduct = (): Product => ({
 })
 
 const buildCustomer = (): CartCustomer => ({
-  fullName: 'Cliente Teste',
-  phone: '71999990000',
-  email: '',
   deliveryMethod: 'pickup',
   paymentMethod: 'pix',
   deliveryRegionId: null,
   deliveryRegionName: '',
   deliveryRegionFee: 0,
-  address: '',
-  neighborhood: '',
-  city: '',
   notes: '',
 })
 
