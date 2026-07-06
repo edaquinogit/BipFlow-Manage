@@ -85,9 +85,9 @@ class StoreMembershipAdmin(admin.ModelAdmin):
 
 @admin.register(CustomerProfile)
 class CustomerProfileAdmin(admin.ModelAdmin):
-    list_display = ("id", "store", "user", "full_name", "phone")
+    list_display = ("id", "store", "user", "full_name", "phone", "city")
     list_filter = ("store",)
-    search_fields = ("user__username", "user__email", "full_name", "phone")
+    search_fields = ("user__username", "user__email", "full_name", "phone", "city")
 
 
 @admin.register(StoreSettings)

@@ -8,7 +8,7 @@ user actually belongs to, or to any store at all for staff/superusers.
 Every path falls back to the single default store, so today's behaviour --
 and every public link issued before this landed -- keeps working unchanged.
 """
-from .models import Store, StoreMembership
+from .models import CustomerProfile, Store, StoreMembership
 
 
 def _claim(token, key: str):
@@ -22,11 +22,37 @@ def _claim(token, key: str):
 
 
 def _user_belongs_to(user, store: Store) -> bool:
-    """Whether `user` may act as `store` -- staff/superusers always may."""
+    """Whether `user` may act as `store` -- staff/superusers always may.
+
+    Checks both dashboard membership and storefront customer profiles
+    (see docs/architecture/customer-profile-checkout-evolution.md) --
+    without the second check, an authenticated customer sending their own
+    store's `X-Store-Slug` would be treated as an unrelated tenant and
+    silently fall back to the default store.
+
+    The CustomerProfile check is deliberately skipped entirely when the
+    user has a StoreMembership *anywhere* (any store, not just this one).
+    Dashboard permission helpers (`has_dashboard_read_access` et al. in
+    permissions.py) only check "does this user have some StoreMembership",
+    never "at the resolved store" -- so without this guard, a dashboard
+    user who also happens to be a customer at a different store could send
+    that store's slug in the header, have this function honor it via the
+    CustomerProfile branch, and land `resolve_request_store()` on a store
+    they have no dashboard relationship with at all, while the
+    store-agnostic permission check still passes. Real cross-tenant leak,
+    caught in review before this shipped -- see
+    docs/architecture/customer-profile-checkout-evolution.md.
+    """
     if user.is_staff or user.is_superuser:
         return True
 
-    return StoreMembership.objects.filter(user=user, store=store).exists()
+    if StoreMembership.objects.filter(user=user, store=store).exists():
+        return True
+
+    if StoreMembership.objects.filter(user=user).exists():
+        return False
+
+    return CustomerProfile.objects.filter(user=user, store=store).exists()
 
 
 def resolve_request_store(request) -> Store:

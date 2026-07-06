@@ -57,11 +57,6 @@ def _request_data_value(request, fields: Iterable[str]) -> str | None:
     return None
 
 
-def _normalize_phone_identifier(value: str) -> str:
-    digits = "".join(character for character in value if character.isdigit())
-    return digits or value.strip().lower()
-
-
 class UserThrottle(UserRateThrottle):
     """
     Limit requests from authenticated users.
@@ -99,12 +94,26 @@ class AuthIpThrottle(AnonRateThrottle):
     scope = "auth_ip"
 
 
-class CheckoutIpThrottle(AnonRateThrottle):
+class CheckoutIpThrottle(SimpleRateThrottle):
     """
-    Limit anonymous checkout creation bursts by client IP.
+    Limit checkout creation bursts by client IP, regardless of auth status.
+
+    Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
+    checkout now requires authentication. Plain AnonRateThrottle's
+    get_cache_key() returns None -- "don't throttle" -- for any
+    authenticated request, which would have silently disabled this IP
+    throttle entirely the moment checkout stopped being anonymous.
+    Overriding get_cache_key() to always key by IP, regardless of auth
+    status, is what keeps it doing its job.
     """
 
     scope = "checkout_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
 
 
 class BotMessageIpThrottle(AnonRateThrottle):
@@ -160,17 +169,24 @@ class SubmittedFieldThrottle(SimpleRateThrottle):
         }
 
 
-class CheckoutPhoneThrottle(SubmittedFieldThrottle):
+class CheckoutCustomerThrottle(UserRateThrottle):
     """
-    Limit repeated checkout attempts for the same submitted customer phone.
+    Limit repeated checkout attempts by the authenticated customer.
+
+    Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
+    checkout now requires authentication, so this keys by the requesting
+    user (UserRateThrottle's default get_cache_key()) instead of a
+    submitted phone field. Replaces the former CheckoutPhoneThrottle, which
+    read `customer.phone` from the request body -- once identity fields
+    moved to CustomerProfile and stopped being submitted on every checkout,
+    that throttle's get_cache_key() would have silently returned None (DRF
+    treats that as "don't throttle"), the same landmine already hit once in
+    this project with TokenRefreshIdentityThrottle during the cookie-auth
+    migration. Keeps the historical "checkout_phone" scope/env var name to
+    avoid an unrelated config rename.
     """
 
     scope = "checkout_phone"
-    identity_fields = ("customer.phone",)
-    lower_identity = False
-
-    def normalize_identifier(self, identifier: str) -> str:
-        return _normalize_phone_identifier(identifier)
 
 
 class LoginIdentityThrottle(SubmittedFieldThrottle):

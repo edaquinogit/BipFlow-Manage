@@ -467,6 +467,24 @@ class CustomerProfile(models.Model):
     )
     full_name = models.CharField(max_length=160, blank=True)
     phone = models.CharField(max_length=32, blank=True)
+    # Default checkout address, added so the public checkout form no longer
+    # has to ask for it on every order (see
+    # docs/architecture/customer-profile-checkout-evolution.md). No separate
+    # email field: the account's own `user.email` (already mandatory/unique
+    # at registration) already serves as the checkout contact email, so
+    # asking for it a second time here would just duplicate that. Deliberately
+    # a single flat address, not an address book -- matches how the rest of
+    # this codebase favors the simplest model that satisfies the ask.
+    address = models.CharField(max_length=255, blank=True)
+    neighborhood = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
+    delivery_region = models.ForeignKey(
+        DeliveryRegion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="customer_profiles",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -681,6 +699,19 @@ class SaleOrder(models.Model):
         ),
     )
 
+    customer_profile = models.ForeignKey(
+        "CustomerProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+        help_text=(
+            "Set when the order was placed by an authenticated storefront "
+            "customer (see docs/architecture/customer-profile-checkout-"
+            "evolution.md); always null for pre-existing orders and for PDV "
+            "sales, which have no customer account involved."
+        ),
+    )
     customer_name = models.CharField(max_length=255)
     customer_phone = models.CharField(max_length=32)
     customer_email = models.EmailField(blank=True)

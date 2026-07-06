@@ -32,6 +32,7 @@ from rest_framework.test import APIClient
 from bipdelivery.api.models import (
     BotConversation,
     Category,
+    CustomerProfile,
     DeliveryRegion,
     Product,
     SaleOrder,
@@ -244,12 +245,21 @@ class PublicCatalogIsolationTest(TwoStoreFixtureMixin, TestCase):
 
 class CheckoutIsolationTest(TwoStoreFixtureMixin, TestCase):
     def test_checkout_rejects_a_product_from_another_store(self) -> None:
+        # Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
+        # checkout requires an authenticated customer with a profile for the
+        # *resolved* store now -- a customer profile at store_b is what makes
+        # the X-Store-Slug header actually resolve to store_b (see
+        # store_scope._user_belongs_to), so this still genuinely exercises
+        # cross-tenant product isolation instead of just failing on auth.
+        customer = User.objects.create_user(username="cliente_loja_b", password="testpass123")
+        CustomerProfile.objects.create(
+            user=customer, store=self.store_b, full_name="Cliente Teste", phone="71999999999"
+        )
         client = APIClient()
+        client.force_authenticate(user=customer)
         payload = {
             "items": [{"product_id": self.product_a.id, "quantity": 1}],
             "customer": {
-                "full_name": "Cliente Teste",
-                "phone": "71999999999",
                 "delivery_method": "pickup",
                 "payment_method": "pix",
             },

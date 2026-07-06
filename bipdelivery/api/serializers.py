@@ -129,6 +129,17 @@ class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         if membership is not None:
             token["store_id"] = membership.store.id
+            return token
+
+        # No dashboard membership: fall back to a storefront customer
+        # profile (see docs/architecture/customer-profile-checkout-
+        # evolution.md) so a customer's JWT also carries a store_id claim,
+        # not just staff/owner logins.
+        customer_profile = (
+            CustomerProfile.objects.filter(user=user).select_related("store").first()
+        )
+        if customer_profile is not None:
+            token["store_id"] = customer_profile.store.id
 
         return token
 
@@ -781,33 +792,20 @@ class CheckoutItemInputSerializer(serializers.Serializer):
 
 
 class CheckoutCustomerInputSerializer(serializers.Serializer):
-    """Serializer for customer checkout data."""
+    """Serializer for the per-order choices still collected at checkout.
 
-    full_name = serializers.CharField(max_length=255)
-    phone = serializers.CharField(max_length=32)
-    email = serializers.EmailField(required=False, allow_blank=True)
+    Etapa 1 of docs/architecture/customer-profile-checkout-evolution.md:
+    identity/address fields (name, phone, email, address, neighborhood,
+    city) moved to `CustomerProfile` and are no longer part of this payload
+    -- `CheckoutWhatsAppView` reads them from the authenticated customer's
+    profile instead. Only the choices that legitimately vary per order
+    (delivery/payment method, region, notes) stay here.
+    """
+
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
     delivery_region_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
-    address = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    neighborhood = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    city = serializers.CharField(required=False, allow_blank=True, max_length=255)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
-
-    def validate(self, attrs):
-        """Require address details only when delivery is selected."""
-        if attrs["delivery_method"] == "delivery":
-            required_fields = {
-                "address": "address is required for delivery orders",
-                "neighborhood": "neighborhood is required for delivery orders",
-                "city": "city is required for delivery orders",
-            }
-
-            for field_name, error_message in required_fields.items():
-                if not attrs.get(field_name, "").strip():
-                    raise serializers.ValidationError({field_name: error_message})
-
-        return attrs
 
 
 CHECKOUT_HONEYPOT_FIELDS = ("website", "company")
@@ -1073,6 +1071,14 @@ class RegisterUserSerializer(serializers.Serializer):
     store_slug = serializers.SlugField(required=False)
     full_name = serializers.CharField(max_length=160, trim_whitespace=True, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, trim_whitespace=True, required=False, allow_blank=True)
+    # Optional at registration for every context; only required for
+    # storefront_customer (validated below), and even then only full_name
+    # and phone -- address stays optional here the same way it always was
+    # optional in the pre-profile checkout form (only required later, at
+    # checkout time, if the customer picks delivery over pickup).
+    address = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
+    neighborhood = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
 
     def validate_store_name(self, value: str) -> str:
         normalized_name = value.strip()
@@ -1127,6 +1133,16 @@ class RegisterUserSerializer(serializers.Serializer):
             attrs["store_slug"] = store_slug
             attrs["resolved_store"] = store
 
+            full_name = (attrs.get("full_name") or "").strip()
+            if not full_name:
+                raise serializers.ValidationError({"full_name": "Informe seu nome."})
+            attrs["full_name"] = full_name
+
+            phone = (attrs.get("phone") or "").strip()
+            if not phone:
+                raise serializers.ValidationError({"phone": "Informe seu WhatsApp."})
+            attrs["phone"] = phone
+
         return attrs
 
     def create(self, validated_data):
@@ -1159,9 +1175,67 @@ class RegisterUserSerializer(serializers.Serializer):
                     store=store,
                     full_name=full_name,
                     phone=str(validated_data.get("phone") or "").strip(),
+                    address=str(validated_data.get("address") or "").strip(),
+                    neighborhood=str(validated_data.get("neighborhood") or "").strip(),
+                    city=str(validated_data.get("city") or "").strip(),
                 )
 
         return user
+
+
+class CustomerProfileSerializer(serializers.Serializer):
+    """Read/update a storefront customer's own profile (identity + address).
+
+    Etapa 0 of docs/architecture/customer-profile-checkout-evolution.md:
+    `RegisterUserSerializer` already creates this row via the
+    `storefront_customer` context; this is the only place it can be read
+    back or edited afterwards. `delivery_region_id` is resolved against
+    `context["store"]` the same way CheckoutWhatsAppView resolves it for an
+    order -- the view must pass the resolved store in. No `email` field:
+    the account's own (mandatory, unique) `user.email` already serves as
+    the checkout contact email.
+    """
+
+    # No allow_blank on full_name/phone: required=False lets a PATCH omit
+    # them entirely (partial update), but if the client DOES send one, DRF
+    # rejects an empty string outright -- these are core identity fields
+    # CheckoutWhatsAppView trusts unconditionally when building an order,
+    # so they must never be saved blank (see docs/architecture/customer-
+    # profile-checkout-evolution.md).
+    full_name = serializers.CharField(max_length=160, required=False)
+    phone = serializers.CharField(max_length=32, required=False)
+    address = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    neighborhood = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    delivery_region_id = serializers.IntegerField(required=False, allow_null=True)
+    delivery_region_name = serializers.SerializerMethodField(read_only=True)
+    email = serializers.SerializerMethodField(read_only=True)
+
+    def get_delivery_region_name(self, instance: "CustomerProfile") -> str:
+        return instance.delivery_region.name if instance.delivery_region_id else ""
+
+    def get_email(self, instance: "CustomerProfile") -> str:
+        return instance.user.email
+
+    def validate_delivery_region_id(self, value):
+        if value is None:
+            return value
+
+        store = self.context["store"]
+        if not DeliveryRegion.objects.filter(id=value, store=store, is_active=True).exists():
+            raise serializers.ValidationError("Selected delivery region is unavailable")
+        return value
+
+    def update(self, instance: "CustomerProfile", validated_data):
+        for field_name in ("full_name", "phone", "address", "neighborhood", "city"):
+            if field_name in validated_data:
+                setattr(instance, field_name, validated_data[field_name].strip())
+
+        if "delivery_region_id" in validated_data:
+            instance.delivery_region_id = validated_data["delivery_region_id"]
+
+        instance.save()
+        return instance
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

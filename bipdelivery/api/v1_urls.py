@@ -7,6 +7,7 @@ from .views import (
     CategoryViewSet,
     CheckoutWhatsAppView,
     CurrentStoreView,
+    CustomerProfileView,
     DeliveryRegionViewSet,
     MyStoreDetailView,
     MyStoresView,
@@ -32,6 +33,7 @@ urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador
     path("bot/messages/", BotMessageView.as_view(), name="bot-message"),
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
+    path("customers/me/", CustomerProfileView.as_view(), name="customer-profile-me"),
     path("pdv/sales/", PdvSaleView.as_view(), name="pdv-sale"),
     path(
         "pdv/sales/<str:order_reference>/receipt-email/",

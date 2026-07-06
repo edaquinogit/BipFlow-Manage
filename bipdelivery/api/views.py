@@ -40,6 +40,7 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerProfile,
     DeliveryRegion,
     LoginAttempt,
     MFABackupCode,
@@ -70,6 +71,7 @@ from .serializers import (
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
     CurrentUserSerializer,
+    CustomerProfileSerializer,
     DeliveryRegionSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -96,8 +98,8 @@ from .throttling import (
     REFRESH_TOKEN_COOKIE_NAME,
     AuthIpThrottle,
     BotMessageIpThrottle,
+    CheckoutCustomerThrottle,
     CheckoutIpThrottle,
-    CheckoutPhoneThrottle,
     LoginIdentityThrottle,
     MfaVerifyIpThrottle,
     PasswordResetConfirmIdentityThrottle,
@@ -1457,14 +1459,17 @@ class CheckoutWhatsAppView(APIView):
     """
     Prepare a checkout note and WhatsApp redirect for the public catalog.
 
-    This endpoint validates the cart server-side, recalculates totals and
-    returns a formatted order message ready to be shared with the configured
+    Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
+    requires an authenticated storefront customer with a CustomerProfile for
+    the resolved store -- identity/address come from that profile, not from
+    the request body, so there is no anonymous checkout path anymore. This
+    endpoint validates the cart server-side, recalculates totals and returns
+    a formatted order message ready to be shared with the configured
     WhatsApp sales number.
     """
 
-    permission_classes = []
-    authentication_classes = []
-    throttle_classes = [CheckoutIpThrottle, CheckoutPhoneThrottle]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [CheckoutIpThrottle, CheckoutCustomerThrottle]
 
     @staticmethod
     def _payment_label(payment_method: str) -> str:
@@ -1586,39 +1591,70 @@ class CheckoutWhatsAppView(APIView):
 
     def post(self, request, *args, **kwargs):
         store = resolve_request_store(request)
+        profile = (
+            CustomerProfile.objects.select_related("delivery_region")
+            .filter(user=request.user, store=store)
+            .first()
+        )
+
+        if profile is None:
+            return Response(
+                {
+                    "code": "customer_profile_required",
+                    "detail": "Crie seu perfil para finalizar o pedido.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = CheckoutRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
         cart_items = validated_data["items"]
         customer = validated_data["customer"]
+        is_delivery = customer["delivery_method"] == "delivery"
 
         delivery_region = None
         delivery_region_id = customer.get("delivery_region_id")
 
-        if customer["delivery_method"] == "delivery" and delivery_region_id:
-            delivery_region = DeliveryRegion.objects.filter(
-                id=delivery_region_id,
-                store=store,
-                is_active=True,
-            ).first()
+        if is_delivery:
+            if delivery_region_id:
+                delivery_region = DeliveryRegion.objects.filter(
+                    id=delivery_region_id,
+                    store=store,
+                    is_active=True,
+                ).first()
 
-            if delivery_region is None:
-                raise serializers.ValidationError(
-                    {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
+                if delivery_region is None:
+                    raise serializers.ValidationError(
+                        {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
+                    )
+            elif profile.delivery_region_id and profile.delivery_region.is_active:
+                delivery_region = profile.delivery_region
+
+            if not profile.address.strip() or not profile.neighborhood.strip() or not profile.city.strip():
+                return Response(
+                    {
+                        "code": "profile_address_incomplete",
+                        "detail": "Complete seu endereco no perfil antes de finalizar uma entrega.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S-%f")
-        customer_name = customer["full_name"].strip()
-        customer_phone = customer["phone"].strip()
-        customer_email = customer.get("email", "").strip()
+        customer_name = profile.full_name.strip()
+        customer_phone = profile.phone.strip()
+        customer_email = request.user.email
         notes = customer.get("notes", "").strip()
+        order_address = profile.address.strip() if is_delivery else ""
+        order_neighborhood = profile.neighborhood.strip() if is_delivery else ""
+        order_city = profile.city.strip() if is_delivery else ""
 
         with transaction.atomic():
             normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items, store)
 
             delivery_fee = Decimal("0.00")
-            if customer["delivery_method"] == "delivery":
+            if is_delivery:
                 delivery_fee = (
                     Decimal(delivery_region.delivery_fee)
                     if delivery_region is not None
@@ -1650,15 +1686,15 @@ class CheckoutWhatsAppView(APIView):
                 f'Pagamento: {self._payment_label(customer["payment_method"])}',
             ]
 
-            if customer["delivery_method"] == "delivery":
+            if is_delivery:
                 if delivery_region is not None:
                     message_lines.append(f"Regiao: {delivery_region.name}")
 
                 message_lines.extend(
                     [
-                        f'Endereco: {customer["address"].strip()}',
-                        f'Bairro: {customer["neighborhood"].strip()}',
-                        f'Cidade: {customer["city"].strip()}',
+                        f"Endereco: {order_address}",
+                        f"Bairro: {order_neighborhood}",
+                        f"Cidade: {order_city}",
                     ]
                 )
 
@@ -1673,6 +1709,7 @@ class CheckoutWhatsAppView(APIView):
 
             sale_order = SaleOrder.objects.create(
                 store=store,
+                customer_profile=profile,
                 order_reference=order_reference,
                 customer_name=customer_name,
                 customer_phone=customer_phone,
@@ -1681,9 +1718,9 @@ class CheckoutWhatsAppView(APIView):
                 payment_method=customer["payment_method"],
                 delivery_region=delivery_region,
                 delivery_region_name=delivery_region.name if delivery_region is not None else "",
-                address=customer.get("address", "").strip(),
-                neighborhood=customer.get("neighborhood", "").strip(),
-                city=customer.get("city", "").strip(),
+                address=order_address,
+                neighborhood=order_neighborhood,
+                city=order_city,
                 notes=notes,
                 subtotal=subtotal.quantize(Decimal("0.01")),
                 delivery_fee=delivery_fee.quantize(Decimal("0.01")),
@@ -1752,9 +1789,9 @@ class CheckoutWhatsAppView(APIView):
                     "delivery_region_name": (
                         delivery_region.name if delivery_region is not None else ""
                     ),
-                    "address": customer.get("address", "").strip(),
-                    "neighborhood": customer.get("neighborhood", "").strip(),
-                    "city": customer.get("city", "").strip(),
+                    "address": order_address,
+                    "neighborhood": order_neighborhood,
+                    "city": order_city,
                     "notes": notes,
                 },
                 "subtotal": subtotal.quantize(Decimal("0.01")),
@@ -2246,6 +2283,50 @@ class RegisterUserView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class CustomerProfileView(APIView):
+    """Read or update the authenticated customer's own storefront profile.
+
+    Etapa 0 of docs/architecture/customer-profile-checkout-evolution.md:
+    registration (RegisterUserView, storefront_customer context) already
+    creates the row; this is the only place it can be read back or edited.
+    Resolves the same way every other store-scoped request does (see
+    resolve_request_store), so it works with either the JWT store_id claim
+    or an explicit X-Store-Slug header.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_profile(self, request) -> CustomerProfile:
+        store = resolve_request_store(request)
+        profile = (
+            CustomerProfile.objects.select_related("user", "delivery_region")
+            .filter(user=request.user, store=store)
+            .first()
+        )
+
+        if profile is None:
+            raise NotFound("No customer profile found for this store.")
+
+        return profile
+
+    def get(self, request, *args, **kwargs):
+        profile = self._get_profile(request)
+        serializer = CustomerProfileSerializer(profile, context={"store": profile.store})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        profile = self._get_profile(request)
+        serializer = CustomerProfileSerializer(
+            profile,
+            data=request.data,
+            partial=True,
+            context={"store": profile.store},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PasswordResetRequestView(APIView):

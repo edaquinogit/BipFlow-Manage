@@ -43,6 +43,7 @@ django.setup()
 from bipdelivery.api.models import (  # noqa: E402
     BotConversation,
     Category,
+    CustomerProfile,
     DeliveryRegion,
     Product,
     SaleOrder,
@@ -706,24 +707,57 @@ class CheckoutWhatsAppAPITest(TestCase):
             category=self.category,
         )
 
+    def _checkout_client(
+        self,
+        *,
+        email: str = "cliente@teste.com",
+        full_name: str = "Cliente Teste",
+        phone: str = "71999990000",
+        address: str = "",
+        neighborhood: str = "",
+        city: str = "",
+    ) -> APIClient:
+        """Authenticated storefront customer with a CustomerProfile for the default store.
+
+        Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
+        checkout requires this now, so every checkout test needs its own
+        customer -- separate from the shared, deliberately-anonymous
+        `self.client` other tests in this class rely on (e.g.
+        test_sales_history_requires_authentication).
+        """
+        user = User.objects.create_user(username=email, email=email, password="testpass123")
+        CustomerProfile.objects.create(
+            user=user,
+            store=Store.get_default(),
+            full_name=full_name,
+            phone=phone,
+            address=address,
+            neighborhood=neighborhood,
+            city=city,
+        )
+        client = APIClient()
+        client.force_authenticate(user=user, token={"store_id": Store.get_default().id})
+        return client
+
     def _build_pickup_payload(self, items: list[dict[str, int]]) -> dict[str, Any]:
         return {
             "items": items,
             "customer": {
-                "full_name": "Cliente Teste",
-                "phone": "(71) 99999-0000",
-                "email": "",
                 "delivery_method": "pickup",
                 "payment_method": "card",
-                "address": "",
-                "neighborhood": "",
-                "city": "",
                 "notes": "",
             },
         }
 
     def test_checkout_builds_whatsapp_payload(self) -> None:
         """Checkout should return totals, note text and WhatsApp URL."""
+        client = self._checkout_client(
+            email="cliente@teste.com",
+            address="Rua A, 123",
+            neighborhood="Centro",
+            city="Salvador",
+        )
+
         with self.settings(WHATSAPP_ORDER_PHONE="5571999999999"):
             payload = {
                 "items": [
@@ -733,18 +767,12 @@ class CheckoutWhatsAppAPITest(TestCase):
                     }
                 ],
                 "customer": {
-                    "full_name": "Cliente Teste",
-                    "phone": "(71) 99999-0000",
-                    "email": "cliente@teste.com",
                     "delivery_method": "delivery",
                     "payment_method": "pix",
-                    "address": "Rua A, 123",
-                    "neighborhood": "Centro",
-                    "city": "Salvador",
                     "notes": "Sem cebola",
                 },
             }
-            response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+            response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["subtotal"], "85.00")
@@ -764,9 +792,10 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_creates_a_stock_movement_per_product(self) -> None:
         """Checkout should leave an auditable saida movement behind the decrement."""
+        client = self._checkout_client()
         payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 2}])
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
@@ -783,13 +812,14 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_links_a_bot_conversation_to_the_resulting_order(self) -> None:
         """A bot_session_id on checkout should mark that conversation as converted."""
+        client = self._checkout_client()
         bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
         session_id = bot_response.data["session_id"]
 
         payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
         payload["bot_session_id"] = session_id
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
@@ -798,12 +828,13 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_without_a_bot_session_id_leaves_conversations_unlinked(self) -> None:
         """Checkout should still work for customers who never used the bot."""
+        client = self._checkout_client()
         bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
         session_id = bot_response.data["session_id"]
 
         payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
@@ -811,6 +842,7 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_ignores_a_bot_session_id_from_another_store(self) -> None:
         """A session id from a different tenant must never be linked across stores."""
+        client = self._checkout_client()
         other_store = Store.objects.create(name="Outra loja", slug="outra-loja-checkout")
         bot_client = APIClient()
         bot_response: Any = bot_client.post(
@@ -824,7 +856,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
         payload["bot_session_id"] = session_id
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
@@ -838,6 +870,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         StoreSettingsView.patch() keeps in sync today (see
         test_dashboard_user_can_update_store_whatsapp).
         """
+        client = self._checkout_client()
         Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5588999999999")
         payload = self._build_pickup_payload(
             [
@@ -849,7 +882,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         )
 
         with self.settings(WHATSAPP_ORDER_PHONE="5571000000000"):
-            response: Any = self.client.post(
+            response: Any = client.post(
                 "/api/v1/checkout/whatsapp/",
                 payload,
                 format="json",
@@ -862,6 +895,7 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_marks_product_unavailable_when_stock_is_consumed(self) -> None:
         """Checkout should reserve stock and update availability when stock reaches zero."""
+        client = self._checkout_client()
         payload = self._build_pickup_payload(
             [
                 {
@@ -871,7 +905,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.product.refresh_from_db()
@@ -880,6 +914,7 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_merges_duplicate_product_lines_before_reserving_stock(self) -> None:
         """Duplicate cart lines should become one reserved quantity for the product."""
+        client = self._checkout_client()
         payload = self._build_pickup_payload(
             [
                 {
@@ -893,7 +928,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["items"][0]["quantity"], 5)
@@ -909,6 +944,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         self,
     ) -> None:
         """Aggregated duplicate quantities should not bypass stock validation."""
+        client = self._checkout_client()
         payload = self._build_pickup_payload(
             [
                 {
@@ -922,7 +958,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -931,6 +967,9 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_checkout_uses_delivery_region_fee(self) -> None:
         """Checkout should use the selected active delivery region fee."""
+        client = self._checkout_client(
+            address="Rua A, 123", neighborhood="Centro", city="Salvador"
+        )
         region = DeliveryRegion.objects.create(
             name="Centro expandido",
             city="Salvador",
@@ -944,20 +983,14 @@ class CheckoutWhatsAppAPITest(TestCase):
                 }
             ],
             "customer": {
-                "full_name": "Cliente Teste",
-                "phone": "(71) 99999-0000",
-                "email": "",
                 "delivery_method": "delivery",
                 "payment_method": "pix",
                 "delivery_region_id": region.id,
-                "address": "Rua A, 123",
-                "neighborhood": "Centro",
-                "city": "Salvador",
                 "notes": "",
             },
         }
 
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["delivery_fee"], "18.50")
@@ -1077,6 +1110,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             is_staff=True,
         )
 
+        checkout_client = self._checkout_client()
         payload = {
             "items": [
                 {
@@ -1085,18 +1119,12 @@ class CheckoutWhatsAppAPITest(TestCase):
                 }
             ],
             "customer": {
-                "full_name": "Cliente Teste",
-                "phone": "(71) 99999-0000",
-                "email": "",
                 "delivery_method": "pickup",
                 "payment_method": "card",
-                "address": "",
-                "neighborhood": "",
-                "city": "",
                 "notes": "",
             },
         }
-        checkout_response: Any = self.client.post(
+        checkout_response: Any = checkout_client.post(
             "/api/v1/checkout/whatsapp/", payload, format="json"
         )
 
@@ -1198,7 +1226,8 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(order.status, SaleOrder.STATUS_PREPARED)
 
     def test_checkout_requires_delivery_address_for_delivery_orders(self) -> None:
-        """Delivery orders should require address fields."""
+        """Delivery orders should require a complete address on the customer's profile."""
+        client = self._checkout_client()  # no address/neighborhood/city set
         payload = {
             "items": [
                 {
@@ -1207,21 +1236,16 @@ class CheckoutWhatsAppAPITest(TestCase):
                 }
             ],
             "customer": {
-                "full_name": "Cliente Teste",
-                "phone": "(71) 99999-0000",
-                "email": "",
                 "delivery_method": "delivery",
                 "payment_method": "pix",
-                "address": "",
-                "neighborhood": "",
-                "city": "",
                 "notes": "",
             },
         }
-        response: Any = self.client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("address", response.data.get("customer", {}))
+        self.assertEqual(response.data["code"], "profile_address_incomplete")
+        self.assertEqual(SaleOrder.objects.count(), 0)
 
 
 class SaleOrderSummaryAPITest(TestCase):
