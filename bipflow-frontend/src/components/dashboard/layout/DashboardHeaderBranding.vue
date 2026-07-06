@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center gap-3.5 min-w-0">
-    <div class="flex h-12 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-bip-line bg-white shadow-sm">
+    <div class="flex h-12 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-bip-line bg-white shadow-sm lg:h-10 lg:w-24">
       <img
         v-if="branding.logoUrl"
         :src="branding.logoUrl"
@@ -13,10 +13,10 @@
     </div>
 
     <div class="min-w-0">
-      <p class="brand-wordmark brand-wordmark-premium max-w-[16rem] truncate text-lg leading-tight">
+      <p class="brand-wordmark brand-wordmark-premium max-w-[16rem] truncate text-lg leading-tight lg:text-[1.05rem]">
         {{ branding.name }}
       </p>
-      <p class="mt-1 text-[10px] font-bold uppercase tracking-widest text-bip-rose">
+      <p class="mt-1 text-[10px] font-bold uppercase tracking-widest text-bip-rose lg:mt-0.5 lg:text-[9px]">
         {{ branding.tagline }}
       </p>
     </div>

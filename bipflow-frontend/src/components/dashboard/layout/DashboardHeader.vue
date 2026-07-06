@@ -15,7 +15,6 @@ import {
 import { buildStoreBranding } from '@/composables/useStoreBranding';
 import { DashboardRoutes } from '@/router/dashboard.routes';
 import type { Store } from '@/types/store';
-import DashboardStoreSelect from './DashboardStoreSelect.vue';
 import DashboardHeaderBranding from './DashboardHeaderBranding.vue';
 import DashboardMobileNav from './DashboardMobileNav.vue';
 
@@ -33,7 +32,6 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  selectStore: [storeSlug: string]
   openStore: []
   logout: []
 }>();
@@ -99,27 +97,20 @@ function closeMobileNav(): void {
 </script>
 
 <template>
-  <header class="sticky top-0 z-50 border-b border-bip-line bg-white/95 shadow-[0_8px_30px_-24px_rgba(5,5,10,0.35)] backdrop-blur-xl">
-    <div class="mx-auto max-w-7xl px-4 py-3.5 sm:px-6">
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div class="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-5">
+  <header class="sticky top-0 z-50 border-b border-bip-line bg-white/95 shadow-[0_6px_22px_-20px_rgba(5,5,10,0.35)] backdrop-blur-xl">
+    <div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-2.5 lg:py-2">
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex min-w-0 items-center">
           <DashboardHeaderBranding :branding="activeBranding" />
 
         </div>
 
-        <div class="flex w-full min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end xl:w-auto">
-          <DashboardStoreSelect
-            :stores="stores"
-            :selected-store="selectedStore"
-            :is-store-loading="isStoreLoading"
-            @select-store="emit('selectStore', $event)"
-          />
-
+        <div class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:flex-nowrap lg:gap-2">
           <a
             :href="storefrontPath"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-bip-rose/20 bg-bip-blush/60 px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-rose transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-bip-rose/20 bg-bip-blush/60 px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-rose transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0 lg:h-10 lg:px-3"
             :title="`Abrir ${storefrontPath}`"
             @click="emit('openStore')"
           >
@@ -128,16 +119,16 @@ function closeMobileNav(): void {
           </a>
 
           <div
-            class="welcome-card flex min-w-0 max-w-full flex-col items-end rounded-xl border border-white/65 bg-white/48 px-3.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md"
+            class="welcome-card hidden min-w-0 max-w-full flex-col items-end rounded-xl border border-white/65 bg-white/48 px-3.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md xl:flex xl:max-w-[19rem] xl:px-3 xl:py-1"
           >
-            <span class="hidden text-3xs font-black uppercase tracking-[0.24em] text-bip-muted sm:block">
+            <span class="hidden text-3xs font-black uppercase tracking-[0.24em] text-bip-muted xl:block">
               {{ welcomeState.periodLabel }}
             </span>
 
             <Transition name="welcome-text" appear>
               <span
                 v-if="isWelcomeVisible"
-                class="w-full max-w-[15rem] whitespace-normal break-words text-right text-[clamp(0.75rem,0.7rem+0.25vw,0.95rem)] font-semibold leading-snug text-bip-black sm:max-w-[22rem]"
+                class="w-full max-w-[15rem] whitespace-normal break-words text-right text-[clamp(0.75rem,0.7rem+0.25vw,0.95rem)] font-semibold leading-snug text-bip-black sm:max-w-[22rem] xl:max-w-[22rem]"
               >
                 {{ welcomeState.emoji }} {{ welcomeMessage }}
               </span>
@@ -146,7 +137,7 @@ function closeMobileNav(): void {
 
           <button
             type="button"
-            class="hidden h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:flex"
+            class="hidden h-10 w-10 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:flex"
             aria-label="Finalizar sessao"
             title="Finalizar sessao"
             @click="emit('logout')"
@@ -156,7 +147,7 @@ function closeMobileNav(): void {
 
           <button
             type="button"
-            class="group inline-flex h-11 w-11 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:hidden"
+            class="group inline-flex h-10 w-10 items-center justify-center rounded-xl border border-bip-line bg-white text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose focus:outline-none focus:ring-2 focus:ring-bip-blush active:scale-[0.98] lg:hidden"
             :aria-expanded="isMobileNavOpen"
             aria-label="Abrir menu de navegacao"
             @click="isMobileNavOpen = !isMobileNavOpen"
@@ -167,16 +158,16 @@ function closeMobileNav(): void {
         </div>
       </div>
 
-      <nav aria-label="Secoes do dashboard" class="mt-2.5 hidden items-center gap-1 lg:flex">
+      <nav aria-label="Secoes do dashboard" class="mt-1 hidden items-center gap-0.5 overflow-x-auto pb-0.5 lg:flex">
         <RouterLink
           v-for="item in NAV_ITEMS"
           :key="item.label"
           :to="item.to"
-          class="flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-bip-blush/60 hover:text-bip-black"
+          class="shrink-0 flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-bip-muted transition hover:bg-bip-blush/60 hover:text-bip-black"
           active-class="bg-bip-blush text-bip-rose"
           exact-active-class="bg-bip-blush text-bip-rose"
         >
-          <component :is="item.icon" class="h-4 w-4" />
+          <component :is="item.icon" class="h-3.5 w-3.5" />
           {{ item.label }}
         </RouterLink>
       </nav>
@@ -217,5 +208,14 @@ function closeMobileNav(): void {
 .welcome-text-appear-to {
   opacity: 1;
   transform: translateY(0);
+}
+
+nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+nav::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
 }
 </style>
