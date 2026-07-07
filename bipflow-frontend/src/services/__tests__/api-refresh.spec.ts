@@ -76,6 +76,69 @@ function timeoutError(config: RetriableConfig) {
   };
 }
 
+// Declared before "API token refresh interceptor" deliberately: that describe
+// block's "refresh call itself fails" test sets api.ts's module-level
+// isAuthFailureInProgress flag, which only clears via a real 1000ms
+// setTimeout (not test-controllable) -- a 401 test placed after it in the
+// same file would silently observe the flag still true and skip the
+// refresh-attempt branch entirely, producing a false failure unrelated to
+// the behavior under test.
+describe("API auth-credential 401 handling", () => {
+  beforeEach(() => {
+    tokenStore.clearAccessToken();
+    axiosMocks.apiInstance.mockClear();
+    axiosMocks.refreshPost.mockReset();
+  });
+
+  it("does not attempt a token refresh for a rejected login attempt", async () => {
+    // A wrong-password 401 on auth/token/ is the actual answer, not a sign
+    // of an expired session -- attempting a refresh here (which would also
+    // fail, since there's no session) used to trigger the hard redirect to
+    // the wrong login page. See isAuthCredentialRequest in ../api.ts.
+    const originalRequest: RetriableConfig = {
+      method: "post",
+      url: "auth/token/",
+      headers: {},
+    };
+
+    await expect(
+      getRejectedInterceptor()(unauthorizedError(originalRequest))
+    ).rejects.toBeDefined();
+
+    expect(axiosMocks.refreshPost).not.toHaveBeenCalled();
+    expect(axiosMocks.apiInstance).not.toHaveBeenCalled();
+  });
+
+  it("does not attempt a token refresh for a rejected MFA verification", async () => {
+    const originalRequest: RetriableConfig = {
+      method: "post",
+      url: "auth/mfa/verify/",
+      headers: {},
+    };
+
+    await expect(
+      getRejectedInterceptor()(unauthorizedError(originalRequest))
+    ).rejects.toBeDefined();
+
+    expect(axiosMocks.refreshPost).not.toHaveBeenCalled();
+  });
+
+  it("still attempts a token refresh for a 401 on a regular authenticated endpoint", async () => {
+    tokenStore.setAccessToken("expired-access");
+    axiosMocks.refreshPost.mockResolvedValue({ data: { access: "new-access" } });
+
+    const originalRequest: RetriableConfig = {
+      method: "get",
+      url: "v1/orders/",
+      headers: {},
+    };
+
+    await getRejectedInterceptor()(unauthorizedError(originalRequest));
+
+    expect(axiosMocks.refreshPost).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("API token refresh interceptor", () => {
   beforeEach(() => {
     tokenStore.clearAccessToken();

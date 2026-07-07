@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '@/services/auth.service'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
@@ -26,6 +26,20 @@ const email = ref('')
 const password = ref('')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+
+// Same reasoning as LoginView.vue's sessionNotice: the router guard's
+// requiresCustomerAuth redirect and the API's 401 handler both attach
+// ?reason=, previously never surfaced to the shopper.
+const sessionNotice = computed(() => {
+  switch (route.query.reason) {
+    case 'session_expired':
+      return 'Sua sessão expirou. Entre novamente para continuar.'
+    case 'customer_auth_required':
+      return 'Entre na sua conta para continuar.'
+    default:
+      return ''
+  }
+})
 
 function extractErrorMessage(error: unknown): string {
   const data = (error as ApiError).response?.data
@@ -93,7 +107,16 @@ async function handleSubmit(): Promise<void> {
       </div>
 
       <div
+        v-if="sessionNotice"
+        data-cy="session-notice"
+        class="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800"
+      >
+        {{ sessionNotice }}
+      </div>
+
+      <div
         v-if="errorMessage"
+        data-cy="login-error"
         class="mb-5 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
       >
         {{ errorMessage }}

@@ -41,8 +41,33 @@ let refreshRequest: Promise<TokenRefreshPayload> | null = null;
  */
 const pendingRequests = new Map<string, AbortController>();
 
+// A 401 from one of these is the actual answer (wrong password, wrong TOTP
+// code, expired reset token) -- not a sign of a live session expiring mid-use.
+// Letting it fall into the refresh-then-redirect flow below meant a plain
+// login rejection could hard-redirect the caller into the wrong login page
+// (see isPublicStorefrontPath's history); these endpoints skip that flow
+// entirely so the calling view's own catch block shows the real error.
+const AUTH_CREDENTIAL_ENDPOINTS = ["auth/token/", "auth/token/refresh/", "auth/mfa/verify/"];
+
+function isAuthCredentialRequest(url: string | undefined): boolean {
+  if (!url) return false;
+  const normalized = url.replace(/^\/+/, "");
+  return AUTH_CREDENTIAL_ENDPOINTS.some((endpoint) => normalized === endpoint);
+}
+
 function isPublicStorefrontPath(pathname: string): boolean {
-  return pathname.startsWith('/l/') || pathname.startsWith('/s/') || pathname.startsWith('/produtos');
+  // Slug-scoped storefront paths, plus the slug-less customer-auth fallbacks
+  // registered in router/auth.routes.ts (/entrar, /conta, /perfil/criar) --
+  // missing these caused a customer 401 on one of them to hard-redirect into
+  // the admin login instead of staying in the storefront/customer context.
+  return (
+    pathname.startsWith('/l/') ||
+    pathname.startsWith('/s/') ||
+    pathname.startsWith('/produtos') ||
+    pathname === '/entrar' ||
+    pathname === '/conta' ||
+    pathname === '/perfil/criar'
+  );
 }
 
 function refreshAuthTokens(): Promise<TokenRefreshPayload> {
@@ -188,7 +213,11 @@ api.interceptors.response.use(
     }
 
     // 1. Session Expiration Protocol (401) - IMPROVED
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthCredentialRequest(originalRequest.url)
+    ) {
       originalRequest._retry = true;
 
       if (!isAuthFailureInProgress) {

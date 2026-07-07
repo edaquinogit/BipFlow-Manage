@@ -38,6 +38,23 @@ const form = reactive({
 const canSubmit = computed(() => !isLoading.value && (!requiresCaptcha.value || Boolean(captchaToken.value)))
 const canSubmitMfa = computed(() => !isVerifyingMfa.value && mfaCode.value.trim().length > 0)
 
+/**
+ * Surfaces *why* the user landed here when the router guard or the API's
+ * 401 handler redirected them (?reason=auth_required / session_expired) --
+ * previously silently dropped, so an expired session just showed a blank
+ * login form with no explanation.
+ */
+const sessionNotice = computed(() => {
+  switch (route.query.reason) {
+    case 'session_expired':
+      return 'Sua sessão expirou. Entre novamente para continuar.'
+    case 'auth_required':
+      return 'Você precisa entrar para acessar essa página.'
+    default:
+      return ''
+  }
+})
+
 const handleCaptchaVerified = (token: string) => {
   captchaToken.value = token
 }
@@ -197,6 +214,15 @@ const handleBackToLogin = () => {
           ? (useBackupCode ? 'Digite um dos seus codigos de backup.' : 'Digite o codigo do seu app autenticador.')
           : 'Acesse sua conta para gerenciar sua loja.' }}
       </p>
+    </div>
+
+    <div
+      v-if="sessionNotice && !mfaToken"
+      data-cy="session-notice"
+      class="mb-6 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800"
+    >
+      <ExclamationTriangleIcon class="h-5 w-5 shrink-0 text-sky-600" />
+      <span>{{ sessionNotice }}</span>
     </div>
 
     <div
