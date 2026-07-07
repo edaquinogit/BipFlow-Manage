@@ -75,9 +75,24 @@ function refreshAuthTokens(): Promise<TokenRefreshPayload> {
     // Separate instance: the refresh token rides the httpOnly cookie
     // automatically via withCredentials, never the request body.
     const refreshInstance = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+    const attemptRefresh = () => refreshInstance.post<TokenRefreshPayload>("auth/token/refresh/");
 
-    refreshRequest = refreshInstance
-      .post<TokenRefreshPayload>("auth/token/refresh/")
+    refreshRequest = attemptRefresh()
+      .catch((error) => {
+        // Mobile Wi-Fi commonly drops the very first request after the
+        // radio wakes from sleep (screen was locked / tab was backgrounded)
+        // -- this call runs on every page load via ensureAuthBooted(), whose
+        // .catch(() => undefined) silently treats ANY failure here as "not
+        // logged in", with no second chance since the result is memoized.
+        // Retry once, but only on a network-level failure (no response at
+        // all) -- a real 401 (expired/invalid refresh cookie) has a
+        // response and genuinely means "not logged in", so it must not retry.
+        const hasHttpResponse = Boolean((error as { response?: unknown })?.response);
+        if (hasHttpResponse) {
+          throw error;
+        }
+        return attemptRefresh();
+      })
       .then((response) => {
         tokenStore.setAccessToken(response.data.access);
         return response.data;

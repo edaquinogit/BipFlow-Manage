@@ -206,9 +206,31 @@ describe("API token refresh interceptor", () => {
     expect(axiosMocks.apiInstance).toHaveBeenCalledTimes(2);
   });
 
-  it("clears the access token and rejects when the refresh call itself fails", async () => {
+  it("retries the refresh once on a network-level failure and still restores the session", async () => {
+    // Mobile Wi-Fi commonly drops the very first request after the radio
+    // wakes from sleep -- ensureAuthBooted() runs this exact call on every
+    // page load and used to treat any single failure as "not logged in"
+    // with no second chance. A network-level failure has no `.response`.
     tokenStore.setAccessToken("expired-access");
-    axiosMocks.refreshPost.mockRejectedValue(new Error("refresh failed"));
+    axiosMocks.refreshPost
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockResolvedValueOnce({ data: { access: "restored-access" } });
+
+    const originalRequest: RetriableConfig = {
+      method: "get",
+      url: "v1/orders/",
+      headers: {},
+    };
+
+    await getRejectedInterceptor()(unauthorizedError(originalRequest));
+
+    expect(axiosMocks.refreshPost).toHaveBeenCalledTimes(2);
+    expect(tokenStore.getAccessToken()).toBe("restored-access");
+  });
+
+  it("clears the access token, rejects, and does not retry when the refresh endpoint returns a real 401 (expired/invalid refresh cookie)", async () => {
+    tokenStore.setAccessToken("expired-access");
+    axiosMocks.refreshPost.mockRejectedValue({ response: { status: 401 } });
 
     const originalRequest: RetriableConfig = {
       method: "get",
@@ -218,8 +240,11 @@ describe("API token refresh interceptor", () => {
 
     await expect(
       getRejectedInterceptor()(unauthorizedError(originalRequest))
-    ).rejects.toThrow("refresh failed");
+    ).rejects.toBeDefined();
 
+    // A real 401 here genuinely means "not logged in" -- unlike a
+    // network-level failure, it must not be retried.
+    expect(axiosMocks.refreshPost).toHaveBeenCalledTimes(1);
     expect(tokenStore.getAccessToken()).toBeNull();
   });
 });
