@@ -645,10 +645,12 @@ class SaleOrder(models.Model):
 
     STATUS_PREPARED = "prepared"
     STATUS_SENT = "sent"
+    STATUS_DELIVERED = "delivered"
     STATUS_CANCELLED = "cancelled"
     STATUS_CHOICES = [
         (STATUS_PREPARED, "Prepared"),
         (STATUS_SENT, "Sent"),
+        (STATUS_DELIVERED, "Delivered"),
         (STATUS_CANCELLED, "Cancelled"),
     ]
 
@@ -735,6 +737,17 @@ class SaleOrder(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     message = models.TextField(blank=True)
     whatsapp_url = models.URLField(max_length=2048, blank=True)
+
+    # Etapa 1 of the pedidos/NF/envio evolution (see
+    # docs/architecture/pedidos-nf-envio-evolution.md): manual shipping --
+    # carrier name + tracking code typed in by the operator, no freight API.
+    # blank=True on all of them: orders already sitting in "sent" from before
+    # this field existed stay valid without a backfill.
+    carrier_name = models.CharField(max_length=120, blank=True)
+    tracking_code = models.CharField(max_length=64, blank=True)
+    tracking_url = models.URLField(max_length=512, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

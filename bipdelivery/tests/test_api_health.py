@@ -1152,7 +1152,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             order_reference=f"BPF-{uuid4().hex[:8].upper()}",
             customer_name="Cliente Teste",
             customer_phone="71999990000",
-            delivery_method="pickup",
+            delivery_method="delivery",
             payment_method="pix",
             subtotal=Decimal("42.50"),
             delivery_fee=Decimal("0.00"),
@@ -1162,7 +1162,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.client.force_authenticate(user=user)
         response: Any = self.client.patch(
             f"/api/v1/sales-orders/{order.id}/status/",
-            {"status": "sent"},
+            {"status": "sent", "carrier_name": "Correios", "tracking_code": "AB123456789BR"},
             format="json",
         )
 

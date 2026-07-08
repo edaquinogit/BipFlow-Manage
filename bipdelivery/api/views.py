@@ -93,6 +93,7 @@ from .serializers import (
     StoreSerializer,
     StoreSettingsSerializer,
 )
+from .shipping import build_tracking_url, get_allowed_next_statuses
 from .stock import StockMovementError, apply_order_cancellation, apply_stock_movement
 from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
@@ -734,13 +735,16 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     pagination_class = StandardPagination
 
     def get_serializer_class(self):
-        """Use the fuller detail payload (address, notes, wa.me link) for retrieve only.
+        """Use the fuller detail payload (address, notes, wa.me link, shipping) for
+        retrieve and status updates.
 
         Keeps the list endpoint's per-row payload lean -- those fields exist
         only for the order detail screen (Etapa 0 of the pedidos/NF/envio
-        evolution).
+        evolution). update_status also needs the detail shape so the detail
+        modal can show the just-recorded carrier/tracking data without a
+        second request (Etapa 1).
         """
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "update_status"):
             return SaleOrderDetailSerializer
         return super().get_serializer_class()
 
@@ -795,6 +799,13 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         order through this endpoint without the stock reversal happening
         too. Idempotent: re-selecting "cancelled" on an already-cancelled
         order is a no-op, not a double restock.
+
+        Etapa 1 of the pedidos/NF/envio evolution: transitions are validated
+        against get_allowed_next_statuses() -- a delivery order must go
+        prepared -> sent -> delivered, a pickup order skips straight to
+        delivered (no shipping leg), and delivered/cancelled are terminal.
+        Moving to "sent" also requires carrier_name+tracking_code and
+        records shipped_at; moving to "delivered" records delivered_at.
         """
         if not has_dashboard_write_access(request.user):
             raise PermissionDenied("Voce nao possui permissao para alterar pedidos.")
@@ -805,15 +816,57 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
         next_status = serializer.validated_data["status"]
         if order.status != next_status:
+            if next_status not in get_allowed_next_statuses(order):
+                status_labels = dict(SaleOrder.STATUS_CHOICES)
+                raise serializers.ValidationError(
+                    {
+                        "status": (
+                            f'Nao e possivel mudar de "{status_labels.get(order.status, order.status)}" '
+                            f'para "{status_labels.get(next_status, next_status)}".'
+                        )
+                    }
+                )
+
             if next_status == SaleOrder.STATUS_CANCELLED:
                 apply_order_cancellation(
                     order=order,
                     store=self.get_request_store(),
                     performed_by=request.user if request.user.is_authenticated else None,
                 )
+            elif next_status == SaleOrder.STATUS_SENT:
+                carrier_name = serializer.validated_data.get("carrier_name", "").strip()
+                tracking_code = serializer.validated_data.get("tracking_code", "").strip()
+                if not carrier_name or not tracking_code:
+                    raise serializers.ValidationError(
+                        {
+                            "tracking_code": (
+                                "Informe a transportadora e o codigo de rastreio para marcar "
+                                "como enviado."
+                            )
+                        }
+                    )
+                order.status = next_status
+                order.carrier_name = carrier_name
+                order.tracking_code = tracking_code
+                order.tracking_url = build_tracking_url(carrier_name, tracking_code)
+                order.shipped_at = timezone.now()
+                order.save(
+                    update_fields=[
+                        "status",
+                        "carrier_name",
+                        "tracking_code",
+                        "tracking_url",
+                        "shipped_at",
+                        "updated_at",
+                    ]
+                )
             else:
                 order.status = next_status
-                order.save(update_fields=["status", "updated_at"])
+                update_fields = ["status", "updated_at"]
+                if next_status == SaleOrder.STATUS_DELIVERED:
+                    order.delivered_at = timezone.now()
+                    update_fields.append("delivered_at")
+                order.save(update_fields=update_fields)
 
             invalidate_dashboard_cache(self.get_request_store().id)
 

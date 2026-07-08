@@ -38,14 +38,16 @@ class SaleOrderCancellationAPITest(TwoStoreFixtureMixin, TestCase):
     def _status_url(self, order: SaleOrder) -> str:
         return f"/api/v1/sales-orders/{order.id}/status/"
 
-    def _make_order(self, *, channel: str, quantities: dict[Product, int]) -> SaleOrder:
+    def _make_order(
+        self, *, channel: str, quantities: dict[Product, int], delivery_method: str = "pickup"
+    ) -> SaleOrder:
         order = SaleOrder.objects.create(
             store=self.store_b,
             order_reference=f"BPF-{uuid4().hex[:8].upper()}",
             channel=channel,
             customer_name="Cliente Teste",
             customer_phone="71999990000",
-            delivery_method="pickup",
+            delivery_method=delivery_method,
             payment_method="pix",
             subtotal=Decimal("10.00"),
             delivery_fee=Decimal("0.00"),
@@ -141,11 +143,21 @@ class SaleOrderCancellationAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertFalse(StockMovement.objects.filter(sale_order=order).exists())
 
     def test_non_cancel_status_change_does_not_restock(self) -> None:
-        order = self._make_order(channel=SaleOrder.CHANNEL_VIRTUAL, quantities={self.product_b: 3})
+        # delivery_method="delivery": a pickup order can no longer reach
+        # "sent" at all (Etapa 1 of the pedidos/NF/envio evolution -- pickup
+        # orders skip the shipping leg entirely, see
+        # test_sale_order_shipping.py for that transition rule).
+        order = self._make_order(
+            channel=SaleOrder.CHANNEL_VIRTUAL, quantities={self.product_b: 3}, delivery_method="delivery"
+        )
         self.product_b.refresh_from_db()
         stock_before = self.product_b.stock_quantity
 
-        response = self.client.patch(self._status_url(order), {"status": "sent"}, format="json")
+        response = self.client.patch(
+            self._status_url(order),
+            {"status": "sent", "carrier_name": "Correios", "tracking_code": "AB123456789BR"},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "sent")

@@ -960,10 +960,10 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 class SaleOrderDetailSerializer(SaleOrderSerializer):
     """Full sale order payload for the dashboard's order detail view.
 
-    Adds delivery address and customer notes/message on top of the list
-    payload (Etapa 0 of the pedidos/NF/envio evolution) -- kept out of
-    SaleOrderSerializer so the list endpoint doesn't inflate every row with
-    fields only the detail screen needs.
+    Adds delivery address, customer notes/message and shipping data on top
+    of the list payload (Etapas 0/1 of the pedidos/NF/envio evolution) --
+    kept out of SaleOrderSerializer so the list endpoint doesn't inflate
+    every row with fields only the detail screen needs.
     """
 
     class Meta(SaleOrderSerializer.Meta):
@@ -974,15 +974,28 @@ class SaleOrderDetailSerializer(SaleOrderSerializer):
             "notes",
             "message",
             "whatsapp_url",
+            "carrier_name",
+            "tracking_code",
+            "tracking_url",
+            "shipped_at",
+            "delivered_at",
         ]
 
 
 class SaleOrderStatusUpdateSerializer(serializers.Serializer):
-    """Validate dashboard sale status transitions."""
+    """Validate dashboard sale status transitions.
+
+    carrier_name/tracking_code are only required when the transition target
+    is "sent" -- that dependency is checked in the view, where the current
+    order's delivery_method is known (see get_allowed_next_statuses in
+    shipping.py, Etapa 1 of the pedidos/NF/envio evolution).
+    """
 
     status = serializers.ChoiceField(
         choices=[choice[0] for choice in SaleOrder.STATUS_CHOICES],
     )
+    carrier_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    tracking_code = serializers.CharField(required=False, allow_blank=True, max_length=64)
 
 
 class SaleOrderSummarySerializer(serializers.Serializer):
