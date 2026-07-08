@@ -348,16 +348,26 @@ Frontend:
       de `has_dashboard_write_access`, sem papel novo — decisão 7 fase 1)
 
 ### Etapa 1
-- [ ] `STATUS_DELIVERED` adicionado, migration testada contra dados
+- [x] `STATUS_DELIVERED` adicionado, migration testada contra dados
       existentes
-- [ ] Transição para `sent` exige transportadora+rastreio quando aplicável
-- [ ] Mapa de transições permitidas rejeita status fora de ordem (ex.
-      `prepared → delivered` direto, ou retroceder `sent → prepared`)
-- [ ] `PaymentBreakdownCard.vue` sem mapa de status duplicado (reaproveita
-      `saleOrder.ts`)
-- [ ] Notificação WhatsApp com rastreio funcional (link `wa.me` correto)
-- [ ] Testes: `test_sale_order_shipping.py` (backend),
-      `DashboardOrdersView.spec.ts` atualizado (frontend)
+- [x] Transição para `sent` exige transportadora+rastreio quando aplicável
+- [x] Mapa de transições permitidas rejeita status fora de ordem (ex.
+      `prepared → delivered` direto, ou retroceder `sent → prepared`) —
+      pickup pula `sent` completamente (sem etapa de envio), `sent` continua
+      alcançável para pedidos pickup legados (não retroativo)
+- [x] `PaymentBreakdownCard.vue` sem mapa de status duplicado (reaproveita
+      `saleOrder.ts`); `DashboardOrdersView.vue`'s próprio mapa duplicado
+      (achado ao implementar, não estava no plano original) também
+      eliminado
+- [x] Notificação WhatsApp com rastreio funcional (link `wa.me` correto) —
+      `customer_phone`, não o telefone da loja
+- [x] Testes: `test_sale_order_shipping.py` (backend, 9 casos),
+      `DashboardOrdersView.spec.ts` + `SaleOrderDetailModal.spec.ts`
+      atualizados/expandidos (frontend)
+- [x] Ações de mudança de status migradas do `<select>` solto do card para
+      o modal de detalhe (Etapa 0) — mudança de UX não estava explícita no
+      plano original mas decorre diretamente do texto da Etapa 1
+      ("em vez do `<select>` solto de hoje")
 
 ### Etapa 2
 - [ ] Campos fiscais de `Store` e `Product` migrados e validados
