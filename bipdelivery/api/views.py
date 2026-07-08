@@ -80,6 +80,7 @@ from .serializers import (
     RegisterUserSerializer,
     SaleOrderBreakdownSerializer,
     SaleOrderCustomerInsightsSerializer,
+    SaleOrderDetailSerializer,
     SaleOrderSerializer,
     SaleOrderStatusUpdateSerializer,
     SaleOrderSummarySerializer,
@@ -731,6 +732,17 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = SaleOrderSerializer
     permission_classes = [IsAuthenticated, IsDashboardReadRole]
     pagination_class = StandardPagination
+
+    def get_serializer_class(self):
+        """Use the fuller detail payload (address, notes, wa.me link) for retrieve only.
+
+        Keeps the list endpoint's per-row payload lean -- those fields exist
+        only for the order detail screen (Etapa 0 of the pedidos/NF/envio
+        evolution).
+        """
+        if self.action == "retrieve":
+            return SaleOrderDetailSerializer
+        return super().get_serializer_class()
 
     def get_base_queryset(self):
         """Return recent sales with optional search, status and channel filters."""

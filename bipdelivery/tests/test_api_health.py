@@ -113,6 +113,7 @@ class CurrentUserAPITest(TestCase):
         self.assertEqual(response.data["display_name"], "Ednaldo Aquino")
         self.assertFalse(response.data["can_access_dashboard"])
         self.assertFalse(response.data["can_manage_catalog"])
+        self.assertFalse(response.data["can_manage_orders"])
 
     def test_current_user_exposes_dashboard_role_capabilities(self) -> None:
         """Current user endpoint should expose dashboard RBAC capabilities."""
@@ -125,6 +126,7 @@ class CurrentUserAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["can_access_dashboard"])
         self.assertTrue(response.data["can_manage_catalog"])
+        self.assertTrue(response.data["can_manage_orders"])
         self.assertIn("staff", response.data["roles"])
 
 

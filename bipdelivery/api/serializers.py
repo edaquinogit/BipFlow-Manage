@@ -45,6 +45,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     can_access_dashboard = serializers.SerializerMethodField()
     can_manage_catalog = serializers.SerializerMethodField()
+    can_manage_orders = serializers.SerializerMethodField()
     mfa_enabled = serializers.SerializerMethodField()
     profile_kinds = serializers.SerializerMethodField()
 
@@ -62,6 +63,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "roles",
             "can_access_dashboard",
             "can_manage_catalog",
+            "can_manage_orders",
             "mfa_enabled",
             "profile_kinds",
         ]
@@ -88,6 +90,17 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     def get_can_manage_catalog(self, user: User) -> bool:
         """Expose whether the user can mutate catalog and freight resources."""
+        return has_dashboard_write_access(user)
+
+    def get_can_manage_orders(self, user: User) -> bool:
+        """Expose whether the user can mutate order status/shipping data.
+
+        Same underlying gate as can_manage_catalog today -- there is no
+        per-feature RBAC yet (decisao arquitetural 7, fase 1 of
+        docs/architecture/pedidos-nf-envio-evolution.md). A stricter,
+        separately-assignable role is deferred to when the truly sensitive
+        fiscal actions (NF-e emission/cancellation) ship.
+        """
         return has_dashboard_write_access(user)
 
     def get_mfa_enabled(self, user: User) -> bool:
@@ -942,6 +955,26 @@ class SaleOrderSerializer(serializers.ModelSerializer):
     def get_item_count(self, order: SaleOrder) -> int:
         """Return the total number of product units in the order."""
         return sum(item.quantity for item in order.items.all())
+
+
+class SaleOrderDetailSerializer(SaleOrderSerializer):
+    """Full sale order payload for the dashboard's order detail view.
+
+    Adds delivery address and customer notes/message on top of the list
+    payload (Etapa 0 of the pedidos/NF/envio evolution) -- kept out of
+    SaleOrderSerializer so the list endpoint doesn't inflate every row with
+    fields only the detail screen needs.
+    """
+
+    class Meta(SaleOrderSerializer.Meta):
+        fields = SaleOrderSerializer.Meta.fields + [
+            "address",
+            "neighborhood",
+            "city",
+            "notes",
+            "message",
+            "whatsapp_url",
+        ]
 
 
 class SaleOrderStatusUpdateSerializer(serializers.Serializer):

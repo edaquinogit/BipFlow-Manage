@@ -97,6 +97,7 @@ class RegistrationCreatesStoreTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["can_access_dashboard"])
         self.assertTrue(response.data["can_manage_catalog"])
+        self.assertTrue(response.data["can_manage_orders"])
 
     def test_newly_registered_owner_can_create_a_product_in_their_own_store(self) -> None:
         self._register()
