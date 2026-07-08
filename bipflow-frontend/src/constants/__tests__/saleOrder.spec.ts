@@ -3,6 +3,7 @@ import {
   getChannelLabel,
   getDeliveryMethodLabel,
   getPaymentLabel,
+  getSaleStatusBadgeClass,
   getSaleStatusLabel,
   SALE_STATUS_OPTIONS,
   SALE_TIMELINE_STEPS,
@@ -40,6 +41,14 @@ describe('getChannelLabel', () => {
 
 describe('SALE_TIMELINE_STEPS', () => {
   it('only lists the non-cancelled statuses, in order', () => {
-    expect(SALE_TIMELINE_STEPS.map((step) => step.value)).toEqual(['prepared', 'sent'])
+    expect(SALE_TIMELINE_STEPS.map((step) => step.value)).toEqual(['prepared', 'sent', 'delivered'])
+  })
+})
+
+describe('getSaleStatusBadgeClass', () => {
+  it('has a badge class for every status referenced by SALE_STATUS_OPTIONS', () => {
+    for (const option of SALE_STATUS_OPTIONS) {
+      expect(getSaleStatusBadgeClass(option.value)).toBeTruthy()
+    }
   })
 })

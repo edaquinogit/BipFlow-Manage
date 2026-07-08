@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, toRef } from 'vue';
-import { ChatBubbleLeftRightIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import { computed, ref, toRef, watch } from 'vue';
+import { ChatBubbleLeftRightIcon, TruckIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { SaleOrderDetail } from '@/types/sales';
 import {
   getChannelLabel,
@@ -15,22 +15,122 @@ import { useDialogA11y } from '@/composables/useDialogA11y';
  * Etapa 0 of the pedidos/NF/envio evolution (see
  * docs/architecture/pedidos-nf-envio-evolution.md): until now there was no
  * way to see a full order -- address, customer notes, or the original
- * WhatsApp message -- anywhere in the dashboard. This is read-only; status
- * changes stay on the order card in DashboardOrdersView.vue.
+ * WhatsApp message -- anywhere in the dashboard.
+ *
+ * Etapa 1: status-changing actions (marcar como enviado/entregue/cancelar)
+ * moved here from the loose <select> the order card used to have. Mutations
+ * themselves stay owned by DashboardOrdersView.vue (isUpdating/updateError
+ * props, ship/deliver/cancel emits) -- this component only owns the ship
+ * form's own draft state.
  */
 const props = defineProps<{
   show: boolean;
   order: SaleOrderDetail | null;
   isLoading: boolean;
   error: string | null;
+  canManage: boolean;
+  isUpdating: boolean;
+  updateError: string | null;
 }>();
 
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{
+  close: [];
+  ship: [{ carrierName: string; trackingCode: string }];
+  deliver: [];
+  cancel: [];
+}>();
 
 const containerRef = ref<HTMLElement | null>(null);
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
 
 useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, closeButtonRef);
+
+const isShipFormOpen = ref(false);
+const carrierNameDraft = ref('');
+const trackingCodeDraft = ref('');
+const shipFormValidationError = ref<string | null>(null);
+
+// Reset the ship form every time the modal opens (for this order or a
+// different one) so a previous attempt's draft/error never leaks in.
+watch(() => props.show, (show) => {
+  if (show) {
+    isShipFormOpen.value = false;
+    carrierNameDraft.value = '';
+    trackingCodeDraft.value = '';
+    shipFormValidationError.value = null;
+  }
+});
+
+// Closes the ship form once the mutation actually lands (order.status
+// flips away from "prepared"); a failed attempt leaves status unchanged,
+// so the form -- and the operator's already-typed carrier/tracking --
+// stays put and shows props.updateError instead.
+watch(() => props.order?.status, (newStatus, oldStatus) => {
+  if (newStatus !== oldStatus) {
+    isShipFormOpen.value = false;
+  }
+});
+
+const canMarkShipped = computed(() => (
+  props.order?.status === 'prepared' && props.order.delivery_method === 'delivery'
+));
+const canMarkDelivered = computed(() => (
+  props.order?.status === 'sent'
+  || (props.order?.status === 'prepared' && props.order.delivery_method === 'pickup')
+));
+const canCancel = computed(() => (
+  props.order?.status === 'prepared' || props.order?.status === 'sent'
+));
+
+// Etapa 1: "Notificar cliente" reuses the wa.me pattern already used by the
+// public checkout (order.service.ts's buildWhatsAppHandoffUrl), but in the
+// other direction -- the operator messaging the customer's own phone, not
+// the store's.
+const notifyCustomerUrl = computed(() => {
+  const order = props.order;
+  if (!order || !order.carrier_name || !order.tracking_code) {
+    return null;
+  }
+
+  const normalizedPhone = order.customer_phone.replace(/\D/g, '');
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  const messageLines = [
+    `Seu pedido ${order.order_reference} foi enviado!`,
+    `Transportadora: ${order.carrier_name}`,
+    `Codigo de rastreio: ${order.tracking_code}`,
+  ];
+  if (order.tracking_url) {
+    messageLines.push(`Rastreie aqui: ${order.tracking_url}`);
+  }
+
+  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(messageLines.join('\n'))}`;
+});
+
+function openShipForm(): void {
+  isShipFormOpen.value = true;
+  shipFormValidationError.value = null;
+}
+
+function closeShipForm(): void {
+  isShipFormOpen.value = false;
+  shipFormValidationError.value = null;
+}
+
+function submitShipForm(): void {
+  const carrierName = carrierNameDraft.value.trim();
+  const trackingCode = trackingCodeDraft.value.trim();
+
+  if (!carrierName || !trackingCode) {
+    shipFormValidationError.value = 'Informe a transportadora e o codigo de rastreio.';
+    return;
+  }
+
+  shipFormValidationError.value = null;
+  emit('ship', { carrierName, trackingCode });
+}
 </script>
 
 <template>
@@ -112,6 +212,38 @@ useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, closeButt
               <p class="whitespace-pre-line text-sm text-[#05050A]">{{ order.notes }}</p>
             </section>
 
+            <section v-if="order.carrier_name || order.tracking_code" class="space-y-1.5">
+              <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Envio</h4>
+              <p class="text-sm text-[#05050A]">{{ order.carrier_name }} - {{ order.tracking_code }}</p>
+              <p v-if="order.shipped_at" class="text-xs text-bip-muted">
+                Enviado em {{ formatDateTimeBR(order.shipped_at) }}
+              </p>
+              <p v-if="order.delivered_at" class="text-xs text-bip-muted">
+                Entregue em {{ formatDateTimeBR(order.delivered_at) }}
+              </p>
+              <a
+                v-if="order.tracking_url"
+                :href="order.tracking_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-[#D81B60] hover:underline"
+              >
+                <TruckIcon class="h-3.5 w-3.5" />
+                Rastrear encomenda
+              </a>
+              <a
+                v-if="notifyCustomerUrl"
+                :href="notifyCustomerUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-cy="notify-customer-link"
+                class="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-800 transition hover:bg-emerald-100"
+              >
+                <ChatBubbleLeftRightIcon class="h-4 w-4" />
+                Notificar cliente
+              </a>
+            </section>
+
             <section class="space-y-1.5">
               <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Itens</h4>
               <ul class="divide-y divide-[#E5E7EB] rounded-lg border border-[#E5E7EB]">
@@ -143,6 +275,94 @@ useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, closeButt
               <ChatBubbleLeftRightIcon class="h-4 w-4" />
               Ver conversa original no WhatsApp
             </a>
+
+            <section v-if="canManage && (canMarkShipped || canMarkDelivered || canCancel)" class="space-y-3 border-t border-[#E5E7EB] pt-4">
+              <p v-if="updateError" data-cy="order-detail-update-error" class="text-xs font-semibold text-[#D81B60]">
+                {{ updateError }}
+              </p>
+
+              <div v-if="isShipFormOpen" class="space-y-2 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
+                <label class="block">
+                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">
+                    Transportadora
+                  </span>
+                  <input
+                    v-model="carrierNameDraft"
+                    type="text"
+                    data-cy="ship-form-carrier"
+                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="Correios, Jadlog, motoboy..."
+                  />
+                </label>
+                <label class="block">
+                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">
+                    Codigo de rastreio
+                  </span>
+                  <input
+                    v-model="trackingCodeDraft"
+                    type="text"
+                    data-cy="ship-form-tracking-code"
+                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="AB123456789BR"
+                  />
+                </label>
+                <p v-if="shipFormValidationError" class="text-xs font-semibold text-[#D81B60]">
+                  {{ shipFormValidationError }}
+                </p>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-zinc-50"
+                    :disabled="isUpdating"
+                    @click="closeShipForm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    data-cy="ship-form-submit"
+                    class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#ad1457] disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="isUpdating"
+                    @click="submitShipForm"
+                  >
+                    {{ isUpdating ? 'Enviando...' : 'Confirmar envio' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-else class="flex flex-wrap gap-2">
+                <button
+                  v-if="canMarkShipped"
+                  type="button"
+                  data-cy="mark-shipped-button"
+                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="isUpdating"
+                  @click="openShipForm"
+                >
+                  Marcar como enviado
+                </button>
+                <button
+                  v-if="canMarkDelivered"
+                  type="button"
+                  data-cy="mark-delivered-button"
+                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="isUpdating"
+                  @click="emit('deliver')"
+                >
+                  {{ isUpdating ? 'Atualizando...' : 'Marcar como entregue' }}
+                </button>
+                <button
+                  v-if="canCancel"
+                  type="button"
+                  data-cy="cancel-order-button"
+                  class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D] transition hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="isUpdating"
+                  @click="emit('cancel')"
+                >
+                  Cancelar pedido
+                </button>
+              </div>
+            </section>
           </div>
         </div>
       </div>

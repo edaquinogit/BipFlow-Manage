@@ -8,7 +8,7 @@ export interface SaleOrderItem {
   line_total: string
 }
 
-export type SaleOrderStatus = 'prepared' | 'sent' | 'cancelled'
+export type SaleOrderStatus = 'prepared' | 'sent' | 'delivered' | 'cancelled'
 
 // Etapa 3 of the QR-code stock-exit evolution: which channel the sale came
 // through -- the existing e-commerce/WhatsApp checkout (virtual) or the
@@ -49,6 +49,13 @@ export interface SaleOrderDetail extends SaleOrder {
   notes: string
   message: string
   whatsapp_url: string
+  // Etapa 1 of the pedidos/NF/envio evolution: manual shipping data,
+  // recorded when the order is marked "sent".
+  carrier_name: string
+  tracking_code: string
+  tracking_url: string
+  shipped_at: string | null
+  delivered_at: string | null
 }
 
 export interface PaginatedSalesOrdersResponse {

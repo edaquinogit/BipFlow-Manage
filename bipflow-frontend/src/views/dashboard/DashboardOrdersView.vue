@@ -10,6 +10,7 @@ import {
   getChannelLabel,
   getDeliveryMethodLabel,
   getPaymentLabel,
+  getSaleStatusBadgeClass,
   getSaleStatusLabel,
   SALE_STATUS_OPTIONS,
   SALE_TIMELINE_STEPS,
@@ -123,19 +124,29 @@ onBeforeUnmount(() => {
   cancelSalesFiltersDebounce();
 });
 
+// Etapa 1 of the pedidos/NF/envio evolution: patches both the list row and
+// the open detail modal (if it's showing this same order) from a single
+// mutation response, so neither goes stale after a status change.
+function applyUpdatedOrder(updatedOrder: SaleOrderDetail): void {
+  if (salesHistory.value) {
+    salesHistory.value = {
+      ...salesHistory.value,
+      results: salesHistory.value.results.map((sale) => (
+        sale.id === updatedOrder.id ? updatedOrder : sale
+      )),
+    };
+  }
+  if (selectedOrderDetail.value?.id === updatedOrder.id) {
+    selectedOrderDetail.value = updatedOrder;
+  }
+}
+
 const handleUpdateSaleStatus = async (orderId: number, nextStatus: SaleOrderStatus): Promise<void> => {
   updatingSaleOrderId.value = orderId;
 
   try {
     const updatedOrder = await salesService.updateStatus(orderId, nextStatus);
-    if (salesHistory.value) {
-      salesHistory.value = {
-        ...salesHistory.value,
-        results: salesHistory.value.results.map((sale) => (
-          sale.id === updatedOrder.id ? updatedOrder : sale
-        )),
-      };
-    }
+    applyUpdatedOrder(updatedOrder);
     success('Status do pedido atualizado.');
   } catch (error: unknown) {
     Logger.error('Sale order status update failed', { error, orderId, nextStatus });
@@ -160,44 +171,26 @@ function formatSaleDate(dateString: string): string {
   }).format(date);
 }
 
-const SALE_STATUS_BADGE_CLASS: Record<SaleOrderStatus, string> = {
-  prepared: 'border-amber-200 bg-amber-50 text-amber-800',
-  sent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  cancelled: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
-};
-
-function getSaleStatusClass(status: SaleOrderStatus): string {
-  return SALE_STATUS_BADGE_CLASS[status];
+// Etapa 1 of the pedidos/NF/envio evolution: a pickup order has no shipping
+// leg, so its timeline skips "Enviado" entirely (Novo -> Entregue) instead
+// of showing a step it will never legitimately pass through.
+function getSaleTimelineSteps(sale: SaleOrder) {
+  return sale.delivery_method === 'pickup'
+    ? saleTimelineSteps.filter((step) => step.value !== 'sent')
+    : saleTimelineSteps;
 }
 
-function getSaleTimelineStepClass(
-  currentStatus: SaleOrderStatus,
-  stepStatus: Exclude<SaleOrderStatus, 'cancelled'>
-): string {
-  if (currentStatus === 'sent') {
-    return SALE_STATUS_BADGE_CLASS.sent;
-  }
-
-  if (currentStatus === stepStatus) {
-    return SALE_STATUS_BADGE_CLASS.prepared;
-  }
-
-  return 'border-[#E5E7EB] bg-zinc-50 text-bip-muted';
+function isSaleTimelineStepReached(sale: SaleOrder, stepStatus: SaleOrderStatus): boolean {
+  const steps = getSaleTimelineSteps(sale);
+  const currentIndex = steps.findIndex((step) => step.value === sale.status);
+  const stepIndex = steps.findIndex((step) => step.value === stepStatus);
+  return currentIndex !== -1 && stepIndex !== -1 && stepIndex <= currentIndex;
 }
 
-function handleSaleStatusChange(sale: SaleOrder, event: Event): void {
-  const nextStatus = (event.target as HTMLSelectElement).value as SaleOrderStatus;
-
-  if (nextStatus === sale.status) {
-    return;
-  }
-
-  if (nextStatus === 'cancelled') {
-    orderPendingCancellation.value = sale;
-    return;
-  }
-
-  void handleUpdateSaleStatus(sale.id, nextStatus);
+function getSaleTimelineStepClass(sale: SaleOrder, stepStatus: SaleOrderStatus): string {
+  return isSaleTimelineStepReached(sale, stepStatus)
+    ? getSaleStatusBadgeClass(stepStatus)
+    : 'border-[#E5E7EB] bg-zinc-50 text-bip-muted';
 }
 
 function closeCancelConfirm(): void {
@@ -218,11 +211,16 @@ const isDetailModalOpen = ref(false);
 const isDetailLoading = ref(false);
 const detailError = ref<string | null>(null);
 const selectedOrderDetail = ref<SaleOrderDetail | null>(null);
+const modalUpdateError = ref<string | null>(null);
+const isDetailUpdating = computed(() => (
+  selectedOrderDetail.value !== null && updatingSaleOrderId.value === selectedOrderDetail.value.id
+));
 
 async function openOrderDetail(order: SaleOrder): Promise<void> {
   isDetailModalOpen.value = true;
   isDetailLoading.value = true;
   detailError.value = null;
+  modalUpdateError.value = null;
   selectedOrderDetail.value = null;
 
   try {
@@ -236,6 +234,50 @@ async function openOrderDetail(order: SaleOrder): Promise<void> {
 }
 
 function closeOrderDetail(): void {
+  isDetailModalOpen.value = false;
+}
+
+// Etapa 1 of the pedidos/NF/envio evolution: status-changing actions now
+// live in SaleOrderDetailModal.vue instead of the loose <select> the order
+// card used to have -- keeps mutations behind an explicit "Detalhes" step
+// instead of a stray dropdown that's easy to mis-click.
+async function handleMarkShipped(
+  order: SaleOrderDetail,
+  shipping: { carrierName: string; trackingCode: string }
+): Promise<void> {
+  updatingSaleOrderId.value = order.id;
+  modalUpdateError.value = null;
+
+  try {
+    const updatedOrder = await salesService.updateStatus(order.id, 'sent', shipping);
+    applyUpdatedOrder(updatedOrder);
+    success('Pedido marcado como enviado.');
+  } catch (error: unknown) {
+    Logger.error('Sale order ship failed', { error, orderId: order.id });
+    modalUpdateError.value = 'Não foi possível marcar o pedido como enviado. Tente novamente.';
+  } finally {
+    updatingSaleOrderId.value = null;
+  }
+}
+
+async function handleMarkDelivered(order: SaleOrderDetail): Promise<void> {
+  updatingSaleOrderId.value = order.id;
+  modalUpdateError.value = null;
+
+  try {
+    const updatedOrder = await salesService.updateStatus(order.id, 'delivered');
+    applyUpdatedOrder(updatedOrder);
+    success('Pedido marcado como entregue.');
+  } catch (error: unknown) {
+    Logger.error('Sale order deliver failed', { error, orderId: order.id });
+    modalUpdateError.value = 'Não foi possível marcar o pedido como entregue. Tente novamente.';
+  } finally {
+    updatingSaleOrderId.value = null;
+  }
+}
+
+function handleCancelFromModal(order: SaleOrderDetail): void {
+  orderPendingCancellation.value = order;
   isDetailModalOpen.value = false;
 }
 
@@ -386,42 +428,33 @@ onMounted(() => {
               Pedido cancelado
             </div>
 
-            <div v-else class="grid grid-cols-2 gap-2">
+            <div
+              v-else
+              class="grid gap-2"
+              :class="getSaleTimelineSteps(sale).length === 3 ? 'grid-cols-3' : 'grid-cols-2'"
+            >
               <div
-                v-for="step in saleTimelineSteps"
+                v-for="step in getSaleTimelineSteps(sale)"
                 :key="step.value"
                 class="flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase tracking-widest"
-                :class="getSaleTimelineStepClass(sale.status, step.value)"
+                :class="getSaleTimelineStepClass(sale, step.value)"
               >
                 <span
                   class="h-2 w-2 rounded-full"
-                  :class="sale.status === 'sent' || sale.status === step.value ? 'bg-current' : 'bg-zinc-300'"
+                  :class="isSaleTimelineStepReached(sale, step.value) ? 'bg-current' : 'bg-zinc-300'"
                 />
                 {{ step.label }}
               </div>
             </div>
           </div>
 
-          <div class="mt-4 flex items-center justify-between gap-3">
+          <div class="mt-4">
             <span
               class="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest"
-              :class="getSaleStatusClass(sale.status)"
+              :class="getSaleStatusBadgeClass(sale.status)"
             >
               {{ getSaleStatusLabel(sale.status) }}
             </span>
-            <label v-if="canManageOrders" class="min-w-[148px]">
-              <span class="sr-only">Atualizar status do pedido {{ sale.order_reference }}</span>
-              <select
-                :value="sale.status"
-                :disabled="updatingSaleOrderId === sale.id"
-                class="h-9 w-full rounded-lg border border-[#D1D5DB] bg-white px-2 text-xs font-bold text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-60"
-                @change="handleSaleStatusChange(sale, $event)"
-              >
-                <option v-for="option in saleStatusOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
           </div>
         </article>
       </template>
@@ -470,7 +503,13 @@ onMounted(() => {
       :order="selectedOrderDetail"
       :is-loading="isDetailLoading"
       :error="detailError"
+      :can-manage="canManageOrders"
+      :is-updating="isDetailUpdating"
+      :update-error="modalUpdateError"
       @close="closeOrderDetail"
+      @ship="(shipping) => selectedOrderDetail && handleMarkShipped(selectedOrderDetail, shipping)"
+      @deliver="() => selectedOrderDetail && handleMarkDelivered(selectedOrderDetail)"
+      @cancel="() => selectedOrderDetail && handleCancelFromModal(selectedOrderDetail)"
     />
   </div>
 </template>

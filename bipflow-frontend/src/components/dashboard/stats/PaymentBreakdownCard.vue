@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue';
 import { CreditCardIcon } from '@heroicons/vue/24/outline';
-import type { PaymentMethodBreakdown, SaleOrderStatus, StatusBreakdown } from '@/types/sales';
+import type { PaymentMethodBreakdown, StatusBreakdown } from '@/types/sales';
+import { getSaleStatusBadgeClass, getSaleStatusLabel } from '@/constants/saleOrder';
 import { formatBRL } from '@/utils/formatters';
 import Card from '@/components/ui/Card.vue';
 
@@ -19,18 +20,6 @@ const PAYMENT_LABELS: Record<PaymentMethodBreakdown['payment_method'], string> =
   pix: 'Pix',
   card: 'Cartao',
   cash: 'Dinheiro',
-};
-
-const STATUS_LABELS: Record<SaleOrderStatus, string> = {
-  prepared: 'Novo',
-  sent: 'Enviado',
-  cancelled: 'Cancelado',
-};
-
-const STATUS_BADGE_CLASS: Record<SaleOrderStatus, string> = {
-  prepared: 'border-amber-200 bg-amber-50 text-amber-800',
-  sent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  cancelled: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
 };
 
 const series = computed(() => props.byPaymentMethod.map((row) => Number(row.revenue_total)));
@@ -105,9 +94,9 @@ const chartOptions = computed(() => ({
         v-for="row in byStatus"
         :key="row.status"
         class="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest"
-        :class="STATUS_BADGE_CLASS[row.status] ?? 'border-[#E5E7EB] bg-zinc-50 text-[#05050A]'"
+        :class="getSaleStatusBadgeClass(row.status)"
       >
-        {{ STATUS_LABELS[row.status] ?? row.status }}: {{ row.orders_count }}
+        {{ getSaleStatusLabel(row.status) }}: {{ row.orders_count }}
       </span>
     </div>
   </Card>

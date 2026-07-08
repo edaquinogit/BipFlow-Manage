@@ -1,7 +1,6 @@
 import api from './api'
 import type {
   PaginatedSalesOrdersResponse,
-  SaleOrder,
   SaleOrderBreakdown,
   SaleOrderCustomerInsights,
   SaleOrderDateRange,
@@ -55,9 +54,19 @@ export const salesService = {
     return response.data
   },
 
-  async updateStatus(orderId: number, status: SaleOrderStatus): Promise<SaleOrder> {
-    const response = await api.patch<SaleOrder>(`v1/sales-orders/${orderId}/status/`, {
+  // Etapa 1 of the pedidos/NF/envio evolution: carrier/tracking are only
+  // required by the backend when status is "sent" (see update_status in
+  // bipdelivery/api/views.py). The backend always returns the fuller detail
+  // shape for this action so the detail modal can show the just-recorded
+  // shipping data without a second request.
+  async updateStatus(
+    orderId: number,
+    status: SaleOrderStatus,
+    shipping?: { carrierName: string; trackingCode: string }
+  ): Promise<SaleOrderDetail> {
+    const response = await api.patch<SaleOrderDetail>(`v1/sales-orders/${orderId}/status/`, {
       status,
+      ...(shipping ? { carrier_name: shipping.carrierName, tracking_code: shipping.trackingCode } : {}),
     })
 
     return response.data

@@ -30,17 +30,69 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     notes: 'Sem cebola, por favor',
     message: 'Pedido via WhatsApp',
     whatsapp_url: 'https://wa.me/5571999990000',
+    carrier_name: '',
+    tracking_code: '',
+    tracking_url: '',
+    shipped_at: null,
+    delivered_at: null,
     ...overrides,
   }
 }
 
 const mountModal = (props: Partial<InstanceType<typeof SaleOrderDetailModal>['$props']> = {}) =>
   mount(SaleOrderDetailModal, {
-    props: { show: true, order: buildOrderDetail(), isLoading: false, error: null, ...props },
+    props: {
+      show: true,
+      order: buildOrderDetail(),
+      isLoading: false,
+      error: null,
+      canManage: true,
+      isUpdating: false,
+      updateError: null,
+      ...props,
+    },
     global: { stubs: { teleport: true } },
   })
 
 describe('SaleOrderDetailModal', () => {
+  it('renders carrier, tracking code and the tracking link once shipped', () => {
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        status: 'sent',
+        carrier_name: 'Correios',
+        tracking_code: 'AB123456789BR',
+        tracking_url: 'https://rastreamento.correios.com.br/app/index.php?objeto=AB123456789BR',
+        shipped_at: '2026-07-08T12:00:00Z',
+      }),
+    })
+
+    expect(wrapper.text()).toContain('Correios')
+    expect(wrapper.text()).toContain('AB123456789BR')
+    expect(wrapper.find('a[href="https://rastreamento.correios.com.br/app/index.php?objeto=AB123456789BR"]').exists()).toBe(true)
+  })
+
+  it('builds a wa.me notify-customer link with the tracking code once shipped', () => {
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        status: 'sent',
+        customer_phone: '71999990000',
+        carrier_name: 'Correios',
+        tracking_code: 'AB123456789BR',
+      }),
+    })
+
+    const link = wrapper.find('[data-cy="notify-customer-link"]')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toContain('https://wa.me/71999990000?text=')
+    expect(decodeURIComponent(link.attributes('href') ?? '')).toContain('AB123456789BR')
+  })
+
+  it('does not render the notify-customer link before the order has shipped', () => {
+    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', carrier_name: '', tracking_code: '' }) })
+
+    expect(wrapper.find('[data-cy="notify-customer-link"]').exists()).toBe(false)
+  })
+
   it('renders the address, notes and whatsapp link for a delivery order', () => {
     const wrapper = mountModal()
 
@@ -83,5 +135,74 @@ describe('SaleOrderDetailModal', () => {
     const wrapper = mountModal({ show: false })
 
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('shows the ship action for a prepared delivery order and hides it once shipped', () => {
+    const preparedDelivery = mountModal({
+      order: buildOrderDetail({ status: 'prepared', delivery_method: 'delivery' }),
+    })
+    expect(preparedDelivery.find('[data-cy="mark-shipped-button"]').exists()).toBe(true)
+
+    const alreadySent = mountModal({ order: buildOrderDetail({ status: 'sent', delivery_method: 'delivery' }) })
+    expect(alreadySent.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
+    expect(alreadySent.find('[data-cy="mark-delivered-button"]').exists()).toBe(true)
+  })
+
+  it('shows deliver directly (no ship step) for a prepared pickup order', () => {
+    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', delivery_method: 'pickup' }) })
+
+    expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="mark-delivered-button"]').exists()).toBe(true)
+  })
+
+  it('hides every action once the order is delivered', () => {
+    const wrapper = mountModal({ order: buildOrderDetail({ status: 'delivered' }) })
+
+    expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="mark-delivered-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="cancel-order-button"]').exists()).toBe(false)
+  })
+
+  it('hides every action when the viewer cannot manage orders', () => {
+    const wrapper = mountModal({ canManage: false, order: buildOrderDetail({ status: 'prepared' }) })
+
+    expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="cancel-order-button"]').exists()).toBe(false)
+  })
+
+  it('requires carrier and tracking code before emitting ship', async () => {
+    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', delivery_method: 'delivery' }) })
+
+    await wrapper.find('[data-cy="mark-shipped-button"]').trigger('click')
+    await wrapper.find('[data-cy="ship-form-submit"]').trigger('click')
+
+    expect(wrapper.emitted('ship')).toBeUndefined()
+    expect(wrapper.text()).toContain('Informe a transportadora e o codigo de rastreio.')
+
+    await wrapper.find('[data-cy="ship-form-carrier"]').setValue('Correios')
+    await wrapper.find('[data-cy="ship-form-tracking-code"]').setValue('AB123456789BR')
+    await wrapper.find('[data-cy="ship-form-submit"]').trigger('click')
+
+    expect(wrapper.emitted('ship')).toEqual([[{ carrierName: 'Correios', trackingCode: 'AB123456789BR' }]])
+  })
+
+  it('emits deliver and cancel from their respective buttons', async () => {
+    const wrapper = mountModal({ order: buildOrderDetail({ status: 'sent' }) })
+
+    await wrapper.find('[data-cy="mark-delivered-button"]').trigger('click')
+    expect(wrapper.emitted('deliver')).toHaveLength(1)
+
+    await wrapper.find('[data-cy="cancel-order-button"]').trigger('click')
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  })
+
+  it('shows updateError near the actions without hiding the rest of the order', () => {
+    const wrapper = mountModal({
+      order: buildOrderDetail({ status: 'prepared' }),
+      updateError: 'Não foi possível marcar o pedido como enviado. Tente novamente.',
+    })
+
+    expect(wrapper.text()).toContain('Não foi possível marcar o pedido como enviado. Tente novamente.')
+    expect(wrapper.text()).toContain('Cliente Teste')
   })
 })

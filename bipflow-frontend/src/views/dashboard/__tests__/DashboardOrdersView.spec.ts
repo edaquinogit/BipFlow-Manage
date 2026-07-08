@@ -51,6 +51,11 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     notes: 'Sem cebola, por favor',
     message: 'Pedido via WhatsApp',
     whatsapp_url: 'https://wa.me/5571999990000',
+    carrier_name: '',
+    tracking_code: '',
+    tracking_url: '',
+    shipped_at: null,
+    delivered_at: null,
     ...overrides,
   }
 }
@@ -153,30 +158,69 @@ describe('DashboardOrdersView', () => {
     expect(badges[0]?.text()).toContain('caixa1')
   })
 
-  it('updates the sale status and reflects the change without refetching', async () => {
-    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
-    vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrder({ status: 'sent' }))
-
-    const wrapper = mount(DashboardOrdersView)
-    await flushPromises()
-
-    const statusSelect = wrapper.find('article select')
-    await statusSelect.setValue('sent')
-    await flushPromises()
-
-    expect(salesService.updateStatus).toHaveBeenCalledWith(1, 'sent')
-    expect(toastState.success).toHaveBeenCalledWith('Status do pedido atualizado.')
-    expect(salesService.list).toHaveBeenCalledTimes(1)
-  })
-
-  it('asks for confirmation instead of cancelling immediately (Etapa R2 of the QR-code stock-exit refinement)', async () => {
-    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ item_count: 2 })]))
+  it('marks a pickup order as delivered directly from the detail modal (Etapa 1 of the pedidos/NF/envio evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(
+      buildResponse([buildOrder({ delivery_method: 'pickup' })])
+    )
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ delivery_method: 'pickup' }))
+    vi.mocked(salesService.updateStatus).mockResolvedValue(
+      buildOrderDetail({ delivery_method: 'pickup', status: 'delivered' })
+    )
 
     const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
     await flushPromises()
 
-    const statusSelect = wrapper.find('article select')
-    await statusSelect.setValue('cancelled')
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-cy="mark-delivered-button"]').trigger('click')
+    await flushPromises()
+
+    expect(salesService.updateStatus).toHaveBeenCalledWith(1, 'delivered')
+    expect(toastState.success).toHaveBeenCalledWith('Pedido marcado como entregue.')
+    expect(salesService.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a delivery order as shipped via the ship form in the detail modal', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(
+      buildResponse([buildOrder({ delivery_method: 'delivery' })])
+    )
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ delivery_method: 'delivery' }))
+    vi.mocked(salesService.updateStatus).mockResolvedValue(
+      buildOrderDetail({
+        delivery_method: 'delivery',
+        status: 'sent',
+        carrier_name: 'Correios',
+        tracking_code: 'AB123456789BR',
+      })
+    )
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-cy="mark-shipped-button"]').trigger('click')
+    await wrapper.find('[data-cy="ship-form-carrier"]').setValue('Correios')
+    await wrapper.find('[data-cy="ship-form-tracking-code"]').setValue('AB123456789BR')
+    await wrapper.find('[data-cy="ship-form-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(salesService.updateStatus).toHaveBeenCalledWith(
+      1, 'sent', { carrierName: 'Correios', trackingCode: 'AB123456789BR' }
+    )
+    expect(toastState.success).toHaveBeenCalledWith('Pedido marcado como enviado.')
+  })
+
+  it('asks for confirmation instead of cancelling immediately (Etapa R2 of the QR-code stock-exit refinement)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ item_count: 2 })]))
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ item_count: 2 }))
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-cy="cancel-order-button"]').trigger('click')
     await flushPromises()
 
     // The cancellation itself must not fire until the confirmation is accepted.
@@ -187,12 +231,15 @@ describe('DashboardOrdersView', () => {
 
   it('cancels the order only after the confirmation is accepted', async () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
-    vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrder({ status: 'cancelled' }))
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
+    vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrderDetail({ status: 'cancelled' }))
 
     const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
     await flushPromises()
 
-    await wrapper.find('article select').setValue('cancelled')
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-cy="cancel-order-button"]').trigger('click')
     await flushPromises()
 
     const confirmButton = wrapper.findAll('button').find((button) => button.text().includes('Confirmar cancelamento'))
@@ -206,11 +253,14 @@ describe('DashboardOrdersView', () => {
 
   it('does not cancel the order when the confirmation is dismissed', async () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
 
     const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
     await flushPromises()
 
-    await wrapper.find('article select').setValue('cancelled')
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-cy="cancel-order-button"]').trigger('click')
     await flushPromises()
 
     const cancelButton = wrapper.findAll('button').find((button) => button.text().includes('Cancelar') && !button.text().includes('cancelamento'))
