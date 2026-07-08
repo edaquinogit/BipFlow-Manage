@@ -17,6 +17,7 @@ export interface CurrentUser {
   roles: string[];
   can_access_dashboard: boolean;
   can_manage_catalog: boolean;
+  can_manage_orders: boolean;
   mfa_enabled: boolean;
 }
 export interface RegisterPayload {

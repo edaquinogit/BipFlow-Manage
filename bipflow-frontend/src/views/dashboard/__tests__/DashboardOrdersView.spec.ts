@@ -6,7 +6,7 @@ import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useToast } from '@/composables/useToast'
 import { salesService } from '@/services/sales.service'
-import type { PaginatedSalesOrdersResponse, SaleOrder } from '@/types/sales'
+import type { PaginatedSalesOrdersResponse, SaleOrder, SaleOrderDetail } from '@/types/sales'
 
 vi.mock('@/composables/useCurrentStore', () => ({ useCurrentStore: vi.fn() }))
 vi.mock('@/composables/useCurrentUser', () => ({ useCurrentUser: vi.fn() }))
@@ -14,6 +14,7 @@ vi.mock('@/composables/useToast', () => ({ useToast: vi.fn() }))
 vi.mock('@/services/sales.service', () => ({
   salesService: {
     list: vi.fn(),
+    get: vi.fn(),
     updateStatus: vi.fn(),
   },
 }))
@@ -41,8 +42,32 @@ function buildOrder(overrides: Partial<SaleOrder> = {}): SaleOrder {
   }
 }
 
-function buildResponse(results: SaleOrder[]): PaginatedSalesOrdersResponse {
-  return { count: results.length, next: null, previous: null, page_size: 20, total_pages: 1, results }
+function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDetail {
+  return {
+    ...buildOrder({ delivery_method: 'delivery' }),
+    address: 'Rua das Flores, 123',
+    neighborhood: 'Centro',
+    city: 'Salvador',
+    notes: 'Sem cebola, por favor',
+    message: 'Pedido via WhatsApp',
+    whatsapp_url: 'https://wa.me/5571999990000',
+    ...overrides,
+  }
+}
+
+function buildResponse(
+  results: SaleOrder[],
+  overrides: Partial<PaginatedSalesOrdersResponse> = {}
+): PaginatedSalesOrdersResponse {
+  return {
+    count: results.length,
+    next: null,
+    previous: null,
+    page_size: 20,
+    total_pages: 1,
+    results,
+    ...overrides,
+  }
 }
 
 describe('DashboardOrdersView', () => {
@@ -51,7 +76,7 @@ describe('DashboardOrdersView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useCurrentStore).mockReturnValue({ selectedStore: ref(null) } as any)
-    vi.mocked(useCurrentUser).mockReturnValue({ canManageCatalog: ref(true) } as any)
+    vi.mocked(useCurrentUser).mockReturnValue({ canManageOrders: ref(true) } as any)
     vi.mocked(useToast).mockReturnValue(toastState as any)
   })
 
@@ -195,5 +220,77 @@ describe('DashboardOrdersView', () => {
 
     expect(salesService.updateStatus).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Cancelar pedido?')
+  })
+
+  it('sends the channel filter and resets to page 1 when a channel is selected (Etapa 0 of the pedidos/NF/envio evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="sales-channel-filter"]').setValue('loja_fisica')
+    await flushPromises()
+
+    expect(salesService.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ channel: 'loja_fisica', page: 1 })
+    )
+  })
+
+  it('shows pagination controls and requests the next page (Etapa 0 of the pedidos/NF/envio evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(
+      buildResponse([buildOrder()], { next: 'http://api/v1/sales-orders/?page=2', total_pages: 2 })
+    )
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    const prevButton = wrapper.find('[data-cy="sales-pagination-prev"]')
+    const nextButton = wrapper.find('[data-cy="sales-pagination-next"]')
+    expect(prevButton.attributes('disabled')).toBeDefined()
+    expect(nextButton.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).toContain('Página 1 de 2')
+
+    await nextButton.trigger('click')
+    await flushPromises()
+
+    expect(salesService.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+  })
+
+  it('does not show pagination controls when there is only one page', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="sales-pagination-next"]').exists()).toBe(false)
+  })
+
+  it('opens the order detail modal with the fetched order (Etapa 0 of the pedidos/NF/envio evolution)', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+    vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+
+    expect(salesService.get).toHaveBeenCalledWith(1)
+    expect(wrapper.text()).toContain('Rua das Flores, 123')
+    expect(wrapper.text()).toContain('Sem cebola, por favor')
+    expect(wrapper.find('a[href="https://wa.me/5571999990000"]').exists()).toBe(true)
+  })
+
+  it('shows an error message when the order detail fetch fails', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+    vi.mocked(salesService.get).mockRejectedValue(new Error('network down'))
+
+    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Não foi possível carregar os detalhes deste pedido.')
   })
 })

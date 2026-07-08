@@ -5,6 +5,7 @@ import type {
   SaleOrderBreakdown,
   SaleOrderCustomerInsights,
   SaleOrderDateRange,
+  SaleOrderDetail,
   SaleOrderFilters,
   SaleOrderStatus,
   SaleOrderSummary,
@@ -41,7 +42,16 @@ export const salesService = {
       params.channel = filters.channel
     }
 
+    if (filters.page) {
+      params.page = filters.page
+    }
+
     const response = await api.get<PaginatedSalesOrdersResponse>('v1/sales-orders/', { params })
+    return response.data
+  },
+
+  async get(orderId: number): Promise<SaleOrderDetail> {
+    const response = await api.get<SaleOrderDetail>(`v1/sales-orders/${orderId}/`)
     return response.data
   },
 

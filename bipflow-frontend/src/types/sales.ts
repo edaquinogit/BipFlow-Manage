@@ -39,6 +39,18 @@ export interface SaleOrder {
   items: SaleOrderItem[]
 }
 
+// Etapa 0 of the pedidos/NF/envio evolution: address/notes/wa.me link only
+// the order detail screen needs, kept off the list payload (see
+// SaleOrderDetailSerializer in bipdelivery/api/serializers.py).
+export interface SaleOrderDetail extends SaleOrder {
+  address: string
+  neighborhood: string
+  city: string
+  notes: string
+  message: string
+  whatsapp_url: string
+}
+
 export interface PaginatedSalesOrdersResponse {
   count: number
   next: string | null
@@ -52,6 +64,10 @@ export interface SaleOrderFilters {
   status?: SaleOrderStatus
   search?: string
   pageSize?: number
+  // Etapa 0 of the pedidos/NF/envio evolution: the dashboard's orders list
+  // always requested page 1 -- stores with more than a page of orders
+  // silently lost the rest. See DashboardOrdersView.vue's pagination.
+  page?: number
   // Etapa 5 of the QR-code stock-exit evolution already added this filter
   // on the backend (SaleOrderViewSet.get_base_queryset()); Etapa R4 of the
   // refinement is the first frontend caller (the PDV's "ultimas vendas"

@@ -44,3 +44,11 @@ const CHANNEL_LABELS: Record<SaleOrderChannel, string> = {
 export function getChannelLabel(channel: SaleOrderChannel): string {
   return CHANNEL_LABELS[channel] ?? channel;
 }
+
+// Etapa 0 of the pedidos/NF/envio evolution: the backend already supported
+// ?channel= on the orders list (Etapa 5 of the QR-code stock-exit
+// evolution), but no screen exposed it as a filter until now.
+export const CHANNEL_FILTER_OPTIONS: { value: SaleOrderChannel; label: string }[] = [
+  { value: 'virtual', label: 'Virtual' },
+  { value: 'loja_fisica', label: 'Loja fisica' },
+];

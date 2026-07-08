@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ClockIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
+import { ClockIcon, EyeIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
 import { useAsyncResource } from '@/composables/useAsyncResource';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import {
+  CHANNEL_FILTER_OPTIONS,
   getChannelLabel,
   getDeliveryMethodLabel,
   getPaymentLabel,
@@ -16,6 +17,8 @@ import {
 import type {
   PaginatedSalesOrdersResponse,
   SaleOrder,
+  SaleOrderChannel,
+  SaleOrderDetail,
   SaleOrderFilters,
   SaleOrderStatus,
 } from '@/types/sales';
@@ -24,8 +27,9 @@ import { salesService } from '@/services/sales.service';
 import { useDebounceFn } from '@/utils/debounce';
 import { formatBRL } from '@/utils/formatters';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
+import SaleOrderDetailModal from '@/components/dashboard/orders/SaleOrderDetailModal.vue';
 
-const { canManageCatalog } = useCurrentUser();
+const { canManageOrders } = useCurrentUser();
 const { success, error: toastError } = useToast();
 
 const { data: salesHistory, isLoading: isSalesLoading, error: salesError, run: runSalesHistory } = (
@@ -52,17 +56,31 @@ const cancelConfirmMessage = computed(() => {
 
 const salesSearchTerm = ref('');
 const salesStatusFilter = ref<'all' | SaleOrderStatus>('all');
+const salesChannelFilter = ref<'all' | SaleOrderChannel>('all');
+const salesPage = ref(1);
 const saleStatusOptions = SALE_STATUS_OPTIONS;
+const saleChannelOptions = CHANNEL_FILTER_OPTIONS;
 const saleTimelineSteps = SALE_TIMELINE_STEPS;
 
 const hasActiveSalesFilters = computed(() => (
-  salesSearchTerm.value.trim() !== '' || salesStatusFilter.value !== 'all'
+  salesSearchTerm.value.trim() !== '' || salesStatusFilter.value !== 'all' || salesChannelFilter.value !== 'all'
+));
+
+// Etapa 0 of the pedidos/NF/envio evolution: the orders list used to always
+// request page 1 and never read count/next/previous back -- stores with
+// more than a page of orders silently lost the rest.
+const totalPages = computed(() => salesHistory.value?.total_pages ?? 1);
+const hasNextPage = computed(() => salesHistory.value?.next !== null && salesHistory.value?.next !== undefined);
+const hasPreviousPage = computed(() => (
+  salesHistory.value?.previous !== null && salesHistory.value?.previous !== undefined
 ));
 
 function buildSalesFilters(): Omit<SaleOrderFilters, 'pageSize'> {
   return {
     search: salesSearchTerm.value.trim() || undefined,
     status: salesStatusFilter.value === 'all' ? undefined : salesStatusFilter.value,
+    channel: salesChannelFilter.value === 'all' ? undefined : salesChannelFilter.value,
+    page: salesPage.value,
   };
 }
 
@@ -74,6 +92,7 @@ const fetchSalesHistory = (filters: SaleOrderFilters = {}): Promise<void> => (
 );
 
 const [emitSalesFiltersDebounced, cancelSalesFiltersDebounce] = useDebounceFn(() => {
+  salesPage.value = 1;
   void fetchSalesHistory(buildSalesFilters());
 }, 320);
 
@@ -81,12 +100,22 @@ watch(salesSearchTerm, () => {
   emitSalesFiltersDebounced();
 });
 
-watch(salesStatusFilter, () => {
+watch([salesStatusFilter, salesChannelFilter], () => {
   cancelSalesFiltersDebounce();
+  salesPage.value = 1;
   void fetchSalesHistory(buildSalesFilters());
 });
 
+function goToPage(page: number): void {
+  if (page < 1 || page > totalPages.value || page === salesPage.value) {
+    return;
+  }
+  salesPage.value = page;
+  void fetchSalesHistory(buildSalesFilters());
+}
+
 useStoreSwitchEffect(() => {
+  salesPage.value = 1;
   void fetchSalesHistory(buildSalesFilters());
 });
 
@@ -185,6 +214,31 @@ async function confirmCancellation(): Promise<void> {
   orderPendingCancellation.value = null;
 }
 
+const isDetailModalOpen = ref(false);
+const isDetailLoading = ref(false);
+const detailError = ref<string | null>(null);
+const selectedOrderDetail = ref<SaleOrderDetail | null>(null);
+
+async function openOrderDetail(order: SaleOrder): Promise<void> {
+  isDetailModalOpen.value = true;
+  isDetailLoading.value = true;
+  detailError.value = null;
+  selectedOrderDetail.value = null;
+
+  try {
+    selectedOrderDetail.value = await salesService.get(order.id);
+  } catch (error: unknown) {
+    Logger.error('Sale order detail fetch failed', { error, orderId: order.id });
+    detailError.value = 'Não foi possível carregar os detalhes deste pedido.';
+  } finally {
+    isDetailLoading.value = false;
+  }
+}
+
+function closeOrderDetail(): void {
+  isDetailModalOpen.value = false;
+}
+
 onMounted(() => {
   void fetchSalesHistory();
 });
@@ -199,7 +253,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="mt-6 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+    <div class="mt-6 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px] xl:grid-cols-[minmax(0,1fr)_180px_180px]">
       <label class="relative block">
         <span class="sr-only">Buscar pedido</span>
         <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bip-muted" />
@@ -219,6 +273,20 @@ onMounted(() => {
         >
           <option value="all">Todos status</option>
           <option v-for="option in saleStatusOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+
+      <label class="block">
+        <span class="sr-only">Filtrar por canal</span>
+        <select
+          v-model="salesChannelFilter"
+          data-cy="sales-channel-filter"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+        >
+          <option value="all">Todos canais</option>
+          <option v-for="option in saleChannelOptions" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>
@@ -267,9 +335,20 @@ onMounted(() => {
             </p>
           </div>
 
-          <p class="mt-3 text-xs text-bip-muted">
-            {{ sale.item_count }} item<span v-if="sale.item_count !== 1">s</span> - {{ sale.order_reference }}
-          </p>
+          <div class="mt-3 flex items-center justify-between gap-3">
+            <p class="text-xs text-bip-muted">
+              {{ sale.item_count }} item<span v-if="sale.item_count !== 1">s</span> - {{ sale.order_reference }}
+            </p>
+            <button
+              type="button"
+              data-cy="sale-detail-button"
+              class="flex shrink-0 items-center gap-1 rounded-full border border-[#E5E7EB] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60] hover:text-[#D81B60]"
+              @click="openOrderDetail(sale)"
+            >
+              <EyeIcon class="h-3.5 w-3.5" />
+              Detalhes
+            </button>
+          </div>
 
           <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-bip-muted">
             <span
@@ -330,7 +409,7 @@ onMounted(() => {
             >
               {{ getSaleStatusLabel(sale.status) }}
             </span>
-            <label v-if="canManageCatalog" class="min-w-[148px]">
+            <label v-if="canManageOrders" class="min-w-[148px]">
               <span class="sr-only">Atualizar status do pedido {{ sale.order_reference }}</span>
               <select
                 :value="sale.status"
@@ -348,6 +427,33 @@ onMounted(() => {
       </template>
     </div>
 
+    <div
+      v-if="!isSalesLoading && !salesError && recentSales.length > 0 && (hasNextPage || hasPreviousPage)"
+      class="mt-6 flex items-center justify-between gap-3"
+    >
+      <button
+        type="button"
+        data-cy="sales-pagination-prev"
+        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+        :disabled="!hasPreviousPage"
+        @click="goToPage(salesPage - 1)"
+      >
+        Anterior
+      </button>
+      <p class="text-[11px] font-bold uppercase tracking-widest text-bip-muted">
+        Página {{ salesPage }} de {{ totalPages }}
+      </p>
+      <button
+        type="button"
+        data-cy="sales-pagination-next"
+        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+        :disabled="!hasNextPage"
+        @click="goToPage(salesPage + 1)"
+      >
+        Próxima
+      </button>
+    </div>
+
     <ConfirmModal
       :show="isCancelConfirmOpen"
       title="Cancelar pedido?"
@@ -357,6 +463,14 @@ onMounted(() => {
       :is-loading="orderPendingCancellation !== null && updatingSaleOrderId === orderPendingCancellation.id"
       @close="closeCancelConfirm"
       @confirm="confirmCancellation"
+    />
+
+    <SaleOrderDetailModal
+      :show="isDetailModalOpen"
+      :order="selectedOrderDetail"
+      :is-loading="isDetailLoading"
+      :error="detailError"
+      @close="closeOrderDetail"
     />
   </div>
 </template>
