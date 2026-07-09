@@ -6,16 +6,12 @@ on:
       - ".github/workflows/frontend-tests.yml"
       - "bipflow-frontend/**"
       - "bipdelivery/**"
-      - "cypress/**"
-      - "cypress.config.ts"
       - "requirements.txt"
   push:
     paths:
       - ".github/workflows/frontend-tests.yml"
       - "bipflow-frontend/**"
       - "bipdelivery/**"
-      - "cypress/**"
-      - "cypress.config.ts"
       - "requirements.txt"
   workflow_dispatch:
 
@@ -142,8 +138,6 @@ jobs:
           name: frontend-e2e-diagnostics
           path: |
             django-e2e.log
-            cypress/screenshots
-            cypress/videos
             bipflow-frontend/cypress/screenshots
             bipflow-frontend/cypress/videos
           if-no-files-found: ignore

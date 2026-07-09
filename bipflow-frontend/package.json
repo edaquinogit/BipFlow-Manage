@@ -27,8 +27,8 @@
     "test:unit:run": "vitest run",
     "coverage": "vitest run --coverage",
     "// --- CYPRESS ENGINE ---": "",
-    "cypress:open": "cypress open --project ..",
-    "cypress:run": "cypress run --project ..",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
     "test:e2e": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:open",
     "test:e2e:run": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:run"
   },

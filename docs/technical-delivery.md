@@ -52,7 +52,7 @@ limites conhecidos.
 | Estado reutilizavel | `bipflow-frontend/src/composables/` |
 | Testes backend | `bipdelivery/tests/` |
 | Testes frontend | `bipflow-frontend/src/**/*.spec.ts` |
-| E2E | `bipflow-frontend/cypress/e2e/` e `cypress/e2e/` |
+| E2E | `bipflow-frontend/cypress/e2e/` |
 | Deploy local containerizado | `docker-compose.yml`, `Dockerfile`, `docker/` |
 | Variaveis de ambiente | `.env.example` |
 
