@@ -22,6 +22,12 @@ const defaultCustomer: CartCustomer = {
   deliveryRegionName: '',
   deliveryRegionFee: 0,
   notes: '',
+  fullName: '',
+  phone: '',
+  email: '',
+  address: '',
+  neighborhood: '',
+  city: '',
 }
 
 const items = ref<CartItem[]>([])

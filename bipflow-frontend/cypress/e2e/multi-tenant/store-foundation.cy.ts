@@ -25,6 +25,17 @@ describe('Store foundation: public contract has no private leakage', () => {
           'is_active',
           'logo_url',
           'name',
+          // receipt_exchange_policy/receipt_paper_format: not a leak -- the
+          // PDV receipt feature intentionally reuses this same public
+          // endpoint (useCurrentStore -> GET /store/current/) to resolve
+          // the current tenant everywhere, dashboard included. Neither
+          // field is sensitive: the exchange policy is already printed on
+          // every customer receipt, and the paper format is a printer enum
+          // with no confidentiality value. Update this allowlist
+          // deliberately if StoreSerializer changes -- that's this test's
+          // actual job -- but these two belong here.
+          'receipt_exchange_policy',
+          'receipt_paper_format',
           'slug',
           'status',
           'tagline',

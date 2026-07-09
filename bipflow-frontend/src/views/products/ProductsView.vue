@@ -27,7 +27,7 @@
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
                 : 'storefront-outline-button bg-white'"
-              @click="isCartOpen = true"
+              @click="openCart"
             >
               <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
               <span>Pedido</span>
@@ -305,7 +305,7 @@
 
     <FloatingCartButton
       :item-count="itemCount"
-      @open-cart="isCartOpen = true"
+      @open-cart="openCart"
     />
 
     <CartDrawer
@@ -320,6 +320,7 @@
       :is-delivery-regions-loading="isDeliveryRegionsLoading"
       :is-submitting="isSubmittingOrder"
       :is-whats-app-configured="isWhatsAppConfigured"
+      :profile="customerProfile"
       @close="isCartOpen = false"
       @clear-cart="clearCart"
       @remove-item="removeItem"
@@ -351,13 +352,14 @@ import {
   ShoppingBagIcon,
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
-import { useCheckoutProfileGate } from '@/composables/useCheckoutProfileGate'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { useCustomerProfile } from '@/composables/useCustomerProfile'
 import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useStoreBranding } from '@/composables/useStoreBranding'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
+import { authService } from '@/services/auth.service'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
@@ -403,7 +405,7 @@ if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
 const toast = useToast()
-const { ensureCustomerProfile } = useCheckoutProfileGate()
+const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
 const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
@@ -417,6 +419,19 @@ const categories = ref<Category[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const isCartOpen = ref(false)
+
+// Guest checkout reinstated: CartDrawer needs a fresh profile (or null) at
+// render time to decide which fields to show, so refresh it whenever the
+// cart opens -- covers switching stores mid-SPA-session without a reload.
+// authService.isAuthenticated() guard matches CustomerProfileMenuButton's
+// own pattern, so an anonymous visitor never fires a doomed 401 fetch.
+function openCart(): void {
+  isCartOpen.value = true
+  if (authService.isAuthenticated()) {
+    void fetchCustomerProfile()
+  }
+}
+
 const isSubmittingOrder = ref(false)
 const isDeliveryRegionsLoading = ref(false)
 const sortBy = ref<ProductSortOption>('featured')
@@ -771,10 +786,6 @@ function canOpenWhatsAppCheckout(): boolean {
 
 async function handleSubmitOrder(): Promise<void> {
   if (!canOpenWhatsAppCheckout() || isSubmittingOrder.value) {
-    return
-  }
-
-  if (!(await ensureCustomerProfile())) {
     return
   }
 

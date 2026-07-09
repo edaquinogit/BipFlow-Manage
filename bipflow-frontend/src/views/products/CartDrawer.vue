@@ -135,6 +135,52 @@
             </div>
 
             <div class="grid gap-4">
+              <template v-if="!hasProfileIdentity">
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      Nome
+                    </span>
+                    <input
+                      :value="customer.fullName"
+                      type="text"
+                      autocomplete="name"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Seu nome"
+                      @input="handleFullNameInput"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      Telefone
+                    </span>
+                    <input
+                      :value="customer.phone"
+                      type="tel"
+                      autocomplete="tel"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="(11) 99999-0000"
+                      @input="handlePhoneInput"
+                    />
+                  </label>
+                </div>
+
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    E-mail (opcional)
+                  </span>
+                  <input
+                    :value="customer.email"
+                    type="email"
+                    autocomplete="email"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    placeholder="voce@exemplo.com"
+                    @input="handleEmailInput"
+                  />
+                </label>
+              </template>
+
               <div class="grid gap-4 sm:grid-cols-2">
                 <label class="block">
                   <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
@@ -190,12 +236,58 @@
                   </select>
                 </label>
 
-                <p class="text-xs leading-5 text-[#6B7280]">
+                <p v-if="hasCompleteProfileAddress" class="text-xs leading-5 text-[#6B7280]">
                   Entregamos no endereço salvo no seu perfil.
                   <RouterLink :to="accountRoute" class="font-semibold text-[#D81B60] hover:underline">
                     Editar endereço
                   </RouterLink>
                 </p>
+
+                <template v-else>
+                  <label class="block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      Endereço
+                    </span>
+                    <input
+                      :value="customer.address"
+                      type="text"
+                      autocomplete="street-address"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      placeholder="Rua, numero e complemento"
+                      @input="handleAddressInput"
+                    />
+                  </label>
+
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="block">
+                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Bairro
+                      </span>
+                      <input
+                        :value="customer.neighborhood"
+                        type="text"
+                        autocomplete="address-level3"
+                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        placeholder="Bairro"
+                        @input="handleNeighborhoodInput"
+                      />
+                    </label>
+
+                    <label class="block">
+                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                        Cidade
+                      </span>
+                      <input
+                        :value="customer.city"
+                        type="text"
+                        autocomplete="address-level2"
+                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        placeholder="Cidade"
+                        @input="handleCityInput"
+                      />
+                    </label>
+                  </div>
+                </template>
               </template>
 
               <label class="block">
@@ -273,6 +365,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { customerAccountPath } from '@/router/auth.routes'
+import type { CustomerProfile } from '@/types/customer'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
@@ -300,6 +393,7 @@ const props = withDefaults(defineProps<{
   isDeliveryRegionsLoading?: boolean
   isSubmitting?: boolean
   isWhatsAppConfigured: boolean
+  profile: CustomerProfile | null
 }>(), {
   isDeliveryRegionsLoading: false,
   isSubmitting: false,
@@ -325,6 +419,18 @@ const accountRoute = computed(() => {
   return { path: customerAccountPath(storeSlug) }
 })
 
+// Guest checkout reinstated: identity always comes from a resolved profile
+// when one exists (hide the name/phone/email inputs entirely); address
+// specifically falls back to the guest inputs whenever the profile's own
+// address is incomplete, independent of identity -- mirrors the backend's
+// exact precedence in CheckoutWhatsAppView.post().
+const hasProfileIdentity = computed(() => props.profile !== null)
+const hasCompleteProfileAddress = computed(() => (
+  !!props.profile?.address?.trim()
+  && !!props.profile?.neighborhood?.trim()
+  && !!props.profile?.city?.trim()
+))
+
 const deliveryRegionPlaceholder = computed(() => {
   if (props.isDeliveryRegionsLoading) {
     return 'Carregando regioes...'
@@ -340,12 +446,24 @@ const checkoutValidationMessage = computed(() => {
     return 'Adicione ao menos um item ao pedido.'
   }
 
+  if (!hasProfileIdentity.value && (!props.customer.fullName.trim() || !props.customer.phone.trim())) {
+    return 'Informe seu nome e telefone para finalizar o pedido.'
+  }
+
   if (
     props.customer.deliveryMethod === 'delivery'
     && props.deliveryRegions.length > 0
     && !props.customer.deliveryRegionId
   ) {
     return 'Selecione a regiao de entrega.'
+  }
+
+  if (
+    props.customer.deliveryMethod === 'delivery'
+    && !hasCompleteProfileAddress.value
+    && (!props.customer.address.trim() || !props.customer.neighborhood.trim() || !props.customer.city.trim())
+  ) {
+    return 'Informe endereco, bairro e cidade para receber em casa.'
   }
 
   return ''
@@ -373,6 +491,30 @@ function handleNotesInput(event: Event): void {
   emit('updateCustomer', {
     notes: getInputValue(event),
   })
+}
+
+function handleFullNameInput(event: Event): void {
+  emit('updateCustomer', { fullName: getInputValue(event) })
+}
+
+function handlePhoneInput(event: Event): void {
+  emit('updateCustomer', { phone: getInputValue(event) })
+}
+
+function handleEmailInput(event: Event): void {
+  emit('updateCustomer', { email: getInputValue(event) })
+}
+
+function handleAddressInput(event: Event): void {
+  emit('updateCustomer', { address: getInputValue(event) })
+}
+
+function handleNeighborhoodInput(event: Event): void {
+  emit('updateCustomer', { neighborhood: getInputValue(event) })
+}
+
+function handleCityInput(event: Event): void {
+  emit('updateCustomer', { city: getInputValue(event) })
 }
 
 function handleDeliveryMethodChange(event: Event): void {

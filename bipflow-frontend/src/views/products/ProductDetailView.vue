@@ -267,7 +267,7 @@
 
     <FloatingCartButton
       :item-count="itemCount"
-      @open-cart="isCartOpen = true"
+      @open-cart="openCart"
     />
 
     <CartDrawer
@@ -282,6 +282,7 @@
       :is-delivery-regions-loading="isDeliveryRegionsLoading"
       :is-submitting="isSubmittingOrder"
       :is-whats-app-configured="isWhatsAppConfigured"
+      :profile="customerProfile"
       @close="isCartOpen = false"
       @clear-cart="clearCart"
       @remove-item="removeItem"
@@ -307,11 +308,12 @@ import CartDrawer from './CartDrawer.vue'
 import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
-import { useCheckoutProfileGate } from '@/composables/useCheckoutProfileGate'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { useCustomerProfile } from '@/composables/useCustomerProfile'
 import { useStoreBranding } from '@/composables/useStoreBranding'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
+import { authService } from '@/services/auth.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
 import { extractCheckoutErrorMessage, orderService } from '@/services/order.service'
@@ -330,7 +332,7 @@ if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
 const toast = useToast()
-const { ensureCustomerProfile } = useCheckoutProfileGate()
+const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
 
@@ -350,6 +352,19 @@ const storeWhatsAppPhone = ref('')
 const activeImage = ref<string | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
+
+// Guest checkout reinstated: refresh the profile whenever the cart opens so
+// CartDrawer decides which fields to show from fresh data (covers switching
+// stores mid-SPA-session without a reload). Guard matches
+// CustomerProfileMenuButton's own pattern so an anonymous visitor never
+// fires a doomed 401 fetch.
+function openCart(): void {
+  isCartOpen.value = true
+  if (authService.isAuthenticated()) {
+    void fetchCustomerProfile()
+  }
+}
+
 const isSubmittingOrder = ref(false)
 const isDeliveryRegionsLoading = ref(false)
 const errorMessage = ref('')
@@ -849,10 +864,6 @@ function canOpenWhatsAppCheckout(): boolean {
 
 async function handleSubmitOrder(): Promise<void> {
   if (!canOpenWhatsAppCheckout() || isSubmittingOrder.value) {
-    return
-  }
-
-  if (!(await ensureCustomerProfile())) {
     return
   }
 

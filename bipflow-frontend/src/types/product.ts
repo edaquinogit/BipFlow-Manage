@@ -68,10 +68,11 @@ export interface CartItem {
   quantity: number
 }
 
-// Etapa 1 of docs/architecture/customer-profile-checkout-evolution.md:
-// identity/address (name, phone, email, address, neighborhood, city) moved
-// to CustomerProfile -- only the choices that still vary per order live
-// here now. See types/customer.ts for the profile shape.
+// Guest checkout reinstated: identity/address (fullName, phone, email,
+// address, neighborhood, city) are collected here again for whoever has no
+// usable CustomerProfile (see types/customer.ts for the profile shape) --
+// the backend prefers the profile when one exists and is complete, and
+// only reads these as a fallback otherwise.
 export interface CartCustomer {
   deliveryMethod: 'delivery' | 'pickup'
   paymentMethod: 'pix' | 'card' | 'cash'
@@ -79,6 +80,12 @@ export interface CartCustomer {
   deliveryRegionName: string
   deliveryRegionFee: number
   notes: string
+  fullName: string
+  phone: string
+  email: string
+  address: string
+  neighborhood: string
+  city: string
 }
 
 export interface CheckoutPayloadItem {
@@ -91,6 +98,12 @@ export interface CheckoutPayloadCustomer {
   payment_method: 'pix' | 'card' | 'cash'
   delivery_region_id: number | null
   notes: string
+  full_name: string
+  phone: string
+  email: string
+  address: string
+  neighborhood: string
+  city: string
 }
 
 export interface CheckoutPayload {

@@ -21,9 +21,9 @@ export const AuthRouteNames = {
  * with a `name` on the slug-scoped path variant (`/l/:storeSlug/...`) --
  * pushing that name with an empty storeSlug throws "missing required
  * param". Every consumer needs a plain path string instead, chosen by
- * whether a storeSlug is known; centralized here so the three call sites
- * (useCheckoutProfileGate, CustomerProfileMenuButton, CartDrawer) can't
- * drift out of sync with each other or with the routes below.
+ * whether a storeSlug is known; centralized here so its call sites
+ * (CustomerProfileMenuButton, CustomerLoginView) can't drift out of sync
+ * with each other or with the routes below.
  */
 export function createCustomerProfilePath(storeSlug: string): string {
   return storeSlug ? `/l/${storeSlug}/perfil/criar` : "/perfil/criar";

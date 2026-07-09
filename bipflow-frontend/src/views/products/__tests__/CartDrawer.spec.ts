@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import CartDrawer from '../CartDrawer.vue'
 import type { CartCustomer, CartItem } from '@/types/product'
+import type { CustomerProfile } from '@/types/customer'
 import type { DeliveryRegion } from '@/types/delivery'
 
 vi.mock('vue-router', () => ({
@@ -16,6 +17,24 @@ const buildCustomer = (overrides: Partial<CartCustomer> = {}): CartCustomer => (
   deliveryRegionName: '',
   deliveryRegionFee: 0,
   notes: '',
+  fullName: 'Convidado Teste',
+  phone: '11999990000',
+  email: '',
+  address: 'Rua Teste, 100',
+  neighborhood: 'Centro',
+  city: 'Salvador',
+  ...overrides,
+})
+
+const buildProfile = (overrides: Partial<CustomerProfile> = {}): CustomerProfile => ({
+  full_name: 'Maria Cliente',
+  phone: '11988887777',
+  email: 'maria@example.com',
+  address: 'Rua das Flores, 42',
+  neighborhood: 'Jardim',
+  city: 'Sao Paulo',
+  delivery_region_id: null,
+  delivery_region_name: '',
   ...overrides,
 })
 
@@ -56,6 +75,7 @@ const mountDrawer = (props: Partial<InstanceType<typeof CartDrawer>['$props']> =
       customer: buildCustomer(),
       deliveryRegions: [],
       isWhatsAppConfigured: true,
+      profile: null,
       ...props,
     },
   })
@@ -65,15 +85,67 @@ describe('CartDrawer', () => {
     vi.resetModules()
   })
 
-  it('no longer collects identity/address fields (moved to the customer profile)', () => {
-    const wrapper = mountDrawer()
+  it('shows guest identity and address fields when there is no profile', () => {
+    const wrapper = mountDrawer({ customer: buildCustomer({ deliveryMethod: 'delivery' }) })
+
+    expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(true)
+  })
+
+  it('hides identity and address fields and shows the saved-address hint when the profile is complete', () => {
+    const wrapper = mountDrawer({
+      customer: buildCustomer({ deliveryMethod: 'delivery' }),
+      profile: buildProfile(),
+    })
 
     expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
-    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(false)
-    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Entregamos no endereço salvo no seu perfil.')
+  })
+
+  it('hides identity fields but still shows address fields when the profile has no saved address', () => {
+    const wrapper = mountDrawer({
+      customer: buildCustomer({ deliveryMethod: 'delivery' }),
+      profile: buildProfile({ address: '', neighborhood: '', city: '' }),
+    })
+
+    expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(true)
+    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Entregamos no endereço salvo no seu perfil.')
+  })
+
+  it('requires guest name and phone before allowing submission when there is no profile', () => {
+    const wrapper = mountDrawer({ customer: buildCustomer({ fullName: '', phone: '' }) })
+
+    expect(wrapper.text()).toContain('Informe seu nome e telefone para finalizar o pedido.')
+    expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
+  })
+
+  it('requires guest address before allowing submission of a delivery order with no profile', () => {
+    const wrapper = mountDrawer({
+      customer: buildCustomer({ deliveryMethod: 'delivery', address: '', neighborhood: '', city: '' }),
+    })
+
+    expect(wrapper.text()).toContain('Informe endereco, bairro e cidade para receber em casa.')
+    expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
+  })
+
+  it('does not require guest fields when a complete profile is present', () => {
+    const wrapper = mountDrawer({
+      customer: buildCustomer({ deliveryMethod: 'delivery', fullName: '', phone: '', address: '' }),
+      profile: buildProfile(),
+    })
+
+    expect(wrapper.find('footer button').attributes('disabled')).toBeUndefined()
   })
 
   it('still lets the customer choose delivery method, payment method and notes', () => {
@@ -117,5 +189,16 @@ describe('CartDrawer', () => {
     await wrapper.find('textarea').setValue('Sem cebola')
 
     expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({ notes: 'Sem cebola' })
+  })
+
+  it('emits updateCustomer with guest identity fields on input', async () => {
+    const wrapper = mountDrawer()
+
+    await wrapper.find('input[autocomplete="name"]').setValue('Joao Convidado')
+    await wrapper.find('input[autocomplete="tel"]').setValue('11955554444')
+
+    const emitted = wrapper.emitted('updateCustomer') ?? []
+    expect(emitted).toContainEqual([{ fullName: 'Joao Convidado' }])
+    expect(emitted).toContainEqual([{ phone: '11955554444' }])
   })
 })

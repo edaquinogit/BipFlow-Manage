@@ -77,8 +77,8 @@ onMounted(async () => {
   // fresh on every navigation between the product list and a product
   // detail page, and re-fetching on each one would be wasted work given
   // the singleton cache already answers "hasProfile" for the storefront's
-  // display purposes (the checkout gate re-verifies for real regardless,
-  // see useCheckoutProfileGate).
+  // display purposes -- CartDrawer's parent view (ProductsView.vue/
+  // ProductDetailView.vue) re-fetches for real whenever the cart opens.
   if (authService.isAuthenticated() && hasProfile.value === null) {
     await fetchCustomerProfile()
   }
