@@ -1,5 +1,23 @@
 # Evolução: Perfil de Cliente na Vitrine + Checkout com Gate de Login
 
+> **Revisão de 2026-07-09: o gate de login foi revertido.** A decisão 1 abaixo
+> ("finalizar no WhatsApp sempre exige perfil/login, sem atalho de continuar
+> sem cadastro") foi deliberadamente desfeita a pedido do usuário — checkout
+> como convidado voltou a funcionar, sem conta nenhuma, exatamente como
+> antes desta evolução. O `CustomerProfile`, o login de cliente, a tela de
+> conta e o restante da fundação descrita aqui **continuam existindo e
+> funcionando** — viraram conveniência opcional (identidade e, quando
+> completo, endereço vêm do perfil automaticamente) em vez de bloqueio.
+> Regra de precedência: perfil presente → identidade sempre vem dele;
+> endereço vem dele só se completo, senão cai para o campo digitado na hora
+> (mesmo pra quem tem conta). Backend: `CheckoutWhatsAppView` não exige mais
+> `IsAuthenticated`; `CheckoutCustomerInputSerializer` ganhou de volta
+> `full_name`/`phone`/`email`/`address`/`neighborhood`/`city` opcionais.
+> Frontend: `CartDrawer.vue` mostra os campos de convidado condicionalmente;
+> `useCheckoutProfileGate.ts` (o bloqueio) foi apagado. O resto deste
+> documento descreve a decisão original e por que ela foi tomada — mantido
+> como registro histórico, não como comportamento atual do gate.
+
 Este documento registra a evolução que permite ao cliente da vitrine criar um
 **perfil** (conta) com seus dados de identidade e endereço, acessível por um
 ícone minimalista no header público, e que passa a **exigir esse perfil**
