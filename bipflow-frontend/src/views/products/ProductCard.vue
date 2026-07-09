@@ -69,7 +69,7 @@
 
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B7280] transition hover:text-[#D81B60] sm:text-[11px]"
+          class="inline-flex items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase leading-[1.15] tracking-[0.12em] text-[#6B7280] transition hover:text-[#D81B60] sm:text-[11px]"
           :aria-label="`Ver descricao e detalhes de ${product.name}`"
           @click="handleOpenDetails"
         >

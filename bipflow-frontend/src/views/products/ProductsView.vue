@@ -23,7 +23,7 @@
             <button
               type="button"
               data-cy="open-cart-button"
-              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 text-[11px] font-bold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
+              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
                 : 'storefront-outline-button bg-white'"
@@ -128,7 +128,7 @@
                   <div class="flex flex-wrap gap-1.5 min-[390px]:gap-2">
                     <button
                       type="button"
-                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200"
+                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
                       :class="!draftCategoryId
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
@@ -141,7 +141,7 @@
                       v-for="category in categories"
                       :key="category.id"
                       type="button"
-                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200"
+                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
                       :class="draftCategoryId === category.id
                         ? 'bg-[#D81B60] text-white shadow-md'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
@@ -156,14 +156,14 @@
                 <div class="mt-5 flex items-center justify-end gap-2.5 border-t border-white/20 pt-4 min-[390px]:mt-6 min-[390px]:gap-3">
                   <button
                     type="button"
-                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
+                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
                     @click="handleCancelFilters"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
-                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
+                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
                     @click="handleSaveFilters"
                   >
                     Salvar
