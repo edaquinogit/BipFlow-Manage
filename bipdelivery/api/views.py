@@ -1524,16 +1524,18 @@ class CheckoutWhatsAppView(APIView):
     """
     Prepare a checkout note and WhatsApp redirect for the public catalog.
 
-    Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
-    requires an authenticated storefront customer with a CustomerProfile for
-    the resolved store -- identity/address come from that profile, not from
-    the request body, so there is no anonymous checkout path anymore. This
-    endpoint validates the cart server-side, recalculates totals and returns
-    a formatted order message ready to be shared with the configured
-    WhatsApp sales number.
+    Guest checkout reinstated: identity/address come from the authenticated
+    customer's CustomerProfile for the resolved store when one exists and
+    is complete; otherwise (no profile, or a profile with an incomplete
+    delivery address) they're read from the request body instead, same as
+    before docs/architecture/customer-profile-checkout-evolution.md made an
+    account mandatory here. A profile, when present, always wins for
+    identity -- submitted guest fields are only consulted as a fallback,
+    never used to override a resolved profile. This endpoint validates the
+    cart server-side, recalculates totals and returns a formatted order
+    message ready to be shared with the configured WhatsApp sales number.
     """
 
-    permission_classes = [IsAuthenticated]
     throttle_classes = [CheckoutIpThrottle, CheckoutCustomerThrottle]
 
     @staticmethod
@@ -1656,19 +1658,12 @@ class CheckoutWhatsAppView(APIView):
 
     def post(self, request, *args, **kwargs):
         store = resolve_request_store(request)
-        profile = (
-            CustomerProfile.objects.select_related("delivery_region")
-            .filter(user=request.user, store=store)
-            .first()
-        )
-
-        if profile is None:
-            return Response(
-                {
-                    "code": "customer_profile_required",
-                    "detail": "Crie seu perfil para finalizar o pedido.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        profile = None
+        if request.user.is_authenticated:
+            profile = (
+                CustomerProfile.objects.select_related("delivery_region")
+                .filter(user=request.user, store=store)
+                .first()
             )
 
         serializer = CheckoutRequestSerializer(data=request.data)
@@ -1679,8 +1674,33 @@ class CheckoutWhatsAppView(APIView):
         customer = validated_data["customer"]
         is_delivery = customer["delivery_method"] == "delivery"
 
+        if profile is not None:
+            customer_name = profile.full_name.strip()
+            customer_phone = profile.phone.strip()
+            customer_email = request.user.email
+        else:
+            customer_name = customer.get("full_name", "").strip()
+            customer_phone = customer.get("phone", "").strip()
+            customer_email = customer.get("email", "").strip()
+            if not customer_name or not customer_phone:
+                return Response(
+                    {
+                        "code": "guest_identity_required",
+                        "detail": "Informe seu nome e telefone para finalizar o pedido.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        profile_has_complete_address = (
+            profile is not None
+            and profile.address.strip()
+            and profile.neighborhood.strip()
+            and profile.city.strip()
+        )
+
         delivery_region = None
         delivery_region_id = customer.get("delivery_region_id")
+        order_address = order_neighborhood = order_city = ""
 
         if is_delivery:
             if delivery_region_id:
@@ -1694,26 +1714,32 @@ class CheckoutWhatsAppView(APIView):
                     raise serializers.ValidationError(
                         {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
                     )
-            elif profile.delivery_region_id and profile.delivery_region.is_active:
+            elif (
+                profile is not None
+                and profile.delivery_region_id
+                and profile.delivery_region.is_active
+            ):
                 delivery_region = profile.delivery_region
 
-            if not profile.address.strip() or not profile.neighborhood.strip() or not profile.city.strip():
-                return Response(
-                    {
-                        "code": "profile_address_incomplete",
-                        "detail": "Complete seu endereco no perfil antes de finalizar uma entrega.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if profile_has_complete_address:
+                order_address = profile.address.strip()
+                order_neighborhood = profile.neighborhood.strip()
+                order_city = profile.city.strip()
+            else:
+                order_address = customer.get("address", "").strip()
+                order_neighborhood = customer.get("neighborhood", "").strip()
+                order_city = customer.get("city", "").strip()
+                if not order_address or not order_neighborhood or not order_city:
+                    return Response(
+                        {
+                            "code": "guest_address_incomplete",
+                            "detail": "Informe endereco, bairro e cidade para receber em casa.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
         order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S-%f")
-        customer_name = profile.full_name.strip()
-        customer_phone = profile.phone.strip()
-        customer_email = request.user.email
         notes = customer.get("notes", "").strip()
-        order_address = profile.address.strip() if is_delivery else ""
-        order_neighborhood = profile.neighborhood.strip() if is_delivery else ""
-        order_city = profile.city.strip() if is_delivery else ""
 
         with transaction.atomic():
             normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items, store)

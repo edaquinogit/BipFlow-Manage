@@ -10,6 +10,8 @@ from typing import Iterable
 
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 
+from .models import StoreSettings
+
 # The refresh token travels exclusively in this httpOnly cookie (never the
 # request body or localStorage) so it can't be exfiltrated via XSS. Shared
 # with views.py, which sets/reads/clears the cookie itself.
@@ -169,24 +171,34 @@ class SubmittedFieldThrottle(SimpleRateThrottle):
         }
 
 
-class CheckoutCustomerThrottle(UserRateThrottle):
+class CheckoutCustomerThrottle(SubmittedFieldThrottle):
     """
-    Limit repeated checkout attempts by the authenticated customer.
+    Limit repeated checkout attempts by customer identity: the authenticated
+    user when logged in, the submitted phone number when a guest.
 
-    Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md:
-    checkout now requires authentication, so this keys by the requesting
-    user (UserRateThrottle's default get_cache_key()) instead of a
-    submitted phone field. Replaces the former CheckoutPhoneThrottle, which
-    read `customer.phone` from the request body -- once identity fields
-    moved to CustomerProfile and stopped being submitted on every checkout,
-    that throttle's get_cache_key() would have silently returned None (DRF
-    treats that as "don't throttle"), the same landmine already hit once in
-    this project with TokenRefreshIdentityThrottle during the cookie-auth
-    migration. Keeps the historical "checkout_phone" scope/env var name to
-    avoid an unrelated config rename.
+    Guest checkout reinstated: this used to be a plain UserRateThrottle
+    (keyed only by the authenticated user), which is exactly the landmine
+    already hit once in this project with TokenRefreshIdentityThrottle
+    during the cookie-auth migration -- UserRateThrottle.get_cache_key()
+    returns None ("don't throttle") for any request where
+    request.user.is_authenticated is False, so a guest could bypass this
+    throttle entirely. Rebased on SubmittedFieldThrottle (already used by
+    LoginIdentityThrottle etc.) so the anonymous path reuses the same
+    submitted-field keying instead of a bespoke implementation; the
+    authenticated path still keys by user, same as before.
     """
 
     scope = "checkout_phone"
+    identity_fields = ("customer.phone",)
+
+    def normalize_identifier(self, identifier: str) -> str:
+        return StoreSettings.normalize_phone(identifier)
+
+    def get_cache_key(self, request, view):
+        user = request.user
+        if user and user.is_authenticated:
+            return self.cache_format % {"scope": self.scope, "ident": user.pk}
+        return super().get_cache_key(request, view)
 
 
 class LoginIdentityThrottle(SubmittedFieldThrottle):

@@ -1,14 +1,14 @@
 """
 Checkout endpoint abuse protection tests.
 
-Etapa 3 of docs/architecture/customer-profile-checkout-evolution.md: the
-checkout endpoint now requires an authenticated customer with a
-CustomerProfile, so these throttles can no longer key off a submitted
-phone field (it isn't in the payload anymore) or rely on plain
-AnonRateThrottle (which never throttles an authenticated request). Both
-throttles were rewritten to key off the authenticated request instead --
-these tests keep them independent from production defaults by using small
-test rates.
+Guest checkout reinstated: CheckoutCustomerThrottle keys by the
+authenticated user when logged in, and by the submitted `customer.phone`
+(digits-only normalized) when anonymous -- a plain UserRateThrottle would
+silently stop limiting anonymous attempts entirely (its get_cache_key()
+returns None for an unauthenticated request), so this is exercised
+explicitly here. CheckoutIpThrottle already keyed by IP regardless of auth
+status, unaffected by guest checkout coming back. These tests keep both
+throttles independent from production defaults by using small test rates.
 """
 
 import os
@@ -153,6 +153,65 @@ class CheckoutWhatsAppThrottlingTest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_checkout_is_throttled_by_submitted_phone_for_anonymous_guests(self) -> None:
+        client = APIClient()
+        guest = {"full_name": "Convidado Teste", "phone": "11977776666"}
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra=guest),
+            format="json",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+
+        response = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra=guest),
+            format="json",
+            REMOTE_ADDR="203.0.113.11",  # different IP, same phone -- still throttled
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_checkout_phone_throttle_normalizes_formatting_before_comparing(self) -> None:
+        client = APIClient()
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra={"full_name": "Convidado A", "phone": "(11) 97777-6666"}),
+            format="json",
+            REMOTE_ADDR="203.0.113.20",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+
+        response = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra={"full_name": "Convidado A", "phone": "11977776666"}),
+            format="json",
+            REMOTE_ADDR="203.0.113.21",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_anonymous_guests_with_different_phones_are_throttled_independently(self) -> None:
+        client = APIClient()
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra={"full_name": "Convidado A", "phone": "11977776666"}),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+
+        response = client.post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(customer_extra={"full_name": "Convidado B", "phone": "11988885555"}),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
 
     def test_checkout_rejects_filled_honeypot_fields(self) -> None:
         client = self._authenticated_client(email="cliente-honeypot-1@example.com")

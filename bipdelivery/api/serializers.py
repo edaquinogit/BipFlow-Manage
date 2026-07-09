@@ -805,20 +805,38 @@ class CheckoutItemInputSerializer(serializers.Serializer):
 
 
 class CheckoutCustomerInputSerializer(serializers.Serializer):
-    """Serializer for the per-order choices still collected at checkout.
+    """Serializer for the per-order choices collected at checkout, plus
+    guest identity/address.
 
-    Etapa 1 of docs/architecture/customer-profile-checkout-evolution.md:
-    identity/address fields (name, phone, email, address, neighborhood,
-    city) moved to `CustomerProfile` and are no longer part of this payload
-    -- `CheckoutWhatsAppView` reads them from the authenticated customer's
-    profile instead. Only the choices that legitimately vary per order
-    (delivery/payment method, region, notes) stay here.
+    Guest checkout reinstated: identity/address (full_name, phone, email,
+    address, neighborhood, city) are optional here -- `CheckoutWhatsAppView`
+    prefers the authenticated customer's `CustomerProfile` when one exists
+    and is complete, and only falls back to these submitted fields
+    otherwise (no profile, or a profile missing its address). Presence is
+    enforced there, not here, since that decision depends on the resolved
+    profile, which this serializer has no access to.
     """
 
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
     delivery_region_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    full_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    phone = serializers.CharField(
+        max_length=32, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
+    address = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    neighborhood = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    city = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
 
 
 CHECKOUT_HONEYPOT_FIELDS = ("website", "company")

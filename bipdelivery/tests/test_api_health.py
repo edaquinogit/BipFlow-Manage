@@ -1228,7 +1228,13 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(order.status, SaleOrder.STATUS_PREPARED)
 
     def test_checkout_requires_delivery_address_for_delivery_orders(self) -> None:
-        """Delivery orders should require a complete address on the customer's profile."""
+        """Delivery orders need a complete address, from the profile or the request.
+
+        Guest checkout reinstated: a customer's profile without an address no
+        longer blocks checkout outright -- it just falls back to requiring the
+        address in the request itself, same as a guest. Omitting both is what
+        this test covers.
+        """
         client = self._checkout_client()  # no address/neighborhood/city set
         payload = {
             "items": [
@@ -1246,7 +1252,7 @@ class CheckoutWhatsAppAPITest(TestCase):
         response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["code"], "profile_address_incomplete")
+        self.assertEqual(response.data["code"], "guest_address_incomplete")
         self.assertEqual(SaleOrder.objects.count(), 0)
 
 
