@@ -29,8 +29,8 @@
     "// --- CYPRESS ENGINE ---": "",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
-    "test:e2e": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:open",
-    "test:e2e:run": "start-server-and-test dev:ci http://127.0.0.1:5173 cypress:run"
+    "test:e2e": "start-server-and-test dev:ci http://localhost:5173 cypress:open",
+    "test:e2e:run": "start-server-and-test dev:ci http://localhost:5173 cypress:run"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
