@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import base64
 from decimal import Decimal
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from bipdelivery.api.models import Category, DeliveryRegion, Product, Store
+
+# 1x1 transparent PNG -- product_sync.cy.ts's "absolute URLs for product
+# images" check needs a real <img> to exist somewhere in the table, and
+# ImageField requires actual (however minimal) image bytes, not just a
+# filename.
+_ONE_PIXEL_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 class Command(BaseCommand):
@@ -48,6 +59,7 @@ class Command(BaseCommand):
                 "stock_quantity": 25,
                 "is_available": True,
                 "size": "M",
+                "image": ContentFile(_ONE_PIXEL_PNG, name="produto-demo-e2e.png"),
             },
         )
 
