@@ -122,6 +122,7 @@ jobs:
         run: |
           python bipdelivery/manage.py migrate --noinput
           python bipdelivery/manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
+          python bipdelivery/manage.py seed_e2e_demo_data
 
       - name: Start Django backend
         run: |
