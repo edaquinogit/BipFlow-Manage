@@ -33,91 +33,94 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
 
 <template>
   <article
-    class="flex gap-3 p-4"
-    :class="isSelected ? 'bg-bip-blush/40' : ''"
+    class="rounded-xl border p-3 shadow-sm transition-colors duration-200"
+    :class="isSelected ? 'border-bip-rose/40 bg-bip-blush/30' : 'border-bip-line bg-white'"
     data-cy="product-table-card"
   >
-    <button
-      v-if="canManageCatalog"
-      type="button"
-      data-cy="row-checkbox"
-      class="flex h-11 w-8 shrink-0 items-center justify-center"
-      @click="emit('toggle-selection', product.id!)"
-    >
-      <span
-        class="flex h-5 w-5 items-center justify-center rounded border-2 transition-all duration-200"
-        :class="[
-          isSelected
-            ? 'bg-bip-rose border-bip-rose shadow-lg shadow-bip-rose/25'
-            : 'border-[#D1D5DB] bg-white'
-        ]"
+    <div class="flex items-start gap-2.5">
+      <button
+        v-if="canManageCatalog"
+        type="button"
+        data-cy="row-checkbox"
+        class="flex h-9 w-9 shrink-0 items-center justify-center"
+        @click="emit('toggle-selection', product.id!)"
       >
-        <svg
-          v-if="isSelected"
-          class="w-3 h-3 text-white"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+        <span
+          class="flex h-[18px] w-[18px] items-center justify-center rounded-md border-2 transition-all duration-200"
+          :class="[
+            isSelected
+              ? 'bg-bip-rose border-bip-rose shadow-sm shadow-bip-rose/30'
+              : 'border-[#D1D5DB] bg-white'
+          ]"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-        </svg>
-      </span>
-      <span class="sr-only">Selecionar produto</span>
-    </button>
+          <svg
+            v-if="isSelected"
+            class="w-2.5 h-2.5 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+        <span class="sr-only">Selecionar produto</span>
+      </button>
 
-    <ProductAvatar :image="product.image" :name="product.name" size="md" />
+      <ProductAvatar :image="product.image" :name="product.name" size="sm" />
 
-    <div class="min-w-0 flex-1">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <p class="truncate text-sm font-bold uppercase tracking-tight text-bip-black">
+      <div class="min-w-0 flex-1 self-center">
+        <div class="flex items-start justify-between gap-2">
+          <p class="truncate text-[13px] font-bold uppercase leading-tight tracking-tight text-bip-black">
             {{ product.name }}
           </p>
-          <p class="text-2xs font-mono font-bold uppercase tracking-widest text-bip-muted">
-            {{ product.sku || 'Sem SKU' }}
-          </p>
+          <span class="shrink-0 text-[13px] font-black font-mono text-bip-rose">
+            {{ formatBRL(product.price) }}
+          </span>
         </div>
-        <span class="shrink-0 text-sm font-black font-mono text-bip-rose">
-          {{ formatBRL(product.price) }}
-        </span>
+        <p class="mt-0.5 truncate text-[10px] font-mono font-bold uppercase tracking-widest text-bip-muted">
+          {{ product.sku || 'Sem SKU' }}
+        </p>
       </div>
+    </div>
 
-      <div class="mt-2 flex flex-wrap items-center gap-2">
-        <CategoryBadge :category="resolvedCategory" />
-        <span
-          class="inline-flex items-center rounded-lg border px-2 text-2xs font-black uppercase tracking-widest"
-          :class="isLowStockRow ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-bip-line bg-zinc-50 text-bip-muted'"
-        >
-          Estoque: {{ product.stock_quantity }}
-        </span>
-      </div>
+    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+      <CategoryBadge :category="resolvedCategory" />
+      <span
+        class="inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
+        :class="isLowStockRow ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-bip-line bg-zinc-50 text-bip-muted'"
+      >
+        Estoque {{ product.stock_quantity }}
+      </span>
+    </div>
 
-      <div v-if="canManageCatalog" class="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          class="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-bip-line text-2xs font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
-          @click="emit('edit', product)"
-        >
-          <PencilIcon class="h-3.5 w-3.5" />
-          Editar
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bip-line text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
-          aria-label="Imprimir etiqueta com QR Code"
-          @click="emit('print-label', product)"
-        >
-          <QrCodeIcon class="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bip-line text-bip-muted transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger"
-          aria-label="Remover produto"
-          @click="emit('delete', product.id!)"
-        >
-          <TrashIcon class="h-3.5 w-3.5" />
-        </button>
-      </div>
+    <div
+      v-if="canManageCatalog"
+      class="mt-2 flex items-center justify-end gap-1.5 border-t border-zinc-100 pt-2"
+    >
+      <button
+        type="button"
+        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-bip-line px-3 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
+        @click="emit('edit', product)"
+      >
+        <PencilIcon class="h-3.5 w-3.5" />
+        Editar
+      </button>
+      <button
+        type="button"
+        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bip-line text-bip-muted transition hover:border-bip-rose/40 hover:bg-bip-blush hover:text-bip-rose"
+        aria-label="Imprimir etiqueta com QR Code"
+        @click="emit('print-label', product)"
+      >
+        <QrCodeIcon class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-bip-line text-bip-muted transition hover:border-danger/40 hover:bg-danger-soft hover:text-danger"
+        aria-label="Remover produto"
+        @click="emit('delete', product.id!)"
+      >
+        <TrashIcon class="h-3.5 w-3.5" />
+      </button>
     </div>
   </article>
 </template>

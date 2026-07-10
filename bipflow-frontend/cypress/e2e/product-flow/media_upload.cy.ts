@@ -65,9 +65,11 @@ describe('Product Image Upload Flow', () => {
     submitBtn: '[data-cy="btn-submit-product"]',
     closeFormBtn: '[data-cy="btn-close-form"]',
 
-    // Table
+    // Table (desktop) / cards (mobile -- this whole suite runs at the
+    // iphone-8 viewport set in beforeEach, see step 10 below)
     productTable: '[data-cy="product-table"]',
     tableRow: '[data-cy="product-table-row"]',
+    productCard: '[data-cy="product-table-card"]',
 
     // Notifications
     toastContainer: '[data-cy="toast-container"]',
@@ -224,8 +226,12 @@ describe('Product Image Upload Flow', () => {
     cy.get(SELECTORS.formPanel, { timeout: 3000 })
       .should('not.exist');
 
-    // Step 10: Verify product appears in table
-    cy.get(SELECTORS.productTable, { timeout: 5000 })
+    // Step 10: Verify product appears in the list -- the desktop
+    // <table> (SELECTORS.productTable) is deliberately `hidden lg:block`,
+    // and this whole suite runs at the iphone-8 viewport set in beforeEach
+    // ("simulate a mobile browser viewport"), so the mobile card list
+    // (TableRowCard.vue) is what's actually on screen, not the table.
+    cy.get(SELECTORS.productCard, { timeout: 5000 })
       .should('be.visible')
       .contains(productName)
       .should('be.visible');

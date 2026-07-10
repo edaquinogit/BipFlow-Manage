@@ -71,9 +71,9 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
       <p class="mt-1.5 text-xs text-bip-muted">Cadastre o primeiro produto para começar a vender.</p>
     </div>
 
-    <div v-else-if="props.isLoading && !hasProducts" class="lg:hidden divide-y divide-[#E5E7EB]">
-      <div v-for="i in 3" :key="i" class="flex gap-3 p-4 animate-pulse">
-        <div class="h-11 w-11 shrink-0 rounded-lg bg-zinc-100" />
+    <div v-else-if="props.isLoading && !hasProducts" class="lg:hidden flex flex-col gap-3 p-3">
+      <div v-for="i in 3" :key="i" class="flex gap-2.5 rounded-xl border border-bip-line bg-white p-3 animate-pulse">
+        <div class="h-8 w-8 shrink-0 rounded-lg bg-zinc-100" />
         <div class="flex-1 space-y-2">
           <div class="h-3 w-2/3 rounded bg-zinc-100" />
           <div class="h-2 w-1/3 rounded bg-zinc-100" />
@@ -122,7 +122,7 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
         </span>
       </div>
 
-      <div class="lg:hidden divide-y divide-[#E5E7EB]">
+      <div class="lg:hidden flex flex-col gap-3 p-3">
         <TableRowCard
           v-for="product in props.products"
           :key="product.id"
