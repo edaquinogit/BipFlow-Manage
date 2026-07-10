@@ -43,18 +43,6 @@ const mountHeader = () =>
   })
 
 describe('DashboardHeader', () => {
-  it('renders the store picker with the active store selected', () => {
-    const wrapper = mountHeader()
-
-    const select = wrapper.find('select')
-    expect(select.exists()).toBe(true)
-    expect(select.element.value).toBe('loja-a')
-
-    const options = wrapper.findAll('option')
-    expect(options).toHaveLength(3)
-    expect(options.at(1)?.text()).toBe('Loja A')
-  })
-
   it('renders a polished welcome message with the user name', () => {
     const wrapper = mountHeader()
 
@@ -65,13 +53,6 @@ describe('DashboardHeader', () => {
     // used to only match the latter, so it passed or failed depending on
     // what time of day (and which timezone) the suite happened to run in.
     expect(text).toMatch(/Bom dia|Boa tarde|Boa noite/)
-  })
-
-  it('emits selectStore when the store selector changes', async () => {
-    const wrapper = mountHeader()
-
-    await wrapper.find('select').setValue('loja-b')
-    expect(wrapper.emitted('selectStore')?.[0]).toEqual(['loja-b'])
   })
 
   it('toggles the mobile nav and emits logout from the mobile menu', async () => {
@@ -96,10 +77,15 @@ describe('DashboardHeader', () => {
     expect(wrapper.emitted('logout')?.[0]).toEqual([])
   })
 
-  it('emits openStore when the storefront button is clicked', async () => {
+  it('opens the storefront menu with a copyable link and an entry point to the store', async () => {
     const wrapper = mountHeader()
 
-    await wrapper.find('a[title="Abrir /produtos"]').trigger('click')
-    expect(wrapper.emitted('openStore')?.[0]).toEqual([])
+    await wrapper.find('button[title="Ver vitrine"]').trigger('click')
+
+    const enterLink = wrapper.find('a[href*="/produtos"]')
+    expect(enterLink.exists()).toBe(true)
+    expect(enterLink.text()).toContain('Entrar na vitrine')
+    expect(enterLink.attributes('target')).toBe('_blank')
   })
+
 })

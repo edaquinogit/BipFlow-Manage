@@ -30,10 +30,6 @@ const handleSelectStore = (storeSlug: string): void => {
   success('Loja ativa atualizada.');
 };
 
-const handleOpenStore = (): void => {
-  window.open(storefrontPath.value, '_blank', 'noopener,noreferrer');
-};
-
 const handleLogout = async (): Promise<void> => {
   await authService.logout();
 };
@@ -59,7 +55,6 @@ onMounted(async () => {
       :is-store-loading="isCurrentStoreLoading"
       :storefront-path="storefrontPath"
       @select-store="handleSelectStore"
-      @open-store="handleOpenStore"
       @logout="handleLogout"
     />
 
