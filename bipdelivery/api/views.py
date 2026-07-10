@@ -61,7 +61,12 @@ from .permissions import (
     has_dashboard_read_access,
     has_dashboard_write_access,
 )
-from .product_labels import build_product_deep_link_url, build_product_qr_code_data_uri
+from .product_labels import (
+    MAX_BULK_LABEL_IDS,
+    build_product_deep_link_url,
+    build_product_label_payload,
+    build_product_qr_code_data_uri,
+)
 from .serializers import (
     BotConversationDetailSerializer,
     BotConversationSummarySerializer,
@@ -277,6 +282,68 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=False, methods=["get"], url_path="qr-codes-bulk")
+    def qr_codes_bulk(self, request):
+        """Bulk-render printable QR labels for up to MAX_BULK_LABEL_IDS
+        products at once (Etapa 6 of the QR-code stock-exit evolution) --
+        the batch label-printing action Etapa 2 explicitly deferred.
+
+        GET with an inline permission check (not POST), mirroring qr_code:
+        this is a render/read action, not a catalog mutation, so a viewer
+        should be able to use it exactly like they can view one product's QR
+        code today. AllowAnyReadDashboardWrite.has_permission() auto-passes
+        any SAFE_METHODS (including GET) at the class level, leaving this
+        inline check as the real gate -- a POST here would instead route
+        through has_dashboard_write_access at dispatch time, before this
+        method body ever runs, incorrectly blocking viewers.
+
+        Unlike bulk_update_category, missing/cross-store ids never hard-fail
+        the whole batch: printing labels for 48 of 50 valid selections
+        should still work, since punishing the whole request for one
+        product deleted mid-selection would be a worse operator experience
+        than just omitting it and reporting it back.
+        """
+        if not has_dashboard_read_access(request.user):
+            self.permission_denied(
+                request, message="Voce nao possui permissao para gerar etiquetas em lote."
+            )
+
+        raw_ids = request.query_params.get("ids", "").strip()
+        if not raw_ids:
+            return validation_error("ids deve conter ao menos um identificador de produto.")
+
+        try:
+            # dict.fromkeys(...) dedupes while preserving request order -- a
+            # duplicate id would otherwise count twice against
+            # MAX_BULK_LABEL_IDS.
+            requested_ids = list(
+                dict.fromkeys(int(piece) for piece in raw_ids.split(",") if piece.strip())
+            )
+        except ValueError:
+            return validation_error("Todos os ids devem ser numeros inteiros validos.")
+
+        if not requested_ids:
+            return validation_error("ids deve conter ao menos um identificador de produto.")
+
+        if len(requested_ids) > MAX_BULK_LABEL_IDS:
+            return validation_error(f"Selecione no maximo {MAX_BULK_LABEL_IDS} produtos por vez.")
+
+        # Scoped to the requester's store via get_queryset(), same
+        # chokepoint bulk_update_category relies on -- an id from another
+        # tenant simply never matches, landing in missing_ids
+        # indistinguishable from a nonexistent id (same non-leaking opacity
+        # as by_code's cross-store 404).
+        products_by_id = {p.id: p for p in self.get_queryset().filter(id__in=requested_ids)}
+
+        labels = [
+            build_product_label_payload(products_by_id[pid])
+            for pid in requested_ids
+            if pid in products_by_id
+        ]
+        missing_ids = [pid for pid in requested_ids if pid not in products_by_id]
+
+        return Response({"labels": labels, "missing_ids": missing_ids}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["patch"])
     def bulk_update_category(self, request):

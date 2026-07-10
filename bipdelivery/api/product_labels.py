@@ -35,3 +35,31 @@ def build_product_qr_code_data_uri(product: Product) -> str:
     image.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+# Etapa 6 of the QR-code stock-exit evolution (batch label printing --
+# explicitly deferred by Etapa 2). Matches ProductListPagination.max_page_size
+# (bipdelivery/api/pagination.py), reusing an already-established ceiling for
+# "how many products this app is comfortable handling in one request" instead
+# of inventing a new number. 50 physical labels is already a large single
+# print run.
+MAX_BULK_LABEL_IDS = 50
+
+
+def build_product_label_payload(product: Product) -> dict:
+    """Per-product payload for the bulk labels endpoint -- richer than the
+    {public_code, url, qr_code} shape qr_code() returns, because a selection
+    made in the dashboard can survive a filter change that drops the product
+    out of the currently-loaded list. Embedding the label's full display text
+    here means the frontend never needs a second per-product round trip to
+    render it.
+    """
+    return {
+        "id": product.id,
+        "public_code": product.public_code,
+        "name": product.name,
+        "price": str(product.price),
+        "size": product.size or None,
+        "url": build_product_deep_link_url(product),
+        "qr_code": build_product_qr_code_data_uri(product),
+    }
