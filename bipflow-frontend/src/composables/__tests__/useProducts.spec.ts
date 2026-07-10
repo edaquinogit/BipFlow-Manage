@@ -428,6 +428,103 @@ describe("useProducts Composable", () => {
     });
   });
 
+  describe("Bulk Selection Actions", () => {
+    const productA = { id: 1, name: "Product A", price: 10, stock_quantity: 5 } as any;
+    const productB = { id: 2, name: "Product B", price: 20, stock_quantity: 3 } as any;
+    const productC = { id: 3, name: "Product C", price: 30, stock_quantity: 1 } as any;
+
+    beforeEach(() => {
+      const { products, selectedAssetIds } = createComposable();
+      products.value = [];
+      selectedAssetIds.value.clear();
+    });
+
+    it("toggleSelection adds and removes a single id", () => {
+      const { products, selectedAssetIds, toggleSelection } = createComposable();
+      products.value = [productA, productB, productC];
+
+      toggleSelection(1);
+      expect(selectedAssetIds.value.has(1)).toBe(true);
+
+      toggleSelection(1);
+      expect(selectedAssetIds.value.has(1)).toBe(false);
+    });
+
+    it("selectAll selects every currently loaded product", () => {
+      const { products, selectedAssetIds, selectAll } = createComposable();
+      products.value = [productA, productB, productC];
+
+      selectAll();
+
+      expect(Array.from(selectedAssetIds.value).sort()).toEqual([1, 2, 3]);
+    });
+
+    it("clearSelection empties the selection", () => {
+      const { products, selectedAssetIds, selectAll, clearSelection } = createComposable();
+      products.value = [productA, productB, productC];
+      selectAll();
+
+      clearSelection();
+
+      expect(selectedAssetIds.value.size).toBe(0);
+    });
+
+    it("isAllSelected is true only when every loaded product is selected", () => {
+      const { products, isAllSelected, toggleSelection } = createComposable();
+      products.value = [productA, productB, productC];
+
+      expect(isAllSelected.value).toBe(false);
+
+      toggleSelection(1);
+      toggleSelection(2);
+      toggleSelection(3);
+      expect(isAllSelected.value).toBe(true);
+    });
+
+    it("isIndeterminate is true only for a partial selection", () => {
+      const { products, isIndeterminate, toggleSelection } = createComposable();
+      products.value = [productA, productB, productC];
+
+      expect(isIndeterminate.value).toBe(false);
+
+      toggleSelection(1);
+      expect(isIndeterminate.value).toBe(true);
+
+      toggleSelection(2);
+      toggleSelection(3);
+      expect(isIndeterminate.value).toBe(false);
+    });
+
+    it("toggleSelectAll selects everything when nothing is selected", () => {
+      const { products, selectedAssetIds, toggleSelectAll } = createComposable();
+      products.value = [productA, productB, productC];
+
+      toggleSelectAll();
+
+      expect(Array.from(selectedAssetIds.value).sort()).toEqual([1, 2, 3]);
+    });
+
+    it("toggleSelectAll clears the selection when everything is already selected", () => {
+      const { products, selectedAssetIds, selectAll, toggleSelectAll } = createComposable();
+      products.value = [productA, productB, productC];
+      selectAll();
+
+      toggleSelectAll();
+
+      expect(selectedAssetIds.value.size).toBe(0);
+    });
+
+    it("toggleSelectAll completes the selection instead of clearing it when only indeterminate (partial)", () => {
+      const { products, selectedAssetIds, toggleSelection, toggleSelectAll } = createComposable();
+      products.value = [productA, productB, productC];
+      toggleSelection(1);
+
+      toggleSelectAll();
+
+      expect(Array.from(selectedAssetIds.value).sort()).toEqual([1, 2, 3]);
+    });
+  });
+
   afterEach(() => {
     dispose?.();
   });

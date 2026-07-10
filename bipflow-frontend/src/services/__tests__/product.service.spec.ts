@@ -225,6 +225,65 @@ describe("ProductService", () => {
     await expect(ProductService.getQrCode(42)).rejects.toBeTruthy();
   });
 
+  it("fetches printable QR Codes for multiple products at once (Etapa 6 of the QR-code stock-exit evolution)", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        labels: [
+          {
+            id: 1,
+            public_code: "ABCD2345",
+            name: "Produto A",
+            price: "10.00",
+            size: "M",
+            url: "https://loja.bipflow.app/l/loja-b/p/ABCD2345",
+            qr_code: "data:image/png;base64,AAAA",
+          },
+          {
+            id: 2,
+            public_code: "WXYZ6789",
+            name: "Produto B",
+            price: "20.00",
+            size: null,
+            url: "https://loja.bipflow.app/l/loja-b/p/WXYZ6789",
+            qr_code: "data:image/png;base64,BBBB",
+          },
+        ],
+        missing_ids: [3],
+      },
+    } as never);
+
+    const response = await ProductService.getQrCodesBulk([1, 2, 3]);
+
+    expect(api.get).toHaveBeenCalledWith("v1/products/qr-codes-bulk/", {
+      params: { ids: "1,2,3" },
+    });
+    expect(response.labels).toHaveLength(2);
+    expect(response.labels[0]?.size).toBe("M");
+    expect(response.labels[1]?.size).toBeNull();
+    expect(response.missing_ids).toEqual([3]);
+  });
+
+  it("rejects a bulk QR Codes payload with a malformed label", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        labels: [
+          {
+            id: 1,
+            public_code: "ABCD2345",
+            name: "Produto A",
+            price: "10.00",
+            size: null,
+            url: "https://loja.bipflow.app/l/loja-b/p/ABCD2345",
+            qr_code: "not-a-data-uri",
+          },
+        ],
+        missing_ids: [],
+      },
+    } as never);
+
+    await expect(ProductService.getQrCodesBulk([1])).rejects.toBeTruthy();
+  });
+
   it("resolves a product by its scanned public_code (Etapa 3 of the QR-code stock-exit evolution)", async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: {

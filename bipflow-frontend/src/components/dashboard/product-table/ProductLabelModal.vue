@@ -106,6 +106,7 @@ const handlePrint = (): void => {
           <div v-else-if="label" class="qr-printable-label" data-cy="qr-printable-label">
             <p class="label-name">{{ product?.name }}</p>
             <p v-if="product?.price" class="label-price">{{ formatBRL(product.price) }}</p>
+            <p v-if="product?.size" class="label-size" data-cy="qr-label-size">Tamanho: {{ product.size }}</p>
             <img :src="label.qr_code" alt="QR Code do produto" class="label-qr" data-cy="qr-label-image" />
             <p class="label-code">{{ label.public_code }}</p>
           </div>
@@ -198,6 +199,14 @@ const handlePrint = (): void => {
   font-family: monospace;
   font-weight: 900;
   color: #d81b60;
+}
+
+.label-size {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7280;
 }
 
 .label-qr {

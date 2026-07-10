@@ -695,6 +695,23 @@ export function useProducts() {
   };
 
   /**
+   * Toggle between selecting every visible asset and clearing the
+   * selection entirely -- the decision a "select all" header checkbox
+   * needs (select when unchecked/indeterminate, clear when fully checked),
+   * kept here rather than in the component so the selection business logic
+   * has one home. When the selection is indeterminate (partial),
+   * isAllSelected is false, so this completes the selection instead of
+   * clearing it -- matches native tri-state checkbox behavior.
+   */
+  const toggleSelectAll = (): void => {
+    if (isAllSelected.value) {
+      clearSelection();
+    } else {
+      selectAll();
+    }
+  };
+
+  /**
    * Bulk update category for selected assets.
    *
    * @param productIds Array of product IDs to update
@@ -791,6 +808,7 @@ export function useProducts() {
     toggleSelection,
     selectAll,
     clearSelection,
+    toggleSelectAll,
     bulkUpdateCategory,
   };
 }

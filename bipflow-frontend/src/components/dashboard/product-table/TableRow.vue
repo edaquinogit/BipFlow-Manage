@@ -45,6 +45,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
     <td class="px-6 py-4">
       <button
         v-if="canManageCatalog"
+        data-cy="row-checkbox"
         @click="emit('toggle-selection', product.id!)"
         class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
         :class="[

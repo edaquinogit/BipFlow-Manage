@@ -13,6 +13,7 @@ import ProductListing from '@/components/dashboard/product-table/ProductListing.
 import ProductForm from '@/components/dashboard/product-form/ProductFormRoot.vue';
 import ConfirmModal from '@/components/dashboard/layout/ConfirmModal.vue';
 import ProductLabelModal from '@/components/dashboard/product-table/ProductLabelModal.vue';
+import BulkQrLabelsModal from '@/components/dashboard/product-table/BulkQrLabelsModal.vue';
 
 const {
   selectedAssetIds,
@@ -37,6 +38,8 @@ const isDeletingAction = ref(false);
 const isBulkUpdating = ref(false);
 const isLabelModalOpen = ref(false);
 const productToLabel = ref<Product | null>(null);
+const isBulkLabelsModalOpen = ref(false);
+const bulkLabelProductIds = ref<number[]>([]);
 
 const buildStockAdjustmentPayload = (
   originalProduct: Product,
@@ -140,6 +143,20 @@ const closeLabelModal = (): void => {
   productToLabel.value = null;
 };
 
+const openBulkLabelsModal = (): void => {
+  // Snapshot the selected ids rather than resolving Product[] from
+  // products.value: a selection can survive a filter change that drops it
+  // out of the currently-loaded list, so the modal always resolves labels
+  // straight from the backend by id instead of relying on this list.
+  bulkLabelProductIds.value = Array.from(selectedAssetIds.value);
+  isBulkLabelsModalOpen.value = true;
+};
+
+const closeBulkLabelsModal = (): void => {
+  isBulkLabelsModalOpen.value = false;
+  bulkLabelProductIds.value = [];
+};
+
 const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
   if (selectedAssetIds.value.size === 0) {
     toastError('Selecione pelo menos um produto antes de alterar a categoria.');
@@ -163,6 +180,7 @@ const refreshProducts = (): void => {
   selectedProduct.value = null;
   isDeleteModalOpen.value = false;
   closeLabelModal();
+  closeBulkLabelsModal();
   void fetchData();
   void fetchCategories(true);
 };
@@ -181,6 +199,7 @@ useStoreSwitchEffect(refreshProducts);
         @delete="openDeleteConfirm"
         @bulk-update-category="handleBulkUpdateCategory"
         @print-label="openLabelModal"
+        @bulk-print-labels="openBulkLabelsModal"
       />
     </section>
 
@@ -206,6 +225,12 @@ useStoreSwitchEffect(refreshProducts);
       :show="isLabelModalOpen"
       :product="productToLabel"
       @close="closeLabelModal"
+    />
+
+    <BulkQrLabelsModal
+      :show="isBulkLabelsModalOpen"
+      :product-ids="bulkLabelProductIds"
+      @close="closeBulkLabelsModal"
     />
   </div>
 </template>

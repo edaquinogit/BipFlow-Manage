@@ -13,7 +13,12 @@ import { filtersToQueryParams } from "../types/filters";
 import type { PaginatedProductsResponse, ProductDetail, ProductFilters } from "../types/product";
 import { PaginatedProductsResponseSchema, ProductDetailSchema } from "../types/product";
 import type { PaginatedStockMovements, StockMovement, StockMovementInput } from "../types/stockMovement";
-import { ProductQrCodeSchema, type ProductQrCode } from "../types/productLabel";
+import {
+  ProductQrCodeSchema,
+  ProductQrCodesBulkResponseSchema,
+  type ProductQrCode,
+  type ProductQrCodesBulkResponse,
+} from "../types/productLabel";
 
 /**
  * Product Service - Business Logic Layer
@@ -492,6 +497,25 @@ class ProductService {
       return ProductQrCodeSchema.parse(data);
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Get Product QR Code");
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch printable QR labels for multiple products at once (Etapa 6 of the
+   * QR-code stock-exit evolution) -- the batch label-printing action Etapa 2
+   * explicitly deferred. `missing_ids` in the response are ids that no
+   * longer exist or belong to another store; the caller decides how to
+   * surface that, this method just passes it through untouched.
+   */
+  async getQrCodesBulk(productIds: number[]): Promise<ProductQrCodesBulkResponse> {
+    try {
+      const { data } = await api.get<unknown>(`${this.endpoint}qr-codes-bulk/`, {
+        params: { ids: productIds.join(",") },
+      });
+      return ProductQrCodesBulkResponseSchema.parse(data);
+    } catch (error: unknown) {
+      this.handleError(error as ApplicationError, "Get Product QR Codes Bulk");
       throw error;
     }
   }

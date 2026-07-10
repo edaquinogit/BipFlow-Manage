@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { XMarkIcon, TagIcon, CheckIcon } from '@heroicons/vue/24/outline';
+import { XMarkIcon, TagIcon, CheckIcon, QrCodeIcon } from '@heroicons/vue/24/outline';
 import type { Category } from '@/schemas/category.schema';
 
 /**
@@ -15,6 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'cancel'): void;
   (e: 'confirm-bulk-update', categoryId: number): void;
+  (e: 'print-labels'): void;
 }>();
 
 /**
@@ -61,11 +62,11 @@ const handleConfirm = () => {
   >
     <div
       v-if="hasValidSelection"
-      class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 transform -translate-x-1/2 z-50"
+      class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 transform z-50"
       :class="getGlowClass(true)"
     >
       <div class="bg-white/95 backdrop-blur-xl border border-[#E5E7EB] rounded-2xl px-6 py-4 shadow-2xl shadow-black/10">
-        <div class="flex items-center gap-6">
+        <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
 
           <!-- Selection Count -->
           <div class="flex items-center gap-3">
@@ -76,6 +77,17 @@ const handleConfirm = () => {
               {{ selectedCount }} produto{{ selectedCount === 1 ? '' : 's' }} selecionado{{ selectedCount === 1 ? '' : 's' }}
             </span>
           </div>
+
+          <!-- QR Labels -->
+          <button
+            type="button"
+            data-cy="btn-bulk-print-labels"
+            @click="emit('print-labels')"
+            class="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#FCE7F3] border border-[#E5E7EB] rounded-lg text-sm font-medium text-bip-muted hover:text-[#D81B60] transition-all"
+          >
+            <QrCodeIcon class="w-4 h-4" />
+            <span class="uppercase tracking-wide">Etiquetas</span>
+          </button>
 
           <!-- Category Selector -->
           <div v-if="hasCategories" class="flex items-center gap-3">

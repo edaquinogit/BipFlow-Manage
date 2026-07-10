@@ -81,19 +81,61 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
       </div>
     </div>
 
-    <div v-else class="lg:hidden divide-y divide-[#E5E7EB]">
-      <TableRowCard
-        v-for="product in props.products"
-        :key="product.id"
-        :product="product"
-        :can-manage-catalog="props.canManageCatalog"
-        :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"
-        @edit="onEdit"
-        @delete="onDelete"
-        @toggle-selection="(productId) => emit('toggle-selection', productId)"
-        @print-label="onPrintLabel"
-      />
-    </div>
+    <template v-else>
+      <div
+        v-if="props.canManageCatalog"
+        class="lg:hidden flex items-center gap-3 border-b border-[#E5E7EB] bg-zinc-50 px-4 py-3"
+      >
+        <button
+          type="button"
+          data-cy="select-all-checkbox-mobile"
+          @click="emit('select-all')"
+          class="w-5 h-5 shrink-0 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+          :class="[
+            props.isAllSelected || props.isIndeterminate
+              ? 'bg-[#D81B60] border-[#D81B60]'
+              : 'border-[#D1D5DB] bg-white'
+          ]"
+          title="Selecionar todos os produtos"
+        >
+          <svg
+            v-if="isAllSelected"
+            class="w-3 h-3 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+          </svg>
+          <svg
+            v-else-if="isIndeterminate"
+            class="w-3 h-3 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4" />
+          </svg>
+        </button>
+        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">
+          Selecionar todos
+        </span>
+      </div>
+
+      <div class="lg:hidden divide-y divide-[#E5E7EB]">
+        <TableRowCard
+          v-for="product in props.products"
+          :key="product.id"
+          :product="product"
+          :can-manage-catalog="props.canManageCatalog"
+          :is-selected="product.id ? props.selectedAssetIds.has(product.id) : false"
+          @edit="onEdit"
+          @delete="onDelete"
+          @toggle-selection="(productId) => emit('toggle-selection', productId)"
+          @print-label="onPrintLabel"
+        />
+      </div>
+    </template>
 
     <div class="hidden overflow-x-auto lg:block">
       <table class="w-full text-left border-collapse table-auto" data-cy="product-table">
@@ -102,6 +144,7 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
             <th class="px-6 py-5">
               <button
                 v-if="props.canManageCatalog"
+                data-cy="select-all-checkbox"
                 @click="emit('select-all')"
                 class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] hover:border-[#D81B60]/50"
                 :class="[

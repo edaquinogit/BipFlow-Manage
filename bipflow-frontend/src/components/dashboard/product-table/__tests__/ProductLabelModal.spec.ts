@@ -86,6 +86,32 @@ describe('ProductLabelModal (Etapa 2 of the QR-code stock-exit evolution)', () =
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
+  it('shows the size chip when the product has a size', async () => {
+    vi.mocked(ProductService.getQrCode).mockResolvedValue({
+      public_code: 'ABCD2345',
+      url: 'https://loja.bipflow.app/l/loja-b/p/ABCD2345',
+      qr_code: 'data:image/png;base64,AAAA',
+    })
+
+    const wrapper = mountModal({ product: { ...product, size: 'M' } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="qr-label-size"]').text()).toContain('M')
+  })
+
+  it('hides the size chip when the product has no size', async () => {
+    vi.mocked(ProductService.getQrCode).mockResolvedValue({
+      public_code: 'ABCD2345',
+      url: 'https://loja.bipflow.app/l/loja-b/p/ABCD2345',
+      qr_code: 'data:image/png;base64,AAAA',
+    })
+
+    const wrapper = mountModal()
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="qr-label-size"]').exists()).toBe(false)
+  })
+
   it('calls window.print() when the print button is clicked', async () => {
     vi.mocked(ProductService.getQrCode).mockResolvedValue({
       public_code: 'ABCD2345',

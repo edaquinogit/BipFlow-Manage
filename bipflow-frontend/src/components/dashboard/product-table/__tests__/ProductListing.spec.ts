@@ -30,7 +30,7 @@ const SearchAndFilterBarStub = defineComponent({
 const BulkActionBarStub = defineComponent({
   name: 'BulkActionBar',
   props: ['selectedCount', 'categories', 'isUpdating'],
-  emits: ['cancel', 'confirm-bulk-update'],
+  emits: ['cancel', 'confirm-bulk-update', 'print-labels'],
   template: '<div class="bulk-action-bar-stub" />',
 })
 
@@ -48,7 +48,7 @@ describe('ProductListing', () => {
     updateFilters: vi.fn(),
     clearFilters: vi.fn(),
     toggleSelection: vi.fn(),
-    selectAll: vi.fn(),
+    toggleSelectAll: vi.fn(),
     clearSelection: vi.fn(),
   }
 
@@ -131,7 +131,7 @@ describe('ProductListing', () => {
     expect(wrapper.emitted('print-label')?.at(-1)).toEqual([{ id: 7, name: 'Produto teste' }])
   })
 
-  it('calls toggleSelection/selectAll directly instead of emitting them', () => {
+  it('calls toggleSelection/toggleSelectAll directly instead of emitting them', () => {
     const wrapper = mountListing()
     const table = wrapper.findComponent(ProductTableStub)
 
@@ -139,7 +139,7 @@ describe('ProductListing', () => {
     table.vm.$emit('select-all')
 
     expect(productsState.toggleSelection).toHaveBeenCalledWith(3)
-    expect(productsState.selectAll).toHaveBeenCalledTimes(1)
+    expect(productsState.toggleSelectAll).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('toggle-selection')).toBeUndefined()
     expect(wrapper.emitted('select-all')).toBeUndefined()
   })
@@ -164,5 +164,14 @@ describe('ProductListing', () => {
 
     expect(productsState.clearSelection).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('bulk-update-category')?.at(-1)).toEqual([9])
+  })
+
+  it('emits bulk-print-labels when the bulk action bar requests labels', () => {
+    const wrapper = mountListing()
+    const bulkBar = wrapper.findComponent(BulkActionBarStub)
+
+    bulkBar.vm.$emit('print-labels')
+
+    expect(wrapper.emitted('bulk-print-labels')).toHaveLength(1)
   })
 })

@@ -28,6 +28,7 @@ defineEmits<{
   (e: 'delete', id: number): void;
   (e: 'bulk-update-category', categoryId: number): void;
   (e: 'print-label', product: Product): void;
+  (e: 'bulk-print-labels'): void;
 }>();
 
 const {
@@ -43,7 +44,7 @@ const {
   updateFilters,
   clearFilters,
   toggleSelection,
-  selectAll,
+  toggleSelectAll,
   clearSelection,
 } = useProducts();
 const { categories } = useCategories();
@@ -120,7 +121,7 @@ const { canManageCatalog } = useCurrentUser();
       @delete="(id) => $emit('delete', id)"
       @edit="(product) => $emit('edit', product)"
       @toggle-selection="(productId) => toggleSelection(productId)"
-      @select-all="selectAll"
+      @select-all="toggleSelectAll"
       @print-label="(product) => $emit('print-label', product)"
     />
   </section>
@@ -132,5 +133,6 @@ const { canManageCatalog } = useCurrentUser();
     :is-updating="isBulkUpdating"
     @cancel="clearSelection"
     @confirm-bulk-update="(categoryId) => $emit('bulk-update-category', categoryId)"
+    @print-labels="$emit('bulk-print-labels')"
   />
 </template>

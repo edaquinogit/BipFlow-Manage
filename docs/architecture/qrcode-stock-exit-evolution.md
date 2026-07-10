@@ -406,6 +406,115 @@ filtro de origem no ledger). **Risco:** baixo — leitura/relatório aditivo
 sobre um campo que a Etapa 3 já gravava; o único ponto de atenção real foi
 o bug de filtro pré-existente, que a suíte de regressão agora cobre.
 
+## 6.1. Etapa 6 — Impressão em lote de etiquetas ✅ (concluída)
+
+A Etapa 2 deixou explicitamente registrado que "ação em lote (imprimir
+etiquetas de vários produtos de uma vez) ficou de fora — avaliar depois,
+não é bloqueante". Esta etapa fecha esse gap: seleção de produtos
+minimalista (individual, todos ou nenhum), preview em grade das etiquetas
+selecionadas com tamanho/variação visível, e imprimir ou baixar um único
+PDF com todas as etiquetas.
+
+Backend:
+
+- Novo `build_product_label_payload()` em `product_labels.py` — payload por
+  produto mais rico que o de `qr_code` (`id`, `public_code`, `name`,
+  `price`, `size`, `url`, `qr_code`), reaproveitando
+  `build_product_deep_link_url()`/`build_product_qr_code_data_uri()` sem
+  duplicar a geração do QR.
+- `ProductViewSet.qr_codes_bulk` (`GET /v1/products/qr-codes-bulk/?ids=1,2,3`,
+  detail=False). **Decisão deliberada: GET, não POST**, com a mesma checagem
+  inline `has_dashboard_read_access()` de `qr_code` — é uma ação de leitura/
+  renderização, não uma mutação de catálogo, então um `viewer` deve poder
+  usá-la como já pode ver uma etiqueta individual. `AllowAnyReadDashboardWrite`
+  libera qualquer `SAFE_METHODS` (GET incluso) a nível de classe; um POST
+  aqui teria exigido `has_dashboard_write_access` no dispatch, bloqueando
+  `viewer` incorretamente.
+- IDs de outra loja ou inexistentes **nunca derrubam o lote inteiro** —
+  diferente de `bulk_update_category`. `qr_codes_bulk` resolve via
+  `self.get_queryset().filter(id__in=ids)` (mesmo chokepoint de escopo por
+  loja) e reporta `missing_ids` separado de `labels`, para que imprimir
+  etiquetas de 48 de 50 produtos selecionados continue funcionando mesmo se
+  2 tiverem sido excluídos entretanto.
+- Teto de `MAX_BULK_LABEL_IDS = 50` (mesmo valor de
+  `ProductListPagination.max_page_size`) evita uma request síncrona lenta ou
+  uma tiragem de impressão patológica.
+
+Frontend:
+
+- `useProducts.toggleSelectAll()` fecha o gap real encontrado ao investigar
+  esta etapa: o checkbox de cabeçalho "selecionar todos" sempre chamava
+  `selectAll()`, mesmo com tudo já selecionado — não existia "clicar de
+  novo para desmarcar tudo" nesse controle (só pelo botão "Cancelar" da
+  barra de seleção em lote). Agora alterna select-all ↔ clear conforme
+  `isAllSelected`; seleção indeterminada (parcial) completa para "todos" em
+  vez de limpar, igual ao comportamento nativo de checkbox tri-state.
+- Bloco mobile (`TableRowCard.vue`) ganhou seu próprio controle de
+  "selecionar todos" — antes só existia na tabela desktop, então um usuário
+  de celular só conseguia selecionar produto a produto.
+- `ProductLabelModal.vue` ganhou um chip "Tamanho: X" condicional (só
+  quando `product.size` existe) — mesmo tratamento no novo modal em lote.
+- Novo `BulkQrLabelsModal.vue`: preview em grade (`grid-template-columns:
+  repeat(auto-fill, minmax(160px, 1fr))`, reflow automático de 1 coluna no
+  celular a 3-4 no desktop), reaproveitando o visual de
+  `.qr-printable-label` de `ProductLabelModal.vue`. Espelha o par de ações
+  "Imprimir"/"Baixar PDF" que `PdvSaleReceiptModal.vue` já resolve para o
+  recibo do PDV (mesmo `Teleport`, `useDialogA11y`, truque de `<style>`
+  não-scoped para `@media print`). Aviso não-bloqueante quando `missing_ids`
+  não é vazio — as etiquetas encontradas continuam imprimíveis/baixáveis.
+- `productIds` é um **snapshot** de IDs (não `Product[]` resolvido de
+  `products.value`) tirado na abertura do modal: uma seleção pode sobreviver
+  a uma troca de filtro que tira o produto da lista carregada, então o
+  modal sempre resolve as etiquetas direto do backend por ID — por isso o
+  payload do backend já embute `name`/`price`/`size`, sem depender do
+  frontend re-derivar esses campos de uma lista que pode estar desatualizada.
+- Novo `utils/productLabelsPdf.ts` (jsPDF, já dependência do projeto via
+  `receiptPdf.ts` — nenhuma lib nova): grade fixa A4, 2 colunas × 5 linhas
+  (10 etiquetas/página), paginação por aritmética simples
+  (`doc.addPage()` a cada 10ª etiqueta). **Sem passe de medição prévia**
+  (diferente de `receiptPdf.ts`): a página é sempre A4 fixo com células de
+  tamanho fixo, então não há altura desconhecida para medir; nome de
+  produto longo é clampado a 2 linhas por célula em vez de deixar a célula
+  crescer (cresceria e desalinharia a grade fixa das vizinhas).
+
+Testes: `bipdelivery/tests/test_product_qr_code_bulk.py` (12 casos: labels
+retornadas com todos os campos, `size` null quando ausente, exclusão
+silenciosa de IDs de outra loja, `missing_ids` sem derrubar o lote, `ids`
+vazio/malformado/acima do teto rejeitados com 400, dedupe de IDs
+repetidos, anônimo 401, autenticado sem papel 403, `viewer` 200 — esse
+último prova a decisão GET-vs-POST contra um request real). Frontend:
+extensão de `useProducts.spec.ts` (`toggleSelectAll` nos 3 estados:
+nenhum/todos/indeterminado), `ProductListing.spec.ts`, novo
+`BulkActionBar.spec.ts` (não existia cobertura nenhuma antes), extensão de
+`ProductLabelModal.spec.ts` (chip de tamanho), novo
+`BulkQrLabelsModal.spec.ts`, novo `productLabelsPdf.spec.ts` (mirror de
+`receiptPdf.spec.ts`), extensão de `product.service.spec.ts`. Novo
+`cypress/e2e/product_bulk_labels.cy.ts` (seleção parcial, toggle
+select-all/deselect-all, preview em lote, passada mobile 390×844 com
+`scrollIntoView`/checagem de bounding-box em vez de `should('be.visible')`
+na grade inteira — o container de preview é intencionalmente mais alto que
+o viewport do modal rolável, então checar visibilidade do primeiro card em
+vez do grid inteiro é o que de fato prova "mobile-safe").
+
+**Verificado contra o servidor de desenvolvimento real:** login real,
+seleção de produtos reais (alguns com `size`, outros sem), preview em lote
+aberto e grade renderizada corretamente, PDF baixado e o arquivo real
+aberto para conferir QR/texto nas células certas (não só "não lança
+exceção"), suíte E2E completa (4 testes) rodando contra o servidor real em
+desktop e em viewport 390×844, incluindo o toggle select-all/deselect-all.
+**Achado durante a verificação:** `media_upload.cy.ts` já falhava de forma
+determinística e idêntica contra o código original (confirmado isolando
+via `git stash`/`git stash pop`) — bug pré-existente não relacionado a esta
+etapa (a suíte roda em viewport `iphone-8` e a asserção final checa a
+tabela desktop, que fica `display:none` nesse viewport), não corrigido
+aqui por estar fora do escopo deste trabalho.
+
+**Visível para o usuário final:** sim (seleção corrigida + botão "Etiquetas"
+na barra de seleção em lote + modal de preview/impressão/PDF em lote).
+**Risco:** baixo — leitura aditiva sobre endpoints/componentes já existentes;
+o único ponto de atenção real foi a decisão GET-vs-POST do novo endpoint,
+verificada contra o comportamento real de `AllowAnyReadDashboardWrite`.
+
 ## 7. Riscos e pontos de atenção
 
 | Risco | Onde aparece | Mitigação |
@@ -506,16 +615,41 @@ o bug de filtro pré-existente, que a suíte de regressão agora cobre.
       de `DashboardOverviewView.spec.ts`/`DashboardOrdersView.spec.ts`/
       `DashboardStockMovementsView.spec.ts`) verdes.
 
-## 9. Estado da suíte após Etapas 1–5
+### Etapa 6
 
-357 testes backend (pytest) + 243 testes frontend (vitest) verdes,
-`vue-tsc --noEmit` limpo, `eslint`/`ruff` limpos nos arquivos tocados,
-`vite build` de produção concluído sem erros (chunks `DashboardPdvView` e
-demais code-splitted corretamente). Nenhuma migration pendente
-(`makemigrations --check` confirma que `models.py` e as migrations estão
-em paridade) — Etapas 4 e 5 não precisaram de nenhuma migration nova.
+- [x] `GET /v1/products/qr-codes-bulk/?ids=1,2,3` (`ProductViewSet.qr_codes_bulk`),
+      GET com checagem inline `has_dashboard_read_access` (decisão
+      deliberada vs. POST, ver Seção 6.1).
+- [x] `build_product_label_payload()` + `MAX_BULK_LABEL_IDS = 50` em
+      `product_labels.py`, reaproveitando as funções de QR já existentes.
+- [x] IDs de outra loja/inexistentes reportados em `missing_ids` sem
+      derrubar o lote inteiro.
+- [x] `useProducts.toggleSelectAll()` (bug corrigido: checkbox de cabeçalho
+      só selecionava, nunca desmarcava) + controle "selecionar todos" no
+      bloco mobile (não existia antes).
+- [x] Chip "Tamanho: X" condicional em `ProductLabelModal.vue` e no novo
+      `BulkQrLabelsModal.vue`.
+- [x] `BulkQrLabelsModal.vue` (preview em grade responsiva, imprimir e
+      baixar PDF) + `utils/productLabelsPdf.ts` (jsPDF, grade fixa A4,
+      2×5 por página, sem lib nova).
+- [x] Verificado contra o servidor de desenvolvimento real: seleção real,
+      preview em lote, PDF baixado e aberto (QR/texto conferidos célula a
+      célula), suíte E2E completa (4/4) em desktop e 390×844.
+- [x] Testes backend (`test_product_qr_code_bulk.py`, 12) e frontend
+      (extensão de `useProducts.spec.ts`/`ProductListing.spec.ts`/
+      `ProductLabelModal.spec.ts`/`product.service.spec.ts`, novo
+      `BulkActionBar.spec.ts`/`BulkQrLabelsModal.spec.ts`/
+      `productLabelsPdf.spec.ts`, novo `cypress/e2e/product_bulk_labels.cy.ts`)
+      verdes.
 
-Com isso, as 5 etapas do plano original estão concluídas. Nenhum trabalho
-adicional foi identificado como bloqueante; eventuais melhorias (scanner
-via câmera no PDV, ação de impressão de etiqueta em lote) ficam registradas
-como fast-follows explícitos nas seções acima, não como pendências.
+## 9. Estado da suíte após Etapas 1–6
+
+447 testes backend (pytest) + 506 testes frontend (vitest) verdes,
+`vue-tsc --noEmit` limpo, `eslint`/`ruff` limpos nos arquivos tocados.
+Nenhuma migration nova nesta etapa (`qr_codes_bulk` é uma action de
+leitura pura, sem mudança de schema).
+
+Com isso, as 6 etapas desta evolução (as 5 originais + o fast-follow de
+impressão em lote) estão concluídas. Nenhum trabalho adicional foi
+identificado como bloqueante; o scanner via câmera no PDV (Etapa 3)
+continua registrado como fast-follow explícito, não como pendência.
