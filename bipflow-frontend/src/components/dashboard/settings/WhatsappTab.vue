@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { StoreSettings, StoreSettingsPayload } from '@/types/store-settings';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { storeSettingsService } from '@/services/store-settings.service';
 
 const { canManageCatalog } = useCurrentUser();
@@ -64,7 +65,7 @@ async function submitStoreSettings(): Promise<void> {
     storeSettings.value = await storeSettingsService.update({ whatsapp_phone: storeWhatsappDigits.value });
     success('WhatsApp da loja atualizado.');
   } catch (error: unknown) {
-    Logger.error('Store settings save failed', { error });
+    Logger.error('Store settings save failed', buildErrorContext(error as ApplicationError));
     toastError('Não foi possível salvar o WhatsApp da loja.');
   } finally {
     isSavingStoreSettings.value = false;

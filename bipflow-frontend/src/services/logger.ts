@@ -75,7 +75,12 @@ class StructuredLogger {
     // In production, structured logs would be sent to a logging service (DataDog, Splunk, etc.)
     // For now, we use appropriate console methods
     const logMethod = this.getConsoleMethod(level);
-    logMethod(`[${entry.level.toUpperCase()}] ${entry.message}`, context || '');
+    // The message string is always a developer-written literal, safe to print
+    // in production for on-call triage. `context` is a different story: it
+    // routinely carries raw AxiosErrors (bearer tokens in headers, request
+    // bodies that can include a plaintext password on auth endpoints,
+    // customer PII in response payloads) -- never print it outside dev.
+    logMethod(`[${entry.level.toUpperCase()}] ${entry.message}`, this.isDevelopment ? context || '' : '');
   }
 
   private getConsoleMethod(level: LogLevel): typeof console.error {

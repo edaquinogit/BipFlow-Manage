@@ -24,6 +24,7 @@ import type {
   SaleOrderStatus,
 } from '@/types/sales';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { salesService } from '@/services/sales.service';
 import { useDebounceFn } from '@/utils/debounce';
 import { formatBRL } from '@/utils/formatters';
@@ -149,7 +150,7 @@ const handleUpdateSaleStatus = async (orderId: number, nextStatus: SaleOrderStat
     applyUpdatedOrder(updatedOrder);
     success('Status do pedido atualizado.');
   } catch (error: unknown) {
-    Logger.error('Sale order status update failed', { error, orderId, nextStatus });
+    Logger.error('Sale order status update failed', buildErrorContext(error as ApplicationError, { orderId, nextStatus }));
     toastError('Não foi possível atualizar o pedido.');
   } finally {
     updatingSaleOrderId.value = null;
@@ -226,7 +227,7 @@ async function openOrderDetail(order: SaleOrder): Promise<void> {
   try {
     selectedOrderDetail.value = await salesService.get(order.id);
   } catch (error: unknown) {
-    Logger.error('Sale order detail fetch failed', { error, orderId: order.id });
+    Logger.error('Sale order detail fetch failed', buildErrorContext(error as ApplicationError, { orderId: order.id }));
     detailError.value = 'Não foi possível carregar os detalhes deste pedido.';
   } finally {
     isDetailLoading.value = false;
@@ -253,7 +254,7 @@ async function handleMarkShipped(
     applyUpdatedOrder(updatedOrder);
     success('Pedido marcado como enviado.');
   } catch (error: unknown) {
-    Logger.error('Sale order ship failed', { error, orderId: order.id });
+    Logger.error('Sale order ship failed', buildErrorContext(error as ApplicationError, { orderId: order.id }));
     modalUpdateError.value = 'Não foi possível marcar o pedido como enviado. Tente novamente.';
   } finally {
     updatingSaleOrderId.value = null;
@@ -269,7 +270,7 @@ async function handleMarkDelivered(order: SaleOrderDetail): Promise<void> {
     applyUpdatedOrder(updatedOrder);
     success('Pedido marcado como entregue.');
   } catch (error: unknown) {
-    Logger.error('Sale order deliver failed', { error, orderId: order.id });
+    Logger.error('Sale order deliver failed', buildErrorContext(error as ApplicationError, { orderId: order.id }));
     modalUpdateError.value = 'Não foi possível marcar o pedido como entregue. Tente novamente.';
   } finally {
     updatingSaleOrderId.value = null;

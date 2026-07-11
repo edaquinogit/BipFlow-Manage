@@ -4,6 +4,7 @@ import { ArrowDownTrayIcon, PrinterIcon, XMarkIcon } from '@heroicons/vue/24/out
 import type { ProductBulkLabel } from '@/types/productLabel';
 import ProductService from '@/services/product.service';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { formatBRL } from '@/utils/formatters';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 import { buildProductLabelsPdf } from '@/utils/productLabelsPdf';
@@ -59,10 +60,10 @@ const loadLabels = async (): Promise<void> => {
     missingIds.value = response.missing_ids;
   } catch (error: unknown) {
     loadError.value = 'Não foi possível gerar as etiquetas dos produtos selecionados.';
-    Logger.error('Failed to load bulk product QR labels', {
-      error,
-      productIds: props.productIds,
-    });
+    Logger.error(
+      'Failed to load bulk product QR labels',
+      buildErrorContext(error as ApplicationError, { productIds: props.productIds }),
+    );
   } finally {
     isLoading.value = false;
   }

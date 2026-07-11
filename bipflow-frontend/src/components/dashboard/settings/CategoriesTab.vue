@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import type { CategoryCreatePayload } from '@/schemas/category.schema';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 
 const { canManageCatalog } = useCurrentUser();
 const { success, error: toastError } = useToast();
@@ -39,7 +40,7 @@ async function submitCategory(): Promise<void> {
     success('Categoria criada com sucesso.');
     resetCategoryDraft();
   } catch (error: unknown) {
-    Logger.error('Category save failed', { error });
+    Logger.error('Category save failed', buildErrorContext(error as ApplicationError));
     toastError('Não foi possível salvar a categoria.');
   } finally {
     isSavingCategory.value = false;
@@ -52,7 +53,7 @@ async function handleDeleteCategory(categoryId: number): Promise<void> {
     await deleteCategory(categoryId);
     success('Categoria removida com sucesso.');
   } catch (error: unknown) {
-    Logger.error('Category deletion failed', { error, categoryId });
+    Logger.error('Category deletion failed', buildErrorContext(error as ApplicationError, { categoryId }));
     toastError('Não foi possível remover a categoria. Verifique se ela possui produtos vinculados.');
   } finally {
     deletingCategoryId.value = null;

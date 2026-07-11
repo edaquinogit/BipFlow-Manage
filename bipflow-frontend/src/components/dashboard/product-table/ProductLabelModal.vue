@@ -5,6 +5,7 @@ import type { Product } from '@/schemas/product.schema';
 import type { ProductQrCode } from '@/types/productLabel';
 import ProductService from '@/services/product.service';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { formatBRL } from '@/utils/formatters';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 
@@ -46,7 +47,7 @@ const loadLabel = async (): Promise<void> => {
     label.value = await ProductService.getQrCode(props.product.id);
   } catch (error: unknown) {
     loadError.value = 'Não foi possível gerar o QR Code deste produto.';
-    Logger.error('Failed to load product QR code', { error, productId: props.product.id });
+    Logger.error('Failed to load product QR code', buildErrorContext(error as ApplicationError, { productId: props.product.id }));
   } finally {
     isLoading.value = false;
   }

@@ -12,6 +12,7 @@ import { useCategories } from '@/composables/useCategories';
 import type { FilterState } from '@/types/filters';
 import { createDefaultFilterState, hasActiveFilters } from '@/types/filters';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 
 interface Props {
   filters: FilterState;
@@ -188,10 +189,10 @@ async function createNewCategory(): Promise<void> {
     emitFilters({ categoryId: newCategory.id });
     toast.success(`Categoria "${newCategory.name}" criada com sucesso.`);
   } catch (error) {
-    Logger.error('Failed to create category from filter bar', {
-      error,
-      categoryName,
-    });
+    Logger.error(
+      'Failed to create category from filter bar',
+      buildErrorContext(error as ApplicationError, { categoryName }),
+    );
     toast.error('Nao foi possivel criar a categoria. Tente novamente.');
   } finally {
     isCreatingCategory.value = false;

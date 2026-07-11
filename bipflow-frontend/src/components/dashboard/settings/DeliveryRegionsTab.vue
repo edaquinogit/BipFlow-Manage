@@ -8,6 +8,7 @@ import { useToast } from '@/composables/useToast';
 import type { DeliveryRegion, DeliveryRegionPayload } from '@/types/delivery';
 import { deliveryRegionService } from '@/services/delivery-region.service';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { formatBRL } from '@/utils/formatters';
 
 const { canManageCatalog } = useCurrentUser();
@@ -82,7 +83,7 @@ async function submitDeliveryRegion(): Promise<void> {
     resetRegionDraft();
     await fetchDeliveryRegions();
   } catch (error: unknown) {
-    Logger.error('Delivery region save failed', { error, regionId: editingRegionId.value });
+    Logger.error('Delivery region save failed', buildErrorContext(error as ApplicationError, { regionId: editingRegionId.value }));
     toastError('Não foi possível salvar a região de frete.');
   } finally {
     isSavingDeliveryRegion.value = false;
@@ -96,7 +97,7 @@ async function handleDeleteDeliveryRegion(regionId: number): Promise<void> {
     success('Região de frete removida.');
     await fetchDeliveryRegions();
   } catch (error: unknown) {
-    Logger.error('Delivery region deletion failed', { error, regionId });
+    Logger.error('Delivery region deletion failed', buildErrorContext(error as ApplicationError, { regionId }));
     toastError('Não foi possível remover a região de frete.');
   } finally {
     deletingDeliveryRegionId.value = null;

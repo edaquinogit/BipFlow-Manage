@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 
 /**
  * Shared shape for the isLoading/error/try-catch-Logger.warn triplet that
@@ -17,7 +18,7 @@ export function useAsyncResource<T>() {
     try {
       data.value = await loader();
     } catch (caughtError: unknown) {
-      Logger.warn('useAsyncResource: request failed', { error: caughtError });
+      Logger.warn('useAsyncResource: request failed', buildErrorContext(caughtError as ApplicationError));
       error.value = errorMessage;
     } finally {
       isLoading.value = false;

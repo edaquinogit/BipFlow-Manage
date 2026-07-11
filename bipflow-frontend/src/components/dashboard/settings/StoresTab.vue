@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { storeService } from '@/services/store.service';
 
 const { selectedStore, fetchCurrentStore, selectStore } = useCurrentStore();
@@ -31,7 +32,7 @@ async function handleRenameStore(): Promise<void> {
     await fetchCurrentStore(true);
     success('Nome da loja atualizado com sucesso.');
   } catch (error: unknown) {
-    Logger.error('Store rename failed', { error, slug: store.slug, name });
+    Logger.error('Store rename failed', buildErrorContext(error as ApplicationError, { slug: store.slug, name }));
     renameError.value = 'Não foi possível renomear a loja. Tente novamente.';
   } finally {
     isRenamingStore.value = false;
@@ -58,7 +59,7 @@ async function handleCreateStore(): Promise<void> {
     newStoreName.value = '';
     success(`Loja "${newStore.name}" criada com sucesso.`);
   } catch (error: unknown) {
-    Logger.error('Store creation failed', { error, name });
+    Logger.error('Store creation failed', buildErrorContext(error as ApplicationError, { name }));
     createStoreError.value = 'Não foi possível criar a loja. Tente novamente.';
   } finally {
     isCreatingStore.value = false;

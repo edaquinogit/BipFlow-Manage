@@ -11,6 +11,7 @@ import type {
   SaleOrderTimeseriesPoint,
 } from '@/types/sales';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { salesService } from '@/services/sales.service';
 import { downloadCsv } from '@/utils/csv';
 import { formatBRL } from '@/utils/formatters';
@@ -54,7 +55,7 @@ const fetchSalesSummary = async (): Promise<void> => {
     const comparison = salesSummary.value.comparison_previous_period;
     salesRevenueComparison.value = comparison === null ? null : Number(comparison);
   } catch (error: unknown) {
-    Logger.warn('Failed to fetch dashboard sales summary', { error });
+    Logger.warn('Failed to fetch dashboard sales summary', buildErrorContext(error as ApplicationError));
     salesSummary.value = null;
   } finally {
     isSalesSummaryLoading.value = false;
@@ -87,7 +88,7 @@ const fetchSalesAnalytics = async (
     salesCustomerInsights.value = customerInsightsResult;
     salesAnalyticsUpdatedAt.value = new Date();
   } catch (error: unknown) {
-    Logger.warn('Failed to fetch dashboard sales analytics', { error });
+    Logger.warn('Failed to fetch dashboard sales analytics', buildErrorContext(error as ApplicationError));
     salesAnalyticsError.value = 'Nao foi possivel carregar a analise de vendas agora.';
   } finally {
     isSalesAnalyticsLoading.value = false;

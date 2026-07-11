@@ -73,7 +73,7 @@ class StockMovementService {
     } else if (error instanceof Error) {
       Logger.error(`[StockMovementService][${context}] Unexpected error: ${error.message}`, buildErrorContext(error));
     } else {
-      Logger.error(`[StockMovementService][${context}] Unknown error occurred`, { error });
+      Logger.error(`[StockMovementService][${context}] Unknown error occurred`, buildErrorContext(error));
     }
   }
 }

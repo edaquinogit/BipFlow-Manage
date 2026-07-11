@@ -2,7 +2,31 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import { Logger } from "./services/logger";
+import { buildErrorContext, type ApplicationError } from "./types/errors";
 import "./assets/main.css";
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+function normalizeLocalLoopbackHost(): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  const currentHost = window.location.hostname;
+  if (!LOOPBACK_HOSTS.has(currentHost)) {
+    return;
+  }
+
+  const canonicalHost = (import.meta.env.VITE_DEV_CANONICAL_HOST as string | undefined)?.trim() || "localhost";
+  if (!LOOPBACK_HOSTS.has(canonicalHost) || canonicalHost === currentHost) {
+    return;
+  }
+
+  const target = `${window.location.protocol}//${canonicalHost}${window.location.port ? `:${window.location.port}` : ""}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  window.location.replace(target);
+}
+
+normalizeLocalLoopbackHost();
 
 /**
  * 🚨 Environment Validation
@@ -23,10 +47,13 @@ if (!import.meta.env.VITE_API_URL && import.meta.env.MODE !== 'test') {
 const app = createApp(App);
 
 // Global error handler for Vue-specific errors
-app.config.errorHandler = (error: unknown, instance, info) => {
+app.config.errorHandler = (error: unknown, _instance, info) => {
+  // Deliberately drop the component instance from the logged context: it
+  // carries the crashed component's live reactive state, including any
+  // bound password/MFA-code v-model values -- printing it would defeat the
+  // point of never logging raw form input.
   Logger.error("Vue error boundary triggered", {
-    error,
-    instance,
+    ...buildErrorContext(error as ApplicationError),
     info,
   });
 

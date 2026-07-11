@@ -8,6 +8,7 @@ import { useDialogA11y } from '@/composables/useDialogA11y';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { buildReceiptPdf } from '@/utils/receiptPdf';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 
 /**
  * Etapa R2 of the QR-code stock-exit refinement (see
@@ -111,10 +112,10 @@ const handleSendEmail = (): void => {
     emailSentMessage.value = `PDF baixado. Anexe-o na aba do Gmail que abrimos para ${email} e envie por lá.`;
     isEmailFormOpen.value = false;
   } catch (error: unknown) {
-    Logger.error('Failed to prepare PDV receipt email via Gmail', {
-      error,
-      orderReference: sale.order_reference,
-    });
+    Logger.error(
+      'Failed to prepare PDV receipt email via Gmail',
+      buildErrorContext(error as ApplicationError, { orderReference: sale.order_reference }),
+    );
     emailError.value = 'Não foi possível preparar o recibo para envio. Tente novamente.';
   }
 };

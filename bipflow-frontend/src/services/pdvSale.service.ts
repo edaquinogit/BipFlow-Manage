@@ -67,7 +67,7 @@ class PdvSaleService {
         buildErrorContext(error)
       );
     } else {
-      Logger.error(`[PdvSaleService][${context}] Unknown error occurred`, { error });
+      Logger.error(`[PdvSaleService][${context}] Unknown error occurred`, buildErrorContext(error));
     }
   }
 }

@@ -15,6 +15,7 @@ import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { getSaleStatusLabel } from '@/constants/saleOrder';
 import { botService } from '@/services/bot.service';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { DashboardRoutes } from '@/router/dashboard.routes';
 import type {
   BotConversationDetail,
@@ -78,7 +79,7 @@ async function selectConversation(conversationId: number): Promise<void> {
   try {
     selectedConversation.value = await botService.getConversation(conversationId);
   } catch (error: unknown) {
-    Logger.warn('Failed to load bot conversation detail', { error, conversationId });
+    Logger.warn('Failed to load bot conversation detail', buildErrorContext(error as ApplicationError, { conversationId }));
     detailError.value = 'Não foi possível abrir essa conversa.';
   } finally {
     isLoadingDetail.value = false;
@@ -113,7 +114,7 @@ async function fetchConversations(): Promise<void> {
     }
     await selectConversation(nextId);
   } catch (error: unknown) {
-    Logger.warn('Failed to load bot conversations', { error });
+    Logger.warn('Failed to load bot conversations', buildErrorContext(error as ApplicationError));
     listError.value = 'Não foi possível carregar as conversas do bot agora.';
   } finally {
     isLoadingList.value = false;

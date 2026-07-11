@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { storeService } from '@/services/store.service';
 import type { ReceiptPaperFormat } from '@/types/store';
 
@@ -50,7 +51,7 @@ async function handleSave(): Promise<void> {
     await fetchCurrentStore(true);
     success('Configurações de recibo atualizadas.');
   } catch (error: unknown) {
-    Logger.error('Store receipt settings save failed', { error, slug: store.slug });
+    Logger.error('Store receipt settings save failed', buildErrorContext(error as ApplicationError, { slug: store.slug }));
     saveError.value = 'Não foi possível salvar as configurações de recibo. Tente novamente.';
     toastError('Não foi possível salvar as configurações de recibo.');
   } finally {

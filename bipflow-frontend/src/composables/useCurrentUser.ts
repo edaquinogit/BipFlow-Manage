@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { authService } from "../services/auth.service";
 import { Logger } from "../services/logger";
+import { buildErrorContext, type ApplicationError } from "../types/errors";
 
 // Singleton (mesmo padrao de useCategories/useCurrentStore/useToast): o
 // DashboardLayout busca o perfil uma vez e as paginas filhas (Produtos,
@@ -34,7 +35,7 @@ export function useCurrentUser() {
       mfaEnabled.value = currentUser.mfa_enabled;
       return true;
     } catch (error: unknown) {
-      Logger.warn("Failed to fetch dashboard user profile", { error });
+      Logger.warn("Failed to fetch dashboard user profile", buildErrorContext(error as ApplicationError));
       currentUserName.value = null;
       canManageCatalog.value = false;
       canManageOrders.value = false;

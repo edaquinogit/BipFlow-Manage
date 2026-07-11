@@ -7,6 +7,7 @@ import { useToast } from '@/composables/useToast';
 import type { Product } from '@/schemas/product.schema';
 import type { StockMovementInput } from '@/types/stockMovement';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import { sanitizePayloadForDjango as sanitizeDashboardPayload } from './productPayload';
 
 import ProductListing from '@/components/dashboard/product-table/ProductListing.vue';
@@ -124,7 +125,7 @@ const executeDelete = async (): Promise<void> => {
     success('Produto removido com sucesso.');
     await fetchData();
   } catch (error: unknown) {
-    Logger.error('Product deletion failed', { error });
+    Logger.error('Product deletion failed', buildErrorContext(error as ApplicationError));
     toastError('Não foi possível remover o produto. Tente novamente.');
   } finally {
     isDeletingAction.value = false;
@@ -167,7 +168,7 @@ const handleBulkUpdateCategory = async (categoryId: number): Promise<void> => {
   try {
     await bulkUpdateCategory(Array.from(selectedAssetIds.value), categoryId);
   } catch (error: unknown) {
-    Logger.error('Bulk category update failed', { error, categoryId });
+    Logger.error('Bulk category update failed', buildErrorContext(error as ApplicationError, { categoryId }));
     toastError('Não foi possível atualizar os produtos selecionados.');
   } finally {
     isBulkUpdating.value = false;

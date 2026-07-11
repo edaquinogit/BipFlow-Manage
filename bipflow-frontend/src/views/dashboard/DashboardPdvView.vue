@@ -11,7 +11,7 @@ import { salesService } from '@/services/sales.service';
 import { formatBRL } from '@/utils/formatters';
 import { isLowStock } from '@/utils/stockAlerts';
 import { Logger } from '@/services/logger';
-import { isAxiosError } from '@/types/errors';
+import { isAxiosError, buildErrorContext, type ApplicationError } from '@/types/errors';
 import { PDV_PAYMENT_METHODS, type PdvPaymentMethod } from '@/types/pdvSale';
 import type { SaleOrder } from '@/types/sales';
 import type { ReceiptData } from '@/types/receipt';
@@ -105,7 +105,7 @@ const loadRecentPdvSales = async (): Promise<void> => {
     const response = await salesService.list({ channel: 'loja_fisica', pageSize: 5 });
     recentPdvSales.value = response.results;
   } catch (error: unknown) {
-    Logger.warn('Failed to load recent PDV sales', { error });
+    Logger.warn('Failed to load recent PDV sales', buildErrorContext(error as ApplicationError));
   } finally {
     isRecentSalesLoading.value = false;
   }
@@ -156,7 +156,7 @@ const resolveScannedCode = async (raw: string): Promise<PdvScanOutcome> => {
     playScanSuccessBeep();
     return { ok: true, product };
   } catch (error: unknown) {
-    Logger.warn('PDV code lookup failed', { error, code });
+    Logger.warn('PDV code lookup failed', buildErrorContext(error as ApplicationError, { code }));
     return { ok: false, message: `Código "${code}" não encontrado.` };
   }
 };
@@ -283,7 +283,7 @@ const handleFinalizeSale = async (): Promise<void> => {
     resetSale();
     void loadRecentPdvSales();
   } catch (error: unknown) {
-    Logger.error('PDV sale failed', { error });
+    Logger.error('PDV sale failed', buildErrorContext(error as ApplicationError));
     toastError(extractPdvSaleErrorMessage(error));
   } finally {
     isSubmitting.value = false;

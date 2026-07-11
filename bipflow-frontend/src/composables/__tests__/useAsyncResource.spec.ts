@@ -56,9 +56,12 @@ describe('useAsyncResource', () => {
     expect(resource.data.value).toBe(1)
     expect(resource.error.value).toBe('Nao foi possivel carregar.')
     expect(resource.isLoading.value).toBe(false)
+    // buildErrorContext(), not the raw Error -- never log the raw error
+    // object itself (see logger.ts), since a caller's caught error can be
+    // an AxiosError carrying the bearer token / request body.
     expect(Logger.warn).toHaveBeenCalledWith(
       'useAsyncResource: request failed',
-      expect.objectContaining({ error: expect.any(Error) })
+      expect.not.objectContaining({ error: expect.anything() })
     )
   })
 
