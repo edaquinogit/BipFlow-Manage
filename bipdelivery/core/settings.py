@@ -374,6 +374,7 @@ REST_FRAMEWORK = {
             "BIPFLOW_THROTTLE_AUTH_TOKEN_REFRESH_IDENTITY", "10/minute"
         ),
         "mfa_verify_ip": get_env_value("BIPFLOW_THROTTLE_MFA_VERIFY_IP", "10/minute"),
+        "mfa_verify_identity": get_env_value("BIPFLOW_THROTTLE_MFA_VERIFY_IDENTITY", "10/minute"),
         "pdv_receipt_email": get_env_value("BIPFLOW_THROTTLE_PDV_RECEIPT_EMAIL", "10/hour"),
     },
 }

@@ -212,6 +212,24 @@ class MfaLoginFlowTest(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_verify_rejects_a_replayed_mfa_token_even_with_the_still_valid_code(self) -> None:
+        mfa_token = build_mfa_challenge_token(self.user.id)
+        code = pyotp.TOTP(self.secret).now()
+
+        first_response: Any = self.client.post(
+            "/api/auth/mfa/verify/",
+            {"mfa_token": mfa_token, "code": code},
+            format="json",
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+        replay_response: Any = self.client.post(
+            "/api/auth/mfa/verify/",
+            {"mfa_token": mfa_token, "code": code},
+            format="json",
+        )
+        self.assertEqual(replay_response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_verify_with_valid_backup_code_issues_real_tokens_and_consumes_it(self) -> None:
         backup_codes = MFABackupCode.generate_for_user(self.user, count=3)
         mfa_token = build_mfa_challenge_token(self.user.id)

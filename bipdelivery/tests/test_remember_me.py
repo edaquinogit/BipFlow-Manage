@@ -20,6 +20,7 @@ import pyotp
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -119,6 +120,13 @@ class RememberMeMfaTest(TestCase):
     secret: str
 
     def setUp(self) -> None:
+        # build_mfa_challenge_token() is deterministic for the same
+        # (user_id, remember_me) pair within the same second, and Django's
+        # TestCase transaction rollback lets SQLite reuse a prior test's
+        # user_id -- without clearing the cache, MfaVerifyView's single-use
+        # marking (views.py) could see an identical token from an earlier
+        # test in the same run and reject this test's very first use of it.
+        cache.clear()
         self.client = APIClient()
         self.user = User.objects.create_user(username="remember-mfa@example.com", password="testpass123")
         device = TOTPDevice(user=self.user)

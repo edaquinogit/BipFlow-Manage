@@ -10,6 +10,7 @@ from typing import Iterable
 
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 
+from .mfa import read_mfa_challenge_payload
 from .models import StoreSettings
 
 # The refresh token travels exclusively in this httpOnly cookie (never the
@@ -145,6 +146,37 @@ class MfaVerifyIpThrottle(AnonRateThrottle):
     """
 
     scope = "mfa_verify_ip"
+
+
+class MfaVerifyIdentityThrottle(SimpleRateThrottle):
+    """
+    Per-user control for MFA verification, independent of source IP.
+
+    MfaVerifyIpThrottle alone lets a distributed attacker (rotating source
+    IPs) brute-force one victim's 6-digit code without ever exhausting a
+    single IP's bucket, since each IP gets its own fresh quota. This keys by
+    the resolved user_id instead, so all attempts against the same account
+    share one budget regardless of where they come from.
+
+    Deliberately does NOT key on the raw mfa_token like SubmittedFieldThrottle
+    would: a fresh token is minted on every password-check attempt
+    (LoginTokenObtainPairView.post), so keying on it would let an attacker
+    sidestep the bucket just by re-submitting the password each time.
+    """
+
+    scope = "mfa_verify_identity"
+
+    def get_cache_key(self, request, view):
+        data = request.data if hasattr(request.data, "get") else {}
+        mfa_token = data.get("mfa_token") if hasattr(data, "get") else None
+        if not mfa_token:
+            return None
+
+        challenge = read_mfa_challenge_payload(mfa_token)
+        user_id = challenge.get("user_id") if challenge else None
+        ident = str(user_id) if user_id is not None else _hash_cache_identifier(str(mfa_token))
+
+        return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
 class SubmittedFieldThrottle(SimpleRateThrottle):

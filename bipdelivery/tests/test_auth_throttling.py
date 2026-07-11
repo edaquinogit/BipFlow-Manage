@@ -10,6 +10,7 @@ import os
 from typing import Any
 
 import django
+import pyotp
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -25,6 +26,8 @@ from rest_framework.test import APIClient
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
 
+from bipdelivery.api.mfa import build_mfa_challenge_token  # noqa: E402
+from bipdelivery.api.models import TOTPDevice  # noqa: E402
 from bipdelivery.api.throttling import REFRESH_TOKEN_COOKIE_NAME  # noqa: E402
 from bipdelivery.tests.throttle_utils import rest_framework_with_rates  # noqa: E402
 
@@ -39,6 +42,10 @@ AUTH_THROTTLE_TEST_REST_FRAMEWORK = rest_framework_with_rates(
     auth_password_reset_confirm_identity="1/minute",
     auth_token_refresh_ip="20/minute",
     auth_token_refresh_identity="1/minute",
+    # High enough to never trip on its own during the identity test below,
+    # which spreads attempts across distinct IPs.
+    mfa_verify_ip="100/minute",
+    mfa_verify_identity="2/minute",
 )
 
 
@@ -153,6 +160,32 @@ class AuthEndpointThrottlingTest(TestCase):
             payload,
             format="json",
             REMOTE_ADDR="198.51.100.40",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_mfa_verify_is_throttled_by_resolved_identity_across_ips(self) -> None:
+        device = TOTPDevice(user=self.user)
+        device.set_secret(pyotp.random_base32())
+        device.confirmed = True
+        device.save()
+
+        for index in range(2):
+            mfa_token = build_mfa_challenge_token(self.user.id)
+            response: Any = self.client.post(
+                "/api/auth/mfa/verify/",
+                {"mfa_token": mfa_token, "code": "000000"},
+                format="json",
+                REMOTE_ADDR=f"198.51.100.{60 + index}",
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        mfa_token = build_mfa_challenge_token(self.user.id)
+        response = self.client.post(
+            "/api/auth/mfa/verify/",
+            {"mfa_token": mfa_token, "code": "000000"},
+            format="json",
+            REMOTE_ADDR="198.51.100.70",
         )
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

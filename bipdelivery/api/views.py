@@ -29,6 +29,7 @@ from .bot_engine import build_bot_reply
 from .captcha import verify_turnstile
 from .errors import business_logic_error, not_found_error, permission_denied_error, validation_error
 from .mfa import (
+    MFA_CHALLENGE_MAX_AGE_SECONDS,
     build_mfa_challenge_token,
     build_provisioning_uri,
     build_qr_code_data_uri,
@@ -104,10 +105,12 @@ from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
     REFRESH_TOKEN_COOKIE_NAME,
     AuthIpThrottle,
+    _hash_cache_identifier,
     BotMessageIpThrottle,
     CheckoutCustomerThrottle,
     CheckoutIpThrottle,
     LoginIdentityThrottle,
+    MfaVerifyIdentityThrottle,
     MfaVerifyIpThrottle,
     PasswordResetConfirmIdentityThrottle,
     PasswordResetIdentityThrottle,
@@ -2347,7 +2350,7 @@ class MfaVerifyView(APIView):
 
     permission_classes = []
     authentication_classes = []
-    throttle_classes = [MfaVerifyIpThrottle]
+    throttle_classes = [MfaVerifyIpThrottle, MfaVerifyIdentityThrottle]
 
     def post(self, request, *args, **kwargs):
         data = request.data if hasattr(request.data, "get") else {}
@@ -2381,6 +2384,23 @@ class MfaVerifyView(APIView):
                 user=user,
             )
             return validation_error("Codigo invalido.")
+
+        # Single-use: without this, a correct mfa_token + code combination
+        # could be replayed to mint a second session for as long as the
+        # challenge token is valid (5 minutes) and the TOTP code still
+        # verifies (~90s window). cache.add() is atomic ("set if absent"),
+        # so two concurrent replays of the same token can't both succeed.
+        challenge_cache_key = f"mfa_challenge_used:{_hash_cache_identifier(str(mfa_token))}"
+        if not cache.add(challenge_cache_key, True, timeout=MFA_CHALLENGE_MAX_AGE_SECONDS):
+            LoginAttempt.record(
+                identifier=user.username,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                succeeded=False,
+                failure_reason=LoginAttempt.FAILURE_MFA_INVALID,
+                user=user,
+            )
+            return validation_error("Sessao de verificacao invalida ou expirada. Faca login novamente.")
 
         membership = StoreMembership.objects.filter(user=user).select_related("store").first()
         LoginAttempt.record(
