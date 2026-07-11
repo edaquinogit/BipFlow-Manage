@@ -107,17 +107,57 @@ class MfaSetupFlowTest(TestCase):
         )
 
         wrong_password_response: Any = self.client.post(
-            "/api/auth/mfa/disable/", {"password": "not-the-password"}, format="json"
+            "/api/auth/mfa/disable/",
+            {"password": "not-the-password", "code": pyotp.TOTP(secret).now()},
+            format="json",
         )
         self.assertEqual(wrong_password_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(TOTPDevice.objects.filter(user=self.user, confirmed=True).exists())
 
         response: Any = self.client.post(
-            "/api/auth/mfa/disable/", {"password": "testpass123"}, format="json"
+            "/api/auth/mfa/disable/",
+            {"password": "testpass123", "code": pyotp.TOTP(secret).now()},
+            format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(TOTPDevice.objects.filter(user=self.user).exists())
         self.assertFalse(MFABackupCode.objects.filter(user=self.user).exists())
+
+    def test_disable_rejects_correct_password_without_totp_code(self) -> None:
+        setup_response: Any = self.client.post("/api/auth/mfa/setup/", {}, format="json")
+        secret = setup_response.data["secret"]
+        self.client.post(
+            "/api/auth/mfa/setup/confirm/", {"code": pyotp.TOTP(secret).now()}, format="json"
+        )
+
+        response: Any = self.client.post(
+            "/api/auth/mfa/disable/", {"password": "testpass123"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(TOTPDevice.objects.filter(user=self.user, confirmed=True).exists())
+
+    def test_disable_accepts_valid_backup_code_instead_of_totp_code(self) -> None:
+        setup_response: Any = self.client.post("/api/auth/mfa/setup/", {}, format="json")
+        secret = setup_response.data["secret"]
+        confirm_response: Any = self.client.post(
+            "/api/auth/mfa/setup/confirm/", {"code": pyotp.TOTP(secret).now()}, format="json"
+        )
+        backup_code = confirm_response.data["backup_codes"][0]
+
+        response: Any = self.client.post(
+            "/api/auth/mfa/disable/",
+            {"password": "testpass123", "backup_code": backup_code},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(TOTPDevice.objects.filter(user=self.user).exists())
+
+    def test_disable_without_a_confirmed_device_only_needs_password(self) -> None:
+        # No TOTPDevice exists at all -- nothing to step up against.
+        response: Any = self.client.post(
+            "/api/auth/mfa/disable/", {"password": "testpass123"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_current_user_reflects_mfa_enabled_state(self) -> None:
         before: Any = self.client.get("/api/auth/me/")

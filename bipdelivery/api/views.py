@@ -2330,14 +2330,30 @@ class MfaSetupConfirmView(APIView):
 
 
 class MfaDisableView(APIView):
-    """Disable MFA for the caller. Requires re-entering the password as a confirmation step."""
+    """Disable MFA for the caller.
+
+    Requires the password AND, when a device is already confirmed, a live
+    TOTP/backup code too -- password alone isn't enough to turn off a second
+    factor, otherwise a stolen password alone would defeat the point of it.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        password = request.data.get("password") if hasattr(request.data, "get") else None
+        data = request.data if hasattr(request.data, "get") else {}
+        password = data.get("password")
         if not password or not request.user.check_password(password):
             return validation_error("Senha incorreta.")
+
+        device = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
+        if device is not None:
+            code = str(data.get("code") or "")
+            backup_code = data.get("backup_code")
+            verified = verify_totp_code(device.get_secret(), code) if code else False
+            if not verified and backup_code:
+                verified = MFABackupCode.consume(request.user, str(backup_code))
+            if not verified:
+                return validation_error("Codigo invalido.")
 
         TOTPDevice.objects.filter(user=request.user).delete()
         MFABackupCode.objects.filter(user=request.user).delete()
