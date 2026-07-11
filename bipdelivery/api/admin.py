@@ -120,6 +120,11 @@ class TOTPDeviceAdmin(admin.ModelAdmin):
     list_filter = ("confirmed",)
     search_fields = ("user__username", "user__email")
     readonly_fields = ("user", "confirmed", "created_at", "confirmed_at")
+    # has_change_permission below makes every field read-only-rendered
+    # regardless of readonly_fields, so the ciphertext would otherwise still
+    # render on the detail page for any staff with view permission -- not
+    # plaintext, but no reason to show it at all.
+    exclude = ("encrypted_secret",)
 
     def has_add_permission(self, request) -> bool:
         return False
@@ -133,7 +138,8 @@ class MFABackupCodeAdmin(admin.ModelAdmin):
     list_display = ("user", "used_at", "created_at")
     list_filter = ("used_at",)
     search_fields = ("user__username", "user__email")
-    readonly_fields = ("user", "code_hash", "used_at", "created_at")
+    readonly_fields = ("user", "used_at", "created_at")
+    exclude = ("code_hash",)
 
     def has_add_permission(self, request) -> bool:
         return False

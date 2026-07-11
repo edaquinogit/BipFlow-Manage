@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
@@ -21,7 +23,11 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--password",
-            help="Optional password to set for the user. Required when creating a new user.",
+            help=(
+                "Optional password to set for the user. Required when creating a new user "
+                "unless DJANGO_BOOTSTRAP_ADMIN_PASSWORD is set in the environment -- prefer "
+                "the env var over this flag so the password never appears in argv/process list."
+            ),
         )
         parser.add_argument(
             "--role",
@@ -48,9 +54,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Dashboard RBAC groups are ready."))
             return
 
+        # Falls back to the env var directly (rather than requiring
+        # --password) so callers never have to put a real password on the
+        # process's argv, which stays visible to anyone who can read the
+        # container's process list for the life of that command.
+        password = options.get("password") or os.environ.get("DJANGO_BOOTSTRAP_ADMIN_PASSWORD")
+
         user = self._create_or_update_user(
             email=email,
-            password=options.get("password"),
+            password=password,
             role=options["role"],
             staff=options["staff"],
             superuser=options["superuser"],

@@ -21,6 +21,7 @@ from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 from uuid import uuid4
 
 import django
@@ -562,6 +563,38 @@ class DashboardRoleSeedCommandTest(TestCase):
         self.assertTrue(user.is_staff)
         self.assertTrue(user.check_password("admin123"))
         self.assertTrue(user.groups.filter(name="admin").exists())
+
+    def test_seed_dashboard_roles_reads_password_from_env_when_flag_omitted(self) -> None:
+        """DJANGO_BOOTSTRAP_ADMIN_PASSWORD must work without --password on argv --
+        see docker/backend-entrypoint.sh's seed_admin_user(), which deliberately
+        omits --password so the plaintext value never appears in the container's
+        process list."""
+        with patch.dict(os.environ, {"DJANGO_BOOTSTRAP_ADMIN_PASSWORD": "env-only-pass123"}):
+            call_command(
+                "seed_dashboard_roles",
+                email="envpass@example.com",
+                role="admin",
+                staff=True,
+                stdout=StringIO(),
+            )
+
+        user = User.objects.get(email="envpass@example.com")
+        self.assertTrue(user.check_password("env-only-pass123"))
+
+    def test_seed_dashboard_roles_prefers_explicit_password_flag_over_env(self) -> None:
+        with patch.dict(os.environ, {"DJANGO_BOOTSTRAP_ADMIN_PASSWORD": "env-pass123"}):
+            call_command(
+                "seed_dashboard_roles",
+                email="flagpass@example.com",
+                password="flag-pass123",
+                role="admin",
+                staff=True,
+                stdout=StringIO(),
+            )
+
+        user = User.objects.get(email="flagpass@example.com")
+        self.assertTrue(user.check_password("flag-pass123"))
+        self.assertFalse(user.check_password("env-pass123"))
 
 
 class StoreSettingsAPITest(TestCase):

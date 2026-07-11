@@ -33,6 +33,34 @@ from bipdelivery.api.models import MFABackupCode, TOTPDevice  # noqa: E402
 pytestmark = pytest.mark.django_db
 
 
+class MfaAdminFieldExclusionTest(TestCase):
+    """TOTPDeviceAdmin/MFABackupCodeAdmin have has_change_permission=False,
+    which makes Django render every non-excluded field as read-only text on
+    the detail page -- exclude must actually keep the ciphertext/hash out of
+    get_fields(), not just out of readonly_fields (redundant with exclude
+    and easy to have silently stop mattering)."""
+
+    def setUp(self) -> None:
+        from django.test import RequestFactory
+
+        self.request = RequestFactory().get("/admin/")
+        self.request.user = User.objects.create_superuser(
+            username="mfa-admin-test", email="mfa-admin-test@example.com", password="testpass123"
+        )
+
+    def test_totp_device_admin_excludes_encrypted_secret(self) -> None:
+        from django.contrib import admin
+
+        model_admin = admin.site._registry[TOTPDevice]
+        self.assertNotIn("encrypted_secret", model_admin.get_fields(self.request))
+
+    def test_mfa_backup_code_admin_excludes_code_hash(self) -> None:
+        from django.contrib import admin
+
+        model_admin = admin.site._registry[MFABackupCode]
+        self.assertNotIn("code_hash", model_admin.get_fields(self.request))
+
+
 class TOTPDeviceEncryptionTest(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(username="mfa-user", password="testpass123")

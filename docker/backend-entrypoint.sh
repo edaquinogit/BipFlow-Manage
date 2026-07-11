@@ -67,9 +67,13 @@ seed_admin_user() {
 
     require_secret "DJANGO_BOOTSTRAP_ADMIN_PASSWORD"
 
+    # No --password flag here on purpose: it would put the plaintext
+    # password in this process's argv, visible to anyone who can read the
+    # container's process list for the life of this command. The command
+    # reads DJANGO_BOOTSTRAP_ADMIN_PASSWORD from the environment directly
+    # instead -- it's already exported into the container's env either way.
     run_as_app python "$MANAGE_PY" seed_dashboard_roles \
         --email "$DJANGO_BOOTSTRAP_ADMIN_EMAIL" \
-        --password "$DJANGO_BOOTSTRAP_ADMIN_PASSWORD" \
         --role "${DJANGO_BOOTSTRAP_ADMIN_ROLE:-admin}" \
         --staff
 }
