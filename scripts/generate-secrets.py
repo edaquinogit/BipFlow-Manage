@@ -16,6 +16,8 @@ import sys
 import time
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 
 SECRET_SIZES = {
     "DJANGO_SECRET_KEY": 64,
@@ -23,9 +25,23 @@ SECRET_SIZES = {
     "REDIS_PASSWORD": 32,
 }
 
+# TOTP_ENCRYPTION_KEY (see bipdelivery/api/crypto.py) must be a valid Fernet
+# key -- 32 url-safe base64-encoded bytes with padding, a different format
+# than secrets.token_urlsafe(N)'s output. Generated separately from the
+# uniform SECRET_SIZES flow below.
+FERNET_KEYS = {"TOTP_ENCRYPTION_KEY"}
+
+ALL_SECRET_KEYS = sorted({*SECRET_SIZES, *FERNET_KEYS})
+
 
 def generate_values(keys: list[str]) -> dict[str, str]:
-    return {key: secrets.token_urlsafe(SECRET_SIZES[key]) for key in keys}
+    values: dict[str, str] = {}
+    for key in keys:
+        if key in FERNET_KEYS:
+            values[key] = Fernet.generate_key().decode("ascii")
+        else:
+            values[key] = secrets.token_urlsafe(SECRET_SIZES[key])
+    return values
 
 
 def render_env_lines(values: dict[str, str]) -> str:
@@ -68,8 +84,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate secure BipFlow secrets.")
     parser.add_argument(
         "--only",
-        choices=sorted(SECRET_SIZES),
-        help="Generate only one secret.",
+        choices=ALL_SECRET_KEYS,
+        help="Generate only one secret. TOTP_ENCRYPTION_KEY is optional and not "
+        "included in the default (no --only) run -- see bipdelivery/api/crypto.py.",
     )
     parser.add_argument(
         "--env",

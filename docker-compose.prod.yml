@@ -48,6 +48,10 @@ x-backend-env: &backend-env
   BIPFLOW_THROTTLE_ADMIN_LOGIN_IP: ${BIPFLOW_THROTTLE_ADMIN_LOGIN_IP:-5/minute}
   BIPFLOW_THROTTLE_ADMIN_LOGIN_IDENTITY: ${BIPFLOW_THROTTLE_ADMIN_LOGIN_IDENTITY:-5/minute}
   DJANGO_ADMIN_MFA_ENFORCED: ${DJANGO_ADMIN_MFA_ENFORCED:-False}
+  # Optional -- see bipdelivery/api/crypto.py. Leave unset unless you've read
+  # the rotation note there (run rotate_totp_encryption_key first if any
+  # confirmed TOTPDevice rows already exist under the old derived key).
+  TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
   # Media persistence: Cloudflare R2 (S3-compatible). Required in production --
   # see USE_R2_STORAGE / IS_PRODUCTION guard in bipdelivery/core/settings.py.
   R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}

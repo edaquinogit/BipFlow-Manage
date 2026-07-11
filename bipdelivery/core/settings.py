@@ -404,6 +404,14 @@ REST_FRAMEWORK = {
 # management command).
 ADMIN_MFA_ENFORCED = get_bool_env("DJANGO_ADMIN_MFA_ENFORCED", False)
 
+# Optional dedicated key for encrypting TOTP secrets at rest (api/crypto.py).
+# Unset by default -- crypto.py falls back to a key derived from SECRET_KEY,
+# same as before this setting existed. See crypto.py's module docstring for
+# the trade-off and docs/admin-mfa-runbook.md-adjacent rotation notes before
+# setting this on a deployment that may already have confirmed TOTPDevice
+# rows (run `manage.py rotate_totp_encryption_key` first in that case).
+TOTP_ENCRYPTION_KEY = os.environ.get("TOTP_ENCRYPTION_KEY", "").strip()
+
 # ðŸ›°ï¸ JWT CONFIGURATION (Token Standards)
 # ------------------------------------------------------------------------------
 SIMPLE_JWT = {

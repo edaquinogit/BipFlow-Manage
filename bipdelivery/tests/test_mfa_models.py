@@ -15,8 +15,9 @@ import os
 import django
 import pyotp
 import pytest
+from cryptography.fernet import Fernet
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bipdelivery.core.settings")
 django.setup()
@@ -50,6 +51,38 @@ class TOTPDeviceEncryptionTest(TestCase):
         device.save()
 
         self.assertNotIn(b"JBSWY3DPEHPK3PXP", bytes(device.encrypted_secret))
+
+    @override_settings(TOTP_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii"))
+    def test_secret_round_trips_with_an_explicit_totp_encryption_key(self) -> None:
+        device = TOTPDevice(user=self.user)
+        device.set_secret("JBSWY3DPEHPK3PXP")
+        device.save()
+
+        reloaded = TOTPDevice.objects.get(pk=device.pk)
+        self.assertEqual(reloaded.get_secret(), "JBSWY3DPEHPK3PXP")
+
+    def test_same_secret_encrypts_differently_under_different_totp_encryption_keys(self) -> None:
+        with override_settings(TOTP_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii")):
+            device_a = TOTPDevice(user=self.user)
+            device_a.set_secret("JBSWY3DPEHPK3PXP")
+
+        other_user = User.objects.create_user(username="mfa-user-2", password="testpass123")
+        with override_settings(TOTP_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii")):
+            device_b = TOTPDevice(user=other_user)
+            device_b.set_secret("JBSWY3DPEHPK3PXP")
+
+        self.assertNotEqual(bytes(device_a.encrypted_secret), bytes(device_b.encrypted_secret))
+
+    @override_settings(TOTP_ENCRYPTION_KEY=Fernet.generate_key().decode("ascii"))
+    def test_secret_encrypted_under_totp_encryption_key_is_not_readable_by_derived_key(self) -> None:
+        from bipdelivery.api.crypto import _derived_key
+
+        device = TOTPDevice(user=self.user)
+        device.set_secret("JBSWY3DPEHPK3PXP")
+        device.save()
+
+        with self.assertRaises(Exception):
+            Fernet(_derived_key()).decrypt(bytes(device.encrypted_secret))
 
 
 class MFABackupCodeTest(TestCase):
