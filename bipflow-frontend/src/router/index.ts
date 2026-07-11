@@ -4,6 +4,7 @@ import { authRoutes, AuthRouteNames, customerLoginPath } from './auth.routes'
 import { dashboardRoutes, DashboardRoutes } from './dashboard.routes'
 import { errorRoutes } from './error.routes'
 import { publicRoutes } from './public.routes'
+import { systemRoutes } from './system.routes'
 import { authService } from '@/services/auth.service'
 import { ensureAuthBooted } from '@/services/api'
 import { Logger } from '@/services/logger'
@@ -16,6 +17,7 @@ const routes: RouteRecordRaw[] = [
   ...authRoutes,
   ...dashboardRoutes,
   ...errorRoutes,
+  ...systemRoutes,
   ...publicRoutes
 ]
 
