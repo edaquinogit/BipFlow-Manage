@@ -10,9 +10,43 @@ import { getSelectedStoreSlug } from '@/services/store-scope'
 const LEGACY_ITEMS_STORAGE_KEY = 'bipflow_public_cart_items'
 const LEGACY_CUSTOMER_STORAGE_KEY = 'bipflow_public_cart_customer'
 
+// The customer key carries PII (name/phone/email/address) typed in during
+// checkout. It has no server-side expiry of its own, so this caps how long
+// it sits in localStorage on a shared/borrowed device -- a stale entry past
+// the TTL is treated the same as if it were never there (defaultCustomer).
+const CART_CUSTOMER_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const CART_CUSTOMER_KEY_PATTERN = /^bipflow_cart_.*_customer(_savedAt)?$/
+
 function storeScopedStorageKey(suffix: 'items' | 'customer'): string {
   const slug = getSelectedStoreSlug() || 'default'
   return `bipflow_cart_${slug}_${suffix}`
+}
+
+function customerSavedAtKey(customerKey: string): string {
+  return `${customerKey}_savedAt`
+}
+
+/**
+ * Removes every store's persisted cart customer PII (and its TTL stamp)
+ * from localStorage -- called on logout so a shared/borrowed device doesn't
+ * keep a former session's name/phone/address around indefinitely. Cart
+ * *items* are deliberately left alone: they're not PII and clearing them
+ * on logout would just be a worse guest-checkout UX for no security benefit.
+ */
+export function clearAllPersistedCartCustomerData(): void {
+  if (!canUseBrowserStorage()) {
+    return
+  }
+
+  const keysToRemove: string[] = []
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i)
+    if (key && CART_CUSTOMER_KEY_PATTERN.test(key)) {
+      keysToRemove.push(key)
+    }
+  }
+  keysToRemove.forEach((key) => window.localStorage.removeItem(key))
+  window.localStorage.removeItem(LEGACY_CUSTOMER_STORAGE_KEY)
 }
 
 const defaultCustomer: CartCustomer = {
@@ -84,18 +118,27 @@ function loadPersistedState(): void {
   try {
     const storedItems = window.localStorage.getItem(itemsKey)
     const storedCustomer = window.localStorage.getItem(customerKey)
+    const savedAtKey = customerSavedAtKey(customerKey)
+    const savedAt = Number(window.localStorage.getItem(savedAtKey))
+    const isCustomerExpired =
+      !savedAt || Number.isNaN(savedAt) || Date.now() - savedAt > CART_CUSTOMER_STORAGE_TTL_MS
 
     if (storedItems) {
       const parsedItems = JSON.parse(storedItems) as CartItem[]
       items.value = Array.isArray(parsedItems) ? parsedItems : []
     }
 
-    if (storedCustomer) {
+    if (storedCustomer && !isCustomerExpired) {
       const parsedCustomer = JSON.parse(storedCustomer) as Partial<CartCustomer>
       customer.value = {
         ...defaultCustomer,
         ...parsedCustomer,
       }
+    } else if (storedCustomer) {
+      // Past its TTL (or missing a timestamp -- legacy data written before
+      // this check existed): drop it rather than trust stale PII.
+      window.localStorage.removeItem(customerKey)
+      window.localStorage.removeItem(savedAtKey)
     }
   } catch {
     items.value = []
@@ -124,10 +167,9 @@ watch(
       return
     }
 
-    window.localStorage.setItem(
-      storeScopedStorageKey('customer'),
-      JSON.stringify(nextCustomer)
-    )
+    const customerKey = storeScopedStorageKey('customer')
+    window.localStorage.setItem(customerKey, JSON.stringify(nextCustomer))
+    window.localStorage.setItem(customerSavedAtKey(customerKey), String(Date.now()))
   },
   { deep: true }
 )

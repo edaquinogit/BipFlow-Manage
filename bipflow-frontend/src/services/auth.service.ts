@@ -1,6 +1,7 @@
 import api from "./api";
 import { Logger } from "./logger";
 import { tokenStore } from "./token-store";
+import { clearAllPersistedCartCustomerData } from "../composables/useCart";
 import type {
   LoginCredentials,
   LoginResult,
@@ -183,6 +184,7 @@ export const authService = {
 
     tokenStore.clearAccessToken();
     sessionStorage.clear();
+    clearAllPersistedCartCustomerData();
     Logger.info("User logged out");
     window.location.href = redirectTo;
   },
@@ -197,6 +199,7 @@ export const authService = {
 
     tokenStore.clearAccessToken();
     sessionStorage.clear();
+    clearAllPersistedCartCustomerData();
     Logger.info("User logged out from all devices");
     window.location.href = "/login";
 
