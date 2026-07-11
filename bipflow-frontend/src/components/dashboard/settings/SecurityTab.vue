@@ -5,6 +5,7 @@ import { authService } from '@/services/auth.service';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
+import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import type { MfaSetupResponse } from '@/types/auth';
 
 const { mfaEnabled, fetchCurrentUser } = useCurrentUser();
@@ -19,16 +20,21 @@ const backupCodes = ref<string[] | null>(null);
 
 const isConfirmingDisable = ref(false);
 const disablePassword = ref('');
+const disableCode = ref('');
+const useBackupCodeForDisable = ref(false);
 const isDisablingMfa = ref(false);
 
 const canConfirmSetup = computed(() => !isConfirmingSetup.value && setupCode.value.trim().length > 0);
+const canConfirmDisable = computed(
+  () => !isDisablingMfa.value && Boolean(disablePassword.value) && disableCode.value.trim().length > 0,
+);
 
 async function startMfaSetup(): Promise<void> {
   isStartingSetup.value = true;
   try {
     setupData.value = await authService.setupMfa();
   } catch (error: unknown) {
-    Logger.error('MFA setup failed to start', { error });
+    Logger.error('MFA setup failed to start', buildErrorContext(error as ApplicationError));
     toastError('Nao foi possivel iniciar a configuracao de MFA agora.');
   } finally {
     isStartingSetup.value = false;
@@ -47,7 +53,7 @@ async function confirmMfaSetup(): Promise<void> {
     await fetchCurrentUser();
     success('MFA ativado com sucesso.');
   } catch (error: unknown) {
-    Logger.error('MFA setup confirmation failed', { error });
+    Logger.error('MFA setup confirmation failed', buildErrorContext(error as ApplicationError));
     toastError('Codigo invalido. Confira o app autenticador e tente novamente.');
   } finally {
     isConfirmingSetup.value = false;
@@ -74,19 +80,35 @@ async function copyBackupCodes(): Promise<void> {
 }
 
 async function confirmDisableMfa(): Promise<void> {
+  if (!canConfirmDisable.value) return;
+
   isDisablingMfa.value = true;
   try {
-    await authService.disableMfa(disablePassword.value);
+    await authService.disableMfa({
+      password: disablePassword.value,
+      ...(useBackupCodeForDisable.value
+        ? { backup_code: disableCode.value.trim() }
+        : { code: disableCode.value.trim() }),
+    });
     disablePassword.value = '';
+    disableCode.value = '';
+    useBackupCodeForDisable.value = false;
     isConfirmingDisable.value = false;
     await fetchCurrentUser();
     success('MFA desativado.');
   } catch (error: unknown) {
-    Logger.error('MFA disable failed', { error });
-    toastError('Senha incorreta ou falha ao desativar o MFA.');
+    Logger.error('MFA disable failed', buildErrorContext(error as ApplicationError));
+    toastError('Senha ou codigo incorretos.');
   } finally {
     isDisablingMfa.value = false;
   }
+}
+
+function cancelDisableMfa(): void {
+  isConfirmingDisable.value = false;
+  disablePassword.value = '';
+  disableCode.value = '';
+  useBackupCodeForDisable.value = false;
 }
 
 // --- Logout everywhere --------------------------------------------------
@@ -100,7 +122,7 @@ async function confirmLogoutAllDevices(): Promise<void> {
     success('Sessao encerrada em todos os dispositivos.');
     // authService.logoutAllDevices() already redirects to /login.
   } catch (error: unknown) {
-    Logger.error('Logout-all-devices failed', { error });
+    Logger.error('Logout-all-devices failed', buildErrorContext(error as ApplicationError));
     toastError('Nao foi possivel encerrar as sessoes agora.');
     isLoggingOutAll.value = false;
     isConfirmingLogoutAll.value = false;
@@ -210,13 +232,34 @@ onMounted(() => {
             <input
               v-model="disablePassword"
               type="password"
+              autocomplete="current-password"
               class="h-10 w-full rounded-lg border border-[#D81B60]/30 bg-white px-3 text-sm text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
             />
           </label>
+          <label class="mt-3 block">
+            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-[#7A143D]">
+              {{ useBackupCodeForDisable ? 'Codigo de backup' : 'Codigo do app autenticador' }}
+            </span>
+            <input
+              v-model="disableCode"
+              type="text"
+              inputmode="text"
+              autocomplete="one-time-code"
+              :placeholder="useBackupCodeForDisable ? 'AB3K-9XQ2' : '123456'"
+              class="h-10 w-full rounded-lg border border-[#D81B60]/30 bg-white px-3 text-center text-sm tracking-[0.2em] text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+            />
+          </label>
+          <button
+            type="button"
+            class="mt-1.5 text-[10px] font-bold text-[#7A143D] underline-offset-2 hover:underline"
+            @click="useBackupCodeForDisable = !useBackupCodeForDisable; disableCode = ''"
+          >
+            {{ useBackupCodeForDisable ? 'Usar codigo do app autenticador' : 'Usar codigo de backup' }}
+          </button>
           <div class="mt-3 flex gap-2">
             <button
               type="button"
-              :disabled="isDisablingMfa || !disablePassword"
+              :disabled="!canConfirmDisable"
               class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
               @click="confirmDisableMfa"
             >
@@ -225,7 +268,7 @@ onMounted(() => {
             <button
               type="button"
               class="flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:bg-zinc-50"
-              @click="isConfirmingDisable = false; disablePassword = ''"
+              @click="cancelDisableMfa"
             >
               Cancelar
             </button>

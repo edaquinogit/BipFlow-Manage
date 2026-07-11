@@ -7,6 +7,7 @@ import type {
   CurrentUser,
   ConfirmResetPayload,
   ConfirmResetResponse,
+  MfaDisablePayload,
   MfaSetupConfirmResponse,
   MfaSetupResponse,
   MfaVerifyPayload,
@@ -232,10 +233,11 @@ export const authService = {
   },
 
   /**
-   * Disable MFA for the current user. Requires re-entering the password.
+   * Disable MFA for the current user. Requires re-entering the password
+   * and, when a device is already confirmed, a live TOTP/backup code too.
    */
-  async disableMfa(password: string): Promise<void> {
-    await api.post("auth/mfa/disable/", { password });
+  async disableMfa(payload: MfaDisablePayload): Promise<void> {
+    await api.post("auth/mfa/disable/", payload);
   },
 
   /**

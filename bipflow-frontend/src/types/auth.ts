@@ -3,6 +3,7 @@ export interface LoginResponse { access: string; }
 export interface MfaChallengeResponse { mfa_required: true; mfa_token: string; }
 export type LoginResult = LoginResponse | MfaChallengeResponse;
 export interface MfaVerifyPayload { mfa_token: string; code?: string; backup_code?: string; }
+export interface MfaDisablePayload { password: string; code?: string; backup_code?: string; }
 export interface MfaSetupResponse { secret: string; provisioning_uri: string; qr_code: string; }
 export interface MfaSetupConfirmResponse { message: string; backup_codes: string[]; }
 export interface CurrentUser {
