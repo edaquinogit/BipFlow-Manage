@@ -40,6 +40,14 @@ x-backend-env: &backend-env
   SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
   SECURE_HSTS_INCLUDE_SUBDOMAINS: ${SECURE_HSTS_INCLUDE_SUBDOMAINS:-True}
   SECURE_HSTS_PRELOAD: ${SECURE_HSTS_PRELOAD:-False}
+  # Django admin MFA gate: see the ADMIN_MFA_ENFORCED comment in
+  # core/settings.py. Defaults to False (MFA is required for any staff
+  # account that already has it configured, but not yet mandatory for
+  # everyone) -- only flip to True after `list_staff_without_mfa` reports
+  # zero stragglers, to avoid locking out an account.
+  BIPFLOW_THROTTLE_ADMIN_LOGIN_IP: ${BIPFLOW_THROTTLE_ADMIN_LOGIN_IP:-5/minute}
+  BIPFLOW_THROTTLE_ADMIN_LOGIN_IDENTITY: ${BIPFLOW_THROTTLE_ADMIN_LOGIN_IDENTITY:-5/minute}
+  DJANGO_ADMIN_MFA_ENFORCED: ${DJANGO_ADMIN_MFA_ENFORCED:-False}
   # Media persistence: Cloudflare R2 (S3-compatible). Required in production --
   # see USE_R2_STORAGE / IS_PRODUCTION guard in bipdelivery/core/settings.py.
   R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}

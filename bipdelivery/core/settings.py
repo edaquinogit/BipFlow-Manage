@@ -388,8 +388,21 @@ REST_FRAMEWORK = {
         "mfa_verify_ip": get_env_value("BIPFLOW_THROTTLE_MFA_VERIFY_IP", "10/minute"),
         "mfa_verify_identity": get_env_value("BIPFLOW_THROTTLE_MFA_VERIFY_IDENTITY", "10/minute"),
         "pdv_receipt_email": get_env_value("BIPFLOW_THROTTLE_PDV_RECEIPT_EMAIL", "10/hour"),
+        "admin_login_ip": get_env_value("BIPFLOW_THROTTLE_ADMIN_LOGIN_IP", "5/minute"),
+        "admin_login_identity": get_env_value("BIPFLOW_THROTTLE_ADMIN_LOGIN_IDENTITY", "5/minute"),
     },
 }
+
+# Gates the MFA requirement on the Django admin login (see api/admin_auth.py).
+# A confirmed TOTPDevice is ALWAYS required regardless of this flag -- it
+# only controls whether staff *without* MFA configured yet can still log in.
+# Deliberately NOT tied to IS_PRODUCTION and defaults to False: flipping it
+# on the same deploy that introduces this code would lock out any staff
+# account (including the bootstrap admin from docker/backend-entrypoint.sh)
+# that hasn't set up MFA yet. Turn on only after confirming every staff/
+# superuser account has MFA configured (see the list_staff_without_mfa
+# management command).
+ADMIN_MFA_ENFORCED = get_bool_env("DJANGO_ADMIN_MFA_ENFORCED", False)
 
 # ðŸ›°ï¸ JWT CONFIGURATION (Token Standards)
 # ------------------------------------------------------------------------------

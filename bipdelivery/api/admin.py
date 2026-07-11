@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from . import admin_auth  # noqa: F401  -- installs the MFA-gated admin login form
 from .models import (
     BotConversation,
     BotMessage,

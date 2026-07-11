@@ -297,3 +297,28 @@ class TokenRefreshIdentityThrottle(SimpleRateThrottle):
             "scope": self.scope,
             "ident": _hash_cache_identifier(identifier),
         }
+
+
+class AdminLoginIpThrottle(AnonRateThrottle):
+    """
+    IP-based control for the Django admin login form (/admin/login/).
+
+    Distinct scope from auth_ip on purpose: the admin login isn't a DRF
+    view, so it's wired up via admin_auth.py's MfaAdminAuthenticationForm
+    instead of throttle_classes, and a shared scope would let traffic on one
+    login surface starve the other's budget for requesters behind the same
+    NAT/proxy IP.
+    """
+
+    scope = "admin_login_ip"
+
+
+class AdminLoginIdentityThrottle(SubmittedFieldThrottle):
+    """
+    Limit repeated admin login attempts for the same submitted username,
+    regardless of source IP -- mirrors LoginIdentityThrottle's rationale for
+    the DRF login endpoint, applied to the admin's own login form.
+    """
+
+    scope = "admin_login_identity"
+    identity_fields = ("username",)

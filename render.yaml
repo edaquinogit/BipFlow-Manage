@@ -78,3 +78,8 @@ services:
         value: "True"
       - key: DEFAULT_FROM_EMAIL
         sync: false
+      # Django admin MFA gate -- safe default, edit later from the Render
+      # dashboard once list_staff_without_mfa confirms zero stragglers (see
+      # the ADMIN_MFA_ENFORCED comment in bipdelivery/core/settings.py).
+      - key: DJANGO_ADMIN_MFA_ENFORCED
+        value: "False"
