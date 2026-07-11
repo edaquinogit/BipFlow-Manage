@@ -329,6 +329,18 @@ if IS_PRODUCTION:
     # SECURE_SSL_REDIRECT 302s them to https on a port gunicorn doesn't
     # terminate TLS on, and the healthcheck times out forever.
     SECURE_REDIRECT_EXEMPT = [r"^healthz/?$"]
+    # HSTS tells the browser to *refuse* plain HTTP on future visits -- a
+    # commitment it caches and can't be revoked once made. Default max-age
+    # is deliberately 1 hour, not the textbook 1 year: shipping a long value
+    # against an unproven HTTPS/proxy setup risks a hard, unrecoverable
+    # outage if the cert/proxy config turns out to be wrong. Ramp plan: run
+    # at the 1h default for a few days, then raise SECURE_HSTS_SECONDS to
+    # 31536000 (1 year) once confirmed stable, and only then consider
+    # SECURE_HSTS_PRELOAD=True (near-irreversible, requires submitting the
+    # domain to hstspreload.org).
+    SECURE_HSTS_SECONDS = get_int_env("SECURE_HSTS_SECONDS", 3600)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = get_bool_env("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
+    SECURE_HSTS_PRELOAD = get_bool_env("SECURE_HSTS_PRELOAD", False)
 
 # Default deploy target is one origin (VM + Nginx proxying /api and /admin),
 # where the refresh-token cookie can stay SameSite=Strict -- the strongest

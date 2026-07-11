@@ -35,6 +35,11 @@ x-backend-env: &backend-env
   WHATSAPP_ORDER_PHONE: ${WHATSAPP_ORDER_PHONE:-}
   ORDER_DELIVERY_FEE: ${ORDER_DELIVERY_FEE:-12.00}
   TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?TURNSTILE_SECRET_KEY is required}
+  # HSTS ramp-up: see the SECURE_HSTS_SECONDS comment in core/settings.py.
+  # Defaults are safe (1h, no preload) if left unset.
+  SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
+  SECURE_HSTS_INCLUDE_SUBDOMAINS: ${SECURE_HSTS_INCLUDE_SUBDOMAINS:-True}
+  SECURE_HSTS_PRELOAD: ${SECURE_HSTS_PRELOAD:-False}
   # Media persistence: Cloudflare R2 (S3-compatible). Required in production --
   # see USE_R2_STORAGE / IS_PRODUCTION guard in bipdelivery/core/settings.py.
   R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is required}
