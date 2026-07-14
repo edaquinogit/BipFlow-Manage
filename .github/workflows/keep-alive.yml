@@ -6,10 +6,15 @@ name: Keep backend warm
 # requests (see the storefront timeout reports on 2026-07-05). Neon's free
 # Postgres branch has its own, shorter auto-suspend on top of that.
 #
-# Pinging a real (DB-backed) public endpoint often enough keeps both awake
-# so nobody ever hits a cold start. This is a stopgap, not a fix: the real
-# fix is a paid Render instance (no spin-down) -- revisit if/when that's
-# worth the recurring cost.
+# GitHub's "schedule" trigger is best-effort and gets silently delayed under
+# load -- checked on 2026-07-13 and real runs landed 1-3.5h apart despite the
+# */5 cron below, which defeats the purpose against a 15-minute spin-down.
+# UptimeRobot (external, real 5-minute interval) is the primary keep-alive
+# now; this workflow just pings the same endpoint as a redundant backup and
+# can run on whatever cadence GitHub actually honors.
+#
+# This is a stopgap either way, not a fix: the real fix is a paid Render
+# instance (no spin-down) -- revisit if/when that's worth the recurring cost.
 on:
   schedule:
     - cron: "*/5 * * * *"
