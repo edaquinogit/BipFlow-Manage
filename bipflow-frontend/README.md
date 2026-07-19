@@ -55,6 +55,9 @@ Crie `bipflow-frontend/.env.local` a partir de `.env.example`:
 ```env
 VITE_API_URL=http://127.0.0.1:8000/api/
 VITE_DEBUG=true
+# Optional in production/staging when admin and storefront are on
+# different domains:
+# VITE_PUBLIC_STOREFRONT_BASE_URL=https://app.bipflow.com
 ```
 
 ## Desenvolvimento
