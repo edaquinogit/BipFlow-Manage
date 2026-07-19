@@ -1,5 +1,5 @@
 <template>
-  <div class="store-select-glass min-w-0 rounded-xl border border-white/65 bg-white/46 px-2.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md sm:w-52">
+  <div class="min-w-0 sm:w-52">
     <label class="relative block min-w-0">
       <span class="mb-1 block text-3xs font-black uppercase tracking-[0.22em] text-bip-muted">
         Loja ativa
