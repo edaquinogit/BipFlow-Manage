@@ -110,6 +110,25 @@ describe('DashboardHeaderStorefrontMenu', () => {
     expect(wrapper.find('button[title="Copiado"]').exists()).toBe(false)
   })
 
+  it('blocks copy and open when storefront path cannot be resolved to a valid URL', async () => {
+    wrapper = mount(DashboardHeaderStorefrontMenu, {
+      props: { storefrontPath: '' },
+      attachTo: document.body,
+    })
+
+    await openMenu(wrapper)
+
+    await wrapper.find('button[title="Copiar link"]').trigger('click')
+    await flushPromises()
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(toastMock.error).toHaveBeenCalledWith('Link da vitrine invalido. Revise a configuracao da URL publica.')
+
+    const enterLink = wrapper.find('a')
+    await enterLink.trigger('click')
+    expect(toastMock.error).toHaveBeenCalledWith('Link da vitrine invalido. Revise a configuracao da URL publica.')
+  })
+
   it('links to the storefront in a new tab and closes the menu on click', async () => {
     wrapper = mountMenu()
     await openMenu(wrapper)

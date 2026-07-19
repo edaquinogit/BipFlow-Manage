@@ -245,6 +245,51 @@ describe('ProductDetailView', () => {
     expect(wrapper.find('[aria-label="Link do produto copiado"]').exists()).toBe(true)
   })
 
+  it('shares a canonical URL without current query params or hash', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+
+    Object.defineProperty(navigator, 'share', {
+      value: share,
+      configurable: true,
+      writable: true,
+    })
+
+    window.history.replaceState({}, '', '/l/default/produtos/premium-burger?utm=campaign#hero')
+
+    await wrapper.find('[aria-label="Compartilhar produto"]').trigger('click')
+
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({
+      url: `${window.location.origin}/l/default/produtos/premium-burger`,
+    }))
+  })
+
+  it('builds a canonical deep-link when route is code-based', async () => {
+    wrapper.unmount()
+
+    vi.mocked(useRoute).mockReturnValue({
+      params: {
+        storeSlug: 'default',
+        code: 'ABC123XYZ',
+      },
+    } as any)
+
+    window.history.replaceState({}, '', '/l/default/p/ABC123XYZ?utm=qr')
+
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('[aria-label="Compartilhar produto"]').trigger('click')
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/l/default/p/ABC123XYZ`)
+  })
+
   it('falls back to copying the public product link when native share fails', async () => {
     const share = vi.fn().mockRejectedValue(new Error('share_failed'))
     const writeText = vi.fn().mockResolvedValue(undefined)

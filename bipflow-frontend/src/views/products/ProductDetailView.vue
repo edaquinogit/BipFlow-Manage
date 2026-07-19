@@ -323,6 +323,7 @@ import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { buildPublicProductUrl } from '@/utils/publicStorefrontUrl'
 import { isLowStock } from '@/utils/stockAlerts'
 
 const route = useRoute()
@@ -579,11 +580,20 @@ const addToCartLabel = computed(() => {
 })
 
 function getProductShareUrl(): string {
-  if (typeof window !== 'undefined' && window.location.href) {
-    return window.location.href
+  if (typeof window === 'undefined') {
+    return ''
   }
 
-  return ''
+  const storeSlug = typeof route.params.storeSlug === 'string' ? route.params.storeSlug : ''
+  const slug = typeof route.params.slug === 'string' ? route.params.slug : ''
+  const code = typeof route.params.code === 'string' ? route.params.code : ''
+
+  return buildPublicProductUrl({
+    runtimeOrigin: window.location.origin,
+    storeSlug,
+    productSlug: slug,
+    productCode: code,
+  }) || ''
 }
 
 function isShareAbortError(error: unknown): boolean {

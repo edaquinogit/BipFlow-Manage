@@ -7,6 +7,7 @@ import {
 } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
+import { buildPublicStorefrontUrl, isValidPublicStorefrontUrl } from '@/utils/publicStorefrontUrl';
 
 const props = defineProps<{
   storefrontPath: string
@@ -19,8 +20,12 @@ const isCopied = ref(false);
 const containerRef = ref<HTMLElement | null>(null);
 let copiedFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const absoluteStorefrontUrl = computed(() => (
-  typeof window !== 'undefined' ? `${window.location.origin}${props.storefrontPath}` : props.storefrontPath
+const absoluteStorefrontUrl = computed(() => buildPublicStorefrontUrl(props.storefrontPath, {
+  runtimeOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
+}));
+
+const hasValidStorefrontUrl = computed(() => (
+  Boolean(absoluteStorefrontUrl.value && isValidPublicStorefrontUrl(absoluteStorefrontUrl.value))
 ));
 
 function toggleMenu(): void {
@@ -62,6 +67,11 @@ function showCopiedFeedback(): void {
 }
 
 async function copyStorefrontLink(): Promise<void> {
+  if (!hasValidStorefrontUrl.value || !absoluteStorefrontUrl.value) {
+    toast.error('Link da vitrine invalido. Revise a configuracao da URL publica.');
+    return;
+  }
+
   if (!navigator.clipboard?.writeText) {
     toast.error('Nao foi possivel copiar o link.');
     return;
@@ -77,6 +87,13 @@ async function copyStorefrontLink(): Promise<void> {
       error: error instanceof Error ? error.message : 'unknown_error',
     });
     toast.error('Nao foi possivel copiar o link.');
+  }
+}
+
+function openStorefrontLink(event: MouseEvent): void {
+  if (!hasValidStorefrontUrl.value || !absoluteStorefrontUrl.value) {
+    event.preventDefault();
+    toast.error('Link da vitrine invalido. Revise a configuracao da URL publica.');
   }
 }
 
@@ -119,7 +136,7 @@ onBeforeUnmount(() => {
         <div class="mt-1.5 flex items-center gap-2">
           <input
             readonly
-            :value="absoluteStorefrontUrl"
+            :value="absoluteStorefrontUrl || ''"
             class="min-w-0 flex-1 truncate rounded-lg border border-bip-line bg-bip-blush/20 px-2 py-1.5 text-xs text-bip-black outline-none focus:border-bip-rose"
             @click="($event.target as HTMLInputElement).select()"
           />
@@ -137,11 +154,11 @@ onBeforeUnmount(() => {
       </div>
 
       <a
-        :href="absoluteStorefrontUrl"
+        :href="absoluteStorefrontUrl || '#'"
         target="_blank"
         rel="noopener noreferrer"
         class="flex min-h-11 items-center justify-center gap-2 border-t border-bip-line bg-bip-blush/40 px-3 py-2.5 text-xs font-black uppercase tracking-[0.14em] text-bip-rose transition hover:bg-bip-blush active:scale-[0.98]"
-        @click="closeMenu"
+        @click="(event) => { openStorefrontLink(event); closeMenu(); }"
       >
         <ArrowTopRightOnSquareIcon class="h-4 w-4" />
         Entrar na vitrine
