@@ -16,6 +16,9 @@ no codigo e suficiente para operar o estado atual do repositorio.
   qualidade e manutencao.
 - [Go-live de producao](production-go-live.md): checklist executavel e smoke
   manual para receber pedidos reais.
+- [Auditoria de prontidao 2026-08-14](audits/production-readiness-audit-2026-08-14.md):
+  registro profissional das correcoes, testes, smoke Docker/Compose e parecer
+  de producao da sessao.
 - [Referencia da API Django](api/reference.md): endpoints implementados em
   `bipdelivery/api/`.
 - [Bot do catalogo](features/catalog-bot.md): comportamento, contrato,
