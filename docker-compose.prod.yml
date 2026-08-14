@@ -131,6 +131,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BIPFLOW_COMMIT_SHA: ${IMAGE_TAG:-local}
     container_name: bipflow_backend
     environment: *backend-env
     volumes:
@@ -163,6 +165,7 @@ services:
       dockerfile: docker/frontend.Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api/}
+        BIPFLOW_COMMIT_SHA: ${IMAGE_TAG:-local}
     container_name: bipflow_frontend
     ports:
       # Bound to loopback only: the host Nginx (Certbot/TLS) proxies to this port.

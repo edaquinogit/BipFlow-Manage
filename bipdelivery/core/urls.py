@@ -1,18 +1,32 @@
 import re
+import os
 
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.http import HttpResponse
+from django.http import JsonResponse
 from django.urls import include, path, re_path
 from django.views.static import serve as serve_static
+
+
+def _runtime_revision() -> str:
+    """Return the deployment revision exposed by the current platform."""
+    for env_name in ("BIPFLOW_COMMIT_SHA", "RENDER_GIT_COMMIT", "SOURCE_VERSION", "GITHUB_SHA"):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def healthz(request):
     # Container/orchestrator liveness probe. Hit directly over plain HTTP by
     # Docker healthchecks (no reverse proxy in front), so it must stay exempt
     # from SECURE_SSL_REDIRECT -- see SECURE_REDIRECT_EXEMPT in settings.py.
-    return HttpResponse("ok")
+    payload = {"status": "ok"}
+    revision = _runtime_revision()
+    if revision:
+        payload["revision"] = revision
+    return JsonResponse(payload)
 
 
 urlpatterns = [

@@ -52,6 +52,11 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          build-args: |
+            BIPFLOW_COMMIT_SHA=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           push: true
           tags: |
             ${{ steps.repo.outputs.backend_image }}:latest
@@ -66,6 +71,10 @@ jobs:
           file: ./docker/frontend.Dockerfile
           build-args: |
             VITE_API_URL=/api/
+            BIPFLOW_COMMIT_SHA=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           push: true
           tags: |
             ${{ steps.repo.outputs.frontend_image }}:latest

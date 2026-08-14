@@ -1,8 +1,15 @@
 FROM python:3.12-slim
 
+ARG BIPFLOW_COMMIT_SHA=unknown
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    BIPFLOW_COMMIT_SHA=${BIPFLOW_COMMIT_SHA}
+
+LABEL org.opencontainers.image.source="https://github.com/edaquinogit/BipFlow-Manage" \
+      org.opencontainers.image.revision="${BIPFLOW_COMMIT_SHA}" \
+      org.opencontainers.image.title="BipFlow backend"
 
 WORKDIR /app
 

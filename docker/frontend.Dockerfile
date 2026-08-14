@@ -13,6 +13,12 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
+ARG BIPFLOW_COMMIT_SHA=unknown
+
+LABEL org.opencontainers.image.source="https://github.com/edaquinogit/BipFlow-Manage" \
+      org.opencontainers.image.revision="${BIPFLOW_COMMIT_SHA}" \
+      org.opencontainers.image.title="BipFlow frontend"
+
 RUN mkdir -p /etc/nginx/snippets
 COPY docker/nginx-proxy-headers.conf /etc/nginx/snippets/proxy-headers.conf
 COPY docker/nginx-http-maps.conf /etc/nginx/conf.d/00-maps.conf
