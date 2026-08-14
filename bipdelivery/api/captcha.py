@@ -16,6 +16,8 @@ import urllib.request
 from django.conf import settings
 
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+TURNSTILE_ALWAYS_PASS_TEST_SECRET = "1x0000000000000000000000000000000AA"
+TURNSTILE_ALWAYS_FAIL_TEST_SECRET = "2x0000000000000000000000000000000AA"
 
 
 def verify_turnstile(token: str | None, remote_ip: str) -> bool:
@@ -25,6 +27,12 @@ def verify_turnstile(token: str | None, remote_ip: str) -> bool:
 
     secret_key = getattr(settings, "TURNSTILE_SECRET_KEY", "")
     if not secret_key:
+        return False
+
+    if secret_key == TURNSTILE_ALWAYS_PASS_TEST_SECRET:
+        return True
+
+    if secret_key == TURNSTILE_ALWAYS_FAIL_TEST_SECRET:
         return False
 
     payload = json.dumps(

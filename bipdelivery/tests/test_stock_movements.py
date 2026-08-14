@@ -13,7 +13,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Product, SaleOrder, StockMovement, StoreMembership
+from bipdelivery.api.models import Product, StockMovement, StoreMembership
 from bipdelivery.tests.test_store_active_isolation import TwoStoreFixtureMixin
 
 
