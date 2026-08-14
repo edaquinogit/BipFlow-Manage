@@ -17,8 +17,8 @@ def generate_bot_session_id() -> str:
 
 # Etapa 1 of the QR-code stock-exit evolution (see
 # docs/architecture/qrcode-stock-exit-evolution.md): Product.public_code is a
-# system-generated identifier meant to be printed as a QR Code, distinct from
-# `sku` (manual, optional, merchant-controlled).
+# system-generated identifier meant to be printed as a QR Code. When a product
+# is created without a merchant-provided SKU, the SKU mirrors this same code.
 PRODUCT_PUBLIC_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O/1/I/L, easy to read aloud
 PRODUCT_PUBLIC_CODE_LENGTH = 8
 PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS = 8
@@ -126,7 +126,7 @@ class Product(models.Model):
         max_length=50,
         blank=True,
         null=True,
-        help_text="Unique product code (SKU/Barcode)",
+        help_text="Unique product code (SKU/Barcode). Defaults to the QR public code when omitted.",
     )
     public_code = models.CharField(
         max_length=12,
@@ -136,9 +136,8 @@ class Product(models.Model):
         help_text=(
             "Auto-generated, immutable lookup code used by QR Code scans "
             "(PDV and public storefront deep links, see "
-            "docs/architecture/qrcode-stock-exit-evolution.md). Distinct "
-            "from `sku`, which stays a manual, optional field the merchant "
-            "controls."
+            "docs/architecture/qrcode-stock-exit-evolution.md). Also used "
+            "as the default SKU when no SKU is provided."
         ),
     )
     name = models.CharField(max_length=255)
@@ -186,10 +185,12 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs) -> None:
         """
-        Auto-generate slug, public_code and manage availability status before saving.
+        Auto-generate slug, public_code/SKU and manage availability before saving.
 
         Generates a unique slug from product name with UUID suffix if not provided.
-        Automatically updates is_available based on stock_quantity.
+        Automatically updates is_available based on stock_quantity. When no
+        SKU is supplied, it mirrors the generated public_code so labels,
+        search and QR/PDV flows share the same human-facing code.
 
         Args:
             *args: Variable length argument list for parent save().
@@ -205,30 +206,57 @@ class Product(models.Model):
             self._save_with_generated_public_code(*args, **kwargs)
             return
 
+        if self._assign_sku_from_public_code_if_missing():
+            kwargs = self._include_update_field(kwargs, "sku")
+
         super().save(*args, **kwargs)
 
+    def _assign_sku_from_public_code_if_missing(self) -> bool:
+        """Mirror public_code into sku when the merchant left SKU blank."""
+        if self.sku or not self.public_code:
+            return False
+
+        self.sku = self.public_code
+        return True
+
+    def _include_update_field(self, kwargs: dict, field_name: str) -> dict:
+        """Ensure auto-filled fields persist even when save(update_fields=...) is used."""
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None:
+            return kwargs
+
+        return {**kwargs, "update_fields": set(update_fields) | {field_name}}
+
     def _save_with_generated_public_code(self, *args, **kwargs) -> None:
-        """Assign a fresh public_code and retry the insert on a rare collision.
+        """Assign a fresh public_code/SKU and retry on a rare collision.
 
         A plain "check then use" query isn't race-safe against a concurrent
         insert for the same store, so this instead lets
         unique_product_public_code_per_store reject the save and retries with
-        a new random code. Collisions are astronomically unlikely given the
-        8-character alphabet's ~8.5e11 combinations per store, so this never
-        realistically loops more than once -- but if the IntegrityError turns
-        out to be about a *different* constraint (e.g. a duplicate sku), a
-        new public_code can't fix that, so it's re-raised immediately instead
-        of masking the real conflict behind pointless retries.
+        a new random code. If SKU was auto-filled from that same candidate,
+        unique_product_sku_per_store can also reject it when the candidate
+        happens to match another product's manual SKU; that collision is also
+        retryable. Other IntegrityErrors are re-raised immediately instead of
+        being masked behind pointless retries.
         """
+        auto_sku = not self.sku
+
         for attempt in range(PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS):
             self.public_code = generate_product_public_code()
+            if auto_sku:
+                self.sku = self.public_code
+                kwargs = self._include_update_field(kwargs, "sku")
+
             try:
                 with transaction.atomic():
                     super().save(*args, **kwargs)
                 return
             except IntegrityError as exc:
                 is_last_attempt = attempt == PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS - 1
-                if "public_code" not in str(exc) or is_last_attempt:
+                error_text = str(exc)
+                is_retryable_code_collision = "public_code" in error_text
+                is_retryable_auto_sku_collision = auto_sku and "sku" in error_text
+                if not (is_retryable_code_collision or is_retryable_auto_sku_collision) or is_last_attempt:
                     raise
 
     def __str__(self) -> str:

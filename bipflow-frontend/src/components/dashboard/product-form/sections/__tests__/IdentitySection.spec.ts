@@ -8,7 +8,6 @@ describe('IdentitySection public_code (Etapa 1 of the QR-code stock-exit evoluti
     const wrapper = mount(IdentitySection, {
       props: {
         name: '',
-        sku: '',
         description: '',
         category: null,
         categories: [],
@@ -18,13 +17,13 @@ describe('IdentitySection public_code (Etapa 1 of the QR-code stock-exit evoluti
     })
 
     expect(wrapper.find('[data-cy="input-product-public-code"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="input-product-sku"]').exists()).toBe(false)
   })
 
   it('shows the generated code read-only when editing an existing product', () => {
     const wrapper = mount(IdentitySection, {
       props: {
         name: 'Produto existente',
-        sku: 'SKU-1',
         description: '',
         category: null,
         categories: [],
@@ -36,6 +35,7 @@ describe('IdentitySection public_code (Etapa 1 of the QR-code stock-exit evoluti
     const input = wrapper.find('[data-cy="input-product-public-code"]').element as HTMLInputElement
     expect(input.value).toBe('ABCD2345')
     expect(input.readOnly).toBe(true)
+    expect(wrapper.find('[data-cy="input-product-sku"]').exists()).toBe(false)
   })
 
   it('copies the code to the clipboard when the copy button is clicked', async () => {
@@ -45,7 +45,6 @@ describe('IdentitySection public_code (Etapa 1 of the QR-code stock-exit evoluti
     const wrapper = mount(IdentitySection, {
       props: {
         name: 'Produto existente',
-        sku: 'SKU-1',
         description: '',
         category: null,
         categories: [],

@@ -25,6 +25,21 @@ class ProductPublicCodeGenerationTest(TwoStoreFixtureMixin, TestCase):
         self.assertTrue(self.product_a.public_code)
         self.assertEqual(len(self.product_a.public_code), api_models.PRODUCT_PUBLIC_CODE_LENGTH)
 
+    def test_creating_a_product_without_sku_mirrors_public_code_into_sku(self) -> None:
+        self.assertEqual(self.product_a.sku, self.product_a.public_code)
+
+    def test_creating_a_product_with_manual_sku_keeps_manual_sku(self) -> None:
+        product = Product.objects.create(
+            name="Produto SKU Manual",
+            price=Decimal("9.00"),
+            category=self.category_a,
+            store=self.store_a,
+            sku="MANUAL-001",
+        )
+
+        self.assertTrue(product.public_code)
+        self.assertEqual(product.sku, "MANUAL-001")
+
     def test_public_code_alphabet_excludes_ambiguous_characters(self) -> None:
         for character in self.product_a.public_code:
             self.assertIn(character, api_models.PRODUCT_PUBLIC_CODE_ALPHABET)
@@ -61,6 +76,31 @@ class ProductPublicCodeGenerationTest(TwoStoreFixtureMixin, TestCase):
             new_product.save()
 
         self.assertEqual(new_product.public_code, unique_code)
+        self.assertEqual(new_product.sku, unique_code)
+
+    def test_auto_sku_collision_on_generation_is_retried_transparently(self) -> None:
+        Product.objects.create(
+            name="Produto SKU Reservado",
+            price=Decimal("7.00"),
+            category=self.category_a,
+            store=self.store_a,
+            public_code="GUARD234",
+            sku="FRESHCOD",
+        )
+
+        new_product = Product(
+            name="Produto Retry SKU",
+            price=Decimal("7.00"),
+            category=self.category_a,
+            store=self.store_a,
+        )
+        with patch.object(
+            api_models, "generate_product_public_code", side_effect=["FRESHCOD", "UNIQCODE"]
+        ):
+            new_product.save()
+
+        self.assertEqual(new_product.public_code, "UNIQCODE")
+        self.assertEqual(new_product.sku, "UNIQCODE")
 
     def test_exhausting_retries_reraises_the_integrity_error(self) -> None:
         colliding_code = self.product_a.public_code
@@ -99,15 +139,28 @@ class ProductPublicCodeGenerationTest(TwoStoreFixtureMixin, TestCase):
 class ProductPublicCodeBackfillCommandTest(TwoStoreFixtureMixin, TestCase):
     def test_command_backfills_only_products_missing_a_code(self) -> None:
         self.product_a.public_code = ""
-        Product.objects.filter(pk=self.product_a.pk).update(public_code="")
+        Product.objects.filter(pk=self.product_a.pk).update(public_code="", sku=None)
         untouched_code = self.product_b.public_code
+        untouched_sku = self.product_b.sku
 
         GenerateMissingProductCodesCommand().handle()
 
         self.product_a.refresh_from_db()
         self.product_b.refresh_from_db()
         self.assertTrue(self.product_a.public_code)
+        self.assertEqual(self.product_a.sku, self.product_a.public_code)
         self.assertEqual(self.product_b.public_code, untouched_code)
+        self.assertEqual(self.product_b.sku, untouched_sku)
+
+    def test_command_backfills_missing_sku_from_existing_public_code(self) -> None:
+        existing_code = self.product_a.public_code
+        Product.objects.filter(pk=self.product_a.pk).update(sku=None)
+
+        GenerateMissingProductCodesCommand().handle()
+
+        self.product_a.refresh_from_db()
+        self.assertEqual(self.product_a.public_code, existing_code)
+        self.assertEqual(self.product_a.sku, existing_code)
 
     def test_command_is_a_no_op_when_nothing_is_missing(self) -> None:
         codes_before = set(Product.objects.values_list("public_code", flat=True))
@@ -136,6 +189,22 @@ class ProductPublicCodeAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 400)
         self.product_b.refresh_from_db()
         self.assertEqual(self.product_b.public_code, original_code)
+
+    def test_create_without_sku_returns_sku_equal_to_public_code(self) -> None:
+        response = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto API Sem SKU",
+                "price": "12.00",
+                "stock_quantity": 2,
+                "category": self.category_b.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["public_code"])
+        self.assertEqual(response.data["sku"], response.data["public_code"])
 
     def test_by_code_lookup_returns_the_matching_product(self) -> None:
         response = self.client.get(f"/api/v1/products/by-code/{self.product_b.public_code}/")

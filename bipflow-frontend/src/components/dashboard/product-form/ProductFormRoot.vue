@@ -40,7 +40,6 @@ type ProductFormState = {
   stock_quantity: number;
   low_stock_threshold: number | null;
   category: ProductFormData['category'] | null | undefined;
-  sku: string;
   size: string;
   image: ProductFormData['image'];
   images: ProductFormData['images'];
@@ -54,7 +53,6 @@ const createEmptyForm = (): ProductFormState => ({
   stock_quantity: 0,
   low_stock_threshold: null,
   category: undefined,
-  sku: '',
   size: '',
   image: null,
   images: [],
@@ -99,7 +97,6 @@ const normalizeInitialFormData = (
     stock_quantity: Math.trunc(toNumberOrZero(product.stock_quantity)),
     low_stock_threshold: product.low_stock_threshold ?? null,
     category: resolveCategoryId(product.category),
-    sku: product.sku ?? '',
     size: product.size ?? '',
     image: product.image ?? null,
     images: galleryImages.slice(0, 2),
@@ -209,7 +206,6 @@ const submitLabel = computed(() => {
         >
           <IdentitySection
             v-model:name="form.name"
-            v-model:sku="form.sku"
             v-model:description="form.description"
             v-model:category="form.category"
             :categories="categories"
