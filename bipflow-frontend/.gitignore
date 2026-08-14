@@ -35,6 +35,9 @@ coverage
 # Vitest
 __screenshots__/
 
+# Local runtime scratch space
+/.tmp/
+
 # Vite
 *.timestamp-*-*.mjs
 

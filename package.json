@@ -7,6 +7,8 @@
     "test": "npm run frontend:test:unit",
     "docs:check": "node analyze_markdown.js",
     "frontend:dev": "npm --prefix bipflow-frontend run dev",
+    "frontend:dev:docker": "npm --prefix bipflow-frontend run dev:docker",
+    "frontend:dev:smoke": "npm --prefix bipflow-frontend run dev:smoke",
     "frontend:build": "npm --prefix bipflow-frontend run build",
     "frontend:typecheck": "npm --prefix bipflow-frontend run typecheck",
     "frontend:lint": "npm --prefix bipflow-frontend run lint",

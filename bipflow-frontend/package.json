@@ -9,6 +9,8 @@
   "scripts": {
     "// --- CORE ---": "",
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort --force --open",
+    "dev:docker": "vite --host 0.0.0.0 --port 5173 --strictPort --force --open --mode docker",
+    "dev:smoke": "vite --host 0.0.0.0 --port 5173 --strictPort --force --open --mode smoke",
     "dev:ci": "vite --host localhost --port 5173 --strictPort",
     "server": "npm run dev",
     "frontend:dev": "npm run dev",
