@@ -38,7 +38,7 @@ describe('ProductCard', () => {
   })
 
   it('emits openDetails when the detail trigger is clicked', async () => {
-    const detailButton = wrapper.findAll('button').find((button) => button.text().includes('Detalhes'))
+    const detailButton = wrapper.findAll('button').find((button) => button.text().includes('Detalhe'))
 
     expect(detailButton).toBeDefined()
 

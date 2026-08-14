@@ -11,24 +11,24 @@
         role="dialog"
         aria-modal="true"
         aria-label="Carrinho de pedido"
-        class="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col bg-[#FAFAFA] shadow-2xl"
+        class="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-[#F8F8F9] shadow-2xl"
       >
-        <header class="border-b border-[#E5E7EB] bg-white px-6 py-5">
+        <header class="border-b border-[#E5E7EB] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div class="flex items-start justify-between gap-4">
-            <div>
-              <p class="text-sm font-semibold text-[#D81B60]">Pedido</p>
-              <h2 class="mt-2 text-2xl font-semibold text-[#05050A]">
+            <div class="min-w-0">
+              <p class="text-xs font-bold uppercase tracking-[0.12em] text-[#D81B60]">Pedido</p>
+              <h2 class="mt-1.5 text-lg font-bold tracking-tight text-[#05050A] sm:mt-2 sm:text-xl">
                 {{ itemCount }} item<span v-if="itemCount !== 1">s</span> no pedido
               </h2>
-              <p class="mt-1 text-sm leading-6 text-[#6B7280]">
-                Revise os produtos e siga para o WhatsApp. A loja combina entrega, pagamento e confirmacao por la.
+              <p class="mt-1 max-w-[34rem] text-xs leading-5 text-[#6B7280] sm:text-sm">
+                Revise os itens e envie o pedido pelo WhatsApp.
               </p>
             </div>
 
             <button
               ref="closeButtonRef"
               type="button"
-              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+              class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] active:bg-[#FAFAFA]"
               aria-label="Fechar carrinho"
               @click="$emit('close')"
             >
@@ -37,7 +37,7 @@
           </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto px-6 py-6">
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
           <div v-if="items.length === 0" class="border-y border-dashed border-[#D1D5DB] py-10 text-center">
             <ShoppingBagIcon class="mx-auto h-10 w-10 text-[#D81B60]" aria-hidden="true" />
             <p class="mt-4 text-base font-semibold text-[#05050A]">Seu pedido esta vazio</p>
@@ -47,11 +47,11 @@
           </div>
 
           <div v-else>
-            <div class="mb-4 flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-[#05050A]">Itens selecionados</h3>
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-sm font-bold text-[#05050A]">Itens selecionados</h3>
               <button
                 type="button"
-                class="text-sm font-medium text-[#6B7280] transition hover:text-[#D81B60]"
+                class="min-h-11 rounded-lg px-2 text-sm font-semibold text-[#6B7280] transition hover:bg-white hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
                 @click="$emit('clearCart')"
               >
                 Limpar
@@ -62,33 +62,33 @@
               <article
                 v-for="item in items"
                 :key="item.product.id"
-                class="py-4 first:pt-0 last:pb-0"
+                class="py-5 first:pt-2 last:pb-1"
               >
-                <div class="flex gap-4">
+                <div class="flex gap-3 sm:gap-4">
                   <img
                     :src="item.product.image || fallbackImageUrl"
                     :alt="`Imagem do produto ${item.product.name}`"
-                    class="h-20 w-20 rounded-lg bg-[#F4F1F3] object-cover"
+                    class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-[#F4F1F3] object-cover sm:h-20 sm:w-20"
                     loading="lazy"
                   />
 
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="text-xs font-medium text-[#D81B60]">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-[#D81B60]">
                           {{ item.product.category.name }}
                         </p>
-                        <h4 class="mt-1 line-clamp-2 text-base font-semibold leading-6 text-[#05050A]">
+                        <h4 class="mt-1 line-clamp-2 text-[15px] font-bold leading-5 text-[#05050A] sm:text-base sm:leading-6">
                           {{ item.product.name }}
                         </h4>
-                        <p class="mt-1 text-sm text-[#6B7280]">
-                          {{ formatBRL(item.product.price) }} por unidade
+                        <p class="mt-1 text-[13px] text-[#6B7280] sm:text-sm">
+                          {{ formatBRL(item.product.price) }} / unidade
                         </p>
                       </div>
 
                       <button
                         type="button"
-                        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-600"
+                        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-100"
                         :aria-label="`Remover ${item.product.name} do pedido`"
                         @click="$emit('removeItem', item.product.id)"
                       >
@@ -97,10 +97,10 @@
                     </div>
 
                     <div class="mt-4 flex items-center justify-between gap-3">
-                      <div class="inline-flex h-11 items-center rounded-lg border border-[#D1D5DB] bg-white">
+                      <div class="inline-flex h-11 items-center rounded-xl border border-[#D1D5DB] bg-white shadow-sm">
                         <button
                           type="button"
-                          class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
+                          class="inline-flex h-11 w-11 items-center justify-center rounded-l-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
                           :aria-label="`Diminuir quantidade de ${item.product.name}`"
                           @click="$emit('updateQuantity', item.product.id, item.quantity - 1)"
                         >
@@ -111,7 +111,7 @@
                         </span>
                         <button
                           type="button"
-                          class="inline-flex h-11 w-11 items-center justify-center text-[#6B7280] transition hover:bg-[#FAFAFA]"
+                          class="inline-flex h-11 w-11 items-center justify-center rounded-r-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
                           :aria-label="`Aumentar quantidade de ${item.product.name}`"
                           @click="$emit('updateQuantity', item.product.id, item.quantity + 1)"
                         >
@@ -119,7 +119,7 @@
                         </button>
                       </div>
 
-                      <p class="text-base font-semibold text-[#05050A]">
+                      <p class="text-base font-bold text-[#05050A]">
                         {{ formatBRL(Number(item.product.price) * item.quantity) }}
                       </p>
                     </div>
@@ -129,12 +129,12 @@
             </div>
           </div>
 
-          <section v-if="items.length > 0" class="mt-6 border-t border-[#E5E7EB] pt-6">
+          <section v-if="items.length > 0" class="mt-5 border-t border-[#D9DADD] pt-5 sm:mt-6 sm:pt-6">
             <div class="mb-4">
-              <h3 class="text-sm font-semibold text-[#05050A]">Dados para finalizar</h3>
+              <h3 class="text-sm font-bold text-[#05050A]">Dados para finalizar</h3>
             </div>
 
-            <div class="grid gap-4">
+            <div class="grid gap-3.5">
               <template v-if="!hasProfileIdentity">
                 <div class="grid gap-4 sm:grid-cols-2">
                   <label class="block">
@@ -306,10 +306,10 @@
           </section>
         </div>
 
-        <footer class="border-t border-[#E5E7EB] bg-white px-6 py-5">
-          <div class="space-y-3 text-sm">
+        <footer class="z-10 border-t border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_-8px_24px_-22px_rgba(5,5,10,0.6)] sm:px-6 sm:py-5">
+          <div class="space-y-2.5 text-sm">
             <div class="flex items-center justify-between text-[#6B7280]">
-              <span>Subtotal dos produtos</span>
+              <span>Produtos</span>
               <span class="font-semibold text-[#05050A]">{{ formatBRL(subtotal) }}</span>
             </div>
             <div
@@ -320,18 +320,16 @@
               <span class="font-semibold text-[#05050A]">{{ formatBRL(deliveryFee) }}</span>
             </div>
             <div class="flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[#05050A]">
-              <span class="font-semibold">Total estimado</span>
-              <span class="text-lg font-semibold">{{ formatBRL(total) }}</span>
+              <span class="font-bold">Total estimado</span>
+              <span class="text-xl font-bold tracking-tight">{{ formatBRL(total) }}</span>
             </div>
-            <p class="text-xs leading-5 text-[#6B7280]">
-              O total final sera confirmado na mensagem gerada pela loja.
-            </p>
-            <p v-if="!isWhatsAppConfigured" class="border-l-4 border-amber-500 px-3 py-2 text-sm font-semibold text-amber-800">
+            <p class="text-[11px] leading-4 text-[#6B7280]">Valor final confirmado no WhatsApp.</p>
+            <p v-if="!isWhatsAppConfigured" class="rounded-r-lg border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
               WhatsApp da loja ainda nao configurado.
             </p>
             <p
               v-if="checkoutValidationMessage"
-              class="border-l-4 border-[#D81B60] px-3 py-2 text-sm font-semibold text-[#7A143D]"
+              class="rounded-r-lg border-l-4 border-[#D81B60] bg-[#FFF4F8] px-3 py-2 text-sm font-semibold text-[#7A143D]"
             >
               {{ checkoutValidationMessage }}
             </p>
@@ -340,7 +338,7 @@
           <button
             type="button"
             data-cy="checkout-submit-button"
-            class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#05050A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
+            class="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#05050A] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D81B60] focus:outline-none focus:ring-4 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] sm:mt-5"
             :disabled="!canSubmitCheckout"
             @click="$emit('submitOrder')"
           >
@@ -551,6 +549,18 @@ function handleDeliveryRegionChange(event: Event): void {
 </script>
 
 <style scoped>
+aside input,
+aside select {
+  min-height: 3rem;
+  border-radius: 0.75rem;
+  padding-inline: 0.875rem;
+}
+
+aside textarea {
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem;
+}
+
 .cart-sheet-enter-active,
 .cart-sheet-leave-active {
   transition: opacity 0.22s ease;
