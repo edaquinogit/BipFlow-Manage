@@ -39,6 +39,32 @@ const router = createRouter({
  * Implementação limpa sem 'next()', seguindo o padrão moderno do Vue Router 4.
  * Added deadlock prevention and loading state bypass for resilience.
  */
+const CHUNK_RELOAD_STORAGE_KEY = 'bipflow:chunk-reload-attempted'
+const CHUNK_LOAD_ERROR_PATTERNS = [
+  'Failed to fetch dynamically imported module',
+  'Importing a module script failed',
+  'error loading dynamically imported module',
+]
+
+router.onError((error) => {
+  const message = error instanceof Error ? error.message : String(error)
+  const isChunkLoadError = CHUNK_LOAD_ERROR_PATTERNS.some((pattern) =>
+    message.includes(pattern)
+  )
+
+  if (!isChunkLoadError) {
+    return
+  }
+
+  if (sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) === '1') {
+    Logger.error('Dynamic route chunk failed after reload attempt', { message })
+    return
+  }
+
+  sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, '1')
+  window.location.reload()
+})
+
 router.beforeEach(async (to) => {
   // Restores the in-memory access token from the httpOnly refresh cookie on
   // first load (no-op on every navigation after that -- memoized).
@@ -105,6 +131,8 @@ router.beforeEach(async (to) => {
  * 🏁 Global After Hooks
  */
 router.afterEach((to) => {
+  sessionStorage.removeItem(CHUNK_RELOAD_STORAGE_KEY)
+
   // Define o título da página dinamicamente
   const title = to.meta.title as string | undefined
   document.title = title ? `${title} | BipFlow` : 'BipFlow - Manage'
