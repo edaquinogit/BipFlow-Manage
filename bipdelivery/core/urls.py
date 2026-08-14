@@ -11,9 +11,10 @@ from django.views.static import serve as serve_static
 
 def _runtime_revision() -> str:
     """Return the deployment revision exposed by the current platform."""
+    ignored_values = {"local", "unknown"}
     for env_name in ("BIPFLOW_COMMIT_SHA", "RENDER_GIT_COMMIT", "SOURCE_VERSION", "GITHUB_SHA"):
         value = os.environ.get(env_name, "").strip()
-        if value:
+        if value and value.lower() not in ignored_values:
             return value
     return ""
 

@@ -27,6 +27,44 @@ def test_healthz_returns_ok_without_revision() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_healthz_ignores_placeholder_revision_values() -> None:
+    client = Client()
+
+    with patch.dict(
+        os.environ,
+        {
+            "BIPFLOW_COMMIT_SHA": "unknown",
+            "RENDER_GIT_COMMIT": "",
+            "SOURCE_VERSION": "",
+            "GITHUB_SHA": "",
+        },
+        clear=False,
+    ):
+        response = client.get("/healthz/")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_healthz_falls_back_to_platform_revision() -> None:
+    client = Client()
+
+    with patch.dict(
+        os.environ,
+        {
+            "BIPFLOW_COMMIT_SHA": "unknown",
+            "RENDER_GIT_COMMIT": "render-sha",
+            "SOURCE_VERSION": "",
+            "GITHUB_SHA": "",
+        },
+        clear=False,
+    ):
+        response = client.get("/healthz/")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "revision": "render-sha"}
+
+
 def test_healthz_exposes_runtime_revision_when_available() -> None:
     client = Client()
 

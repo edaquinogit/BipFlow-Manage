@@ -13,7 +13,7 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
-ARG BIPFLOW_COMMIT_SHA=unknown
+ARG BIPFLOW_COMMIT_SHA
 
 LABEL org.opencontainers.image.source="https://github.com/edaquinogit/BipFlow-Manage" \
       org.opencontainers.image.revision="${BIPFLOW_COMMIT_SHA}" \
