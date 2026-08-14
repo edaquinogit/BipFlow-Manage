@@ -179,6 +179,7 @@ describe('ProductsView', () => {
     success: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
+    clearByType: vi.fn(),
   }
 
   const currentStoreState = {

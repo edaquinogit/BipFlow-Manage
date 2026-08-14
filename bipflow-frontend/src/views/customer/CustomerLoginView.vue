@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '@/services/auth.service'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
-import { AuthRouteNames, createCustomerProfilePath } from '@/router/auth.routes'
+import { createCustomerProfilePath, customerForgotPasswordPath } from '@/router/auth.routes'
 import { PublicRoutes } from '@/router/public.routes'
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import type { ApiError } from '@/types/auth'
@@ -41,8 +41,24 @@ const sessionNotice = computed(() => {
   }
 })
 
+const redirectQuery = computed(() => (
+  route.query.redirect ? { redirect: route.query.redirect } : {}
+))
+
+const createProfileRoute = computed(() => ({
+  path: createCustomerProfilePath(routeStoreSlug),
+  query: redirectQuery.value,
+}))
+
+const forgotPasswordRoute = computed(() => ({
+  path: customerForgotPasswordPath(routeStoreSlug),
+  query: redirectQuery.value,
+}))
+
 function extractErrorMessage(error: unknown): string {
-  const data = (error as ApiError).response?.data
+  const response = (error as ApiError).response
+  const data = response?.data
+  if (response?.status === 401) return 'Email ou senha inválidos.'
   if (!data) return 'Não foi possível entrar agora. Tente novamente.'
   if (typeof data.detail === 'string') return data.detail
   if (typeof data.message === 'string') return data.message
@@ -85,7 +101,15 @@ async function handleSubmit(): Promise<void> {
       return
     }
 
-    await fetchCustomerProfile()
+    const hasStoreProfile = await fetchCustomerProfile()
+    if (!hasStoreProfile) {
+      void router.push({
+        path: createCustomerProfilePath(routeStoreSlug),
+        query: redirectQuery.value,
+      })
+      return
+    }
+
     redirectAfterLogin()
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
@@ -158,12 +182,12 @@ async function handleSubmit(): Promise<void> {
 
       <div class="mt-6 flex flex-col items-center gap-2 text-sm">
         <RouterLink
-          :to="{ path: createCustomerProfilePath(routeStoreSlug), query: route.query.redirect ? { redirect: route.query.redirect } : {} }"
+          :to="createProfileRoute"
           class="font-semibold text-[#D81B60] hover:underline"
         >
           Ainda não tem perfil? Criar agora
         </RouterLink>
-        <RouterLink :to="{ name: AuthRouteNames.ForgotPassword }" class="text-[#6B7280] hover:underline">
+        <RouterLink :to="forgotPasswordRoute" class="text-[#6B7280] hover:underline">
           Esqueci minha senha
         </RouterLink>
       </div>

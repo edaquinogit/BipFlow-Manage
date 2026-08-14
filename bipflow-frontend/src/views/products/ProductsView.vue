@@ -17,24 +17,27 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-2.5 sm:flex-row">
+          <div class="grid grid-cols-[2.75rem,minmax(0,1fr)] items-center gap-2.5 min-[390px]:flex min-[390px]:justify-end">
             <CustomerProfileMenuButton />
 
             <button
               type="button"
               data-cy="open-cart-button"
-              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
+              class="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.08em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[360px]:gap-2 min-[360px]:px-3 min-[360px]:tracking-[0.12em] min-[390px]:px-4 min-[390px]:text-xs min-[390px]:tracking-[0.14em]"
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
                 : 'storefront-outline-button bg-white'"
               @click="openCart"
             >
-              <ShoppingBagIcon class="h-4 w-4" aria-hidden="true" />
-              <span>Pedido</span>
-              <span class="whitespace-nowrap" :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'">
+              <ShoppingBagIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span class="hidden min-[360px]:inline">Pedido</span>
+              <span
+                class="shrink-0 whitespace-nowrap"
+                :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'"
+              >
                 {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
               </span>
-              <span class="whitespace-nowrap font-bold">{{ formatBRL(subtotal) }}</span>
+              <span class="min-w-0 truncate whitespace-nowrap font-bold">{{ formatBRL(subtotal) }}</span>
             </button>
           </div>
         </div>
@@ -426,6 +429,7 @@ const isCartOpen = ref(false)
 // authService.isAuthenticated() guard matches CustomerProfileMenuButton's
 // own pattern, so an anonymous visitor never fires a doomed 401 fetch.
 function openCart(): void {
+  toast.clearByType('success')
   isCartOpen.value = true
   if (authService.isAuthenticated()) {
     void fetchCustomerProfile()

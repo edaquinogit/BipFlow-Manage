@@ -114,6 +114,13 @@ function clearAll(): void {
 }
 
 /**
+ * Clear toasts of a specific type while preserving higher-priority feedback.
+ */
+function clearByType(type: ToastType): void {
+  toasts.value = toasts.value.filter((toast) => toast.type !== type);
+}
+
+/**
  * Vue composable for using toast notifications
  */
 export function useToast() {
@@ -126,5 +133,6 @@ export function useToast() {
     info,
     removeToast,
     clearAll,
+    clearByType,
   };
 }

@@ -82,6 +82,7 @@ describe('ProductDetailView', () => {
     error: vi.fn(),
     info: vi.fn(),
     warning: vi.fn(),
+    clearByType: vi.fn(),
   }
 
   const productDetail = {

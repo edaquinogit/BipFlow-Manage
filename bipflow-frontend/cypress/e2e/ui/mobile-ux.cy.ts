@@ -32,4 +32,29 @@ describe('mobile UX regressions', () => {
       expect(fontSize).to.equal('16px')
     })
   })
+
+  it('keeps cart entry points inside a 320px viewport after adding an item', () => {
+    cy.viewport(320, 568)
+
+    cy.visit('/l/default/produtos', {
+      onBeforeLoad(win) {
+        win.sessionStorage.setItem('bipflow:storefront-intro-shown:default', '1')
+        win.localStorage.clear()
+      },
+    })
+
+    cy.get('[data-cy="add-to-cart-button"]:not([disabled])', { timeout: 15000 })
+      .first()
+      .click()
+
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(320)
+    })
+
+    cy.get('[data-cy="open-cart-button"]').click()
+    cy.get('[data-cy="toast-success"]').should('not.exist')
+    cy.get('aside[role="dialog"]').should(($drawer) => {
+      expect($drawer[0].scrollWidth).to.be.at.most(320)
+    })
+  })
 })

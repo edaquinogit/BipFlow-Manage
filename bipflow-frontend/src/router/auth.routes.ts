@@ -12,6 +12,7 @@ export const AuthRouteNames = {
   CreateCustomerProfile: "auth.create-customer-profile",
   CustomerAccount: "auth.customer-account",
   CustomerLogin: "auth.customer-login",
+  CustomerForgotPassword: "auth.customer-forgot-password",
 } as const;
 
 /**
@@ -35,6 +36,10 @@ export function customerAccountPath(storeSlug: string): string {
 
 export function customerLoginPath(storeSlug: string): string {
   return storeSlug ? `/l/${storeSlug}/login` : "/entrar";
+}
+
+export function customerForgotPasswordPath(storeSlug: string): string {
+  return storeSlug ? `/l/${storeSlug}/senha/recuperar` : "/senha/recuperar";
 }
 
 /**
@@ -93,6 +98,22 @@ export const authRoutes: RouteRecordRaw[] = [
     path: "/entrar",
     component: () => import("@/views/customer/CustomerLoginView.vue"),
     meta: authTaskMeta("Entrar")
+  },
+  {
+    path: "/l/:storeSlug/senha/recuperar",
+    name: AuthRouteNames.CustomerForgotPassword,
+    component: () => import("@/views/customer/CustomerForgotPasswordView.vue"),
+    meta: authTaskMeta("Recuperar senha")
+  },
+  {
+    path: "/s/:storeSlug/senha/recuperar",
+    component: () => import("@/views/customer/CustomerForgotPasswordView.vue"),
+    meta: authTaskMeta("Recuperar senha")
+  },
+  {
+    path: "/senha/recuperar",
+    component: () => import("@/views/customer/CustomerForgotPasswordView.vue"),
+    meta: authTaskMeta("Recuperar senha")
   },
   {
     path: "/register",

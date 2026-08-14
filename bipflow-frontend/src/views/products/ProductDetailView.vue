@@ -360,6 +360,7 @@ const isCartOpen = ref(false)
 // CustomerProfileMenuButton's own pattern so an anonymous visitor never
 // fires a doomed 401 fetch.
 function openCart(): void {
+  toast.clearByType('success')
   isCartOpen.value = true
   if (authService.isAuthenticated()) {
     void fetchCustomerProfile()

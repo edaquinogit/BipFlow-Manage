@@ -306,30 +306,30 @@
           </section>
         </div>
 
-        <footer class="z-10 border-t border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_-8px_24px_-22px_rgba(5,5,10,0.6)] sm:px-6 sm:py-5">
-          <div class="space-y-2.5 text-sm">
-            <div class="flex items-center justify-between text-[#6B7280]">
+        <footer class="cart-summary-footer z-10 border-t border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_-8px_24px_-22px_rgba(5,5,10,0.6)] sm:px-6 sm:py-5">
+          <div class="cart-summary-list space-y-2.5 text-sm">
+            <div class="cart-summary-row flex items-center justify-between text-[#6B7280]">
               <span>Produtos</span>
               <span class="font-semibold text-[#05050A]">{{ formatBRL(subtotal) }}</span>
             </div>
             <div
               v-if="customer.deliveryMethod === 'delivery' && deliveryFee > 0"
-              class="flex items-center justify-between text-[#6B7280]"
+              class="cart-summary-row flex items-center justify-between text-[#6B7280]"
             >
               <span>Frete</span>
               <span class="font-semibold text-[#05050A]">{{ formatBRL(deliveryFee) }}</span>
             </div>
-            <div class="flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[#05050A]">
+            <div class="cart-total-row flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[#05050A]">
               <span class="font-bold">Total estimado</span>
               <span class="text-xl font-bold tracking-tight">{{ formatBRL(total) }}</span>
             </div>
-            <p class="text-[11px] leading-4 text-[#6B7280]">Valor final confirmado no WhatsApp.</p>
-            <p v-if="!isWhatsAppConfigured" class="rounded-r-lg border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+            <p class="cart-summary-note text-[11px] leading-4 text-[#6B7280]">Valor final confirmado no WhatsApp.</p>
+            <p v-if="!isWhatsAppConfigured" class="cart-summary-alert rounded-r-lg border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
               WhatsApp da loja ainda nao configurado.
             </p>
             <p
               v-if="checkoutValidationMessage"
-              class="rounded-r-lg border-l-4 border-[#D81B60] bg-[#FFF4F8] px-3 py-2 text-sm font-semibold text-[#7A143D]"
+              class="cart-summary-alert rounded-r-lg border-l-4 border-[#D81B60] bg-[#FFF4F8] px-3 py-2 text-sm font-semibold text-[#7A143D]"
             >
               {{ checkoutValidationMessage }}
             </p>
@@ -338,7 +338,7 @@
           <button
             type="button"
             data-cy="checkout-submit-button"
-            class="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#05050A] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D81B60] focus:outline-none focus:ring-4 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] sm:mt-5"
+            class="cart-summary-cta mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#05050A] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D81B60] focus:outline-none focus:ring-4 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] sm:mt-5"
             :disabled="!canSubmitCheckout"
             @click="$emit('submitOrder')"
           >
@@ -559,6 +559,45 @@ aside select {
 aside textarea {
   border-radius: 0.75rem;
   padding: 0.625rem 0.875rem;
+}
+
+@media (max-height: 640px) {
+  .cart-summary-footer {
+    padding-block: 0.75rem;
+  }
+
+  .cart-summary-list {
+    gap: 0.375rem;
+  }
+
+  .cart-summary-row {
+    display: none;
+  }
+
+  .cart-total-row {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .cart-total-row span:last-child {
+    font-size: 1.125rem;
+  }
+
+  .cart-summary-note {
+    display: none;
+  }
+
+  .cart-summary-alert {
+    padding-block: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
+  .cart-summary-cta {
+    margin-top: 0.625rem;
+    min-height: 2.625rem;
+    padding-block: 0.5rem;
+  }
 }
 
 .cart-sheet-enter-active,
