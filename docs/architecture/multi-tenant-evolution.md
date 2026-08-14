@@ -1,18 +1,25 @@
 # Evolução Multi-Loja (Multi-Tenant)
 
-Este documento descreve a estratégia para evoluir o BipFlow Manage de
+Este documento registra a estratégia usada para evoluir o BipFlow Manage de
 **single-tenant** (uma loja por instância) para **multi-loja** (várias lojas
-isoladas na mesma instância). Ele é a fonte de verdade do planejamento; o código
-desta evolução deve ser implementado em fases, com a rede de segurança de testes
-sempre verde.
+isoladas na mesma instância). Ele continua como histórico/roadmap técnico da
+evolução; a visão operacional atual fica em
+[system-overview.md](system-overview.md).
 
-> Status atual: **single-tenant**. Nenhuma tabela de negócio possui escopo de
-> loja e `StoreSettings` é um singleton. Cada lojista exigiria, hoje, uma
-> instância separada do sistema.
+> Status atual em 2026-08-13: a base multi-loja por coluna `store_id` ja esta
+> implementada para os fluxos principais. Existem `Store`, `StoreMembership`,
+> `store_id` nas tabelas de negocio, resolucao por `X-Store-Slug`/JWT,
+> seletor de loja no dashboard, rotas publicas `/l/:storeSlug/...` e fallback
+> `default` para compatibilidade. `StoreSettings` permanece como contrato
+> legado/minimo de WhatsApp, enquanto dados ricos vivem em `Store`.
 
-## 1. Diagnóstico do estado atual
+## 1. Diagnóstico original
 
-O sistema assume um catálogo único e global. Pontos que impedem múltiplas lojas:
+O diagnóstico abaixo descreve o estado anterior a evolução multi-loja. Ele fica
+registrado para explicar as decisões e as fases executadas.
+
+O sistema assumia um catálogo único e global. Pontos que impediam múltiplas
+lojas:
 
 | Camada | Situação atual | Bloqueio |
 | --- | --- | --- |
@@ -88,12 +95,11 @@ semanas sem nada visível/testável de ponta a ponta, e uma integração grande 
 uma vez quando o frontend finalmente entra — exatamente o tipo de mudança
 grande e especulativa que este projeto evita.
 
-Por isso a evolução é organizada em **etapas verticais**: cada etapa entrega
-backend **e** frontend juntos, na mesma janela de trabalho, fica em produção e
-mantém o comportamento single-tenant idêntico ao atual (1 loja só) até a
-última etapa. É o padrão *strangler fig / dark launch*: a estrutura
-multi-tenant é construída por baixo do sistema atual sem alterar o que o
-usuário final vê, até o momento controlado de "ligar" multi-loja.
+Por isso a evolução foi organizada em **etapas verticais**: cada etapa entregou
+backend **e** frontend juntos, na mesma janela de trabalho, mantendo o
+comportamento da loja `default` durante a migração. Foi o padrão *strangler fig
+/ dark launch*: a estrutura multi-tenant foi construída por baixo do sistema
+existente antes de expor rotas por loja e seletor de loja.
 
 ### Etapa 0 — Saneamento e rede de segurança ✅ (concluída)
 
@@ -219,11 +225,16 @@ Total aproximado: 3–4 semanas de trabalho solo. Span de calendário maior se
 intercalado com manutenção do produto atual — saudável para um projeto solo,
 não é uma corrida.
 
-## 7. Definição de pronto da Etapa 0
+## 7. Definição De Pronto Da Evolucao
 
 - [x] Backend canônico = Django; motor Node arquivado em `legacy/`.
 - [x] README e visão geral refletem a arquitetura real.
 - [x] Este documento criado.
 - [x] Testes do fluxo atual verdes (pytest) e CI configurado como rede de
       segurança.
-- [ ] (Próxima etapa) `Store` / `StoreMembership` — **não** implementados nesta etapa.
+- [x] `Store` / `StoreMembership` implementados.
+- [x] `store_id` adicionado aos modelos de negocio principais.
+- [x] Resolucao de loja centralizada em `store_scope.py`.
+- [x] Rotas publicas com `storeSlug` e seletor de loja no dashboard.
+- [x] Isolamento de catalogo, delivery, checkout, bot, estoque e vendas coberto
+      por testes.

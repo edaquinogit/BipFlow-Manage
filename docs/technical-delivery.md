@@ -22,15 +22,22 @@ limites conhecidos.
 ## Escopo Entregue
 
 - Dashboard administrativo protegido por JWT e papel de dashboard.
+- Base multi-loja com `Store`, `StoreMembership`, seletor de loja e vitrine
+  publica por `storeSlug`.
 - CRUD de produtos e categorias com leitura publica e escrita administrativa.
 - Upload de capa e galeria limitada a tres imagens por produto.
+- Codigo publico imutavel por produto, QR de etiqueta e lookup por
+  `/products/by-code/{code}/`.
+- Movimentacoes de estoque auditadas para entrada, saida, venda e cancelamento.
+- PDV de balcao por codigo/QR, recibo e envio de recibo por email.
 - Regioes de entrega configuraveis e taxa usada no checkout publico.
 - Configuracao de WhatsApp da loja pelo dashboard.
 - Catalogo publico com busca, filtros, detalhe por slug, carrinho e checkout.
+- Perfil autenticado de cliente por loja para reutilizar identidade e endereco.
 - Checkout via WhatsApp com validacao server-side e persistencia de
   `SaleOrder` e `SaleOrderItem`.
 - Historico de vendas para usuarios com papel de dashboard e atualizacao de
-  status por operadores com permissao de escrita.
+  status por operadores com permissao de escrita, incluindo envio e entrega.
 - Bot publico deterministico, sem IA externa, integrado a produtos e regioes
   ativas.
 - Vitrine administrativa read-only para conversas do bot.
@@ -50,6 +57,8 @@ limites conhecidos.
 | Dashboard | `bipflow-frontend/src/views/dashboard/` |
 | Camada HTTP frontend | `bipflow-frontend/src/services/` |
 | Estado reutilizavel | `bipflow-frontend/src/composables/` |
+| Loja e escopo por tenant | `bipdelivery/api/store_scope.py`, `bipflow-frontend/src/composables/useCurrentStore.ts` |
+| PDV, QR e estoque | `bipdelivery/api/pdv.py`, `bipdelivery/api/product_labels.py`, `bipdelivery/api/stock.py` |
 | Testes backend | `bipdelivery/tests/` |
 | Testes frontend | `bipflow-frontend/src/**/*.spec.ts` |
 | E2E | `bipflow-frontend/cypress/e2e/` |

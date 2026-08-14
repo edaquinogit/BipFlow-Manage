@@ -19,16 +19,17 @@ O que já existe e será reaproveitado, não recriado:
 - Multi-tenant maduro (`Store`, `StoreScopedViewSetMixin`,
   `resolve_request_store()`) — todo código novo é escopado por loja "de
   graça".
-- `Product.sku` (opcional, manual, `UniqueConstraint(["store","sku"])`) —
-  **não** é o código que vamos gerar: é o SKU que o lojista já usa no
-  fornecedor dele. O código do BipFlow é um conceito novo e paralelo.
+- `Product.sku` (opcional, `UniqueConstraint(["store","sku"])`) pode continuar
+  vindo de um codigo manual do lojista; quando fica vazio, o backend passa a
+  usar automaticamente o mesmo `public_code` gerado para QR/PDV.
 - Checkout via WhatsApp (`CheckoutWhatsAppView`) já decrementa estoque em
   lote com lock — é o único canal de venda que existe hoje.
 
 O que não existe e esta evolução constrói:
 
-- Nenhum código gerado automaticamente pelo sistema (o `sku` é manual e
-  opcional).
+- Nenhum codigo gerado automaticamente pelo sistema existia antes desta
+  evolucao; agora `public_code` e gerado e tambem preenche `sku` quando o SKU
+  vem vazio.
 - Nenhuma geração/renderização de QR Code para produtos (o único uso de
   `qrcode` no repo hoje é para MFA/TOTP, `bipdelivery/api/mfa.py`).
 - Nenhum canal de venda presencial/PDV — `SaleOrder` só nasce hoje pelo
@@ -110,12 +111,18 @@ Backend:
   é relançado imediatamente na primeira tentativa — um código novo nunca
   resolveria esse tipo de conflito, então continuar tentando só mascararia
   o erro real.
+- Quando `sku` vem vazio, o mesmo codigo gerado em `public_code` tambem e
+  persistido em `sku`. Se esse SKU automatico bater em um SKU manual ja
+  existente na loja, a geracao tenta outro codigo; SKU manual duplicado segue
+  falhando normalmente pela constraint.
 - **Backfill obrigatório** (diferente da decisão da Etapa 1 do
   `stock-movement-evolution.md`, que deliberadamente não fabricou
   histórico): aqui é necessário porque um produto sem código não pode ser
   vendido por QR. Migration de dados `0024_backfill_product_public_code.py`
   (histórico não tem acesso ao `save()` real, então a geração é reimplementada
   ali mesmo, de propósito — migrations precisam ficar auto-contidas) +
+  `0034_product_auto_sku_from_public_code.py` para preencher SKUs vazios a
+  partir do `public_code` existente quando nao houver conflito na loja +
   management command `generate_missing_product_codes` reutilizável para
   o caso raro de precisar rodar de novo fora de uma migration (ex. import
   em lote que grave `public_code=""` direto).
@@ -525,7 +532,7 @@ verificada contra o comportamento real de `AllowAnyReadDashboardWrite`.
 | Leitor HID de balcão exigir lib de câmera desnecessária | Etapa 3 | Input de texto focado como caminho primário; câmera é o caminho secundário/opcional |
 | Duas vendas presenciais simultâneas do mesmo produto | Etapa 3 | Reaproveita o mesmo lock em lote (`select_for_update` ordenado por `id`) que o checkout do WhatsApp já usa hoje |
 | `SaleOrder.channel` sem default seguro quebrar relatórios existentes | Etapa 3 | `default="virtual"` preserva o comportamento e os dados atuais sem migração de dados retroativa |
-| Confundir `public_code` (gerado, imutável) com `sku` (manual, editável) | Etapa 1 | Campos deliberadamente separados na UI e no modelo — `sku` continua sendo o código do lojista, `public_code` é o código do BipFlow |
+| Confundir `public_code` com `sku` | Etapa 1 | `public_code` segue imutavel; quando SKU fica vazio, ele espelha esse codigo para busca/etiqueta/PDV, enquanto SKU manual informado continua respeitado |
 | Um `watch()` de rota só reage a *mudança* do valor observado, não à sua presença | Etapa 4 | `route.params.code` precisou do seu próprio watcher — o watcher existente de `route.params.slug` nunca dispara ao navegar entre dois produtos por código, já que esse campo fica `undefined` nos dois casos |
 | Filtro `source` do ledger validado contra uma tupla fixa de valores conhecidos *na época em que foi escrito* | Etapa 5 (bug encontrado, não introduzido) | `?source=pdv` silenciosamente não filtrava nada (retornava tudo) em vez de dar erro ou lista vazia — corrigido para validar contra `dict(StockMovement.SOURCE_CHOICES)` dinamicamente, para que um `source` futuro não repita o mesmo problema |
 

@@ -76,8 +76,9 @@ Resposta:
 local do email ou o `username`.
 
 Os campos `roles`, `can_access_dashboard` e `can_manage_catalog` expoem o RBAC
-usado pelo dashboard. Usuarios criados pelo cadastro publico nascem ativos, mas
-sem permissao administrativa.
+usado pelo dashboard. O acesso tambem pode vir de `StoreMembership` com papel
+`owner`, `manager` ou `viewer`, alem dos grupos globais mantidos para
+compatibilidade.
 
 ### Renovar token
 
@@ -101,14 +102,19 @@ POST /api/auth/register/
 {
   "email": "admin@example.com",
   "password": "senha-segura",
-  "confirm_password": "senha-segura"
+  "confirm_password": "senha-segura",
+  "registration_context": "dashboard_owner",
+  "store_name": "Minha Loja"
 }
 ```
 
-O cadastro publico cria uma conta ativa comum. Essa conta nao recebe acesso de
-dashboard, escrita administrativa ou historico de vendas ate ser promovida para
-`is_staff`/`is_superuser` ou adicionada aos grupos `admin`, `manager` ou
-`viewer`.
+O cadastro cria conta ativa. Por padrao, `registration_context` e
+`dashboard_owner`: o backend cria a primeira `Store` e um `StoreMembership`
+`owner`, liberando acesso ao dashboard daquela loja.
+
+Para cadastro de cliente da vitrine, envie `registration_context` como
+`storefront_customer`, `store_slug`, `full_name` e `phone`. Nesse caso o backend
+cria apenas o perfil de cliente daquela loja, sem acesso ao dashboard.
 
 ### Reset de senha
 
@@ -136,16 +142,56 @@ Quando o limite e excedido, a API retorna `429 Too Many Requests`.
 ## Permissoes
 
 - Produtos, categorias e regioes de entrega: leitura publica, escrita apenas
-  para `is_staff`, `is_superuser` ou usuarios nos grupos `admin`/`manager`.
+  para `is_staff`, `is_superuser`, usuarios nos grupos `admin`/`manager` ou
+  membros `owner`/`manager` da loja resolvida.
 - Regioes de entrega para usuario anonimo: somente regioes ativas.
 - Configuracoes da loja: leitura administrativa para papeis de dashboard;
   escrita apenas para `is_staff`, `is_superuser` ou usuarios nos grupos
-  `admin`/`manager`. O catalogo publico consome somente o endpoint seguro
-  `/api/v1/store-settings/public/`.
+  `admin`/`manager` ou membros `owner`/`manager`. O catalogo publico consome
+  somente o endpoint seguro `/api/v1/store-settings/public/`.
 - Checkout WhatsApp: publico.
 - Historico de vendas: leitura para `is_staff`, `is_superuser` ou usuarios
-  nos grupos `admin`/`manager`/`viewer`; atualizacao de status para
-  `is_staff`, `is_superuser`, `admin` ou `manager`.
+  nos grupos `admin`/`manager`/`viewer` ou membros `owner`/`manager`/`viewer`;
+  atualizacao de status para `is_staff`, `is_superuser`, `admin`, `manager`,
+  `owner` ou `manager` de loja.
+
+## Escopo De Loja
+
+A API canonica e multi-loja por coluna `store_id`.
+
+- Rotas publicas podem enviar `X-Store-Slug` para resolver uma loja especifica.
+- Rotas autenticadas usam o `store_id` carregado no JWT e tambem aceitam
+  `X-Store-Slug` para troca de loja, desde que o usuario pertenca a ela.
+- Quando nada e enviado, a loja `default` e usada como fallback.
+- Queries de catalogo, estoque, pedidos, bot, checkout e PDV sao sempre
+  filtradas pela loja resolvida.
+
+```http
+GET /api/v1/store/current/
+GET /api/v1/store/mine/
+POST /api/v1/store/mine/
+PATCH /api/v1/store/mine/{slug}/
+PATCH /api/v1/store/mine/{slug}/receipt-settings/
+```
+
+`store/current` e publico e retorna a loja resolvida. `store/mine` exige
+autenticacao, lista as lojas do usuario e cria uma nova loja como `owner`.
+Renomear loja e alterar configuracao de recibo exigem papel `owner` ou
+`manager` naquela loja.
+
+Campos principais de loja:
+
+- `id`
+- `name`
+- `slug`
+- `logo_url`
+- `tagline`
+- `whatsapp_phone`
+- `theme`
+- `is_active`
+- `status`
+- `receipt_exchange_policy`
+- `receipt_paper_format`
 
 ## Paginacao
 
@@ -174,11 +220,16 @@ GET /api/v1/products/{id}/
 PATCH /api/v1/products/{id}/
 DELETE /api/v1/products/{id}/
 GET /api/v1/products/by-slug/{slug}/
+GET /api/v1/products/by-code/{code}/
+GET /api/v1/products/{id}/qr-code/
+GET /api/v1/products/qr-codes-bulk/
+GET /api/v1/products/{id}/stock-movements/
+POST /api/v1/products/{id}/stock-movements/
 PATCH /api/v1/products/bulk_update_category/
 ```
 
 Leitura e publica. Escrita exige `staff`, `superuser`, grupo `admin` ou grupo
-`manager`.
+`manager`, ou papel `owner`/`manager` na loja resolvida.
 
 Query params de listagem:
 
@@ -194,12 +245,14 @@ Campos principais:
 
 - `id`
 - `sku`
+- `public_code`
 - `name`
 - `slug`
 - `description`
 - `price`
 - `size`
 - `stock_quantity`
+- `low_stock_threshold`
 - `is_available`
 - `image`
 - `images`
@@ -213,6 +266,9 @@ Contrato de escrita:
 - `category` deve ser o ID numerico de uma categoria existente;
 - `price` aceita valor decimal;
 - `stock_quantity` deve ser inteiro nao negativo;
+- `sku` e opcional; quando vem vazio/ausente, o backend usa o mesmo
+  `public_code` gerado para o QR;
+- `public_code` e `slug` sao somente leitura;
 - `PATCH` aceita atualizacao parcial, mas o dashboard envia o formulario
   normalizado com os campos de negocio atuais.
 
@@ -234,6 +290,33 @@ Atualizacao em lote:
 }
 ```
 
+Codigo publico e QR:
+
+- `public_code` e gerado automaticamente, imutavel e unico por loja;
+- produtos sem SKU manual recebem `sku = public_code` automaticamente;
+- `/by-code/{code}/` e publico, case-insensitive e escopado pela loja;
+- `/{id}/qr-code/` retorna `public_code`, URL publica e PNG em data URI;
+- `/qr-codes-bulk/?ids=1,2,3` retorna etiquetas em lote para dashboard.
+
+Movimentacoes de estoque:
+
+```json
+{
+  "movement_type": "entrada",
+  "quantity": 5,
+  "reason": "ajuste_inventario",
+  "notes": "Contagem fisica"
+}
+```
+
+Regras:
+
+- leitura do historico exige papel de dashboard;
+- criacao exige papel de escrita;
+- `saida` nao pode deixar estoque negativo;
+- checkout, PDV e cancelamento tambem criam movimentacoes de auditoria;
+- edicao direta de `stock_quantity` em `PATCH /products/{id}/` e rejeitada.
+
 ## Categorias
 
 ```http
@@ -245,8 +328,8 @@ PATCH /api/v1/categories/{id}/
 DELETE /api/v1/categories/{id}/
 ```
 
-Leitura e publica. Escrita exige `staff`, `superuser`, grupo `admin` ou grupo
-`manager`.
+Leitura e publica. Escrita exige `staff`, `superuser`, grupo `admin`/`manager`
+ou papel `owner`/`manager` na loja resolvida.
 
 Campos:
 
@@ -284,11 +367,11 @@ Notas:
 - usuarios anonimos e autenticados sem papel de dashboard recebem apenas
   regioes ativas;
 - usuarios com papel de dashboard veem todas;
-- somente `staff`, `superuser`, grupo `admin` ou grupo `manager` cria, edita e
-  remove regioes;
+- somente `staff`, `superuser`, grupo `admin`/`manager` ou papel
+  `owner`/`manager` cria, edita e remove regioes;
 - o carrinho publico usa `/active/` para calcular frete.
 
-## Configuracoes Da Loja
+## Configuracoes Operacionais De WhatsApp
 
 ```http
 GET /api/v1/store-settings/
@@ -328,9 +411,39 @@ Notas:
 - o WhatsApp deve incluir codigo do pais e DDD;
 - o catalogo publico usa apenas `whatsapp_phone_digits` para exibir o contato
   e montar atalhos de duvidas frequentes;
-- o checkout usa este numero para montar `whatsapp_url`;
-- `WHATSAPP_ORDER_PHONE` fica como fallback quando o dashboard ainda nao tem
-  WhatsApp cadastrado.
+- o checkout prioriza o WhatsApp da loja resolvida e usa `WHATSAPP_ORDER_PHONE`
+  como fallback quando ainda nao ha numero cadastrado;
+- configuracoes ricas por loja, como nome, slug e recibo de PDV, ficam nos
+  endpoints `store/current` e `store/mine`.
+
+## Perfil De Cliente
+
+```http
+GET /api/v1/customers/me/
+PATCH /api/v1/customers/me/
+```
+
+Exige autenticacao de cliente da vitrine. O perfil e escopado por loja e nunca
+concede acesso ao dashboard.
+
+Campos:
+
+- `full_name`
+- `phone`
+- `address`
+- `neighborhood`
+- `city`
+- `delivery_region_id`
+- `delivery_region_name`
+- `email`
+
+Regras:
+
+- `full_name` e `phone` nao podem ser salvos em branco quando enviados;
+- `delivery_region_id`, quando enviado, precisa pertencer a loja resolvida e
+  estar ativo;
+- no checkout, perfil completo vence os dados enviados como convidado; campos
+  de convidado sao usados apenas como fallback.
 
 ## Bot MVP Sem IA
 
@@ -460,6 +573,9 @@ Regras:
 
 - `items` nao pode ser vazio;
 - produtos precisam existir, estar disponiveis e ter estoque;
+- produtos e regioes sao resolvidos dentro da loja atual;
+- quando o usuario autenticado possui perfil de cliente completo para a loja,
+  identidade e endereco do perfil vencem os campos de convidado enviados;
 - entrega exige `address`, `neighborhood` e `city`;
 - quando `delivery_region_id` ativo e enviado, o backend usa a taxa da regiao;
 - sem regiao enviada, entrega usa `ORDER_DELIVERY_FEE`;
@@ -479,21 +595,89 @@ Resposta:
 - `message`
 - `whatsapp_url`
 
+## PDV De Balcao
+
+```http
+POST /api/v1/pdv/sales/
+POST /api/v1/pdv/sales/{order_reference}/receipt-email/
+```
+
+`pdv/sales` exige autenticacao e papel de escrita de dashboard. Ele registra uma
+venda presencial usando `public_code`, baixa estoque de forma atomica e persiste
+um `SaleOrder` com canal `loja_fisica`.
+
+Payload:
+
+```json
+{
+  "items": [
+    {
+      "public_code": "ABCD2345",
+      "quantity": 2
+    }
+  ],
+  "payment_method": "pix",
+  "customer_name": "Cliente balcao",
+  "customer_phone": "5571999999999",
+  "customer_email": "cliente@example.com",
+  "notes": "Venda no caixa"
+}
+```
+
+Resposta principal:
+
+- `order_reference`
+- `items`
+- `subtotal`
+- `total`
+- `payment_method`
+- `created_at`
+- `customer_email`
+
+Regras:
+
+- `items` nao pode ser vazio;
+- `public_code` e resolvido dentro da loja atual;
+- produtos indisponiveis, sem estoque ou de outra loja sao rejeitados;
+- linhas repetidas sao agregadas antes da reserva de estoque;
+- o pedido e os movimentos de estoque sao gravados na mesma transacao.
+
+Envio de recibo:
+
+```json
+{
+  "email": "cliente@example.com",
+  "pdf_base64": "JVBERi0x..."
+}
+```
+
+O PDF e gerado no frontend e enviado como base64. O backend valida tamanho
+maximo de 5 MB, assinatura de PDF e escopo do pedido antes de enviar o email.
+
 ## Historico De Vendas
 
 ```http
 GET /api/v1/sales-orders/
 GET /api/v1/sales-orders/{id}/
 PATCH /api/v1/sales-orders/{id}/status/
+GET /api/v1/sales-orders/summary/
+GET /api/v1/sales-orders/timeseries/
+GET /api/v1/sales-orders/breakdown/
+GET /api/v1/sales-orders/customers/
 ```
 
 Listagem e detalhe exigem papel de dashboard. Atualizacao de status exige papel
-de escrita (`staff`, `superuser`, `admin` ou `manager`).
+de escrita (`staff`, `superuser`, `admin`, `manager`, `owner` ou `manager` de
+loja).
 
 Query params:
 
 - `status`
+- `channel`
 - `search`
+- `period`
+- `start`
+- `end`
 - `page`
 - `page_size`
 
@@ -502,6 +686,7 @@ Campos principais:
 - `id`
 - `order_reference`
 - `status`
+- `channel`
 - `customer_name`
 - `customer_phone`
 - `customer_email`
@@ -514,12 +699,29 @@ Campos principais:
 - `created_at`
 - `item_count`
 - `items`
+- `performed_by_username`
+
+O detalhe adiciona:
+
+- `address`
+- `neighborhood`
+- `city`
+- `notes`
+- `message`
+- `whatsapp_url`
+- `carrier_name`
+- `tracking_code`
+- `tracking_url`
+- `shipped_at`
+- `delivered_at`
 
 Atualizacao de status:
 
 ```json
 {
-  "status": "sent"
+  "status": "sent",
+  "carrier_name": "Correios",
+  "tracking_code": "AB123456789BR"
 }
 ```
 
@@ -527,4 +729,13 @@ Valores aceitos:
 
 - `prepared`
 - `sent`
+- `delivered`
 - `cancelled`
+
+Regras de transicao:
+
+- pedido delivery passa de `prepared` para `sent` e depois `delivered`;
+- para marcar `sent`, envie `carrier_name` e `tracking_code`;
+- pedido pickup pode ir de `prepared` direto para `delivered`;
+- `delivered` e `cancelled` sao terminais;
+- cancelar estorna estoque de checkout e PDV de forma idempotente.

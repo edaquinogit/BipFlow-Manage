@@ -10,8 +10,8 @@ no codigo e suficiente para operar o estado atual do repositorio.
   para tech lead, avaliador tecnico ou recrutador tecnico.
 - [Arquitetura](architecture/system-overview.md): responsabilidades de cada
   aplicacao e limites entre Django e Vue.
-- [Evolucao multi-loja](architecture/multi-tenant-evolution.md): estrategia para
-  suportar varias lojas (multi-tenant) e roadmap por fases.
+- [Evolucao multi-loja](architecture/multi-tenant-evolution.md): historico,
+  status e decisoes da evolucao para varias lojas (multi-tenant).
 - [Guia de desenvolvimento](development-guide.md): ambiente local, comandos,
   qualidade e manutencao.
 - [Go-live de producao](production-go-live.md): checklist executavel e smoke

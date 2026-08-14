@@ -10,17 +10,19 @@ Usuario administrativo ou cliente publico
   v
 Frontend Vue 3 (bipflow-frontend)
   |
-  | HTTP JSON ou multipart
+  | HTTP JSON ou multipart + X-Store-Slug quando a loja e explicita
   v
 Backend Django REST (bipdelivery)
   |
-  | ORM / File storage local em desenvolvimento
+  | resolve_request_store() / ORM / File storage local em desenvolvimento
   v
-SQLite + MEDIA_ROOT
+SQLite + MEDIA_ROOT por ambiente local
 ```
 
 O caminho acima e o produto principal: dashboard autenticado, catalogo publico,
-carrinho, frete por regiao, checkout e historico de vendas.
+carrinho, frete por regiao, checkout, PDV, estoque auditado e historico de
+vendas. Em producao, media deve usar R2/S3 compativel e o banco deve ser
+PostgreSQL.
 
 ## Sistemas Separados
 
@@ -33,10 +35,17 @@ nao-canonico fica isolado e nao participa do fluxo principal:
 - `api-order-validation/`: pacote/test harness isolado (avaliacao Jitterbit),
   mantido como artefato independente.
 
-## Evolucao Planejada
+## Estado Multi-Loja
 
-- `architecture/multi-tenant-evolution.md`: estrategia para suportar varias
-  lojas (multi-tenant). O sistema e single-tenant hoje.
+O sistema deixou de ser single-tenant puro. O backend possui `Store`,
+`StoreMembership` e um unico ponto de resolucao de tenant em
+`bipdelivery/api/store_scope.py`. As tabelas de negocio principais possuem
+`store_id`; endpoints de catalogo, estoque, pedidos, bot, checkout e PDV sao
+filtrados pela loja resolvida. A loja `default` permanece como fallback para
+links antigos e desenvolvimento local.
+
+`architecture/multi-tenant-evolution.md` registra o historico e as fases dessa
+evolucao.
 
 ## Frontend Vue
 
@@ -44,14 +53,19 @@ Responsabilidades:
 
 - proteger o dashboard por guarda de rota autenticada e papel de dashboard;
 - exibir saudacao com o usuario retornado por `GET /api/auth/me/`;
+- resolver loja atual e permitir troca entre lojas do usuario;
 - listar e gerenciar produtos no dashboard;
+- registrar vendas de balcao no PDV por QR/codigo publico;
 - abrir menu operacional com historico de vendas, alertas de estoque, atalhos e
   gestao de regioes de entrega e WhatsApp da loja;
-- expor catalogo publico em `/produtos`;
+- expor catalogo publico em `/produtos` e em rotas por loja
+  `/l/:storeSlug/produtos`;
 - carregar regioes ativas de entrega no carrinho;
+- manter carrinho local separado por loja;
 - exibir o WhatsApp publico da loja e abrir duvidas frequentes com mensagem
   pronta para `api.whatsapp.com/send`;
-- enviar checkout para a API Django e abrir o fluxo de WhatsApp.
+- enviar checkout para a API Django e abrir o fluxo de WhatsApp;
+- reutilizar perfil de cliente por loja quando o comprador esta autenticado.
 
 Camadas relevantes:
 
@@ -70,14 +84,21 @@ Responsabilidades:
 - aplicar RBAC de dashboard com `is_staff`, `is_superuser` e grupos
   `admin`/`manager`/`viewer`;
 - aplicar throttling em endpoints sensiveis de auth;
+- resolver a loja da request por JWT, `X-Store-Slug` ou fallback `default`;
+- manter lojas, memberships e configuracoes por loja;
 - manter produtos, categorias e galerias de imagens;
+- gerar `public_code` imutavel e QR de etiqueta para produtos;
+- registrar movimentacoes de estoque e impedir saida maior que o saldo;
 - manter regioes de entrega e taxa por regiao;
 - manter configuracoes operacionais da loja, incluindo WhatsApp de atendimento;
 - responder mensagens do bot MVP sem IA por regras deterministicas;
 - persistir conversas e mensagens do bot em `BotConversation` e `BotMessage`;
 - validar checkout no servidor;
 - persistir pedidos como `SaleOrder` e `SaleOrderItem`;
-- expor historico de vendas para usuarios com papel de dashboard.
+- expor historico de vendas para usuarios com papel de dashboard;
+- registrar vendas de PDV e enviar recibo PDF por email;
+- validar transicoes de pedido, incluindo envio, entrega e cancelamento com
+  estorno de estoque.
 
 Arquivos principais:
 
@@ -85,6 +106,8 @@ Arquivos principais:
 - `bipdelivery/api/bot_engine.py`
 - `bipdelivery/api/serializers.py`
 - `bipdelivery/api/views.py`
+- `bipdelivery/api/pdv.py`
+- `bipdelivery/api/store_scope.py`
 - `bipdelivery/api/v1_urls.py`
 - `bipdelivery/core/settings.py`
 
@@ -97,7 +120,18 @@ Produtos:
 - escrita por `staff`, `superuser`, `admin` ou `manager`;
 - filtros por busca, categoria, estoque e preco;
 - detalhe publico por slug em `/api/v1/products/by-slug/{slug}/`;
+- detalhe publico por codigo em `/api/v1/products/by-code/{code}/`;
+- QR individual e em lote para usuarios de dashboard;
+- historico e ajuste manual de estoque por produto;
 - ate 3 imagens por produto.
+
+Lojas:
+
+- `/api/v1/store/current/` resolve a loja da request;
+- `/api/v1/store/mine/` lista ou cria lojas do usuario autenticado;
+- `/api/v1/store/mine/{slug}/` renomeia loja para owner/manager;
+- `/api/v1/store/mine/{slug}/receipt-settings/` atualiza politica e formato de
+  recibo do PDV.
 
 Categorias:
 
@@ -154,16 +188,30 @@ Vendas:
 - somente papel de dashboard;
 - listagem e detalhe para papeis de dashboard;
 - atualizacao de status para papeis com escrita operacional;
-- suporta filtros `status` e `search`.
+- suporta filtros `status`, `search` e `channel`;
+- agregados de dashboard em `summary`, `timeseries`, `breakdown` e `customers`.
+
+PDV:
+
+- `/api/v1/pdv/sales/`;
+- registra venda de loja fisica por `public_code`;
+- baixa estoque de forma atomica;
+- persiste `SaleOrder` com canal `loja_fisica`;
+- `/api/v1/pdv/sales/{order_reference}/receipt-email/` envia recibo PDF gerado
+  pelo frontend.
 
 ## Decisoes Arquiteturais
 
 - O backend e a autoridade para preco, estoque, disponibilidade, frete e total.
+- O escopo de loja fica no backend; o frontend apenas informa o `storeSlug`
+  quando a rota ou o seletor de loja tornam isso explicito.
 - O backend e a barreira de seguranca: cadastro publico nao concede papel de
   dashboard nem permissao de escrita.
 - O frontend nao grava tokens fora de `token-store.ts`.
 - O frontend nao deve espalhar chamadas `axios` fora de `src/services/`.
 - O dashboard consome historico de vendas persistido pelo checkout publico.
+- O PDV e o checkout compartilham o mesmo historico de pedidos, mas canais e
+  regras de captura sao separados.
 - O bot do catalogo deve continuar fino no frontend: UI chama service, service
   chama API, backend classifica e consulta dados reais.
 - Documentacao deve representar o codigo atual e ser removida quando virar

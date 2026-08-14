@@ -7,11 +7,13 @@ e checkout público com geração de pedido para WhatsApp.
 
 ## Visão Rápida
 
-- Dashboard administrativo com autenticação, papéis de acesso e rotas
-  protegidas.
-- Catálogo público com produtos, categorias, carrinho e detalhe por slug.
+- Dashboard administrativo com autenticação, papéis de acesso, troca de loja
+  e rotas protegidas.
+- Catálogo público com produtos, categorias, carrinho e detalhe por slug ou
+  `public_code`.
 - Frete por região, calculado e validado no backend.
 - Checkout via WhatsApp com pedido persistido no histórico de vendas.
+- PDV de balcão por QR/código público, recibo e baixa de estoque auditada.
 - Backend como autoridade para preço, estoque, disponibilidade, frete e totais.
 - Qualidade verificada com testes backend, typecheck, lint, testes frontend e
   build.
@@ -121,10 +123,10 @@ qualidade para validar backend e frontend.
 O runtime canônico tem duas superfícies de código:
 
 - `bipdelivery/`: backend canônico em Django REST. Mantém autenticação JWT,
-  RBAC, produtos, categorias, regiões de entrega, checkout, pedidos persistidos
-  e histórico de vendas.
+  RBAC, lojas, produtos, categorias, regiões de entrega, checkout, PDV,
+  pedidos persistidos, estoque auditado e histórico de vendas.
 - `bipflow-frontend/`: aplicação Vue 3 + TypeScript. Entrega o dashboard
-  autenticado, o menu operacional, o catálogo público, o carrinho e o checkout.
+  autenticado, troca de loja, PDV, o catálogo público, o carrinho e o checkout.
 
 Código não-canônico fica isolado e não participa do fluxo principal:
 
@@ -133,9 +135,11 @@ Código não-canônico fica isolado e não participa do fluxo principal:
 - `api-order-validation/`: pacote/test harness isolado (avaliação Jitterbit),
   mantido como artefato independente.
 
-O sistema é **single-tenant** (uma loja por instância). A estratégia para
-suportar várias lojas está em
-[docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md).
+O sistema hoje tem base **multi-loja por coluna `store_id`**: `Store`,
+`StoreMembership`, rotas públicas com `storeSlug`, seletor de loja no dashboard e
+queries de negócio escopadas por loja. A loja `default` continua existindo como
+fallback para links antigos e desenvolvimento local. O histórico da evolução está
+em [docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md).
 
 ## Documentação Oficial
 
@@ -145,7 +149,7 @@ suportar várias lojas está em
 - [docs/architecture/system-overview.md](docs/architecture/system-overview.md):
   arquitetura real do projeto.
 - [docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-evolution.md):
-  estratégia e roadmap para suporte a múltiplas lojas.
+  histórico, status e decisões da evolução multi-loja.
 - [docs/development-guide.md](docs/development-guide.md): setup, comandos,
   qualidade e manutenção.
 - [docs/production-go-live.md](docs/production-go-live.md): checklist
@@ -273,6 +277,18 @@ npm install --ignore-scripts
 Copy-Item .env.example .env.local
 npm run dev
 ```
+
+Se estiver usando o frontend dev em `5173` junto com Docker/Compose, reinicie
+o Vite com o proxy do ambiente em vez do default `127.0.0.1:8000`:
+
+```powershell
+npm run dev:docker  # proxy para http://localhost:8080
+npm run dev:smoke   # proxy para http://localhost:18088
+```
+
+Quando o catalogo em `5173` retorna 502 em `/api/v1/products/`, normalmente o
+backend direto em `8000` nao esta rodando. Nesse caso, abra o Docker em
+`18088` ou reinicie o frontend com `dev:smoke`.
 
 Aplicação local: `http://127.0.0.1:5173/`
 

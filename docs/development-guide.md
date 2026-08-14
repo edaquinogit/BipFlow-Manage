@@ -16,19 +16,19 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 
 - Local: `bipdelivery/`.
 - Stack: Django 6, Django REST Framework, Simple JWT e SQLite local.
-- Responsabilidades: autenticacao, perfil autenticado, produtos, categorias,
-  regioes de entrega, checkout via WhatsApp, pedidos persistidos, historico de
-  vendas, bot publico guiado por regras, RBAC de dashboard e media em
-  desenvolvimento.
+- Responsabilidades: autenticacao, perfil autenticado, lojas, memberships,
+  produtos, categorias, regioes de entrega, estoque auditado, PDV, checkout via
+  WhatsApp, pedidos persistidos, historico de vendas, bot publico guiado por
+  regras, RBAC de dashboard e media em desenvolvimento.
 
 ### Frontend principal
 
 - Local: `bipflow-frontend/`.
 - Stack: Vue 3, TypeScript, Vite, Vue Router, Axios e Tailwind.
-- Responsabilidades: dashboard autenticado, saudacao do usuario, menu
-  operacional, gestao de produtos, gestao de frete, alertas de estoque,
-  historico recente de vendas, catalogo publico, bot de atendimento do
-  catalogo, carrinho e checkout.
+- Responsabilidades: dashboard autenticado, saudacao do usuario, troca de loja,
+  menu operacional, gestao de produtos, gestao de frete, PDV por QR/codigo,
+  recibo, alertas de estoque, historico recente de vendas, catalogo publico por
+  loja, bot de atendimento do catalogo, carrinho por loja e checkout.
 - Contrato de auth: tokens JWT persistidos somente por
   `src/services/token-store.ts`.
 - Contrato de produtos: mutacoes passam por `ProductFormSchema`,
@@ -221,13 +221,15 @@ Documentacao:
 npm run docs:check
 ```
 
-Pipeline de frontend:
+Pipeline de CI:
 
-- `.github/workflows/frontend-tests.yml` roda em `push`, `pull_request` e
-  execucao manual.
-- O job rapido executa typecheck, lint, Vitest e build de producao.
-- O job E2E prepara o Django, cria o usuario `admin@example.com`/`admin123` e
-  roda Cypress.
+- `.github/workflows/ci.yml` roda em `push`, `pull_request` e execucao manual.
+- O job backend instala Python 3.12, executa `manage.py check` e `pytest`.
+- O job frontend executa typecheck, lint, Vitest e build de producao.
+- O job E2E prepara o Django, cria o usuario `admin@example.com`/senha de CI,
+  semeia dados de demonstracao e roda Cypress.
+- A CI tambem valida build Docker do backend e build/smoke do container
+  frontend.
 - Testes unitarios novos entram automaticamente seguindo
   `bipflow-frontend/src/**/*.spec.{ts,tsx,vue}`.
 - Testes E2E novos entram automaticamente seguindo
@@ -276,7 +278,7 @@ Frontend:
 
 ## Verificacao Local Atual
 
-Ultima verificacao registrada nesta documentacao: 2026-05-09.
+Ultima verificacao registrada nesta documentacao: 2026-08-13.
 
 Documentacao:
 
@@ -289,28 +291,34 @@ Resultado: checagem Markdown sem issues.
 Backend:
 
 ```powershell
-.\.venv\Scripts\python.exe bipdelivery\manage.py check
+.\bipdelivery\venv\Scripts\python.exe bipdelivery\manage.py check
+.\bipdelivery\venv\Scripts\python.exe bipdelivery\manage.py makemigrations --check --dry-run
+.\bipdelivery\venv\Scripts\ruff.exe check bipdelivery\api bipdelivery\tests
 ```
 
-Resultado: system check sem issues.
+Resultado: system check sem issues, nenhuma migration pendente e Ruff sem
+issues.
 
-Frontend unitario:
+Backend pytest:
 
 ```powershell
-npm test
+.\bipdelivery\venv\Scripts\python.exe -m pytest bipdelivery\tests -k "not TurnstileVerificationTest"
 ```
 
-Resultado: 11 arquivos e 48 testes unitarios passaram.
+Resultado: 472 testes passaram e 4 testes dependentes de verificacao real do
+Cloudflare Turnstile foram desmarcados.
 
-Frontend completo registrado anteriormente:
+Frontend:
 
 ```powershell
-npm run typecheck
-npm run test:unit:run
-npm run build
+npm run frontend:typecheck
+npm run frontend:lint
+npm run frontend:test:unit
+npm run frontend:build
 ```
 
-Resultado: typecheck, 37 testes unitarios e build de producao passaram.
+Resultado: typecheck, lint, 81 arquivos/537 testes unitarios e build de
+producao passaram.
 
 ## Padroes De Codigo
 
