@@ -630,6 +630,17 @@ class StoreSettingsAPITest(TestCase):
         self.assertNotIn("created_at", response.data)
         self.assertNotIn("updated_at", response.data)
 
+    def test_public_store_settings_reads_store_level_whatsapp(self) -> None:
+        """Public catalog contact must match the store used by checkout."""
+        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5588999999999")
+
+        response: Any = self.client.get("/api/v1/store-settings/public/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5588999999999")
+        self.assertTrue(response.data["is_whatsapp_configured"])
+        self.assertEqual(StoreSettings.objects.count(), 0)
+
     def test_public_store_settings_does_not_create_empty_settings_row(self) -> None:
         """Anonymous catalog reads should not mutate settings storage."""
         response: Any = self.client.get("/api/v1/store-settings/public/")
@@ -655,6 +666,18 @@ class StoreSettingsAPITest(TestCase):
         self.assertTrue(response.data["is_whatsapp_configured"])
         self.assertEqual(StoreSettings.get_solo().whatsapp_phone, "5571999999999")
         self.assertEqual(Store.get_default().whatsapp_phone, "5571999999999")
+
+    def test_dashboard_store_settings_reflects_store_level_whatsapp(self) -> None:
+        """Dashboard settings should not show stale blank data after store migration."""
+        self.client.force_authenticate(user=self.user)
+        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5571888888888")
+
+        response: Any = self.client.get("/api/v1/store-settings/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone"], "5571888888888")
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5571888888888")
+        self.assertTrue(response.data["is_whatsapp_configured"])
 
     def test_regular_user_cannot_update_store_settings(self) -> None:
         """Regular authenticated users should not mutate operational settings."""
@@ -709,6 +732,36 @@ class GoLiveReadinessCommandTest(TestCase):
 
         call_command("check_go_live_readiness", stdout=output)
 
+        self.assertIn("Go-live readiness checks passed.", output.getvalue())
+
+    @override_settings(**go_live_settings)
+    def test_go_live_readiness_accepts_store_level_whatsapp(self) -> None:
+        """Readiness should follow the same store contact source as checkout."""
+        User.objects.create_user(
+            username="operator@example.com",
+            email="operator@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        category = Category.objects.create(name="Prontos", slug="prontos")
+        Product.objects.create(
+            name="Produto pronto",
+            sku="READY-001",
+            price=Decimal("19.90"),
+            stock_quantity=5,
+            category=category,
+        )
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("12.00"),
+        )
+        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5571999999999")
+        output = StringIO()
+
+        call_command("check_go_live_readiness", stdout=output)
+
+        self.assertIn("store_whatsapp", output.getvalue())
         self.assertIn("Go-live readiness checks passed.", output.getvalue())
 
     @override_settings(**go_live_settings)

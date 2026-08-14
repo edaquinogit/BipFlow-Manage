@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
-from bipdelivery.api.models import Category, DeliveryRegion, Product, StoreSettings
+from bipdelivery.api.models import Category, DeliveryRegion, Product, Store, StoreSettings
 from bipdelivery.api.permissions import DASHBOARD_READ_ROLES, DASHBOARD_WRITE_ROLES
 
 
@@ -163,7 +163,12 @@ class Command(BaseCommand):
         return ReadinessCheck("dashboard_operator", True, "Dashboard operator exists.")
 
     def _check_store_whatsapp(self) -> ReadinessCheck:
-        if StoreSettings.get_configured_whatsapp_phone():
+        has_store_phone = any(
+            store.get_configured_whatsapp_phone()
+            for store in Store.objects.filter(is_active=True).only("whatsapp_phone")
+        )
+
+        if has_store_phone or StoreSettings.get_configured_whatsapp_phone():
             return ReadinessCheck("store_whatsapp", True, "Store WhatsApp is configured.")
 
         return ReadinessCheck(

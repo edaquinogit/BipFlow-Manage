@@ -89,6 +89,7 @@ function refreshAuthTokens(): Promise<TokenRefreshPayload> {
         // response and genuinely means "not logged in", so it must not retry.
         const hasHttpResponse = Boolean((error as { response?: unknown })?.response);
         if (hasHttpResponse) {
+          tokenStore.clearAccessToken();
           throw error;
         }
         return attemptRefresh();
@@ -112,7 +113,11 @@ function refreshAuthTokens(): Promise<TokenRefreshPayload> {
  */
 let authBootPromise: Promise<void> | null = null;
 
-export function ensureAuthBooted(): Promise<void> {
+export function ensureAuthBooted(options: { force?: boolean } = {}): Promise<void> {
+  if (!options.force && !tokenStore.hasSessionHint()) {
+    return Promise.resolve();
+  }
+
   if (!authBootPromise) {
     authBootPromise = refreshAuthTokens()
       .then(() => undefined)

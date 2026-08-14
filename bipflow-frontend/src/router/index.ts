@@ -67,8 +67,12 @@ router.onError((error) => {
 
 router.beforeEach(async (to) => {
   // Restores the in-memory access token from the httpOnly refresh cookie on
-  // first load (no-op on every navigation after that -- memoized).
-  await ensureAuthBooted()
+  // first load. Public storefront pages only attempt this when a non-sensitive
+  // client hint says a session may exist, keeping anonymous catalog visits from
+  // generating expected-but-noisy refresh 400s in the backend logs.
+  await ensureAuthBooted({
+    force: Boolean(to.meta.requiresAuth || to.meta.requiresCustomerAuth || to.meta.guestOnly),
+  })
   const isLogged = authService.isAuthenticated()
 
   // NOTE: there used to be a blanket "always allow navigation to /login"

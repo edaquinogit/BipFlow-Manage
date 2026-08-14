@@ -37,6 +37,7 @@ from rest_framework.views import APIView
 
 from .errors import not_found_error
 from .models import Product, SaleOrder, SaleOrderItem, StockMovement, Store
+from .order_reference import build_sale_order_reference
 from .permissions import has_dashboard_write_access
 from .store_scope import resolve_request_store
 from .throttling import PdvReceiptEmailThrottle
@@ -223,7 +224,7 @@ class PdvSaleView(APIView):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
-        order_reference = timezone.localtime().strftime("PDV-%Y%m%d-%H%M%S-%f")
+        order_reference = build_sale_order_reference("PDV")
         customer_name = validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
         customer_phone = validated.get("customer_phone", "").strip()
         customer_email = validated.get("customer_email", "").strip()

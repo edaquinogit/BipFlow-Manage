@@ -8,7 +8,7 @@
  * exposure this module was built to close).
  *
  * Run with:
- *   vitest run token-store.test.ts
+ *   vitest run token-store.spec.ts
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -46,7 +46,8 @@ describe('Token Store - in-memory access token', () => {
     it('never writes the access token to localStorage or sessionStorage', () => {
       tokenStore.setAccessToken('test-access-token')
 
-      expect(localStorage.length).toBe(0)
+      expect(localStorage.getItem('bipflow_auth_session_hint')).toBe('1')
+      expect(Object.values(localStorage)).not.toContain('test-access-token')
       expect(sessionStorage.length).toBe(0)
     })
   })
@@ -65,6 +66,28 @@ describe('Token Store - in-memory access token', () => {
       tokenStore.setAccessToken('test-access-token')
       tokenStore.clearAccessToken()
       expect(tokenStore.hasAccessToken()).toBe(false)
+    })
+  })
+
+  describe('hasSessionHint()', () => {
+    it('returns false before login', () => {
+      expect(tokenStore.hasSessionHint()).toBe(false)
+    })
+
+    it('returns true after an access token is received without persisting the token value', () => {
+      tokenStore.setAccessToken('test-access-token')
+
+      expect(tokenStore.hasSessionHint()).toBe(true)
+      expect(localStorage.getItem('bipflow_auth_session_hint')).toBe('1')
+      expect(JSON.stringify(localStorage)).not.toContain('test-access-token')
+    })
+
+    it('clears the hint together with the in-memory token', () => {
+      tokenStore.setAccessToken('test-access-token')
+      tokenStore.clearAccessToken()
+
+      expect(tokenStore.hasSessionHint()).toBe(false)
+      expect(localStorage.getItem('bipflow_auth_session_hint')).toBeNull()
     })
   })
 

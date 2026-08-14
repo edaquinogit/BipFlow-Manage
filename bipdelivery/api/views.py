@@ -54,6 +54,7 @@ from .models import (
     StoreSettings,
     TOTPDevice,
 )
+from .order_reference import build_sale_order_reference
 from .pagination import ProductListPagination, StandardPagination
 from .permissions import (
     AllowAnyReadDashboardWrite,
@@ -1336,6 +1337,9 @@ class StoreSettingsView(APIView):
 
     def get(self, request, *args, **kwargs):
         settings_instance = StoreSettings.get_solo()
+        store = resolve_request_store(request)
+        if not settings_instance.whatsapp_phone and store.whatsapp_phone:
+            settings_instance.whatsapp_phone = store.whatsapp_phone
         serializer = StoreSettingsSerializer(settings_instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1363,7 +1367,11 @@ class PublicStoreSettingsView(APIView):
     authentication_classes = []
 
     def get(self, request, *args, **kwargs):
-        settings_instance = StoreSettings.objects.filter(singleton_key=1).first() or StoreSettings()
+        store = resolve_request_store(request)
+        whatsapp_phone = (
+            store.get_configured_whatsapp_phone() or StoreSettings.get_configured_whatsapp_phone()
+        )
+        settings_instance = StoreSettings(whatsapp_phone=whatsapp_phone)
         serializer = PublicStoreSettingsSerializer(settings_instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1808,7 +1816,7 @@ class CheckoutWhatsAppView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-        order_reference = timezone.localtime().strftime("BPF-%Y%m%d-%H%M%S-%f")
+        order_reference = build_sale_order_reference("BPF")
         notes = customer.get("notes", "").strip()
 
         with transaction.atomic():
