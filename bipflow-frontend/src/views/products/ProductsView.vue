@@ -763,16 +763,27 @@ function handleAddToCart(product: Product, quantity: number): void {
 }
 
 function handleOpenDetails(product: Product): void {
-  if (!product.slug) {
+  const storeSlug = typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+  const normalizedSlug = (product.slug || '').trim()
+  const normalizedPublicCode = (product.public_code || '').trim()
+
+  if (normalizedSlug) {
+    void router.push({
+      name: storeSlug ? PublicRoutes.StoreProductDetails : PublicRoutes.ProductDetails,
+      params: storeSlug ? { storeSlug, slug: normalizedSlug } : { slug: normalizedSlug },
+    })
     return
   }
 
-  const storeSlug = typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+  if (storeSlug && normalizedPublicCode) {
+    void router.push({
+      name: PublicRoutes.StoreProductByCode,
+      params: { storeSlug, code: normalizedPublicCode },
+    })
+    return
+  }
 
-  void router.push({
-    name: storeSlug ? PublicRoutes.StoreProductDetails : PublicRoutes.ProductDetails,
-    params: storeSlug ? { storeSlug, slug: product.slug } : { slug: product.slug },
-  })
+  toast.info('Nao foi possivel abrir os detalhes deste produto no momento.')
 }
 
 function canOpenWhatsAppCheckout(): boolean {

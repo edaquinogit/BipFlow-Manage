@@ -26,6 +26,7 @@ export interface Product {
   id: number
   name: string
   slug: string | null
+  public_code?: string
   sku?: string | null
   description?: string | null
   price: string
@@ -176,6 +177,7 @@ export const ProductSchema = z.object({
   id: z.number(),
   name: z.string(),
   slug: z.string().nullable(),
+  public_code: z.string().optional(),
   sku: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   price: z.union([z.string(), z.number()]).transform((value) => String(value)),

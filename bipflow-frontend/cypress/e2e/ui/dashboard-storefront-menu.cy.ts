@@ -19,6 +19,10 @@ describe('Dashboard header: "Ver vitrine" storefront menu', () => {
     cy.loginViaApi()
   })
 
+  function expectedStorefrontUrl(): string {
+    return `${String(Cypress.config('baseUrl')).replace(/\/$/, '')}/l/default/produtos`
+  }
+
   it('keeps the popover fully inside the viewport and touch targets at 44px on a small phone', () => {
     // iPhone 14 dimensions -- same convention as cypress/e2e/ui/mobile-ux.cy.ts.
     cy.viewport(390, 844)
@@ -87,5 +91,46 @@ describe('Dashboard header: "Ver vitrine" storefront menu', () => {
     cy.get('[role="dialog"][aria-label="Compartilhar vitrine"]').should('be.visible')
     cy.get('body').type('{esc}')
     cy.get('[role="dialog"][aria-label="Compartilhar vitrine"]').should('not.exist')
+  })
+
+  it('shares a valid store-scoped storefront link that renders the public catalog', () => {
+    const expectedUrl = expectedStorefrontUrl()
+
+    cy.visitWithAuth('/dashboard')
+
+    cy.window().then((win) => {
+      const writeText = cy.stub().resolves()
+      Object.defineProperty(win.navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+      })
+      cy.wrap(writeText).as('writeText')
+    })
+
+    cy.get('button[title="Ver vitrine"]', { timeout: 10000 }).should('be.visible').click()
+
+    cy.get('[role="dialog"][aria-label="Compartilhar vitrine"] input')
+      .should('have.value', expectedUrl)
+
+    cy.contains('[role="dialog"] a', 'Entrar na vitrine')
+      .should('have.attr', 'href', expectedUrl)
+
+    cy.get('button[aria-label="Copiar link da vitrine"]').click()
+    cy.get('@writeText').should('have.been.calledWith', expectedUrl)
+    cy.contains('Link da vitrine invalido').should('not.exist')
+
+    cy.contains('[role="dialog"] a', 'Entrar na vitrine').invoke('removeAttr', 'target').click()
+
+    cy.location('pathname', { timeout: 15000 }).should('eq', '/l/default/produtos')
+    cy.contains('Link da vitrine invalido').should('not.exist')
+
+    cy.request('/api/v1/products/?page_size=1')
+      .its('body.count')
+      .should('be.gte', 1)
+
+    cy.visit('/l/default/produtos')
+    cy.contains('Produto Demo E2E', { timeout: 15000 }).should('be.visible')
+    cy.get('[data-cy="add-to-cart-button"]:not([disabled])').should('exist')
+    cy.contains('Erro ao carregar produtos').should('not.exist')
   })
 })

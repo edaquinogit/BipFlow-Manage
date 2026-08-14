@@ -9,22 +9,23 @@ import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { storeSettingsService } from '@/services/store-settings.service'
+import type { Product } from '@/types/product'
 import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
-  useProductSearch: vi.fn()
+  useProductSearch: vi.fn(),
 }))
 
 vi.mock('@/composables/useCart', () => ({
-  useCart: vi.fn()
+  useCart: vi.fn(),
 }))
 
 vi.mock('@/composables/useCurrentStore', () => ({
-  useCurrentStore: vi.fn()
+  useCurrentStore: vi.fn(),
 }))
 
 vi.mock('@/composables/useToast', () => ({
-  useToast: vi.fn()
+  useToast: vi.fn(),
 }))
 
 vi.mock('@/services/category.service', () => ({
@@ -88,7 +89,14 @@ const CartDrawerStub = defineComponent({
     isSubmitting: { type: Boolean, default: false },
     isWhatsAppConfigured: { type: Boolean, required: true },
   },
-  emits: ['close', 'clear-cart', 'remove-item', 'update-quantity', 'update-customer', 'submit-order'],
+  emits: [
+    'close',
+    'clear-cart',
+    'remove-item',
+    'update-quantity',
+    'update-customer',
+    'submit-order',
+  ],
   template: '<div class="cart-drawer-stub"></div>',
 })
 
@@ -98,19 +106,18 @@ describe('ProductsView', () => {
   const routerReplace = vi.fn(() => Promise.resolve())
   const windowOpen = vi.fn()
 
-  const mockProducts = [
-    {
-      id: 1,
-      name: 'Test Product',
-      slug: 'test-product',
-      price: '99.90',
-      category: { id: 1, name: 'Test Category', slug: 'test-category' },
-      image: 'https://example.com/image.jpg',
-      stock_quantity: 10,
-      is_available: true,
-      created_at: '2024-01-01T00:00:00Z'
-    }
-  ]
+  const mockProduct: Product = {
+    id: 1,
+    name: 'Test Product',
+    slug: 'test-product',
+    price: '99.90',
+    category: { id: 1, name: 'Test Category', slug: 'test-category' },
+    image: 'https://example.com/image.jpg',
+    stock_quantity: 10,
+    is_available: true,
+    created_at: '2024-01-01T00:00:00Z',
+  }
+  const mockProducts: Product[] = [mockProduct]
 
   const searchState = {
     products: ref(mockProducts),
@@ -125,7 +132,7 @@ describe('ProductsView', () => {
       categoryId: undefined,
       priceMin: undefined,
       priceMax: undefined,
-      inStockOnly: false
+      inStockOnly: false,
     }),
     hasNextPage: ref(false),
     hasPreviousPage: ref(false),
@@ -135,7 +142,7 @@ describe('ProductsView', () => {
     clearFilters: vi.fn(),
     goToPage: vi.fn(),
     nextPage: vi.fn(),
-    previousPage: vi.fn()
+    previousPage: vi.fn(),
   }
 
   const cartState = {
@@ -219,6 +226,7 @@ describe('ProductsView', () => {
     vi.mocked(useCurrentStore).mockReturnValue(currentStoreState as any)
     vi.mocked(useToast).mockReturnValue(toastMock as any)
     vi.mocked(useRoute).mockReturnValue({
+      params: {},
       query: {},
     } as any)
     vi.mocked(useRouter).mockReturnValue({
@@ -255,12 +263,70 @@ describe('ProductsView', () => {
 
   it('navigates to product details when a card requests it', async () => {
     const cardComponent = wrapper.findComponent(ProductCardStub)
-    await cardComponent.vm.$emit('open-details', mockProducts[0])
+    await cardComponent.vm.$emit('open-details', mockProduct)
 
     expect(routerPush).toHaveBeenCalledWith({
       name: 'public.product-details',
       params: { slug: 'test-product' },
     })
+  })
+
+  it('falls back to code-based storefront route when slug is missing but public_code exists', async () => {
+    wrapper.unmount()
+
+    vi.mocked(useRoute).mockReturnValue({
+      params: { storeSlug: 'default' },
+      query: {},
+    } as any)
+
+    searchState.products.value = [
+      {
+        ...mockProduct,
+        slug: null,
+        public_code: 'ABC123XYZ',
+      },
+    ]
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    const cardComponent = wrapper.findComponent(ProductCardStub)
+    await cardComponent.vm.$emit('open-details', searchState.products.value[0])
+
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'public.store-product-by-code',
+      params: { storeSlug: 'default', code: 'ABC123XYZ' },
+    })
+  })
+
+  it('shows an info toast when neither slug nor public_code are available', async () => {
+    wrapper.unmount()
+
+    vi.mocked(useRoute).mockReturnValue({
+      params: { storeSlug: 'default' },
+      query: {},
+    } as any)
+
+    const productWithoutDetailKeys = {
+      ...mockProduct,
+      slug: null,
+      public_code: '',
+    }
+
+    searchState.products.value = [productWithoutDetailKeys]
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    const cardComponent = wrapper.findComponent(ProductCardStub)
+    await cardComponent.vm.$emit('open-details', productWithoutDetailKeys)
+
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(toastMock.info).toHaveBeenCalledWith(
+      'Nao foi possivel abrir os detalhes deste produto no momento.',
+    )
   })
 
   it('renders catalog header and products', () => {
@@ -278,12 +344,16 @@ describe('ProductsView', () => {
   })
 
   it('shows the floating cart action after an item is added', async () => {
-    expect(wrapper.find('[aria-label="Abrir carrinho com 1 item"]').exists()).toBe(false)
+    expect(
+      wrapper.find('[aria-label="Abrir carrinho com 1 item"]').exists(),
+    ).toBe(false)
 
     cartState.itemCount.value = 1
     await nextTick()
 
-    const floatingCartButton = wrapper.find('[aria-label="Abrir carrinho com 1 item"]')
+    const floatingCartButton = wrapper.find(
+      '[aria-label="Abrir carrinho com 1 item"]',
+    )
     expect(floatingCartButton.exists()).toBe(true)
 
     await floatingCartButton.trigger('click')
@@ -295,7 +365,9 @@ describe('ProductsView', () => {
     await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
 
     const buttons = wrapper.findAll('button')
-    const categoryButton = buttons.find((button) => button.text() === 'Test Category')
+    const categoryButton = buttons.find(
+      (button) => button.text() === 'Test Category',
+    )
 
     expect(categoryButton).toBeDefined()
 
@@ -303,10 +375,15 @@ describe('ProductsView', () => {
 
     expect(searchState.updateFilters).not.toHaveBeenCalled()
 
-    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Salvar')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Salvar')
     await saveButton!.trigger('click')
 
-    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: 1, inStockOnly: false })
+    expect(searchState.updateFilters).toHaveBeenCalledWith({
+      categoryId: 1,
+      inStockOnly: false,
+    })
   })
 
   it('stages the in-stock checkbox without applying it until Salvar is clicked', async () => {
@@ -319,10 +396,15 @@ describe('ProductsView', () => {
 
     expect(searchState.updateFilters).not.toHaveBeenCalled()
 
-    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Salvar')
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Salvar')
     await saveButton!.trigger('click')
 
-    expect(searchState.updateFilters).toHaveBeenCalledWith({ categoryId: undefined, inStockOnly: true })
+    expect(searchState.updateFilters).toHaveBeenCalledWith({
+      categoryId: undefined,
+      inStockOnly: true,
+    })
   })
 
   it('only changes page when the pagination widget is clicked, not on its own', async () => {
@@ -349,11 +431,15 @@ describe('ProductsView', () => {
     const stockCheckbox = wrapper.find('input[type="checkbox"]')
     await stockCheckbox.setValue(true)
 
-    const cancelButton = wrapper.findAll('button').find((button) => button.text() === 'Cancelar')
+    const cancelButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Cancelar')
     await cancelButton!.trigger('click')
 
     expect(searchState.updateFilters).not.toHaveBeenCalled()
-    expect(wrapper.find('[aria-label="Abrir filtros"]').attributes('aria-expanded')).toBe('false')
+    expect(
+      wrapper.find('[aria-label="Abrir filtros"]').attributes('aria-expanded'),
+    ).toBe('false')
   })
 
   it('adds product to cart and shows toast feedback', async () => {

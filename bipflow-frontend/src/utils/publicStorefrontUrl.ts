@@ -1,4 +1,4 @@
-const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1"])
+const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1"])
 
 interface BuildPublicStorefrontUrlOptions {
   runtimeOrigin?: string
@@ -16,16 +16,37 @@ function getConfiguredStorefrontBaseUrl(): string {
   return (import.meta.env.VITE_PUBLIC_STOREFRONT_BASE_URL as string | undefined)?.trim() || ''
 }
 
-function canUseHttpProtocol(url: URL): boolean {
-  if (url.protocol !== 'http:') {
+function isPrivateOrLoopbackIpv4(hostname: string): boolean {
+  const octets = hostname.split('.').map((part) => Number(part))
+
+  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
     return false
   }
 
-  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-    return true
-  }
+  const first = octets[0] ?? -1
+  const second = octets[1] ?? -1
 
-  return LOCALHOST_HOSTS.has(url.hostname)
+  return (
+    first === 10
+    || first === 127
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || (first === 169 && second === 254)
+  )
+}
+
+function isLocalHttpHost(hostname: string): boolean {
+  const normalizedHost = hostname.trim().toLowerCase()
+
+  return (
+    LOCALHOST_HOSTS.has(normalizedHost)
+    || normalizedHost.endsWith('.localhost')
+    || isPrivateOrLoopbackIpv4(normalizedHost)
+  )
+}
+
+function canUseHttpProtocol(url: URL): boolean {
+  return url.protocol === 'http:' && isLocalHttpHost(url.hostname)
 }
 
 function isSupportedPublicProtocol(url: URL): boolean {
