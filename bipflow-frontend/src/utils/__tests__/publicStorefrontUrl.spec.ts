@@ -73,6 +73,16 @@ describe('buildPublicProductUrl', () => {
     ).toBe('https://app.bipflow.com/l/loja-a/produtos/camiseta-x')
   })
 
+  it('builds a local HTTP slug product URL for smoke sharing', () => {
+    expect(
+      buildPublicProductUrl({
+        runtimeOrigin: 'http://localhost:18088',
+        storeSlug: 'default',
+        productSlug: 'produto-teste',
+      }),
+    ).toBe('http://localhost:18088/l/default/produtos/produto-teste')
+  })
+
   it('builds a code-based deep link for QR share scenarios', () => {
     expect(
       buildPublicProductUrl({
@@ -81,6 +91,26 @@ describe('buildPublicProductUrl', () => {
         productCode: 'ABC123XYZ',
       }),
     ).toBe('https://app.bipflow.com/l/loja-a/p/ABC123XYZ')
+  })
+
+  it('builds a local HTTP code product URL when slug is unavailable', () => {
+    expect(
+      buildPublicProductUrl({
+        runtimeOrigin: 'http://localhost:5173',
+        storeSlug: 'default',
+        productCode: 'ABC123XYZ',
+      }),
+    ).toBe('http://localhost:5173/l/default/p/ABC123XYZ')
+  })
+
+  it('rejects public HTTP product URLs', () => {
+    expect(
+      buildPublicProductUrl({
+        runtimeOrigin: 'http://app.bipflow.com',
+        storeSlug: 'loja-a',
+        productSlug: 'camiseta-x',
+      }),
+    ).toBeNull()
   })
 
   it('returns null when route params are invalid', () => {
