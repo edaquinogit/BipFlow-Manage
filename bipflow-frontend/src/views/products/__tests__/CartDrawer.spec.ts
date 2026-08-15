@@ -13,6 +13,7 @@ vi.mock('vue-router', () => ({
 const buildCustomer = (overrides: Partial<CartCustomer> = {}): CartCustomer => ({
   deliveryMethod: 'delivery',
   paymentMethod: 'pix',
+  paymentInstallments: 1,
   deliveryRegionId: null,
   deliveryRegionName: '',
   deliveryRegionFee: 0,
@@ -195,6 +196,34 @@ describe('CartDrawer', () => {
 
     expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({
       paymentMethod: 'card',
+      paymentInstallments: 1,
+    })
+  })
+
+  it('shows card installment options and emits the selected installment count', async () => {
+    const wrapper = mountDrawer({
+      customer: buildCustomer({ paymentMethod: 'card', paymentInstallments: 2 }),
+      profile: buildProfile(),
+      paymentGateway: {
+        pix_payment_link_url: '',
+        card_payment_link_url: 'https://pay.example.com/card',
+        is_pix_link_configured: false,
+        is_card_link_configured: true,
+        card_max_installments: 3,
+        card_monthly_interest_rate: '0.00',
+        card_min_installment_amount: '5.00',
+      },
+    })
+
+    const installmentsSelect = wrapper.find('[data-cy="checkout-installments-select"]')
+    expect(installmentsSelect.exists()).toBe(true)
+    expect(installmentsSelect.findAll('option')).toHaveLength(3)
+    expect(wrapper.find('[data-cy="checkout-payment-link-status"]').text()).toContain('Link de cartao')
+
+    await installmentsSelect.setValue('3')
+
+    expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({
+      paymentInstallments: 3,
     })
   })
 })

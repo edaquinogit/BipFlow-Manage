@@ -52,6 +52,7 @@ export function clearAllPersistedCartCustomerData(): void {
 const defaultCustomer: CartCustomer = {
   deliveryMethod: 'delivery',
   paymentMethod: 'pix',
+  paymentInstallments: 1,
   deliveryRegionId: null,
   deliveryRegionName: '',
   deliveryRegionFee: 0,
@@ -66,12 +67,18 @@ const defaultCustomer: CartCustomer = {
 
 function normalizeCustomer(value: Partial<CartCustomer>): CartCustomer {
   const paymentMethod = value.paymentMethod === 'card' ? 'card' : 'pix'
+  const requestedInstallments = Math.trunc(Number(value.paymentInstallments || 1))
+  const paymentInstallments =
+    paymentMethod === 'card'
+      ? Math.max(1, Math.min(24, Number.isFinite(requestedInstallments) ? requestedInstallments : 1))
+      : 1
 
   return {
     ...defaultCustomer,
     ...value,
     deliveryMethod: 'delivery',
     paymentMethod,
+    paymentInstallments,
   }
 }
 

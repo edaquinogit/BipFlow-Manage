@@ -17,6 +17,10 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     payment_status: 'pending',
     payment_reference: 'PIX-2606200001',
     payment_display_code: 'BIPFLOW-PIX-2606200001-5500',
+    payment_link_url: '',
+    payment_installments: 1,
+    payment_installment_amount: null,
+    payment_installment_total: null,
     delivery_region_name: 'Centro',
     performed_by_username: null,
     subtotal: '50.00',
@@ -126,6 +130,23 @@ describe('SaleOrderDetailModal', () => {
     expect(wrapper.text()).toContain('Aguardando pagamento')
     expect(wrapper.find('[data-cy="order-payment-code"]').text()).toContain('BIPFLOW-PIX-2606200001-5500')
     expect(wrapper.text()).toContain('Codigo Pix interno para conferencia do pedido.')
+  })
+
+  it('renders payment link and card installments when present', () => {
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        payment_method: 'card',
+        payment_link_url: 'https://pay.example.com/card',
+        payment_installments: 3,
+        payment_installment_amount: '29.48',
+        payment_installment_total: '88.43',
+      }),
+    })
+
+    expect(wrapper.find('[data-cy="order-payment-installments"]').text()).toContain('3x')
+    expect(wrapper.find('[data-cy="order-payment-link"]').attributes('href')).toBe(
+      'https://pay.example.com/card'
+    )
   })
 
   it('does not render delivery address fields for a pickup order', () => {

@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
@@ -354,6 +355,9 @@ class Store(models.Model):
         "Trocas e devoluções em até 7 dias mediante apresentação deste comprovante."
     )
 
+    DEFAULT_CARD_MIN_INSTALLMENT_AMOUNT = Decimal("5.00")
+    MAX_CARD_INSTALLMENTS_LIMIT = 24
+
     name = models.CharField(max_length=120)
     slug = models.SlugField(unique=True)
     logo_url = models.URLField(max_length=500, blank=True)
@@ -361,6 +365,21 @@ class Store(models.Model):
     whatsapp_phone = models.CharField(max_length=32, blank=True)
     theme = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
+    payment_pix_link_url = models.URLField(max_length=512, blank=True)
+    payment_card_link_url = models.URLField(max_length=512, blank=True)
+    card_max_installments = models.PositiveSmallIntegerField(default=1)
+    card_monthly_interest_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Monthly percentage used only for card installment simulation.",
+    )
+    card_min_installment_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=DEFAULT_CARD_MIN_INSTALLMENT_AMOUNT,
+        help_text="Smallest allowed simulated card installment amount.",
+    )
     # Etapa PDV receipt refinement: store-level, editable per store (blank
     # means "don't show a policy line on the printed receipt at all") --
     # deliberately not a hardcoded "7 dias" string in the frontend template.
@@ -388,6 +407,22 @@ class Store(models.Model):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(card_max_installments__gte=1)
+                & models.Q(card_max_installments__lte=24),
+                name="store_card_max_installments_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(card_monthly_interest_rate__gte=Decimal("0.00"))
+                & models.Q(card_monthly_interest_rate__lte=Decimal("30.00")),
+                name="store_card_monthly_interest_rate_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(card_min_installment_amount__gte=Decimal("1.00")),
+                name="store_card_min_installment_amount_min",
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return the store name for admin/debug purposes."""
@@ -763,6 +798,20 @@ class SaleOrder(models.Model):
     payment_reference = models.CharField(max_length=48, blank=True, db_index=True)
     payment_display_code = models.CharField(max_length=120, blank=True)
     payment_instructions = models.TextField(blank=True)
+    payment_link_url = models.URLField(max_length=512, blank=True)
+    payment_installments = models.PositiveSmallIntegerField(default=1)
+    payment_installment_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    payment_installment_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     address = models.CharField(max_length=255, blank=True)
     neighborhood = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=255, blank=True)
@@ -801,6 +850,13 @@ class SaleOrder(models.Model):
         indexes = [
             models.Index(fields=["store", "created_at"]),
             models.Index(fields=["store", "status", "created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(payment_installments__gte=1)
+                & models.Q(payment_installments__lte=Store.MAX_CARD_INSTALLMENTS_LIMIT),
+                name="saleorder_payment_installments_range",
+            ),
         ]
 
     def __str__(self) -> str:

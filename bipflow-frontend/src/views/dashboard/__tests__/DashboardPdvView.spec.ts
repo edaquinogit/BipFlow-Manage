@@ -3,12 +3,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import DashboardPdvView from '../DashboardPdvView.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
+import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect'
 import ProductService from '@/services/product.service'
 import PdvSaleService from '@/services/pdvSale.service'
 import { salesService } from '@/services/sales.service'
+import { storeService } from '@/services/store.service'
 
 vi.mock('@/composables/useCurrentUser', () => ({ useCurrentUser: vi.fn() }))
+vi.mock('@/composables/useCurrentStore', () => ({ useCurrentStore: vi.fn() }))
 vi.mock('@/composables/useStoreSwitchEffect', () => ({ useStoreSwitchEffect: vi.fn() }))
 vi.mock('@/services/product.service', () => ({
   default: { getByCode: vi.fn() },
@@ -18,6 +21,9 @@ vi.mock('@/services/pdvSale.service', () => ({
 }))
 vi.mock('@/services/sales.service', () => ({
   salesService: { list: vi.fn() },
+}))
+vi.mock('@/services/store.service', () => ({
+  storeService: { getPaymentSettings: vi.fn() },
 }))
 // Etapa C2 of the PDV camera-scanner evolution: DashboardPdvView.spec.ts
 // only needs to prove the camera decode is wired into the same lookup path
@@ -75,7 +81,17 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useCurrentUser).mockReturnValue({ canManageCatalog: ref(true) } as any)
+    vi.mocked(useCurrentStore).mockReturnValue({
+      selectedStore: ref({ id: 1, name: 'Loja Principal', slug: 'default' }),
+    } as any)
     vi.mocked(salesService.list).mockResolvedValue(buildEmptySalesResponse())
+    vi.mocked(storeService.getPaymentSettings).mockResolvedValue({
+      payment_pix_link_url: '',
+      payment_card_link_url: '',
+      card_max_installments: 1,
+      card_monthly_interest_rate: '0.00',
+      card_min_installment_amount: '5.00',
+    })
   })
 
   it('shows a permission notice and hides the scan input without catalog access', () => {
@@ -169,6 +185,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: '',
     })
@@ -199,6 +220,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: '',
     })
@@ -217,6 +243,54 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
     )
   })
 
+  it('shows card installments and sends the selected count when finalizing', async () => {
+    vi.mocked(storeService.getPaymentSettings).mockResolvedValue({
+      payment_pix_link_url: '',
+      payment_card_link_url: 'https://pay.example.com/card',
+      card_max_installments: 4,
+      card_monthly_interest_rate: '0.00',
+      card_min_installment_amount: '5.00',
+    })
+    vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
+    vi.mocked(PdvSaleService.create).mockResolvedValue({
+      order_reference: 'PDV-20260702-120000-000000',
+      items: [],
+      subtotal: '18.50',
+      total: '18.50',
+      payment_method: 'card',
+      payment_link_url: 'https://pay.example.com/card',
+      payment_installments: 2,
+      payment_installment_amount: '9.25',
+      payment_installment_total: '18.50',
+      card_installment_options: [],
+      created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
+    })
+
+    const wrapper = mountPdvView()
+    await flushPromises()
+    await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+    await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+    await flushPromises()
+    await wrapper.find('[data-cy="pdv-payment-method"]').setValue('card')
+    await flushPromises()
+
+    const installmentsSelect = wrapper.find('[data-cy="pdv-payment-installments"]')
+    expect(installmentsSelect.exists()).toBe(true)
+    expect(wrapper.find('[data-cy="pdv-payment-link-status"]').text()).toContain('Link de cartao')
+
+    await installmentsSelect.setValue('2')
+    await wrapper.find('[data-cy="pdv-finalize-sale"]').trigger('click')
+    await flushPromises()
+
+    expect(PdvSaleService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_method: 'card',
+        payment_installments: 2,
+      })
+    )
+  })
+
   it('passes the optional customer email through to the sale payload (PDV receipt PDF/email evolution)', async () => {
     vi.mocked(ProductService.getByCode).mockResolvedValue(scannedProduct as any)
     vi.mocked(PdvSaleService.create).mockResolvedValue({
@@ -225,6 +299,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: 'cliente@example.com',
     })
@@ -260,6 +339,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: '',
     })
@@ -285,6 +369,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: '',
     })
@@ -447,6 +536,10 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
           payment_status: 'confirmed',
           payment_reference: 'PDV-260702100000',
           payment_display_code: 'PDV-260702100000',
+          payment_link_url: '',
+          payment_installments: 1,
+          payment_installment_amount: null,
+          payment_installment_total: null,
           delivery_region_name: '',
           performed_by_username: 'caixa1',
           subtotal: '18.50',
@@ -490,6 +583,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       subtotal: '18.50',
       total: '18.50',
       payment_method: 'pix',
+      payment_link_url: '',
+      payment_installments: 1,
+      payment_installment_amount: null,
+      payment_installment_total: null,
+      card_installment_options: [],
       created_at: '2026-07-02T12:00:00Z',
       customer_email: '',
     })
@@ -528,6 +626,10 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
           payment_status: 'confirmed',
           payment_reference: 'PDV-260702100000',
           payment_display_code: 'PDV-260702100000',
+          payment_link_url: '',
+          payment_installments: 1,
+          payment_installment_amount: null,
+          payment_installment_total: null,
           delivery_region_name: '',
           performed_by_username: 'caixa1',
           subtotal: '18.50',
@@ -666,6 +768,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
         subtotal: '18.50',
         total: '18.50',
         payment_method: 'pix',
+        payment_link_url: '',
+        payment_installments: 1,
+        payment_installment_amount: null,
+        payment_installment_total: null,
+        card_installment_options: [],
         created_at: '2026-07-02T12:00:00Z',
         customer_email: '',
       })

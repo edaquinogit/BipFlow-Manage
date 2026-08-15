@@ -234,6 +234,19 @@ function submitShipForm(): void {
                 <p v-if="order.payment_instructions" class="mt-2 text-xs leading-5 text-bip-muted">
                   {{ order.payment_instructions }}
                 </p>
+                <p v-if="order.payment_method === 'card' && order.payment_installments > 1" data-cy="order-payment-installments" class="mt-2 text-xs font-semibold text-[#05050A]">
+                  {{ order.payment_installments }}x de {{ formatBRL(order.payment_installment_amount || 0) }}
+                </p>
+                <a
+                  v-if="order.payment_link_url"
+                  data-cy="order-payment-link"
+                  :href="order.payment_link_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="mt-2 inline-flex text-xs font-black uppercase tracking-widest text-[#D81B60] hover:underline"
+                >
+                  Abrir link de pagamento
+                </a>
               </div>
             </section>
 

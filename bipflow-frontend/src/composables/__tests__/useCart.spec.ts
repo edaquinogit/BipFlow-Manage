@@ -50,6 +50,16 @@ describe('useCart - customer PII TTL', () => {
     expect(cart.customer.value.paymentMethod).toBe('pix')
   })
 
+  it('normalizes card installments and resets them when payment returns to pix', async () => {
+    const cart = await loadCart()
+
+    cart.updateCustomer({ paymentMethod: 'card', paymentInstallments: 99 })
+    expect(cart.customer.value.paymentInstallments).toBe(24)
+
+    cart.updateCustomer({ paymentMethod: 'pix', paymentInstallments: 3 })
+    expect(cart.customer.value.paymentInstallments).toBe(1)
+  })
+
   it('treats customer data past the 30-day TTL as expired', async () => {
     const cart = await loadCart()
     cart.updateCustomer({ fullName: 'Ana' })

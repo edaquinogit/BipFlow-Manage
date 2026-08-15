@@ -50,6 +50,7 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
     customer: {
       delivery_method: 'delivery',
       payment_method: paymentMethod,
+      payment_installments: paymentMethod === 'card' ? customer.paymentInstallments : 1,
       delivery_region_id: customer.deliveryRegionId,
       notes: customer.notes.trim(),
       full_name: customer.fullName.trim(),

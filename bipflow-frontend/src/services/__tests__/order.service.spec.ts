@@ -30,6 +30,7 @@ const buildProduct = (): Product => ({
 const buildCustomer = (overrides: Partial<CartCustomer> = {}): CartCustomer => ({
   deliveryMethod: 'pickup',
   paymentMethod: 'pix',
+  paymentInstallments: 1,
   deliveryRegionId: null,
   deliveryRegionName: '',
   deliveryRegionFee: 0,
@@ -117,6 +118,21 @@ describe('orderService.checkoutViaWhatsApp', () => {
       customer: Record<string, unknown>
     }
     expect(payload.customer.payment_method).toBe('pix')
+  })
+
+  it('sends selected card installments when payment method is card', async () => {
+    const items: CartItem[] = [{ product: buildProduct(), quantity: 1 }]
+
+    await orderService.checkoutViaWhatsApp(
+      items,
+      buildCustomer({ paymentMethod: 'card', paymentInstallments: 3 }),
+    )
+
+    const payload = vi.mocked(api.post).mock.calls[0]?.[1] as {
+      customer: Record<string, unknown>
+    }
+    expect(payload.customer.payment_method).toBe('card')
+    expect(payload.customer.payment_installments).toBe(3)
   })
 })
 

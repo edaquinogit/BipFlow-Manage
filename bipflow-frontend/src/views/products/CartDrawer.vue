@@ -126,6 +126,24 @@
                       </p>
                     </div>
                   </div>
+                  <label v-if="customer.paymentMethod === 'card' && installmentOptions.length > 1" class="mt-3 block">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]"> Parcelas </span>
+                    <select
+                      :value="customer.paymentInstallments"
+                      data-cy="checkout-installments-select"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      @change="handlePaymentInstallmentsChange"
+                    >
+                      <option v-for="option in installmentOptions" :key="option.installments" :value="option.installments">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <p data-cy="checkout-payment-link-status" class="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold leading-5 text-zinc-700">
+                    {{ paymentLinkStatus }}
+                  </p>
+
                   <p data-cy="checkout-cash-store-only" class="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold leading-5 text-zinc-700">
                     Dinheiro somente no caixa da loja.
                   </p>
@@ -191,8 +209,13 @@ import { createCustomerProfilePath, customerAccountPath } from '@/router/auth.ro
 import type { CustomerProfile } from '@/types/customer'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
+import type { PublicPaymentGatewaySettings } from '@/types/store-settings'
 import { formatBRL } from '@/utils/formatters'
 import { useDialogA11y } from '@/composables/useDialogA11y'
+import {
+  DEFAULT_PUBLIC_PAYMENT_GATEWAY,
+  buildCardInstallmentOptions,
+} from '@/utils/paymentInstallments'
 
 const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
@@ -218,10 +241,12 @@ const props = withDefaults(
     isSubmitting?: boolean
     isWhatsAppConfigured: boolean
     profile: CustomerProfile | null
+    paymentGateway?: PublicPaymentGatewaySettings
   }>(),
   {
     isDeliveryRegionsLoading: false,
     isSubmitting: false,
+    paymentGateway: () => DEFAULT_PUBLIC_PAYMENT_GATEWAY,
   },
 )
 
@@ -297,6 +322,22 @@ const paymentPanel = computed(() => {
   }
 })
 
+const installmentOptions = computed(() =>
+  buildCardInstallmentOptions(props.total, props.paymentGateway)
+)
+
+const paymentLinkStatus = computed(() => {
+  if (props.customer.paymentMethod === 'card') {
+    return props.paymentGateway.is_card_link_configured
+      ? 'Link de cartao sera enviado junto com a referencia do pedido.'
+      : 'Cartao sem link configurado: combine a cobranca no atendimento.'
+  }
+
+  return props.paymentGateway.is_pix_link_configured
+    ? 'Link Pix sera enviado junto com a referencia do pedido.'
+    : 'Pix sem link configurado: use a referencia interna para conferencia.'
+})
+
 const deliveryRegionPlaceholder = computed(() => {
   if (props.isDeliveryRegionsLoading) {
     return 'Carregando regioes...'
@@ -352,6 +393,13 @@ function handleNotesInput(event: Event): void {
 function handlePaymentMethodChange(event: Event): void {
   emit('updateCustomer', {
     paymentMethod: getInputValue(event) as CartCustomer['paymentMethod'],
+    paymentInstallments: 1,
+  })
+}
+
+function handlePaymentInstallmentsChange(event: Event): void {
+  emit('updateCustomer', {
+    paymentInstallments: Number(getInputValue(event)),
   })
 }
 

@@ -29,6 +29,10 @@ from .models import (
     StoreSettings,
     TOTPDevice,
 )
+from .payment_gateway import (
+    MAX_INSTALLMENTS_LIMIT,
+    get_card_settings,
+)
 from .permissions import (
     get_user_roles,
     has_dashboard_read_access,
@@ -535,7 +539,11 @@ class DeliveryRegionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-PUBLIC_STORE_SETTINGS_FIELDS = ("whatsapp_phone_digits", "is_whatsapp_configured")
+PUBLIC_STORE_SETTINGS_FIELDS = (
+    "whatsapp_phone_digits",
+    "is_whatsapp_configured",
+    "payment_gateway",
+)
 
 
 class StoreSerializer(serializers.ModelSerializer):
@@ -593,11 +601,87 @@ class StoreReceiptSettingsSerializer(serializers.Serializer):
     )
 
 
+class StorePaymentSettingsSerializer(serializers.ModelSerializer):
+    """Dashboard-managed payment links and card simulation rules.
+
+    Deliberately stores only gateway/payment-link configuration. Card PAN,
+    expiry and CVV are out of scope for this system and must be collected by
+    the acquirer/gateway page later.
+    """
+
+    class Meta:
+        model = Store
+        fields = [
+            "payment_pix_link_url",
+            "payment_card_link_url",
+            "card_max_installments",
+            "card_monthly_interest_rate",
+            "card_min_installment_amount",
+        ]
+
+    def _validate_payment_url(self, value: str) -> str:
+        normalized_url = value.strip()
+        if not normalized_url:
+            return ""
+
+        parsed = urlparse(normalized_url)
+        if parsed.scheme != "https":
+            raise serializers.ValidationError("Informe uma URL HTTPS do gateway ou maquininha.")
+
+        if parsed.username or parsed.password:
+            raise serializers.ValidationError("A URL de pagamento nao pode conter credenciais.")
+
+        return normalized_url
+
+    def validate_payment_pix_link_url(self, value: str) -> str:
+        return self._validate_payment_url(value)
+
+    def validate_payment_card_link_url(self, value: str) -> str:
+        return self._validate_payment_url(value)
+
+    def validate_card_max_installments(self, value: int) -> int:
+        if value < 1 or value > Store.MAX_CARD_INSTALLMENTS_LIMIT:
+            raise serializers.ValidationError(
+                f"Informe um limite entre 1 e {Store.MAX_CARD_INSTALLMENTS_LIMIT} parcelas."
+            )
+        return value
+
+    def validate_card_monthly_interest_rate(self, value: Decimal) -> Decimal:
+        if value < 0 or value > Decimal("30.00"):
+            raise serializers.ValidationError("Informe uma taxa mensal entre 0 e 30%.")
+        return value
+
+    def validate_card_min_installment_amount(self, value: Decimal) -> Decimal:
+        if value < Decimal("1.00") or value > Decimal("10000.00"):
+            raise serializers.ValidationError("Informe uma parcela minima entre R$ 1,00 e R$ 10.000,00.")
+        return value
+
+
+class CardInstallmentOptionSerializer(serializers.Serializer):
+    installments = serializers.IntegerField(min_value=1)
+    installment_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)
+    monthly_interest_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
+    label = serializers.CharField()
+
+
+class PaymentSimulationSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0.01"))
+    payment_method = serializers.ChoiceField(choices=["pix", "card"], default="card", required=False)
+    payment_installments = serializers.IntegerField(
+        min_value=1,
+        max_value=MAX_INSTALLMENTS_LIMIT,
+        default=1,
+        required=False,
+    )
+
+
 class PublicStoreSettingsSerializer(serializers.ModelSerializer):
     """Safe public store contact settings exposed to the catalog."""
 
     whatsapp_phone_digits = serializers.SerializerMethodField()
     is_whatsapp_configured = serializers.SerializerMethodField()
+    payment_gateway = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreSettings
@@ -611,6 +695,32 @@ class PublicStoreSettingsSerializer(serializers.ModelSerializer):
     def get_is_whatsapp_configured(self, settings_instance: StoreSettings) -> bool:
         """Expose whether checkout can generate a direct WhatsApp URL."""
         return bool(settings_instance.whatsapp_phone_digits)
+
+    def get_payment_gateway(self, settings_instance: StoreSettings) -> dict:
+        store = self.context.get("store")
+        if store is None:
+            return {
+                "pix_payment_link_url": "",
+                "card_payment_link_url": "",
+                "is_pix_link_configured": False,
+                "is_card_link_configured": False,
+                "card_max_installments": 1,
+                "card_monthly_interest_rate": "0.00",
+                "card_min_installment_amount": f"{Store.DEFAULT_CARD_MIN_INSTALLMENT_AMOUNT:.2f}",
+            }
+
+        max_installments, min_installment, monthly_interest_rate = get_card_settings(store)
+        pix_link_url = store.payment_pix_link_url.strip()
+        card_link_url = store.payment_card_link_url.strip()
+        return {
+            "pix_payment_link_url": pix_link_url,
+            "card_payment_link_url": card_link_url,
+            "is_pix_link_configured": bool(pix_link_url),
+            "is_card_link_configured": bool(card_link_url),
+            "card_max_installments": max_installments,
+            "card_monthly_interest_rate": f"{monthly_interest_rate:.2f}",
+            "card_min_installment_amount": f"{min_installment:.2f}",
+        }
 
 
 class StoreSettingsSerializer(PublicStoreSettingsSerializer):
@@ -819,6 +929,12 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
 
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
+    payment_installments = serializers.IntegerField(
+        min_value=1,
+        max_value=MAX_INSTALLMENTS_LIMIT,
+        required=False,
+        default=1,
+    )
     delivery_region_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
     full_name = serializers.CharField(
@@ -900,6 +1016,19 @@ class CheckoutCustomerResponseSerializer(serializers.Serializer):
     email = serializers.CharField(allow_blank=True)
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
+    payment_installments = serializers.IntegerField(min_value=1)
+    payment_installment_amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
+    payment_installment_total = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
     address = serializers.CharField(allow_blank=True)
     neighborhood = serializers.CharField(allow_blank=True)
     city = serializers.CharField(allow_blank=True)
@@ -916,6 +1045,21 @@ class CheckoutResponseSerializer(serializers.Serializer):
     payment_reference = serializers.CharField(allow_blank=True)
     payment_display_code = serializers.CharField(allow_blank=True)
     payment_instructions = serializers.CharField(allow_blank=True)
+    payment_link_url = serializers.CharField(allow_blank=True)
+    payment_installments = serializers.IntegerField(min_value=1)
+    payment_installment_amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
+    payment_installment_total = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
+    card_installment_options = CardInstallmentOptionSerializer(many=True, required=False)
     items = CheckoutItemResponseSerializer(many=True)
     customer = CheckoutCustomerResponseSerializer()
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
@@ -967,6 +1111,10 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "payment_reference",
             "payment_display_code",
+            "payment_link_url",
+            "payment_installments",
+            "payment_installment_amount",
+            "payment_installment_total",
             "subtotal",
             "delivery_fee",
             "delivery_region_name",

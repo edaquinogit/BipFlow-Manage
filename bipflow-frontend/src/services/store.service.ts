@@ -1,5 +1,10 @@
 import api from './api'
-import type { Store, StoreReceiptSettingsPayload } from '@/types/store'
+import type {
+  Store,
+  StorePaymentSettings,
+  StorePaymentSettingsPayload,
+  StoreReceiptSettingsPayload,
+} from '@/types/store'
 
 export const storeService = {
   async getCurrent(): Promise<Store> {
@@ -28,6 +33,22 @@ export const storeService = {
   /** Update a store's PDV receipt settings (exchange policy + paper format). */
   async updateReceiptSettings(slug: string, payload: StoreReceiptSettingsPayload): Promise<Store> {
     const response = await api.patch<Store>(`v1/store/mine/${slug}/receipt-settings/`, payload)
+    return response.data
+  },
+
+  async getPaymentSettings(slug: string): Promise<StorePaymentSettings> {
+    const response = await api.get<StorePaymentSettings>(`v1/store/mine/${slug}/payment-settings/`)
+    return response.data
+  },
+
+  async updatePaymentSettings(
+    slug: string,
+    payload: StorePaymentSettingsPayload,
+  ): Promise<StorePaymentSettings> {
+    const response = await api.patch<StorePaymentSettings>(
+      `v1/store/mine/${slug}/payment-settings/`,
+      payload,
+    )
     return response.data
   },
 }

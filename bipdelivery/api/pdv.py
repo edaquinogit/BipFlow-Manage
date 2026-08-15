@@ -38,6 +38,7 @@ from rest_framework.views import APIView
 from .errors import not_found_error
 from .models import Product, SaleOrder, SaleOrderItem, StockMovement, Store
 from .order_reference import build_payment_reference_details, build_sale_order_reference
+from .payment_gateway import build_payment_gateway_snapshot, serialize_installment_options
 from .permissions import has_dashboard_write_access
 from .store_scope import resolve_request_store
 from .throttling import PdvReceiptEmailThrottle
@@ -69,6 +70,12 @@ class PdvSaleRequestSerializer(serializers.Serializer):
 
     items = PdvSaleItemInputSerializer(many=True)
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
+    payment_installments = serializers.IntegerField(
+        min_value=1,
+        max_value=24,
+        required=False,
+        default=1,
+    )
     customer_name = serializers.CharField(
         required=False, allow_blank=True, max_length=255, default=""
     )
@@ -113,6 +120,21 @@ class PdvSaleResponseSerializer(serializers.Serializer):
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
     total = serializers.DecimalField(max_digits=10, decimal_places=2)
     payment_method = serializers.CharField()
+    payment_link_url = serializers.CharField(allow_blank=True)
+    payment_installments = serializers.IntegerField()
+    payment_installment_amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
+    payment_installment_total = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        allow_null=True,
+        required=False,
+    )
+    card_installment_options = serializers.ListField(required=False)
     created_at = serializers.DateTimeField()
     # Receipt PDF/email evolution: lets the just-finalized receipt modal
     # pre-fill the "send by email" field without a fresh lookup.
@@ -225,12 +247,6 @@ class PdvSaleView(APIView):
         validated = serializer.validated_data
 
         order_reference = build_sale_order_reference("PDV")
-        payment_details = build_payment_reference_details(
-            order_reference,
-            validated["payment_method"],
-            Decimal("0.00"),
-            confirmed=True,
-        )
         customer_name = validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
         customer_phone = validated.get("customer_phone", "").strip()
         customer_email = validated.get("customer_email", "").strip()
@@ -241,6 +257,18 @@ class PdvSaleView(APIView):
                 validated["items"], store
             )
             rounded_subtotal = subtotal.quantize(Decimal("0.01"))
+            payment_details = build_payment_reference_details(
+                order_reference,
+                validated["payment_method"],
+                rounded_subtotal,
+                confirmed=True,
+            )
+            payment_snapshot = build_payment_gateway_snapshot(
+                store=store,
+                payment_method=validated["payment_method"],
+                total=rounded_subtotal,
+                requested_installments=validated.get("payment_installments", 1),
+            )
 
             sale_order = SaleOrder.objects.create(
                 store=store,
@@ -256,6 +284,10 @@ class PdvSaleView(APIView):
                 payment_reference=payment_details.reference,
                 payment_display_code=payment_details.display_code,
                 payment_instructions=payment_details.instructions,
+                payment_link_url=payment_snapshot.payment_link_url,
+                payment_installments=payment_snapshot.installments,
+                payment_installment_amount=payment_snapshot.installment_amount,
+                payment_installment_total=payment_snapshot.installment_total,
                 notes=notes,
                 subtotal=rounded_subtotal,
                 delivery_fee=Decimal("0.00"),
@@ -308,6 +340,13 @@ class PdvSaleView(APIView):
                     "subtotal": rounded_subtotal,
                     "total": rounded_subtotal,
                     "payment_method": validated["payment_method"],
+                    "payment_link_url": payment_snapshot.payment_link_url,
+                    "payment_installments": payment_snapshot.installments,
+                    "payment_installment_amount": payment_snapshot.installment_amount,
+                    "payment_installment_total": payment_snapshot.installment_total,
+                    "card_installment_options": serialize_installment_options(
+                        payment_snapshot.card_options
+                    ),
                     "created_at": sale_order.created_at,
                     "customer_email": customer_email,
                 }

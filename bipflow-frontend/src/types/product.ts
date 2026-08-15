@@ -72,6 +72,7 @@ export interface CartItem {
 export interface CartCustomer {
   deliveryMethod: 'delivery' | 'pickup'
   paymentMethod: 'pix' | 'card' | 'cash'
+  paymentInstallments: number
   deliveryRegionId: number | null
   deliveryRegionName: string
   deliveryRegionFee: number
@@ -92,6 +93,7 @@ export interface CheckoutPayloadItem {
 export interface CheckoutPayloadCustomer {
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
+  payment_installments: number
   delivery_region_id: number | null
   notes: string
   full_name: string
@@ -126,6 +128,9 @@ export interface CheckoutResponseCustomer {
   email: string
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
+  payment_installments: number
+  payment_installment_amount: string | null
+  payment_installment_total: string | null
   delivery_region_id: number | null
   delivery_region_name?: string
   address: string
@@ -136,12 +141,25 @@ export interface CheckoutResponseCustomer {
 
 export type CheckoutPaymentStatus = 'pending' | 'pay_at_store' | 'confirmed'
 
+export interface CardInstallmentOption {
+  installments: number
+  installment_amount: string
+  total: string
+  monthly_interest_rate: string
+  label: string
+}
+
 export interface CheckoutResponse {
   order_reference: string
   payment_status: CheckoutPaymentStatus
   payment_reference: string
   payment_display_code: string
   payment_instructions: string
+  payment_link_url: string
+  payment_installments: number
+  payment_installment_amount: string | null
+  payment_installment_total: string | null
+  card_installment_options?: CardInstallmentOption[]
   items: CheckoutResponseItem[]
   customer: CheckoutResponseCustomer
   subtotal: string

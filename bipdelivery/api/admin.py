@@ -66,7 +66,15 @@ class DeliveryRegionAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "slug", "tagline", "is_active", "owner")
+    list_display = (
+        "id",
+        "name",
+        "slug",
+        "tagline",
+        "is_active",
+        "card_max_installments",
+        "owner",
+    )
     list_filter = ("is_active",)
     search_fields = ("name", "slug")
 
@@ -193,6 +201,7 @@ class SaleOrderAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
     search_fields = (
         "order_reference",
         "payment_reference",
+        "payment_link_url",
         "customer_name",
         "customer_phone",
         "items__product_name",

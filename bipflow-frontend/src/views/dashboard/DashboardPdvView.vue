@@ -1,23 +1,31 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { CameraIcon, EyeIcon, MinusIcon, PlusIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import { useCurrentUser } from '@/composables/useCurrentUser';
+import { useCurrentStore } from '@/composables/useCurrentStore';
 import { usePdvCart, type PdvCartLine } from '@/composables/usePdvCart';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useToast } from '@/composables/useToast';
 import ProductService from '@/services/product.service';
 import PdvSaleService from '@/services/pdvSale.service';
 import { salesService } from '@/services/sales.service';
+import { storeService } from '@/services/store.service';
 import { formatBRL } from '@/utils/formatters';
 import { isLowStock } from '@/utils/stockAlerts';
 import { Logger } from '@/services/logger';
 import { isAxiosError, buildErrorContext, type ApplicationError } from '@/types/errors';
 import { PDV_PAYMENT_METHODS, type PdvPaymentMethod } from '@/types/pdvSale';
 import type { SaleOrder } from '@/types/sales';
+import type { StorePaymentSettings } from '@/types/store';
 import type { ReceiptData } from '@/types/receipt';
 import type { Product } from '@/schemas/product.schema';
 import { extractPublicCodeFromScan } from '@/utils/pdvScan';
 import { playScanSuccessBeep } from '@/utils/sound';
+import {
+  DEFAULT_STORE_PAYMENT_SETTINGS,
+  buildCardInstallmentOptions,
+  getEffectiveMaxInstallments,
+} from '@/utils/paymentInstallments';
 import PdvSaleReceiptModal from '@/components/dashboard/product-table/PdvSaleReceiptModal.vue';
 import PdvCameraScannerModal, {
   type PdvCameraFeedback,
@@ -74,6 +82,7 @@ const extractPdvSaleErrorMessage = (error: unknown): string => {
  * USB scanner.
  */
 const { canManageCatalog } = useCurrentUser();
+const { selectedStore } = useCurrentStore();
 const { success, error: toastError, warning: toastWarning } = useToast();
 const cart = usePdvCart();
 
@@ -83,6 +92,7 @@ const scanError = ref<string | null>(null);
 const isLookingUp = ref(false);
 
 const paymentMethod = ref<PdvPaymentMethod>('pix');
+const paymentInstallments = ref(1);
 const customerName = ref('');
 const customerPhone = ref('');
 // PDV receipt PDF/email evolution: optional, lets the cashier email the
@@ -90,6 +100,7 @@ const customerPhone = ref('');
 const customerEmail = ref('');
 const notes = ref('');
 const isSubmitting = ref(false);
+const paymentSettings = ref<StorePaymentSettings>({ ...DEFAULT_STORE_PAYMENT_SETTINGS });
 
 // Etapa R4 of the QR-code stock-exit refinement: lets the cashier confirm a
 // sale actually registered without leaving the PDV screen. Shows the most
@@ -110,6 +121,41 @@ const loadRecentPdvSales = async (): Promise<void> => {
     isRecentSalesLoading.value = false;
   }
 };
+
+const loadPaymentSettings = async (): Promise<void> => {
+  const store = selectedStore.value;
+  if (!store) {
+    paymentSettings.value = { ...DEFAULT_STORE_PAYMENT_SETTINGS };
+    return;
+  }
+
+  try {
+    paymentSettings.value = await storeService.getPaymentSettings(store.slug);
+  } catch (error: unknown) {
+    Logger.warn('Failed to load PDV payment settings', buildErrorContext(error as ApplicationError, { slug: store.slug }));
+    paymentSettings.value = { ...DEFAULT_STORE_PAYMENT_SETTINGS };
+  }
+};
+
+const installmentOptions = computed(() =>
+  buildCardInstallmentOptions(cart.subtotal.value, paymentSettings.value)
+);
+
+const pdvPaymentLinkStatus = computed(() => {
+  if (paymentMethod.value === 'card') {
+    return paymentSettings.value.payment_card_link_url
+      ? 'Link de cartao configurado para conferencia da venda.'
+      : 'Cartao sem link configurado: registre pela maquininha no caixa.';
+  }
+
+  if (paymentMethod.value === 'pix') {
+    return paymentSettings.value.payment_pix_link_url
+      ? 'Link Pix configurado para conferencia da venda.'
+      : 'Pix sem link configurado: confira pelo comprovante do cliente.';
+  }
+
+  return 'Dinheiro registrado apenas no caixa da loja.';
+});
 // Etapa R2 of the QR-code stock-exit refinement: a snapshot of the sale just
 // completed, kept separately from the cart (which clears immediately) so
 // the receipt modal has something to show after resetSale() runs. Also
@@ -256,6 +302,7 @@ const resetSale = (): void => {
   customerEmail.value = '';
   notes.value = '';
   paymentMethod.value = 'pix';
+  paymentInstallments.value = 1;
   scanError.value = null;
   focusScanInput();
 };
@@ -271,6 +318,7 @@ const handleFinalizeSale = async (): Promise<void> => {
     const response = await PdvSaleService.create({
       items: cart.toSaleItems(),
       payment_method: paymentMethod.value,
+      ...(paymentMethod.value === 'card' ? { payment_installments: paymentInstallments.value } : {}),
       customer_name: customerName.value.trim() || undefined,
       customer_phone: customerPhone.value.trim() || undefined,
       customer_email: customerEmail.value.trim() || undefined,
@@ -317,6 +365,26 @@ useStoreSwitchEffect(() => {
   }
   resetSale();
   void loadRecentPdvSales();
+  void loadPaymentSettings();
+});
+
+watch(
+  () => [cart.subtotal.value, paymentMethod.value, paymentInstallments.value, paymentSettings.value],
+  () => {
+    if (paymentMethod.value !== 'card') {
+      paymentInstallments.value = 1;
+      return;
+    }
+
+    const maxInstallments = getEffectiveMaxInstallments(cart.subtotal.value, paymentSettings.value);
+    if (paymentInstallments.value > maxInstallments) {
+      paymentInstallments.value = maxInstallments;
+    }
+  },
+);
+
+watch(selectedStore, () => {
+  void loadPaymentSettings();
 });
 
 // Etapa C3 of the PDV camera-scanner evolution: Ctrl/Cmd+Enter finalizes the
@@ -341,6 +409,7 @@ const handleGlobalKeydown = (event: KeyboardEvent): void => {
 onMounted(() => {
   if (canManageCatalog.value) {
     void loadRecentPdvSales();
+    void loadPaymentSettings();
   }
   window.addEventListener('keydown', handleGlobalKeydown);
 });
@@ -545,6 +614,25 @@ onBeforeUnmount(() => {
               </option>
             </select>
           </div>
+
+          <div v-if="paymentMethod === 'card' && installmentOptions.length > 1" class="flex flex-col gap-2">
+            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">
+              Parcelas
+            </label>
+            <select
+              v-model.number="paymentInstallments"
+              data-cy="pdv-payment-installments"
+              class="rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-sm"
+            >
+              <option v-for="option in installmentOptions" :key="option.installments" :value="option.installments">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+
+          <p data-cy="pdv-payment-link-status" class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold leading-5 text-zinc-700">
+            {{ pdvPaymentLinkStatus }}
+          </p>
 
           <div class="flex flex-col gap-2">
             <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">

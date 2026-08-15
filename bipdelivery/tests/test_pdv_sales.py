@@ -106,6 +106,60 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertTrue(sale_order.payment_reference.startswith("PDV-"))
         self.assertNotEqual(sale_order.payment_reference, "FAKE-PDV")
 
+    def test_card_sale_persists_payment_gateway_snapshot(self) -> None:
+        self.store_b.payment_card_link_url = "https://pay.example.com/card"
+        self.store_b.card_max_installments = 3
+        self.store_b.card_min_installment_amount = Decimal("10.00")
+        self.store_b.save(
+            update_fields=[
+                "payment_card_link_url",
+                "card_max_installments",
+                "card_min_installment_amount",
+            ]
+        )
+
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [{"public_code": self.product_b.public_code, "quantity": 2}],
+                "payment_method": "card",
+                "payment_installments": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        self.assertEqual(response.data["payment_link_url"], "https://pay.example.com/card")
+        self.assertEqual(response.data["payment_installments"], 2)
+        self.assertEqual(response.data["payment_installment_amount"], "20.00")
+        self.assertEqual(response.data["payment_installment_total"], "40.00")
+        self.assertEqual(len(response.data["card_installment_options"]), 3)
+
+        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(sale_order.payment_link_url, "https://pay.example.com/card")
+        self.assertEqual(sale_order.payment_installments, 2)
+        self.assertEqual(sale_order.payment_installment_amount, Decimal("20.00"))
+
+    def test_card_sale_rejects_installments_above_effective_limit_without_side_effects(self) -> None:
+        self.store_b.card_max_installments = 6
+        self.store_b.card_min_installment_amount = Decimal("30.00")
+        self.store_b.save(update_fields=["card_max_installments", "card_min_installment_amount"])
+
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [{"public_code": self.product_b.public_code, "quantity": 1}],
+                "payment_method": "card",
+                "payment_installments": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product_b.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 10)
+        self.assertFalse(SaleOrder.objects.filter(payment_method="card").exists())
+
     def test_multi_item_sale_is_atomic_across_products(self) -> None:
         response = self.client.post(
             PDV_SALES_URL,

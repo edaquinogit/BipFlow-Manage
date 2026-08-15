@@ -250,6 +250,15 @@ describe('ProductsView', () => {
     vi.mocked(storeSettingsService.getPublic).mockResolvedValue({
       whatsapp_phone_digits: '5579999999999',
       is_whatsapp_configured: true,
+      payment_gateway: {
+        pix_payment_link_url: '',
+        card_payment_link_url: '',
+        is_pix_link_configured: false,
+        is_card_link_configured: false,
+        card_max_installments: 1,
+        card_monthly_interest_rate: '0.00',
+        card_min_installment_amount: '5.00',
+      },
     })
     wrapper = mountView()
     await flushPromises()

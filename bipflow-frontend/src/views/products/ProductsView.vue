@@ -158,7 +158,7 @@
 
     <FloatingCartButton :item-count="itemCount" @open-cart="openCart" />
 
-    <CartDrawer :is-open="isCartOpen" :items="items" :item-count="itemCount" :subtotal="subtotal" :delivery-fee="deliveryFee" :total="total" :customer="customer" :delivery-regions="deliveryRegions" :is-delivery-regions-loading="isDeliveryRegionsLoading" :is-submitting="isSubmittingOrder" :is-whats-app-configured="isWhatsAppConfigured" :profile="customerProfile" @close="isCartOpen = false" @clear-cart="clearCart" @remove-item="removeItem" @update-quantity="updateQuantity" @update-customer="updateCustomer" @submit-order="handleSubmitOrder" />
+    <CartDrawer :is-open="isCartOpen" :items="items" :item-count="itemCount" :subtotal="subtotal" :delivery-fee="deliveryFee" :total="total" :customer="customer" :delivery-regions="deliveryRegions" :is-delivery-regions-loading="isDeliveryRegionsLoading" :is-submitting="isSubmittingOrder" :is-whats-app-configured="isWhatsAppConfigured" :profile="customerProfile" :payment-gateway="paymentGateway" @close="isCartOpen = false" @clear-cart="clearCart" @remove-item="removeItem" @update-quantity="updateQuantity" @update-customer="updateCustomer" @submit-order="handleSubmitOrder" />
 
     <IntroSplash :visible="showIntro" :is-backend-ready="isBackendReady" @dismiss="dismissIntro" />
   </div>
@@ -192,7 +192,12 @@ import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
+import type { PublicPaymentGatewaySettings } from '@/types/store-settings'
 import { formatBRL } from '@/utils/formatters'
+import {
+  DEFAULT_PUBLIC_PAYMENT_GATEWAY,
+  getEffectiveMaxInstallments,
+} from '@/utils/paymentInstallments'
 
 function parseNumberParam(value: LocationQueryValue | LocationQueryValue[] | undefined): number | undefined {
   const normalizedValue = Array.isArray(value) ? value[0] : value
@@ -242,6 +247,7 @@ const isBackendReady = computed(() => isCoreDataReady.value && isProductsReady.v
 const categories = ref<Category[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
+const paymentGateway = ref<PublicPaymentGatewaySettings>({ ...DEFAULT_PUBLIC_PAYMENT_GATEWAY })
 const isCartOpen = ref(false)
 
 // Guest checkout reinstated: CartDrawer needs a fresh profile (or null) at
@@ -370,8 +376,10 @@ async function loadStoreSettings(): Promise<void> {
   try {
     const settings = await storeSettingsService.getPublic()
     storeWhatsAppPhone.value = settings.whatsapp_phone_digits
+    paymentGateway.value = settings.payment_gateway ?? { ...DEFAULT_PUBLIC_PAYMENT_GATEWAY }
   } catch (err) {
     storeWhatsAppPhone.value = ''
+    paymentGateway.value = { ...DEFAULT_PUBLIC_PAYMENT_GATEWAY }
     Logger.warn('Failed to load public store settings', {
       error: err instanceof Error ? err.message : 'unknown_error',
     })
@@ -421,6 +429,20 @@ watch(
   () => {
     if (!isSyncingRouteState) {
       syncRouteQuery()
+    }
+  },
+)
+
+watch(
+  () => [total.value, customer.value.paymentMethod, customer.value.paymentInstallments, paymentGateway.value],
+  () => {
+    if (customer.value.paymentMethod !== 'card') {
+      return
+    }
+
+    const maxInstallments = getEffectiveMaxInstallments(total.value, paymentGateway.value)
+    if (customer.value.paymentInstallments > maxInstallments) {
+      updateCustomer({ paymentInstallments: maxInstallments })
     }
   },
 )

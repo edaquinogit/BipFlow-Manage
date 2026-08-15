@@ -80,6 +80,7 @@ from .serializers import (
     CurrentUserSerializer,
     CustomerProfileSerializer,
     DeliveryRegionSerializer,
+    PaymentSimulationSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProductSerializer,
@@ -96,9 +97,14 @@ from .serializers import (
     StockMovementSerializer,
     StoreReceiptSettingsSerializer,
     StoreRenameSerializer,
+    StorePaymentSettingsSerializer,
     StoreScopedTokenObtainPairSerializer,
     StoreSerializer,
     StoreSettingsSerializer,
+)
+from .payment_gateway import (
+    build_payment_gateway_snapshot,
+    serialize_installment_options,
 )
 from .shipping import build_tracking_url, get_allowed_next_statuses
 from .stock import StockMovementError, apply_order_cancellation, apply_stock_movement
@@ -1372,7 +1378,7 @@ class PublicStoreSettingsView(APIView):
             store.get_configured_whatsapp_phone() or StoreSettings.get_configured_whatsapp_phone()
         )
         settings_instance = StoreSettings(whatsapp_phone=whatsapp_phone)
-        serializer = PublicStoreSettingsSerializer(settings_instance)
+        serializer = PublicStoreSettingsSerializer(settings_instance, context={"store": store})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -1489,6 +1495,78 @@ class StoreReceiptSettingsView(APIView):
         store.save(update_fields=update_fields)
 
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
+class StorePaymentSettingsView(APIView):
+    """Read/update payment links and card simulation for one owned store."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _get_editable_store(request, slug: str):
+        store = Store.objects.filter(slug=slug).first()
+        if store is None:
+            return None, not_found_error("Loja nao encontrada.")
+
+        can_edit = store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+        if not can_edit:
+            return None, permission_denied_error(
+                "Voce nao possui permissao para editar as configuracoes de pagamento desta loja."
+            )
+
+        return store, None
+
+    def get(self, request, *args, **kwargs):
+        store, error_response = self._get_editable_store(request, kwargs["slug"])
+        if error_response is not None:
+            return error_response
+
+        return Response(StorePaymentSettingsSerializer(store).data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        store, error_response = self._get_editable_store(request, kwargs["slug"])
+        if error_response is not None:
+            return error_response
+
+        serializer = StorePaymentSettingsSerializer(store, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PaymentOptionsView(APIView):
+    """Return public Pix/card payment options for the current store and amount."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        serializer = PaymentSimulationSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        snapshot = build_payment_gateway_snapshot(
+            store=store,
+            payment_method=validated["payment_method"],
+            total=validated["amount"],
+            requested_installments=validated["payment_installments"],
+        )
+
+        return Response(
+            {
+                "payment_method": validated["payment_method"],
+                "payment_link_url": snapshot.payment_link_url,
+                "payment_installments": snapshot.installments,
+                "payment_installment_amount": snapshot.installment_amount,
+                "payment_installment_total": snapshot.installment_total,
+                "card_installment_options": serialize_installment_options(snapshot.card_options),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class BotMessageView(APIView):
@@ -1844,6 +1922,12 @@ class CheckoutWhatsAppView(APIView):
                 customer["payment_method"],
                 total,
             )
+            payment_snapshot = build_payment_gateway_snapshot(
+                store=store,
+                payment_method=customer["payment_method"],
+                total=total,
+                requested_installments=customer.get("payment_installments", 1),
+            )
 
             message_lines = [
                 "Pedido BipFlow",
@@ -1872,6 +1956,17 @@ class CheckoutWhatsAppView(APIView):
                 message_lines.append(f"Codigo pagamento: {payment_details.reference}")
             if payment_details.display_code:
                 message_lines.append(f"Conferencia: {payment_details.display_code}")
+            if payment_snapshot.payment_link_url:
+                message_lines.append(f"Link pagamento: {payment_snapshot.payment_link_url}")
+            if customer["payment_method"] == "card":
+                if payment_snapshot.installments > 1:
+                    message_lines.append(
+                        "Parcelamento: "
+                        f"{payment_snapshot.installments}x de "
+                        f"R$ {payment_snapshot.installment_amount:.2f}"
+                    )
+                else:
+                    message_lines.append("Parcelamento: 1x")
 
             if is_delivery:
                 if delivery_region is not None:
@@ -1907,6 +2002,10 @@ class CheckoutWhatsAppView(APIView):
                 payment_reference=payment_details.reference,
                 payment_display_code=payment_details.display_code,
                 payment_instructions=payment_details.instructions,
+                payment_link_url=payment_snapshot.payment_link_url,
+                payment_installments=payment_snapshot.installments,
+                payment_installment_amount=payment_snapshot.installment_amount,
+                payment_installment_total=payment_snapshot.installment_total,
                 delivery_region=delivery_region,
                 delivery_region_name=delivery_region.name if delivery_region is not None else "",
                 address=order_address,
@@ -1971,6 +2070,13 @@ class CheckoutWhatsAppView(APIView):
                 "payment_reference": payment_details.reference,
                 "payment_display_code": payment_details.display_code,
                 "payment_instructions": payment_details.instructions,
+                "payment_link_url": payment_snapshot.payment_link_url,
+                "payment_installments": payment_snapshot.installments,
+                "payment_installment_amount": payment_snapshot.installment_amount,
+                "payment_installment_total": payment_snapshot.installment_total,
+                "card_installment_options": serialize_installment_options(
+                    payment_snapshot.card_options
+                ),
                 "items": normalized_items,
                 "customer": {
                     "full_name": customer_name,
@@ -1978,6 +2084,9 @@ class CheckoutWhatsAppView(APIView):
                     "email": customer_email,
                     "delivery_method": customer["delivery_method"],
                     "payment_method": customer["payment_method"],
+                    "payment_installments": payment_snapshot.installments,
+                    "payment_installment_amount": payment_snapshot.installment_amount,
+                    "payment_installment_total": payment_snapshot.installment_total,
                     "delivery_region_id": (
                         delivery_region.id if delivery_region is not None else None
                     ),

@@ -29,3 +29,13 @@ export interface StoreReceiptSettingsPayload {
   receipt_exchange_policy?: string
   receipt_paper_format?: ReceiptPaperFormat
 }
+
+export interface StorePaymentSettings {
+  payment_pix_link_url: string
+  payment_card_link_url: string
+  card_max_installments: number
+  card_monthly_interest_rate: string
+  card_min_installment_amount: string
+}
+
+export type StorePaymentSettingsPayload = Partial<StorePaymentSettings>

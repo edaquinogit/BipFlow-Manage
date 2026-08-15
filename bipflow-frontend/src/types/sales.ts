@@ -30,6 +30,10 @@ export interface SaleOrder {
   payment_status: SaleOrderPaymentStatus
   payment_reference: string
   payment_display_code: string
+  payment_link_url: string
+  payment_installments: number
+  payment_installment_amount: string | null
+  payment_installment_total: string | null
   delivery_region_name: string
   // Etapa R3 of the QR-code stock-exit refinement: who rang up the sale.
   // Always null for a virtual/WhatsApp order (no authenticated staff

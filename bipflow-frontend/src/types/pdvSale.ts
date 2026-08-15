@@ -18,6 +18,7 @@ export interface PdvSaleItemPayload {
 export interface PdvSaleRequestPayload {
   items: PdvSaleItemPayload[]
   payment_method: PdvPaymentMethod
+  payment_installments?: number
   customer_name?: string
   // Etapa R4 of the QR-code stock-exit refinement: optional, but capturing
   // it lets a PDV sale count toward the new-vs-returning customer insight
@@ -44,6 +45,19 @@ export const PdvSaleResponseSchema = z.object({
   subtotal: z.union([z.string(), z.number()]).transform((value) => String(value)),
   total: z.union([z.string(), z.number()]).transform((value) => String(value)),
   payment_method: z.string(),
+  payment_link_url: z.string().optional().default(''),
+  payment_installments: z.number().optional().default(1),
+  payment_installment_amount: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .optional()
+    .transform((value) => (value === null || value === undefined ? null : String(value))),
+  payment_installment_total: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .optional()
+    .transform((value) => (value === null || value === undefined ? null : String(value))),
+  card_installment_options: z.array(z.unknown()).optional().default([]),
   created_at: z.string(),
   customer_email: z.string().optional().default(''),
 })

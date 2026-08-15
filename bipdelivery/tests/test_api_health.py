@@ -641,6 +641,58 @@ class StoreSettingsAPITest(TestCase):
         self.assertTrue(response.data["is_whatsapp_configured"])
         self.assertEqual(StoreSettings.objects.count(), 0)
 
+    def test_public_store_settings_exposes_safe_payment_gateway_summary(self) -> None:
+        """Public checkout can show configured payment links without card data."""
+        Store.objects.filter(id=Store.get_default().id).update(
+            payment_pix_link_url="https://pay.example.com/pix",
+            payment_card_link_url="https://pay.example.com/card",
+            card_max_installments=4,
+            card_monthly_interest_rate=Decimal("1.50"),
+            card_min_installment_amount=Decimal("10.00"),
+        )
+
+        response: Any = self.client.get("/api/v1/store-settings/public/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        gateway = response.data["payment_gateway"]
+        self.assertEqual(gateway["pix_payment_link_url"], "https://pay.example.com/pix")
+        self.assertEqual(gateway["card_payment_link_url"], "https://pay.example.com/card")
+        self.assertTrue(gateway["is_pix_link_configured"])
+        self.assertTrue(gateway["is_card_link_configured"])
+        self.assertEqual(gateway["card_max_installments"], 4)
+        self.assertEqual(gateway["card_monthly_interest_rate"], "1.50")
+
+    def test_public_payment_options_simulates_card_installments(self) -> None:
+        Store.objects.filter(id=Store.get_default().id).update(
+            payment_card_link_url="https://pay.example.com/card",
+            card_max_installments=4,
+            card_monthly_interest_rate=Decimal("2.00"),
+            card_min_installment_amount=Decimal("10.00"),
+        )
+
+        response: Any = self.client.get(
+            "/api/v1/payments/options/?amount=120.00&payment_method=card&payment_installments=3"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data["payment_link_url"], "https://pay.example.com/card")
+        self.assertEqual(response.data["payment_installments"], 3)
+        self.assertEqual(response.data["payment_installment_total"], Decimal("124.85"))
+        self.assertEqual(response.data["payment_installment_amount"], Decimal("41.62"))
+        self.assertEqual(len(response.data["card_installment_options"]), 4)
+
+    def test_public_payment_options_rejects_unavailable_installments(self) -> None:
+        Store.objects.filter(id=Store.get_default().id).update(
+            card_max_installments=6,
+            card_min_installment_amount=Decimal("10.00"),
+        )
+
+        response: Any = self.client.get(
+            "/api/v1/payments/options/?amount=20.00&payment_method=card&payment_installments=3"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_public_store_settings_does_not_create_empty_settings_row(self) -> None:
         """Anonymous catalog reads should not mutate settings storage."""
         response: Any = self.client.get("/api/v1/store-settings/public/")
@@ -1232,6 +1284,63 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(response.data["results"][0]["item_count"], 1)
         self.assertEqual(response.data["results"][0]["payment_status"], "pending")
         self.assertTrue(response.data["results"][0]["payment_reference"].startswith("CARD-"))
+
+    def test_checkout_persists_card_gateway_snapshot(self) -> None:
+        Store.objects.filter(id=Store.get_default().id).update(
+            payment_card_link_url="https://pay.example.com/card",
+            card_max_installments=4,
+            card_monthly_interest_rate=Decimal("2.00"),
+            card_min_installment_amount=Decimal("10.00"),
+        )
+        checkout_client = self._checkout_client()
+        payload = {
+            "items": [{"product_id": self.product.id, "quantity": 2}],
+            "customer": {
+                "delivery_method": "pickup",
+                "payment_method": "card",
+                "payment_installments": 3,
+                "notes": "",
+            },
+        }
+
+        response: Any = checkout_client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data["payment_link_url"], "https://pay.example.com/card")
+        self.assertEqual(response.data["payment_installments"], 3)
+        self.assertEqual(response.data["payment_installment_total"], "88.43")
+        self.assertEqual(response.data["payment_installment_amount"], "29.48")
+        self.assertEqual(len(response.data["card_installment_options"]), 4)
+        self.assertIn("Link pagamento: https://pay.example.com/card", response.data["message"])
+        self.assertIn("Parcelamento: 3x de R$ 29.48", response.data["message"])
+
+        order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(order.payment_link_url, "https://pay.example.com/card")
+        self.assertEqual(order.payment_installments, 3)
+        self.assertEqual(order.payment_installment_total, Decimal("88.43"))
+
+    def test_checkout_rejects_card_installments_above_store_limit(self) -> None:
+        Store.objects.filter(id=Store.get_default().id).update(
+            card_max_installments=2,
+            card_min_installment_amount=Decimal("10.00"),
+        )
+        checkout_client = self._checkout_client()
+        payload = {
+            "items": [{"product_id": self.product.id, "quantity": 1}],
+            "customer": {
+                "delivery_method": "pickup",
+                "payment_method": "card",
+                "payment_installments": 3,
+                "notes": "",
+            },
+        }
+
+        response: Any = checkout_client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertFalse(SaleOrder.objects.filter(payment_method="card").exists())
 
     def test_dashboard_writer_can_update_sale_order_status(self) -> None:
         """Dashboard operators should move orders through operational states."""

@@ -370,6 +370,89 @@ class StoreReceiptSettingsEndpointTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class StorePaymentSettingsEndpointTest(TestCase):
+    """Payment gateway links are store-scoped dashboard settings."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(username="payment_owner", password="testpass123")
+        StoreMembership.objects.create(store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER)
+        StoreMembership.objects.create(store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER)
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user, token={"store_id": self.store_a.id})
+
+    def _url(self, slug: str) -> str:
+        return f"/api/v1/store/mine/{slug}/payment-settings/"
+
+    def test_owner_can_update_payment_links_and_card_rules(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {
+                "payment_pix_link_url": "https://pay.example.com/pix",
+                "payment_card_link_url": "https://pay.example.com/card",
+                "card_max_installments": 6,
+                "card_monthly_interest_rate": "1.99",
+                "card_min_installment_amount": "10.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.payment_pix_link_url, "https://pay.example.com/pix")
+        self.assertEqual(self.store_a.payment_card_link_url, "https://pay.example.com/card")
+        self.assertEqual(self.store_a.card_max_installments, 6)
+        self.assertEqual(self.store_a.card_monthly_interest_rate, Decimal("1.99"))
+        self.assertEqual(self.store_a.card_min_installment_amount, Decimal("10.00"))
+
+    def test_owner_can_read_payment_settings(self) -> None:
+        self.store_a.payment_card_link_url = "https://pay.example.com/card"
+        self.store_a.card_max_installments = 4
+        self.store_a.save(update_fields=["payment_card_link_url", "card_max_installments"])
+
+        response = self.client.get(self._url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["payment_card_link_url"], "https://pay.example.com/card")
+        self.assertEqual(response.data["card_max_installments"], 4)
+
+    def test_rejects_insecure_payment_link(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {"payment_pix_link_url": "http://pay.example.com/pix"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.payment_pix_link_url, "")
+
+    def test_rejects_payment_link_with_credentials(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {"payment_card_link_url": "https://user:secret@pay.example.com/card"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_viewer_role_cannot_update_payment_settings(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_b.slug),
+            {"payment_card_link_url": "https://pay.example.com/card"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_requires_authentication(self) -> None:
+        response = APIClient().get(self._url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class ProductImageUploadPathTest(TestCase):
     """Etapa 4: media paths are scoped by store_id, not shared across tenants."""
 
