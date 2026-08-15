@@ -19,6 +19,9 @@ no codigo e suficiente para operar o estado atual do repositorio.
 - [Auditoria de prontidao 2026-08-14](audits/production-readiness-audit-2026-08-14.md):
   registro profissional das correcoes, testes, smoke Docker/Compose e parecer
   de producao da sessao.
+- [Auditoria de carrinho mobile e login 2026-08-14](audits/cart-mobile-login-audit-2026-08-14.md):
+  registro dos achados de UX em telas pequenas, correcoes aplicadas no carrinho
+  da vitrine e alinhamento do fluxo de login/recuperacao de senha do cliente.
 - [Referencia da API Django](api/reference.md): endpoints implementados em
   `bipdelivery/api/`.
 - [Bot do catalogo](features/catalog-bot.md): comportamento, contrato,

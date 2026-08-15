@@ -2,6 +2,8 @@
 
 Data: 2026-08-14
 
+Status pos-correcao: corrigida no commit `f580bda fix: refine mobile cart and customer login flow`, publicado na branch `agent/cart-mobile-login-refinement`.
+
 ## Escopo
 
 Auditoria focada na experiencia mobile do carrinho da vitrine publica e na coerencia do fluxo de login do cliente. Foram revisados os componentes de catalogo, cart drawer, botao flutuante, toasts, rotas de cliente e recuperacao de senha.
@@ -13,20 +15,24 @@ Arquivos principais:
 - `bipflow-frontend/src/views/products/FloatingCartButton.vue`
 - `bipflow-frontend/src/components/common/ToastHost.vue`
 - `bipflow-frontend/src/views/customer/CustomerLoginView.vue`
+- `bipflow-frontend/src/views/customer/CustomerForgotPasswordView.vue`
 - `bipflow-frontend/src/views/customer/CreateCustomerProfileView.vue`
 - `bipflow-frontend/src/views/auth/ForgotPasswordView.vue`
 - `bipflow-frontend/src/router/auth.routes.ts`
 - `bipflow-frontend/src/router/index.ts`
 - `bipflow-frontend/src/services/api.ts`
 - `bipflow-frontend/src/composables/useCart.ts`
+- `bipflow-frontend/src/composables/useToast.ts`
 
 ## Veredito executivo
 
-Status geral: aprovado com ressalvas para mobile pequeno.
+Status original: aprovado com ressalvas para mobile pequeno.
+
+Status pos-correcao: corrigido e validado para o escopo auditado.
 
 O fluxo base esta correto: o carrinho permite checkout convidado, reaproveita perfil de cliente quando existe, persiste dados por loja, limpa PII no logout e o login de cliente nao cai no painel administrativo. Em telas comuns de mobile, como 390 x 844, o carrinho nao apresentou overflow horizontal.
 
-O principal problema esta em telas pequenas, especialmente 320 x 568: o botao de pedido no header estoura a largura da viewport apos adicionar item. Tambem ha polimento necessario na relacao entre toast e carrinho, no rodape do drawer em telas curtas e no fluxo de recuperacao de senha, que ainda leva o cliente para uma experiencia administrativa.
+Os problemas encontrados em telas pequenas foram corrigidos: o botao de pedido no header nao estoura mais a largura de 320px, o toast de sucesso e limpo ao abrir o carrinho, o footer do drawer ganhou variante compacta para telas curtas, o erro de login do cliente foi localizado em portugues, a recuperacao de senha recebeu experiencia propria da vitrine e o login de uma conta sem perfil na loja redireciona para criacao de perfil.
 
 ## Evidencias de validacao
 
@@ -61,9 +67,24 @@ Metricas observadas:
 - Carrinho aberto em 390 x 844: sem overflow horizontal, `scrollWidth: 390`.
 - Login de cliente em 320 x 568: sem overflow horizontal e mantendo rota `/entrar` apos credencial invalida.
 
+Validacao pos-correcao:
+
+- `cd bipflow-frontend; npm run test:unit:run -- useToast ProductsView ProductDetailView CustomerLoginView CustomerForgotPasswordView CartDrawer customerAccountGuard`
+- Resultado: 7 arquivos e 39 testes passaram.
+- `cd bipflow-frontend; npm run build`
+- Resultado: typecheck e build passaram; Vite alertou apenas sobre chunks grandes.
+- Edge headless/CDP em 320 x 568
+- Resultado: `htmlScrollWidth: 320`, `bodyScrollWidth: 320`, `drawerScrollWidth: 320`, `successToastVisible: false`, footer compacto com 163px e area central do carrinho com 278px.
+- Hook de pre-commit no commit `f580bda`
+- Resultado: higiene de segredos, validacoes de raiz, typecheck frontend e sintaxe Python passaram.
+- Suite unitaria completa do frontend
+- Resultado: tentativa excedeu o timeout de 124s neste ambiente sem reportar falha; a regressao coberta pela mudanca ficou validada pelo pacote focado acima.
+
 ## Achados por severidade
 
 ### Alta: header do carrinho estoura em 320px
+
+Status: corrigido em `ProductsView.vue` com layout compacto abaixo de 390px, icone sem shrink, label adaptavel e subtotal truncado.
 
 Onde: `ProductsView.vue`, botao `data-cy="open-cart-button"` com `whitespace-nowrap` e subtotal visivel no header.
 
@@ -80,6 +101,8 @@ Recomendacao: criar variante compacta abaixo de 360px. Opcoes:
 
 ### Alta: toast cobre cabecalho do cart drawer
 
+Status: corrigido com `toast.clearByType('success')` ao abrir o carrinho na listagem e no detalhe do produto.
+
 Onde: `ToastHost.vue` usa container fixo `top-3 z-50`; `CartDrawer.vue` tambem abre em `z-50`.
 
 Impacto: ao adicionar item e abrir o carrinho imediatamente, o toast de sucesso fica sobre a area superior do drawer. Em mobile, isso esconde ou compete com o cabecalho e o controle de fechamento, deixando a primeira leitura do carrinho pesada.
@@ -89,6 +112,8 @@ Evidencia: capturas de 320 x 568 e 390 x 844 mostram o toast ocupando a parte su
 Recomendacao: quando o carrinho abrir, limpar o toast de sucesso ou reduzir sua prioridade visual. Alternativas: baixar o z-index dos toasts atras do drawer, reposicionar toasts em modal aberto, ou trocar o feedback de "adicionado" por estado inline no proprio carrinho/FAB.
 
 ### Media: rodape do carrinho ocupa area demais em telas curtas
+
+Status: corrigido em `CartDrawer.vue` com classes dedicadas e regra `@media (max-height: 640px)` para compactar resumo, alerta e CTA.
 
 Onde: `CartDrawer.vue`, footer com resumo, frete, total, nota, alerta de validacao e CTA.
 
@@ -103,6 +128,8 @@ Recomendacao: criar footer compacto para alturas pequenas. Opcoes:
 
 ### Media: erro de login do cliente aparece em ingles
 
+Status: corrigido em `CustomerLoginView.vue`; respostas 401 agora mostram `Email ou senha invalidos.` para o cliente final.
+
 Onde: `CustomerLoginView.vue` retorna `data.detail` antes do fallback em portugues.
 
 Impacto: credencial invalida exibiu "No active account found with the given credentials". Para cliente final, isso reduz confianca e parece erro tecnico.
@@ -111,6 +138,8 @@ Recomendacao: mapear respostas 401 conhecidas para `Email ou senha invalidos.` o
 
 ### Media: recuperacao de senha quebra o contexto de cliente
 
+Status: corrigido com `CustomerForgotPasswordView.vue`, helper `customerForgotPasswordPath()` e rotas `/l/:storeSlug/senha/recuperar`, `/s/:storeSlug/senha/recuperar` e `/senha/recuperar`.
+
 Onde: `CustomerLoginView.vue` aponta "Esqueci minha senha" para `AuthRouteNames.ForgotPassword`; `ForgotPasswordView.vue` usa `AuthShell`, fala em "email administrativo" e volta para `AuthRouteNames.Login`.
 
 Impacto: cliente que esta na vitrine cai em uma tela com linguagem administrativa. Isso contradiz a separacao bem feita entre login de cliente e login admin.
@@ -118,6 +147,8 @@ Impacto: cliente que esta na vitrine cai em uma tela com linguagem administrativ
 Recomendacao: criar uma rota/tela de recuperacao de senha do cliente, mantendo storefront shell e redirect de volta para `/entrar` ou `/l/:storeSlug/login`. Se o endpoint for o mesmo, a UI e os redirects ainda devem ser de cliente.
 
 ### Baixa: login com conta sem perfil da loja pode parecer inconclusivo
+
+Status: corrigido em `CustomerLoginView.vue`; quando `fetchCustomerProfile()` retorna falso, o cliente e redirecionado para criacao de perfil preservando `redirect`.
 
 Onde: `CustomerLoginView.vue` chama `fetchCustomerProfile()` e depois redireciona mesmo se o perfil nao existir.
 
@@ -139,9 +170,9 @@ Recomendacao: apos login, se `fetchCustomerProfile()` retornar falso, redirecion
 
 ## Compatibilidade por faixa de tela
 
-320px: requer ajuste. O header do pedido estoura horizontalmente; o carrinho cabe, mas fica visualmente pressionado pelo toast e pelo footer alto.
+320px: corrigido na validacao pos-correcao. O header do pedido nao gera overflow horizontal, o drawer permanece com `scrollWidth` de 320px, o toast nao cobre o carrinho e o footer compacto preserva contexto de item e CTA.
 
-360px: provavel melhora, mas ainda deve ser tratado como faixa critica porque o botao do header tem largura proxima ao limite quando combinado com o icone de conta, gaps e padding.
+360px: coberto pelas regras compactas abaixo de 390px, mantendo label e subtotal sob controle de largura.
 
 390px: aprovado na validacao headless. Sem overflow horizontal no carrinho.
 
@@ -149,16 +180,18 @@ Recomendacao: apos login, se `fetchCustomerProfile()` retornar falso, redirecion
 
 Tablet: estrutura de `max-w-xl` para drawer e grids responsivos deve se comportar bem.
 
-## Prioridade recomendada
+## Prioridade executada
 
-1. Corrigir overflow do botao de pedido no header abaixo de 360px.
-2. Resolver sobreposicao do toast com o cart drawer.
-3. Compactar o footer do carrinho em telas curtas.
-4. Localizar mensagens de erro do login de cliente.
-5. Separar recuperacao de senha do cliente da recuperacao administrativa.
-6. Adicionar teste automatizado para viewport 320 x 568 com item no carrinho.
+1. Overflow do botao de pedido no header abaixo de 390px corrigido.
+2. Sobreposicao do toast com o cart drawer corrigida.
+3. Footer do carrinho em telas curtas compactado.
+4. Mensagens de erro do login de cliente localizadas.
+5. Recuperacao de senha do cliente separada da recuperacao administrativa.
+6. Teste automatizado para viewport 320 x 568 com item no carrinho adicionado em `mobile-ux.cy.ts`.
 
 ## Criterios de aceite sugeridos
+
+Status pos-correcao: atendidos para o escopo validado.
 
 - Em 320 x 568, `document.documentElement.scrollWidth <= window.innerWidth`.
 - Nenhum botao visivel do header termina fora da viewport.

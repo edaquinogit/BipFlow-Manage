@@ -12,11 +12,11 @@ GitHub: https://github.com/edaquinogit
 Desenvolvedor Full Stack Junior em formacao, com foco em backend Python,
 APIs REST, autenticacao, controle de acesso, testes automatizados e frontend
 Vue.js com TypeScript. Desenvolvi o BipFlow Manage, uma aplicacao full-stack
-para gestao de catalogo, frete, checkout via WhatsApp e historico de vendas,
-aplicando boas praticas de Clean Code, documentacao tecnica, validacao de dados
-e qualidade com testes. Busco primeira oportunidade formal em desenvolvimento
-para atuar com backend, frontend ou full stack em times que valorizem codigo
-claro, testavel e bem documentado.
+multi-loja para gestao de catalogo, frete, PDV, estoque auditado, perfil de
+cliente, checkout via WhatsApp e historico de vendas. Aplico boas praticas de
+Clean Code, documentacao tecnica, validacao de dados, refinamento de UX mobile
+e qualidade com testes. Busco primeira vaga dedicada como desenvolvedor junior
+ou full stack em times que valorizem codigo claro, testavel e bem documentado.
 
 ## Competencias Tecnicas
 
@@ -34,18 +34,26 @@ claro, testavel e bem documentado.
 
 ### BipFlow Manage | Projeto Full Stack | 2025 - atual
 
-Aplicacao full-stack para pequenos negocios controlarem catalogo, frete por
-regiao, pedidos e checkout via WhatsApp.
+Aplicacao full-stack multi-loja para pequenos negocios controlarem catalogo,
+frete por regiao, PDV, estoque, pedidos e checkout via WhatsApp.
 
 - Desenvolvi o backend com Django REST Framework para centralizar regras de
-  negocio de produtos, categorias, estoque, frete, checkout e historico de
-  vendas, reduzindo dependencia de controles manuais em planilhas ou mensagens.
+  negocio de lojas, produtos, categorias, estoque, frete, checkout e historico
+  de vendas, reduzindo dependencia de controles manuais em planilhas ou
+  mensagens.
 - Implementei autenticacao JWT com refresh token, throttling em endpoints
   sensiveis e RBAC para proteger dashboard, historico de vendas e operacoes
   administrativas.
 - Modelei endpoints REST para catalogo publico, regioes de entrega, checkout
   via WhatsApp e vendas, mantendo o backend como autoridade para preco, estoque,
   disponibilidade, frete e total do pedido.
+- Evolui a base multi-loja com `Store`, `StoreMembership`, seletor de loja,
+  vitrine publica por `storeSlug` e queries de negocio escopadas por loja.
+- Implementei PDV por QR/codigo publico, recibo, envio de recibo por email e
+  baixa de estoque auditada para vendas presenciais e online.
+- Criei fluxo de perfil de cliente por loja, login da vitrine e recuperacao de
+  senha no contexto do cliente, preservando separacao entre cliente final e
+  painel administrativo.
 - Construi o frontend com Vue.js 3 e TypeScript, separando services,
   composables, types e schemas para manter o fluxo de dados previsivel e facil
   de manter.
@@ -53,16 +61,20 @@ regiao, pedidos e checkout via WhatsApp.
   payloads invalidos antes de gravar ou processar dados sensiveis.
 - Implementei upload de imagens com capa e galeria limitada, preservando ordem
   visual e URLs absolutas para renderizacao correta no catalogo e dashboard.
-- Criei cobertura de testes e validacoes com Pytest, Vitest, Ruff, ESLint,
-  typecheck e build, com 86 testes backend e 37 testes unitarios frontend
-  executados localmente.
+- Realizei refinamento visual do carrinho em telas pequenas, corrigindo
+  overflow em 320px, sobreposicao de toast, footer compacto e mensagens de
+  login do cliente em portugues.
+- Mantenho cobertura de regressao com Pytest, Vitest, Cypress, Ruff, ESLint,
+  typecheck, build e hooks de pre-commit em backend, frontend e fluxos E2E.
 - Configurei specs Cypress e comandos reutilizaveis de login via API para
-  validar fluxos de dashboard e upload de produto em ambiente E2E.
+  validar fluxos de dashboard, upload de produto, loja publica e UX mobile.
 - Documentei arquitetura, setup, contratos de API e decisoes tecnicas em
-  Markdown, facilitando manutencao, revisao e onboarding.
+  Markdown, incluindo checklist de producao, auditorias e registros de
+  validacao para facilitar manutencao, revisao e onboarding.
 
 Tecnologias: Python, Django REST Framework, Simple JWT, Vue.js 3, TypeScript,
-Vite, Axios, Zod, SQLite, Pytest, Vitest, Cypress, Ruff, ESLint, Git.
+Vite, Axios, Zod, SQLite, PostgreSQL, Redis, Docker, Pytest, Vitest, Cypress,
+Ruff, ESLint, Git.
 
 ## Experiencia Profissional
 
@@ -91,7 +103,7 @@ UNIGRANDE | Em andamento | Conclusao prevista: 2027
 
 ## Informacoes Adicionais
 
-- Disponivel para oportunidades Junior, Estagio ou Trainee em Desenvolvimento
-  Backend, Frontend ou Full Stack.
+- Disponivel para primeira vaga dedicada como Desenvolvedor Junior, Estagio ou
+  Trainee em Backend, Frontend ou Full Stack.
 - Interesse em Python, Django REST Framework, Vue.js, TypeScript, APIs REST,
   testes automatizados e produtos digitais.

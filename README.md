@@ -154,6 +154,9 @@ em [docs/architecture/multi-tenant-evolution.md](docs/architecture/multi-tenant-
   qualidade e manutenção.
 - [docs/production-go-live.md](docs/production-go-live.md): checklist
   operacional para receber pedidos reais.
+- [docs/audits/cart-mobile-login-audit-2026-08-14.md](docs/audits/cart-mobile-login-audit-2026-08-14.md):
+  auditoria e correcao do carrinho mobile em telas pequenas e do fluxo de login
+  do cliente da vitrine.
 - [docs/api/reference.md](docs/api/reference.md): contrato funcional da API
   Django.
 - [docs/features/catalog-bot.md](docs/features/catalog-bot.md): documentação do

@@ -1,15 +1,17 @@
 # Estrategia De Posicionamento Profissional
 
 Este documento registra os criterios usados para transformar o curriculo em uma
-versao mais alinhada a primeira oportunidade em desenvolvimento de software,
-mantendo coerencia entre experiencia, projeto pratico e leitura por ATS.
+versao mais alinhada a primeira vaga dedicada como desenvolvedor junior ou full
+stack, mantendo coerencia entre experiencia operacional/tecnica, projeto
+pratico e leitura por ATS.
 
 ## Diagnostico
 
 O curriculo original ja demonstrava uma base tecnica consistente, mas precisava
 ser ajustado para comunicar com mais precisao o momento profissional atual:
-busca por primeira oportunidade formal como desenvolvedor junior, com forte
-apoio em projeto pratico, documentacao e validacoes.
+busca por primeira vaga dedicada como desenvolvedor junior ou full stack, com
+forte apoio em projeto pratico, documentacao e validacoes, sem apagar a
+experiencia operacional/tecnica ja existente.
 
 Tambem foi considerado o risco de curriculos gerados a partir de PDFs com layout
 complexo. Para sistemas ATS, a versao mais segura e um DOCX simples, em uma
@@ -30,15 +32,19 @@ coluna, sem tabelas, icones ou caixas de texto.
 - Reduzir frases abstratas e priorizar evidencias verificaveis.
 - Usar bullets em formato STAR: contexto, acao tecnica e resultado pratico.
 - Evitar metricas sem fonte auditavel.
+- Evitar numeros fixos de testes no curriculo quando eles mudam com frequencia;
+  preferir citar tipos de validacao e ferramentas usadas.
 - Inserir palavras-chave de vaga de forma natural: Django REST Framework, API
   REST, JWT, RBAC, Vue.js, TypeScript, Pytest, Vitest, Cypress, SQL, Git.
+- Destacar evidencias recentes do BipFlow: multi-loja, PDV, estoque auditado,
+  perfil de cliente, refinamento mobile, testes e preparo de producao.
 
 ## Estrategia
 
-Para primeira oportunidade, o curriculo deve vender potencial com prova. O
-BipFlow deve aparecer como projeto principal, pois demonstra ciclo completo:
-modelagem, API, autenticacao, permissoes, frontend, checkout, testes,
-documentacao e validacao local.
+Para a primeira vaga dedicada como desenvolvedor, o curriculo deve vender
+potencial com prova. O BipFlow deve aparecer como projeto principal, pois
+demonstra ciclo completo: modelagem, API, autenticacao, permissoes, frontend,
+checkout, PDV, estoque, UX mobile, testes, documentacao e validacao local.
 
 O tom definido para o material profissional e: desenvolvedor junior organizado,
 testavel, com boa base full-stack e pronto para contribuir em um time de produto.

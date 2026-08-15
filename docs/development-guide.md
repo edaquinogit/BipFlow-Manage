@@ -28,7 +28,8 @@ Este guia descreve o fluxo local recomendado para o estado atual do BipFlow.
 - Responsabilidades: dashboard autenticado, saudacao do usuario, troca de loja,
   menu operacional, gestao de produtos, gestao de frete, PDV por QR/codigo,
   recibo, alertas de estoque, historico recente de vendas, catalogo publico por
-  loja, bot de atendimento do catalogo, carrinho por loja e checkout.
+  loja, bot de atendimento do catalogo, carrinho por loja, checkout, login de
+  cliente, recuperacao de senha da vitrine e perfil de cliente por loja.
 - Contrato de auth: tokens JWT persistidos somente por
   `src/services/token-store.ts`.
 - Contrato de produtos: mutacoes passam por `ProductFormSchema`,
@@ -175,7 +176,18 @@ Rotas atuais:
 - `/produtos`: catalogo publico.
 - `/produtos/:slug`: detalhe publico do produto.
 - `/products` e `/products/:slug`: aliases em ingles.
-- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao.
+- `/l/:storeSlug/produtos`: catalogo publico de uma loja especifica.
+- `/l/:storeSlug/produtos/:slug`: detalhe publico por slug dentro da loja.
+- `/l/:storeSlug/p/:code`: detalhe publico por `public_code`/QR.
+- `/l/:storeSlug/login`, `/l/:storeSlug/senha/recuperar`,
+  `/l/:storeSlug/perfil/criar`, `/l/:storeSlug/conta`: fluxo de cliente da
+  vitrine.
+- `/s/:storeSlug/login`, `/s/:storeSlug/senha/recuperar`,
+  `/s/:storeSlug/perfil/criar`, `/s/:storeSlug/conta`: aliases de vitrine.
+- `/entrar`, `/senha/recuperar`, `/perfil/criar`, `/conta`: fallbacks de
+  cliente quando a loja nao esta no path.
+- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao do
+  dashboard e rotas globais de conta.
 
 ## Motor Node Arquivado (opcional)
 
@@ -276,9 +288,9 @@ Frontend:
   coercao numerica de preco/estoque e payload multipart com categoria;
 - validacoes unitarias e fluxos E2E existentes.
 
-## Verificacao Local Atual
+## Verificacao Local De Referencia
 
-Ultima verificacao registrada nesta documentacao: 2026-08-13.
+Verificacao ampla registrada nesta documentacao em 2026-08-13.
 
 Documentacao:
 
@@ -319,6 +331,22 @@ npm run frontend:build
 
 Resultado: typecheck, lint, 81 arquivos/537 testes unitarios e build de
 producao passaram.
+
+Atualizacao complementar em 2026-08-14 para o refinamento de carrinho mobile e
+login de cliente:
+
+```powershell
+npm run docs:check
+npm run frontend:build
+npm --prefix bipflow-frontend run test:unit:run -- useToast ProductsView ProductDetailView CustomerLoginView CustomerForgotPasswordView CartDrawer customerAccountGuard
+```
+
+Resultado: documentacao sem issues, build de producao passou e o pacote focado
+do frontend passou com 7 arquivos e 39 testes. A validacao visual via Edge
+headless em 320 x 568 confirmou ausencia de overflow horizontal no carrinho,
+toast de sucesso fora do drawer aberto e footer compacto em tela curta. A suite
+unitaria completa do frontend foi tentada neste ambiente, mas excedeu o timeout
+do terminal sem reportar falha; use a CI como validacao completa de regressao.
 
 ## Padroes De Codigo
 

@@ -19,7 +19,8 @@ catalogo publico de produtos.
 - Bot publico no catalogo com atalhos, sugestoes de produtos e regioes de
   entrega retornadas pelo Django.
 - Carrinho local separado por loja, com frete por regiao ativa.
-- Perfil de cliente por loja para reutilizar identidade e endereco no checkout.
+- Login, recuperacao de senha e perfil de cliente por loja para reutilizar
+  identidade e endereco no checkout.
 - Checkout via endpoint Django `/api/v1/checkout/whatsapp/`.
 
 ## Stack
@@ -102,9 +103,15 @@ Rotas:
 - `/l/:storeSlug/produtos`: catalogo publico de uma loja especifica.
 - `/l/:storeSlug/produtos/:slug`: detalhe publico por slug dentro da loja.
 - `/l/:storeSlug/p/:code`: detalhe publico por `public_code`/QR.
-- `/l/:storeSlug/login`, `/l/:storeSlug/perfil/criar`,
-  `/l/:storeSlug/conta`: fluxo de cliente da vitrine.
-- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao.
+- `/l/:storeSlug/login`, `/l/:storeSlug/senha/recuperar`,
+  `/l/:storeSlug/perfil/criar`, `/l/:storeSlug/conta`: fluxo de cliente da
+  vitrine.
+- `/s/:storeSlug/login`, `/s/:storeSlug/senha/recuperar`,
+  `/s/:storeSlug/perfil/criar`, `/s/:storeSlug/conta`: aliases de vitrine.
+- `/entrar`, `/senha/recuperar`, `/perfil/criar`, `/conta`: fallbacks de
+  cliente quando a loja nao esta no path.
+- `/login`, `/register`, `/forgot-password`, `/reset-password`: autenticacao
+  do dashboard e rotas globais de conta.
 
 ## Scripts
 
