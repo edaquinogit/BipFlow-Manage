@@ -57,12 +57,7 @@ export interface ProductFilters {
   inStockOnly?: boolean
 }
 
-export type ProductSortOption =
-  | 'featured'
-  | 'price-asc'
-  | 'price-desc'
-  | 'name-asc'
-  | 'newest'
+export type ProductSortOption = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'newest'
 
 export interface CartItem {
   product: Product
@@ -139,8 +134,14 @@ export interface CheckoutResponseCustomer {
   notes: string
 }
 
+export type CheckoutPaymentStatus = 'pending' | 'pay_at_store' | 'confirmed'
+
 export interface CheckoutResponse {
   order_reference: string
+  payment_status: CheckoutPaymentStatus
+  payment_reference: string
+  payment_display_code: string
+  payment_instructions: string
   items: CheckoutResponseItem[]
   customer: CheckoutResponseCustomer
   subtotal: string

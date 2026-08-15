@@ -692,6 +692,14 @@ class SaleOrder(models.Model):
         ("card", "Card"),
         ("cash", "Cash"),
     ]
+    PAYMENT_STATUS_PENDING = "pending"
+    PAYMENT_STATUS_PAY_AT_STORE = "pay_at_store"
+    PAYMENT_STATUS_CONFIRMED = "confirmed"
+    PAYMENT_STATUS_CHOICES = [
+        (PAYMENT_STATUS_PENDING, "Pending"),
+        (PAYMENT_STATUS_PAY_AT_STORE, "Pay at store"),
+        (PAYMENT_STATUS_CONFIRMED, "Confirmed"),
+    ]
 
     # Etapa 3 of the QR-code stock-exit evolution (see
     # docs/architecture/qrcode-stock-exit-evolution.md): distinguishes the
@@ -747,6 +755,14 @@ class SaleOrder(models.Model):
     customer_email = models.EmailField(blank=True)
     delivery_method = models.CharField(max_length=16, choices=DELIVERY_CHOICES)
     payment_method = models.CharField(max_length=16, choices=PAYMENT_CHOICES)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default=PAYMENT_STATUS_PENDING,
+    )
+    payment_reference = models.CharField(max_length=48, blank=True, db_index=True)
+    payment_display_code = models.CharField(max_length=120, blank=True)
+    payment_instructions = models.TextField(blank=True)
     address = models.CharField(max_length=255, blank=True)
     neighborhood = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=255, blank=True)

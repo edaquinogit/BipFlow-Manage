@@ -2,12 +2,7 @@
 import { computed, ref, toRef, watch } from 'vue';
 import { ChatBubbleLeftRightIcon, TruckIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { SaleOrderDetail } from '@/types/sales';
-import {
-  getChannelLabel,
-  getDeliveryMethodLabel,
-  getPaymentLabel,
-  getSaleStatusLabel,
-} from '@/constants/saleOrder';
+import { getChannelLabel, getDeliveryMethodLabel, getPaymentLabel, getPaymentStatusBadgeClass, getPaymentStatusLabel, getSaleStatusLabel } from '@/constants/saleOrder';
 import { formatBRL, formatDateTimeBR } from '@/utils/formatters';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 
@@ -52,35 +47,34 @@ const shipFormValidationError = ref<string | null>(null);
 
 // Reset the ship form every time the modal opens (for this order or a
 // different one) so a previous attempt's draft/error never leaks in.
-watch(() => props.show, (show) => {
-  if (show) {
-    isShipFormOpen.value = false;
-    carrierNameDraft.value = '';
-    trackingCodeDraft.value = '';
-    shipFormValidationError.value = null;
-  }
-});
+watch(
+  () => props.show,
+  (show) => {
+    if (show) {
+      isShipFormOpen.value = false;
+      carrierNameDraft.value = '';
+      trackingCodeDraft.value = '';
+      shipFormValidationError.value = null;
+    }
+  },
+);
 
 // Closes the ship form once the mutation actually lands (order.status
 // flips away from "prepared"); a failed attempt leaves status unchanged,
 // so the form -- and the operator's already-typed carrier/tracking --
 // stays put and shows props.updateError instead.
-watch(() => props.order?.status, (newStatus, oldStatus) => {
-  if (newStatus !== oldStatus) {
-    isShipFormOpen.value = false;
-  }
-});
+watch(
+  () => props.order?.status,
+  (newStatus, oldStatus) => {
+    if (newStatus !== oldStatus) {
+      isShipFormOpen.value = false;
+    }
+  },
+);
 
-const canMarkShipped = computed(() => (
-  props.order?.status === 'prepared' && props.order.delivery_method === 'delivery'
-));
-const canMarkDelivered = computed(() => (
-  props.order?.status === 'sent'
-  || (props.order?.status === 'prepared' && props.order.delivery_method === 'pickup')
-));
-const canCancel = computed(() => (
-  props.order?.status === 'prepared' || props.order?.status === 'sent'
-));
+const canMarkShipped = computed(() => props.order?.status === 'prepared' && props.order.delivery_method === 'delivery');
+const canMarkDelivered = computed(() => props.order?.status === 'sent' || (props.order?.status === 'prepared' && props.order.delivery_method === 'pickup'));
+const canCancel = computed(() => props.order?.status === 'prepared' || props.order?.status === 'sent');
 
 // Etapa 1: "Notificar cliente" reuses the wa.me pattern already used by the
 // public checkout (order.service.ts's buildWhatsAppHandoffUrl), but in the
@@ -97,11 +91,7 @@ const notifyCustomerUrl = computed(() => {
     return null;
   }
 
-  const messageLines = [
-    `Seu pedido ${order.order_reference} foi enviado!`,
-    `Transportadora: ${order.carrier_name}`,
-    `Codigo de rastreio: ${order.tracking_code}`,
-  ];
+  const messageLines = [`Seu pedido ${order.order_reference} foi enviado!`, `Transportadora: ${order.carrier_name}`, `Codigo de rastreio: ${order.tracking_code}`];
   if (order.tracking_url) {
     messageLines.push(`Rastreie aqui: ${order.tracking_url}`);
   }
@@ -137,20 +127,8 @@ function submitShipForm(): void {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="modal-overlay">
-        <div
-          ref="containerRef"
-          class="modal-container"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Detalhes do pedido"
-        >
-          <button
-            ref="closeButtonRef"
-            type="button"
-            aria-label="Fechar"
-            class="close-button"
-            @click="emit('close')"
-          >
+        <div ref="containerRef" class="modal-container" role="dialog" aria-modal="true" aria-label="Detalhes do pedido">
+          <button ref="closeButtonRef" type="button" aria-label="Fechar" class="close-button" @click="emit('close')">
             <XMarkIcon class="h-4 w-4" />
           </button>
 
@@ -166,9 +144,7 @@ function submitShipForm(): void {
 
           <div v-else-if="order" class="max-h-[75vh] space-y-6 overflow-y-auto pr-1">
             <div>
-              <p class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">
-                Pedido {{ order.order_reference }}
-              </p>
+              <p class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Pedido {{ order.order_reference }}</p>
               <h3 class="mt-1 text-xl font-black italic tracking-tighter text-[#05050A]">
                 {{ order.customer_name }}
               </h3>
@@ -180,13 +156,17 @@ function submitShipForm(): void {
                   {{ getChannelLabel(order.channel) }}
                 </span>
               </div>
-              <p class="mt-2 text-xs text-bip-muted">{{ formatDateTimeBR(order.created_at) }}</p>
+              <p class="mt-2 text-xs text-bip-muted">
+                {{ formatDateTimeBR(order.created_at) }}
+              </p>
             </div>
 
             <section class="space-y-1.5">
               <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Cliente</h4>
               <p class="text-sm text-[#05050A]">{{ order.customer_phone }}</p>
-              <p v-if="order.customer_email" class="text-sm text-[#05050A]">{{ order.customer_email }}</p>
+              <p v-if="order.customer_email" class="text-sm text-[#05050A]">
+                {{ order.customer_email }}
+              </p>
             </section>
 
             <section class="space-y-1.5">
@@ -197,48 +177,31 @@ function submitShipForm(): void {
                 <p v-if="order.address" class="text-sm text-[#05050A]">
                   {{ order.address }}<span v-if="order.neighborhood">, {{ order.neighborhood }}</span>
                 </p>
-                <p v-if="order.city" class="text-sm text-[#05050A]">{{ order.city }}</p>
-                <p v-if="order.delivery_region_name" class="text-xs text-bip-muted">
-                  Regiao: {{ order.delivery_region_name }}
+                <p v-if="order.city" class="text-sm text-[#05050A]">
+                  {{ order.city }}
                 </p>
+                <p v-if="order.delivery_region_name" class="text-xs text-bip-muted">Regiao: {{ order.delivery_region_name }}</p>
                 <p v-if="!order.address" class="text-xs text-bip-muted">Endereco nao informado.</p>
               </template>
             </section>
 
             <section v-if="order.notes" class="space-y-1.5">
-              <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">
-                Observacoes do cliente
-              </h4>
-              <p class="whitespace-pre-line text-sm text-[#05050A]">{{ order.notes }}</p>
+              <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Observacoes do cliente</h4>
+              <p class="whitespace-pre-line text-sm text-[#05050A]">
+                {{ order.notes }}
+              </p>
             </section>
 
             <section v-if="order.carrier_name || order.tracking_code" class="space-y-1.5">
               <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Envio</h4>
               <p class="text-sm text-[#05050A]">{{ order.carrier_name }} - {{ order.tracking_code }}</p>
-              <p v-if="order.shipped_at" class="text-xs text-bip-muted">
-                Enviado em {{ formatDateTimeBR(order.shipped_at) }}
-              </p>
-              <p v-if="order.delivered_at" class="text-xs text-bip-muted">
-                Entregue em {{ formatDateTimeBR(order.delivered_at) }}
-              </p>
-              <a
-                v-if="order.tracking_url"
-                :href="order.tracking_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1.5 text-xs font-bold text-[#D81B60] hover:underline"
-              >
+              <p v-if="order.shipped_at" class="text-xs text-bip-muted">Enviado em {{ formatDateTimeBR(order.shipped_at) }}</p>
+              <p v-if="order.delivered_at" class="text-xs text-bip-muted">Entregue em {{ formatDateTimeBR(order.delivered_at) }}</p>
+              <a v-if="order.tracking_url" :href="order.tracking_url" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-bold text-[#D81B60] hover:underline">
                 <TruckIcon class="h-3.5 w-3.5" />
                 Rastrear encomenda
               </a>
-              <a
-                v-if="notifyCustomerUrl"
-                :href="notifyCustomerUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-cy="notify-customer-link"
-                class="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-800 transition hover:bg-emerald-100"
-              >
+              <a v-if="notifyCustomerUrl" :href="notifyCustomerUrl" target="_blank" rel="noopener noreferrer" data-cy="notify-customer-link" class="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-800 transition hover:bg-emerald-100">
                 <ChatBubbleLeftRightIcon class="h-4 w-4" />
                 Notificar cliente
               </a>
@@ -247,11 +210,7 @@ function submitShipForm(): void {
             <section class="space-y-1.5">
               <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-bip-muted">Itens</h4>
               <ul class="divide-y divide-[#E5E7EB] rounded-lg border border-[#E5E7EB]">
-                <li
-                  v-for="item in order.items"
-                  :key="item.id"
-                  class="flex items-baseline justify-between gap-3 px-3 py-2 text-sm"
-                >
+                <li v-for="item in order.items" :key="item.id" class="flex items-baseline justify-between gap-3 px-3 py-2 text-sm">
                   <span class="min-w-0 truncate text-[#05050A]">{{ item.quantity }}x {{ item.product_name }}</span>
                   <span class="shrink-0 font-mono text-[#05050A]">{{ formatBRL(item.line_total) }}</span>
                 </li>
@@ -260,18 +219,25 @@ function submitShipForm(): void {
                 <span>Total</span>
                 <span class="font-mono">{{ formatBRL(order.total) }}</span>
               </div>
-              <p class="px-1 text-xs text-bip-muted">
-                Pagamento: {{ getPaymentLabel(order.payment_method) }}
-              </p>
+              <div class="mt-3 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-xs font-bold text-[#05050A]">
+                    {{ getPaymentLabel(order.payment_method) }}
+                  </span>
+                  <span class="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest" :class="getPaymentStatusBadgeClass(order.payment_status)">
+                    {{ getPaymentStatusLabel(order.payment_status) }}
+                  </span>
+                </div>
+                <p v-if="order.payment_reference || order.payment_display_code" class="mt-2 break-words font-mono text-xs font-semibold text-[#05050A]" data-cy="order-payment-code">
+                  {{ order.payment_display_code || order.payment_reference }}
+                </p>
+                <p v-if="order.payment_instructions" class="mt-2 text-xs leading-5 text-bip-muted">
+                  {{ order.payment_instructions }}
+                </p>
+              </div>
             </section>
 
-            <a
-              v-if="order.whatsapp_url"
-              :href="order.whatsapp_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-800 transition hover:bg-emerald-100"
-            >
+            <a v-if="order.whatsapp_url" :href="order.whatsapp_url" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-emerald-800 transition hover:bg-emerald-100">
               <ChatBubbleLeftRightIcon class="h-4 w-4" />
               Ver conversa original no WhatsApp
             </a>
@@ -283,84 +249,30 @@ function submitShipForm(): void {
 
               <div v-if="isShipFormOpen" class="space-y-2 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
                 <label class="block">
-                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">
-                    Transportadora
-                  </span>
-                  <input
-                    v-model="carrierNameDraft"
-                    type="text"
-                    data-cy="ship-form-carrier"
-                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    placeholder="Correios, Jadlog, motoboy..."
-                  />
+                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted"> Transportadora </span>
+                  <input v-model="carrierNameDraft" type="text" data-cy="ship-form-carrier" class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="Correios, Jadlog, motoboy..." />
                 </label>
                 <label class="block">
-                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted">
-                    Codigo de rastreio
-                  </span>
-                  <input
-                    v-model="trackingCodeDraft"
-                    type="text"
-                    data-cy="ship-form-tracking-code"
-                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    placeholder="AB123456789BR"
-                  />
+                  <span class="mb-1 block text-[10px] font-black uppercase tracking-widest text-bip-muted"> Codigo de rastreio </span>
+                  <input v-model="trackingCodeDraft" type="text" data-cy="ship-form-tracking-code" class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="AB123456789BR" />
                 </label>
                 <p v-if="shipFormValidationError" class="text-xs font-semibold text-[#D81B60]">
                   {{ shipFormValidationError }}
                 </p>
                 <div class="flex gap-2">
-                  <button
-                    type="button"
-                    class="flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-zinc-50"
-                    :disabled="isUpdating"
-                    @click="closeShipForm"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    data-cy="ship-form-submit"
-                    class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#ad1457] disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="isUpdating"
-                    @click="submitShipForm"
-                  >
+                  <button type="button" class="flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:bg-zinc-50" :disabled="isUpdating" @click="closeShipForm">Cancelar</button>
+                  <button type="button" data-cy="ship-form-submit" class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#ad1457] disabled:cursor-not-allowed disabled:opacity-60" :disabled="isUpdating" @click="submitShipForm">
                     {{ isUpdating ? 'Enviando...' : 'Confirmar envio' }}
                   </button>
                 </div>
               </div>
 
               <div v-else class="flex flex-wrap gap-2">
-                <button
-                  v-if="canMarkShipped"
-                  type="button"
-                  data-cy="mark-shipped-button"
-                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isUpdating"
-                  @click="openShipForm"
-                >
-                  Marcar como enviado
-                </button>
-                <button
-                  v-if="canMarkDelivered"
-                  type="button"
-                  data-cy="mark-delivered-button"
-                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isUpdating"
-                  @click="emit('deliver')"
-                >
+                <button v-if="canMarkShipped" type="button" data-cy="mark-shipped-button" class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60" :disabled="isUpdating" @click="openShipForm">Marcar como enviado</button>
+                <button v-if="canMarkDelivered" type="button" data-cy="mark-delivered-button" class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60" :disabled="isUpdating" @click="emit('deliver')">
                   {{ isUpdating ? 'Atualizando...' : 'Marcar como entregue' }}
                 </button>
-                <button
-                  v-if="canCancel"
-                  type="button"
-                  data-cy="cancel-order-button"
-                  class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D] transition hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="isUpdating"
-                  @click="emit('cancel')"
-                >
-                  Cancelar pedido
-                </button>
+                <button v-if="canCancel" type="button" data-cy="cancel-order-button" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D] transition hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-60" :disabled="isUpdating" @click="emit('cancel')">Cancelar pedido</button>
               </div>
             </section>
           </div>

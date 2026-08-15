@@ -26,6 +26,30 @@ describe('useCart - customer PII TTL', () => {
     expect(reloaded.customer.value.phone).toBe('5571999990000')
   })
 
+  it('normalizes old pickup customer state back to delivery', async () => {
+    window.localStorage.setItem(
+      'bipflow_cart_acme_customer',
+      JSON.stringify({ deliveryMethod: 'pickup', fullName: 'Ana' })
+    )
+    window.localStorage.setItem('bipflow_cart_acme_customer_savedAt', String(Date.now()))
+
+    const cart = await loadCart()
+
+    expect(cart.customer.value.deliveryMethod).toBe('delivery')
+  })
+
+  it('normalizes old cash customer state back to pix for public checkout', async () => {
+    window.localStorage.setItem(
+      'bipflow_cart_acme_customer',
+      JSON.stringify({ paymentMethod: 'cash', fullName: 'Ana' })
+    )
+    window.localStorage.setItem('bipflow_cart_acme_customer_savedAt', String(Date.now()))
+
+    const cart = await loadCart()
+
+    expect(cart.customer.value.paymentMethod).toBe('pix')
+  })
+
   it('treats customer data past the 30-day TTL as expired', async () => {
     const cart = await loadCart()
     cart.updateCustomer({ fullName: 'Ana' })

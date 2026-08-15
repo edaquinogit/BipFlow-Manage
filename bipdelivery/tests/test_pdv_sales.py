@@ -72,6 +72,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(sale_order.channel, SaleOrder.CHANNEL_LOJA_FISICA)
         self.assertEqual(sale_order.store, self.store_b)
         self.assertEqual(sale_order.delivery_method, "pickup")
+        self.assertEqual(sale_order.payment_status, SaleOrder.PAYMENT_STATUS_CONFIRMED)
+        self.assertTrue(sale_order.payment_reference.startswith("PDV-"))
+        self.assertEqual(sale_order.payment_display_code, sale_order.payment_reference)
         self.assertEqual(sale_order.customer_name, "Cliente balcão")
         # Etapa R3 of the QR-code stock-exit refinement: a PDV sale always
         # records who rang it up, unlike a public/WhatsApp checkout.
@@ -84,6 +87,24 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(movement.previous_stock, 10)
         self.assertEqual(movement.new_stock, 7)
         self.assertEqual(movement.performed_by, self.user_b)
+
+    def test_client_supplied_payment_tracking_fields_are_ignored(self) -> None:
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [{"public_code": self.product_b.public_code, "quantity": 1}],
+                "payment_method": "card",
+                "payment_status": "pending",
+                "payment_reference": "FAKE-PDV",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(sale_order.payment_status, SaleOrder.PAYMENT_STATUS_CONFIRMED)
+        self.assertTrue(sale_order.payment_reference.startswith("PDV-"))
+        self.assertNotEqual(sale_order.payment_reference, "FAKE-PDV")
 
     def test_multi_item_sale_is_atomic_across_products(self) -> None:
         response = self.client.post(

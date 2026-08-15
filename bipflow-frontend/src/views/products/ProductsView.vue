@@ -5,38 +5,25 @@
         <div class="flex flex-col gap-3 min-[390px]:gap-3.5 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-2.5 min-[390px]:gap-3">
             <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
-              <img
-                :src="storeBranding.logoUrl"
-                :alt="storeBranding.name"
-                class="h-full w-full object-contain"
-              />
+              <img :src="storeBranding.logoUrl" :alt="storeBranding.name" class="h-full w-full object-contain" />
             </div>
             <div class="min-w-0">
-              <p class="brand-wordmark brand-wordmark-premium truncate text-lg min-[390px]:text-xl">{{ storeBranding.name }}</p>
-              <p class="storefront-muted truncate text-xs min-[390px]:text-sm">{{ storeBranding.tagline }}</p>
+              <p class="brand-wordmark brand-wordmark-premium truncate text-lg min-[390px]:text-xl">
+                {{ storeBranding.name }}
+              </p>
+              <p class="storefront-muted truncate text-xs min-[390px]:text-sm">
+                {{ storeBranding.tagline }}
+              </p>
             </div>
           </div>
 
           <div class="grid grid-cols-[2.75rem,minmax(0,1fr)] items-center gap-2.5 min-[390px]:flex min-[390px]:justify-end">
             <CustomerProfileMenuButton />
 
-            <button
-              type="button"
-              data-cy="open-cart-button"
-              class="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.08em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[360px]:gap-2 min-[360px]:px-3 min-[360px]:tracking-[0.12em] min-[390px]:px-4 min-[390px]:text-xs min-[390px]:tracking-[0.14em]"
-              :class="itemCount > 0
-                ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
-                : 'storefront-outline-button bg-white'"
-              @click="openCart"
-            >
+            <button type="button" data-cy="open-cart-button" class="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-xl border px-2 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.08em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[360px]:gap-2 min-[360px]:px-3 min-[360px]:tracking-[0.12em] min-[390px]:px-4 min-[390px]:text-xs min-[390px]:tracking-[0.14em]" :class="itemCount > 0 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]' : 'storefront-outline-button bg-white'" @click="openCart">
               <ShoppingBagIcon class="h-4 w-4 shrink-0" aria-hidden="true" />
               <span class="hidden min-[360px]:inline">Pedido</span>
-              <span
-                class="shrink-0 whitespace-nowrap"
-                :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'"
-              >
-                {{ itemCount }} item<span v-if="itemCount !== 1">s</span>
-              </span>
+              <span class="shrink-0 whitespace-nowrap" :class="itemCount > 0 ? 'text-white/75' : 'text-[#6B7280]'"> {{ itemCount }} item<span v-if="itemCount !== 1">s</span> </span>
               <span class="min-w-0 truncate whitespace-nowrap font-bold">{{ formatBRL(subtotal) }}</span>
             </button>
           </div>
@@ -46,27 +33,11 @@
           <div class="flex items-center gap-2">
             <label class="relative min-w-0 flex-1">
               <span class="sr-only">Buscar produtos</span>
-              <MagnifyingGlassIcon
-                class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9CA3AF]"
-                aria-hidden="true"
-              />
-              <input
-                :value="filters.search"
-                type="search"
-                class="h-10 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11"
-                placeholder="Buscar produto"
-                aria-label="Buscar produtos por nome"
-                @input="handleSearchInput"
-              />
+              <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9CA3AF]" aria-hidden="true" />
+              <input :value="filters.search" type="search" class="h-10 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11" placeholder="Buscar produto" aria-label="Buscar produtos por nome" @input="handleSearchInput" />
             </label>
 
-            <button
-              type="button"
-              :aria-expanded="isFiltersOpen"
-              aria-label="Abrir filtros"
-              class="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11 min-[390px]:w-11"
-              @click="toggleFilters"
-            >
+            <button type="button" :aria-expanded="isFiltersOpen" aria-label="Abrir filtros" class="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11 min-[390px]:w-11" @click="toggleFilters">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
@@ -74,14 +45,7 @@
           </div>
 
           <!-- Glass Morphism Filters Drawer -->
-          <Transition
-            enter-active-class="transition duration-300 ease-out"
-            enter-from-class="opacity-0 translate-y-2"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition duration-200 ease-in"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 translate-y-2"
-          >
+          <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-2">
             <div v-if="isFiltersOpen" class="absolute left-0 right-0 top-full z-40 mx-2.5 mt-2 min-[390px]:mx-3 lg:mx-4">
               <!-- Overlay backdrop -->
               <div class="fixed inset-0 bg-black/10 backdrop-blur-sm" @click="isFiltersOpen = false" />
@@ -91,13 +55,8 @@
                 <div class="grid gap-4 min-[390px]:gap-6 sm:grid-cols-2">
                   <!-- Sort -->
                   <div>
-                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
-                      Ordenação
-                    </label>
-                    <select
-                      v-model="sortBy"
-                      class="w-full rounded-xl border border-[#D1D5DB] bg-white/50 px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                    >
+                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs"> Ordenação </label>
+                    <select v-model="sortBy" class="w-full rounded-xl border border-[#D1D5DB] bg-white/50 px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
                       <option value="featured">Mais relevantes</option>
                       <option value="price-asc">Menor preço</option>
                       <option value="price-desc">Maior preço</option>
@@ -108,16 +67,9 @@
 
                   <!-- Stock Filter -->
                   <div>
-                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
-                      Disponibilidade
-                    </label>
+                    <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs"> Disponibilidade </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        :checked="draftInStockOnly"
-                        class="w-4 h-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                        @change="handleStockFilterToggle"
-                      />
+                      <input type="checkbox" :checked="draftInStockOnly" class="w-4 h-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" @change="handleStockFilterToggle" />
                       <span class="text-sm text-[#6B7280]">Em estoque</span>
                     </label>
                   </div>
@@ -125,31 +77,11 @@
 
                 <!-- Categories -->
                 <div class="mt-5 border-t border-white/20 pt-5 min-[390px]:mt-6 min-[390px]:pt-6">
-                  <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs">
-                    Categorias
-                  </label>
+                  <label class="mb-2.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6B7280] min-[390px]:mb-3 min-[390px]:text-xs"> Categorias </label>
                   <div class="flex flex-wrap gap-1.5 min-[390px]:gap-2">
-                    <button
-                      type="button"
-                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
-                      :class="!draftCategoryId
-                        ? 'bg-[#D81B60] text-white shadow-md'
-                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
-                      @click="handleQuickCategory(undefined)"
-                    >
-                      Todas
-                    </button>
+                    <button type="button" class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200" :class="!draftCategoryId ? 'bg-[#D81B60] text-white shadow-md' : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'" @click="handleQuickCategory(undefined)">Todas</button>
 
-                    <button
-                      v-for="category in categories"
-                      :key="category.id"
-                      type="button"
-                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
-                      :class="draftCategoryId === category.id
-                        ? 'bg-[#D81B60] text-white shadow-md'
-                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
-                      @click="handleQuickCategory(category.id)"
-                    >
+                    <button v-for="category in categories" :key="category.id" type="button" class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200" :class="draftCategoryId === category.id ? 'bg-[#D81B60] text-white shadow-md' : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'" @click="handleQuickCategory(category.id)">
                       {{ category.name }}
                     </button>
                   </div>
@@ -157,29 +89,12 @@
 
                 <!-- Save / Cancel -->
                 <div class="mt-5 flex items-center justify-end gap-2.5 border-t border-white/20 pt-4 min-[390px]:mt-6 min-[390px]:gap-3">
-                  <button
-                    type="button"
-                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
-                    @click="handleCancelFilters"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
-                    @click="handleSaveFilters"
-                  >
-                    Salvar
-                  </button>
+                  <button type="button" class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs" @click="handleCancelFilters">Cancelar</button>
+                  <button type="button" class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs" @click="handleSaveFilters">Salvar</button>
                 </div>
 
                 <!-- Close button -->
-                <button
-                  type="button"
-                  @click="isFiltersOpen = false"
-                  class="absolute top-3 right-3 text-[#9CA3AF] hover:text-[#D81B60] transition-colors"
-                  aria-label="Fechar filtros"
-                >
+                <button type="button" @click="isFiltersOpen = false" class="absolute top-3 right-3 text-[#9CA3AF] hover:text-[#D81B60] transition-colors" aria-label="Fechar filtros">
                   <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -191,30 +106,16 @@
       </div>
     </header>
 
-    <main
-      class="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8"
-      :aria-busy="isLoading ? 'true' : 'false'"
-    >
+    <main class="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 lg:px-8" :aria-busy="isLoading ? 'true' : 'false'">
       <p class="sr-only" aria-live="polite">{{ liveRegionMessage }}</p>
 
       <div class="mb-5 flex flex-col gap-2 text-sm text-[#6B7280] min-[390px]:mb-6 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between min-[390px]:gap-4">
         <p>{{ showingRange }}</p>
-        <button
-          v-if="filters.search || filters.categoryId"
-          type="button"
-          class="font-medium text-[#05050A] underline-offset-4 hover:text-[#D81B60] hover:underline"
-          @click="handleClearFilters"
-        >
-          Limpar filtros
-        </button>
+        <button v-if="filters.search || filters.categoryId" type="button" class="font-medium text-[#05050A] underline-offset-4 hover:text-[#D81B60] hover:underline" @click="handleClearFilters">Limpar filtros</button>
       </div>
 
       <div v-if="isInitialLoading && products.length === 0" class="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:gap-x-5 xl:grid-cols-4">
-        <div
-          v-for="n in 8"
-          :key="n"
-          class="animate-pulse"
-        >
+        <div v-for="n in 8" :key="n" class="animate-pulse">
           <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
           <div class="space-y-3 pt-4">
             <div class="h-4 w-2/3 rounded bg-slate-200" />
@@ -224,119 +125,42 @@
         </div>
       </div>
 
-      <div
-        v-else-if="error && products.length === 0"
-        class="mx-auto max-w-xl py-24 text-center"
-      >
+      <div v-else-if="error && products.length === 0" class="mx-auto max-w-xl py-24 text-center">
         <div class="mb-4 text-red-600">
           <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
         </div>
         <h2 class="mb-2 text-lg font-medium text-[#05050A]">Erro ao carregar produtos</h2>
         <p class="mb-6 text-[#6B7280]">{{ error }}</p>
-        <button
-          type="button"
-          aria-label="Tentar novamente"
-          class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
-          @click="retryFetch"
-        >
-          Tentar novamente
-        </button>
+        <button type="button" aria-label="Tentar novamente" class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2" @click="retryFetch">Tentar novamente</button>
       </div>
 
-      <div
-        v-else-if="displayedProducts.length > 0"
-        class="grid grid-cols-2 gap-x-2.5 gap-y-5 min-[390px]:gap-x-3 min-[390px]:gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4"
-      >
-        <ProductCard
-          v-for="product in displayedProducts"
-          :key="product.id"
-          :product="product"
-          :cart-quantity="getProductQuantity(product.id)"
-          @add-to-cart="handleAddToCart"
-          @open-details="handleOpenDetails"
-        />
+      <div v-else-if="displayedProducts.length > 0" class="grid grid-cols-2 gap-x-2.5 gap-y-5 min-[390px]:gap-x-3 min-[390px]:gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4">
+        <ProductCard v-for="product in displayedProducts" :key="product.id" :product="product" :cart-quantity="getProductQuantity(product.id)" @add-to-cart="handleAddToCart" @open-details="handleOpenDetails" />
       </div>
 
-      <div
-        v-else
-        class="mx-auto max-w-xl py-24 text-center"
-      >
+      <div v-else class="mx-auto max-w-xl py-24 text-center">
         <div class="mb-4 text-slate-400">
           <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m8-5v2m0 0v2m0-2h2m-2 0h-2"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m8-5v2m0 0v2m0-2h2m-2 0h-2" />
           </svg>
         </div>
         <h2 class="mb-2 text-lg font-medium text-[#05050A]">Nenhum produto encontrado</h2>
-        <p class="mb-6 text-[#6B7280]">
-          Escolha outra categoria para continuar explorando.
-        </p>
-        <button
-          type="button"
-          aria-label="Limpar filtros"
-          class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#05050A] transition-colors hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
-          @click="handleClearFilters"
-        >
-          Limpar filtros
-        </button>
+        <p class="mb-6 text-[#6B7280]">Escolha outra categoria para continuar explorando.</p>
+        <button type="button" aria-label="Limpar filtros" class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#05050A] transition-colors hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2" @click="handleClearFilters">Limpar filtros</button>
       </div>
 
       <div v-if="totalPages > 1" class="mt-8">
-        <ProductPagination
-          :current-page="page"
-          :total-pages="totalPages"
-          :has-previous-page="hasPreviousPage"
-          :has-next-page="hasNextPage"
-          :showing-range="showingRange"
-          @go-to-page="handleGoToPage"
-          @next-page="nextPage"
-          @previous-page="previousPage"
-        />
+        <ProductPagination :current-page="page" :total-pages="totalPages" :has-previous-page="hasPreviousPage" :has-next-page="hasNextPage" :showing-range="showingRange" @go-to-page="handleGoToPage" @next-page="nextPage" @previous-page="previousPage" />
       </div>
     </main>
 
-    <FloatingCartButton
-      :item-count="itemCount"
-      @open-cart="openCart"
-    />
+    <FloatingCartButton :item-count="itemCount" @open-cart="openCart" />
 
-    <CartDrawer
-      :is-open="isCartOpen"
-      :items="items"
-      :item-count="itemCount"
-      :subtotal="subtotal"
-      :delivery-fee="deliveryFee"
-      :total="total"
-      :customer="customer"
-      :delivery-regions="deliveryRegions"
-      :is-delivery-regions-loading="isDeliveryRegionsLoading"
-      :is-submitting="isSubmittingOrder"
-      :is-whats-app-configured="isWhatsAppConfigured"
-      :profile="customerProfile"
-      @close="isCartOpen = false"
-      @clear-cart="clearCart"
-      @remove-item="removeItem"
-      @update-quantity="updateQuantity"
-      @update-customer="updateCustomer"
-      @submit-order="handleSubmitOrder"
-    />
+    <CartDrawer :is-open="isCartOpen" :items="items" :item-count="itemCount" :subtotal="subtotal" :delivery-fee="deliveryFee" :total="total" :customer="customer" :delivery-regions="deliveryRegions" :is-delivery-regions-loading="isDeliveryRegionsLoading" :is-submitting="isSubmittingOrder" :is-whats-app-configured="isWhatsAppConfigured" :profile="customerProfile" @close="isCartOpen = false" @clear-cart="clearCart" @remove-item="removeItem" @update-quantity="updateQuantity" @update-customer="updateCustomer" @submit-order="handleSubmitOrder" />
 
-    <IntroSplash
-      :visible="showIntro"
-      :is-backend-ready="isBackendReady"
-      @dismiss="dismissIntro"
-    />
+    <IntroSplash :visible="showIntro" :is-backend-ready="isBackendReady" @dismiss="dismissIntro" />
   </div>
 </template>
 
@@ -350,10 +174,7 @@ import FloatingCartButton from './FloatingCartButton.vue'
 import IntroSplash from './IntroSplash.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
-import {
-  MagnifyingGlassIcon,
-  ShoppingBagIcon,
-} from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, ShoppingBagIcon } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
@@ -373,9 +194,7 @@ import type { DeliveryRegion } from '@/types/delivery'
 import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
-function parseNumberParam(
-  value: LocationQueryValue | LocationQueryValue[] | undefined
-): number | undefined {
+function parseNumberParam(value: LocationQueryValue | LocationQueryValue[] | undefined): number | undefined {
   const normalizedValue = Array.isArray(value) ? value[0] : value
 
   if (typeof normalizedValue !== 'string' || normalizedValue.trim() === '') {
@@ -411,7 +230,9 @@ const toast = useToast()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const storeBranding = useStoreBranding(selectedStore)
-const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
+const { showIntro, dismissIntro } = useIdleIntro({
+  storeKey: routeStoreSlug || 'default',
+})
 // Two independent fetches gate the intro's loading state: store/categories/etc
 // (awaited directly below) and the product list, which useProductSearch kicks
 // off on its own -- tracked via the isInitialLoading transition instead.
@@ -446,43 +267,12 @@ const draftInStockOnly = ref(false)
 const initialFilters = parseFiltersFromQuery(route.query)
 const initialPage = parsePageFromQuery(route.query)
 
-const {
-  products,
-  isLoading,
-  isInitialLoading,
-  error,
-  page,
-  totalPages,
-  filters,
-  hasNextPage,
-  hasPreviousPage,
-  showingRange,
-  fetchProducts,
-  updateFilters,
-  clearFilters,
-  goToPage,
-  nextPage,
-  previousPage,
-} = useProductSearch({
+const { products, isLoading, isInitialLoading, error, page, totalPages, filters, hasNextPage, hasPreviousPage, showingRange, fetchProducts, updateFilters, clearFilters, goToPage, nextPage, previousPage } = useProductSearch({
   initialFilters,
   initialPage,
 })
 
-const {
-  items,
-  customer,
-  itemCount,
-  subtotal,
-  deliveryFee,
-  total,
-  addItem,
-  removeItem,
-  updateQuantity,
-  clearCart,
-  updateCustomer,
-  resetCustomer,
-  getProductQuantity,
-} = useCart()
+const { items, customer, itemCount, subtotal, deliveryFee, total, addItem, removeItem, updateQuantity, clearCart, updateCustomer, resetCustomer, getProductQuantity } = useCart()
 
 let isSyncingRouteState = false
 
@@ -497,9 +287,7 @@ const displayedProducts = computed(() => {
     case 'name-asc':
       return nextProducts.sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
     case 'newest':
-      return nextProducts.sort(
-        (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-      )
+      return nextProducts.sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
     default:
       return nextProducts
   }
@@ -596,9 +384,7 @@ async function loadDeliveryRegions(): Promise<void> {
   try {
     deliveryRegions.value = await deliveryRegionService.getActive()
 
-    const selectedRegion = deliveryRegions.value.find(
-      (region) => region.id === customer.value.deliveryRegionId
-    )
+    const selectedRegion = deliveryRegions.value.find((region) => region.id === customer.value.deliveryRegionId)
 
     if (customer.value.deliveryRegionId && !selectedRegion) {
       updateCustomer({
@@ -608,11 +394,7 @@ async function loadDeliveryRegions(): Promise<void> {
       })
     }
 
-    if (
-      customer.value.deliveryMethod === 'delivery'
-      && !customer.value.deliveryRegionId
-      && deliveryRegions.value.length === 1
-    ) {
+    if (customer.value.deliveryMethod === 'delivery' && !customer.value.deliveryRegionId && deliveryRegions.value.length === 1) {
       const [region] = deliveryRegions.value
       if (!region) {
         return
@@ -635,19 +417,12 @@ async function loadDeliveryRegions(): Promise<void> {
 }
 
 watch(
-  () => [
-    filters.value.search,
-    filters.value.categoryId,
-    filters.value.priceMin,
-    filters.value.priceMax,
-    filters.value.inStockOnly,
-    page.value,
-  ],
+  () => [filters.value.search, filters.value.categoryId, filters.value.priceMin, filters.value.priceMax, filters.value.inStockOnly, page.value],
   () => {
     if (!isSyncingRouteState) {
       syncRouteQuery()
     }
-  }
+  },
 )
 
 watch(
@@ -669,7 +444,7 @@ watch(
     if (page.value !== nextPageValue) {
       goToPage(nextPageValue)
     }
-  }
+  },
 )
 
 watch(
@@ -679,17 +454,11 @@ watch(
       setSelectedStoreSlug(storeSlug)
       isCoreDataReady.value = false
       isProductsReady.value = false
-      await Promise.allSettled([
-        fetchCurrentStore(true),
-        loadCategories(),
-        loadDeliveryRegions(),
-        loadStoreSettings(),
-        fetchProducts(),
-      ])
+      await Promise.allSettled([fetchCurrentStore(true), loadCategories(), loadDeliveryRegions(), loadStoreSettings(), fetchProducts()])
       isCoreDataReady.value = true
       isProductsReady.value = true
     }
-  }
+  },
 )
 
 watch(isInitialLoading, (loading, wasLoading) => {
@@ -699,12 +468,7 @@ watch(isInitialLoading, (loading, wasLoading) => {
 })
 
 onMounted(async () => {
-  await Promise.allSettled([
-    fetchCurrentStore(),
-    loadCategories(),
-    loadDeliveryRegions(),
-    loadStoreSettings(),
-  ])
+  await Promise.allSettled([fetchCurrentStore(), loadCategories(), loadDeliveryRegions(), loadStoreSettings()])
   isCoreDataReady.value = true
 })
 
@@ -808,13 +572,14 @@ async function handleSubmitOrder(): Promise<void> {
 
   try {
     const checkout = await orderService.checkoutViaWhatsApp(items.value, customer.value)
+    const paymentNotice = checkout.payment_reference ? ` Codigo: ${checkout.payment_reference}.` : checkout.payment_display_code ? ` Pagamento: ${checkout.payment_display_code}.` : ''
 
     if (checkout.whatsapp_url) {
       const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
       if (!openedWindow) {
         window.location.href = checkout.whatsapp_url
       }
-      toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
+      toast.success(`Pedido ${checkout.order_reference} registrado.${paymentNotice} Abrimos o WhatsApp para atendimento.`)
     } else {
       toast.error('Pedido registrado, mas o WhatsApp da loja nao esta configurado.')
     }

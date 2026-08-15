@@ -103,6 +103,17 @@ class CustomerProfileEndpointTest(TestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.phone, "11999999999")
 
+    def test_patch_rejects_incomplete_address(self) -> None:
+        response = self.client.patch(
+            "/api/v1/customers/me/",
+            {"address": "", "neighborhood": "Centro", "city": "Sao Paulo"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.address, "Rua A, 100")
+
     def test_patch_accepts_a_delivery_region_from_the_same_store(self) -> None:
         region = DeliveryRegion.objects.create(name="Regiao A", store=self.store, delivery_fee="7.00")
 

@@ -9,6 +9,7 @@ export interface SaleOrderItem {
 }
 
 export type SaleOrderStatus = 'prepared' | 'sent' | 'delivered' | 'cancelled'
+export type SaleOrderPaymentStatus = 'pending' | 'pay_at_store' | 'confirmed'
 
 // Etapa 3 of the QR-code stock-exit evolution: which channel the sale came
 // through -- the existing e-commerce/WhatsApp checkout (virtual) or the
@@ -26,6 +27,9 @@ export interface SaleOrder {
   customer_email: string
   delivery_method: 'delivery' | 'pickup'
   payment_method: 'pix' | 'card' | 'cash'
+  payment_status: SaleOrderPaymentStatus
+  payment_reference: string
+  payment_display_code: string
   delivery_region_name: string
   // Etapa R3 of the QR-code stock-exit refinement: who rang up the sale.
   // Always null for a virtual/WhatsApp order (no authenticated staff
@@ -47,6 +51,7 @@ export interface SaleOrderDetail extends SaleOrder {
   neighborhood: string
   city: string
   notes: string
+  payment_instructions: string
   message: string
   whatsapp_url: string
   // Etapa 1 of the pedidos/NF/envio evolution: manual shipping data,

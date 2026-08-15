@@ -27,6 +27,10 @@ export function extractCheckoutErrorMessage(error: unknown): string {
       return 'Informe endereco, bairro e cidade para receber em casa.'
     }
 
+    if (data?.code === 'cash_payment_store_only') {
+      return 'Pagamento em dinheiro esta disponivel apenas no caixa da loja.'
+    }
+
     if (typeof data?.detail === 'string') {
       return data.detail
     }
@@ -36,14 +40,16 @@ export function extractCheckoutErrorMessage(error: unknown): string {
 }
 
 function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): CheckoutPayload {
+  const paymentMethod = customer.paymentMethod === 'card' ? 'card' : 'pix'
+
   const payload: CheckoutPayload = {
     items: items.map((item) => ({
       product_id: item.product.id,
       quantity: item.quantity,
     })),
     customer: {
-      delivery_method: customer.deliveryMethod,
-      payment_method: customer.paymentMethod,
+      delivery_method: 'delivery',
+      payment_method: paymentMethod,
       delivery_region_id: customer.deliveryRegionId,
       notes: customer.notes.trim(),
       full_name: customer.fullName.trim(),

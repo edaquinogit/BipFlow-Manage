@@ -54,7 +54,7 @@ from .models import (
     StoreSettings,
     TOTPDevice,
 )
-from .order_reference import build_sale_order_reference
+from .order_reference import build_payment_reference_details, build_sale_order_reference
 from .pagination import ProductListPagination, StandardPagination
 from .permissions import (
     AllowAnyReadDashboardWrite,
@@ -1752,6 +1752,15 @@ class CheckoutWhatsAppView(APIView):
         customer = validated_data["customer"]
         is_delivery = customer["delivery_method"] == "delivery"
 
+        if customer["payment_method"] == "cash":
+            return Response(
+                {
+                    "code": "cash_payment_store_only",
+                    "detail": "Pagamento em dinheiro esta disponivel apenas no caixa da loja.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if profile is not None:
             customer_name = profile.full_name.strip()
             customer_phone = profile.phone.strip()
@@ -1830,6 +1839,11 @@ class CheckoutWhatsAppView(APIView):
                     else settings.ORDER_DELIVERY_FEE
                 )
             total = subtotal + delivery_fee
+            payment_details = build_payment_reference_details(
+                order_reference,
+                customer["payment_method"],
+                total,
+            )
 
             message_lines = [
                 "Pedido BipFlow",
@@ -1854,6 +1868,10 @@ class CheckoutWhatsAppView(APIView):
                 f'Entrega: {self._delivery_label(customer["delivery_method"])}',
                 f'Pagamento: {self._payment_label(customer["payment_method"])}',
             ]
+            if payment_details.reference:
+                message_lines.append(f"Codigo pagamento: {payment_details.reference}")
+            if payment_details.display_code:
+                message_lines.append(f"Conferencia: {payment_details.display_code}")
 
             if is_delivery:
                 if delivery_region is not None:
@@ -1885,6 +1903,10 @@ class CheckoutWhatsAppView(APIView):
                 customer_email=customer_email,
                 delivery_method=customer["delivery_method"],
                 payment_method=customer["payment_method"],
+                payment_status=payment_details.status,
+                payment_reference=payment_details.reference,
+                payment_display_code=payment_details.display_code,
+                payment_instructions=payment_details.instructions,
                 delivery_region=delivery_region,
                 delivery_region_name=delivery_region.name if delivery_region is not None else "",
                 address=order_address,
@@ -1945,6 +1967,10 @@ class CheckoutWhatsAppView(APIView):
 
             response_payload = {
                 "order_reference": order_reference,
+                "payment_status": payment_details.status,
+                "payment_reference": payment_details.reference,
+                "payment_display_code": payment_details.display_code,
+                "payment_instructions": payment_details.instructions,
                 "items": normalized_items,
                 "customer": {
                     "full_name": customer_name,

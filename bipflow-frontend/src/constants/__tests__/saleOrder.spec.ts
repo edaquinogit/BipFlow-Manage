@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  getChannelLabel,
-  getDeliveryMethodLabel,
-  getPaymentLabel,
-  getSaleStatusBadgeClass,
-  getSaleStatusLabel,
-  SALE_STATUS_OPTIONS,
-  SALE_TIMELINE_STEPS,
-} from '../saleOrder'
+import { getChannelLabel, getDeliveryMethodLabel, getPaymentLabel, getPaymentStatusBadgeClass, getPaymentStatusLabel, getSaleStatusBadgeClass, getSaleStatusLabel, SALE_STATUS_OPTIONS, SALE_TIMELINE_STEPS } from '../saleOrder'
 
 describe('getSaleStatusLabel', () => {
   it('has a label for every status referenced by SALE_STATUS_OPTIONS', () => {
@@ -22,6 +14,22 @@ describe('getPaymentLabel', () => {
     expect(getPaymentLabel('pix')).toBe('Pix')
     expect(getPaymentLabel('card')).toBe('Cartao')
     expect(getPaymentLabel('cash')).toBe('Dinheiro')
+  })
+})
+
+describe('getPaymentStatusLabel', () => {
+  it('maps payment statuses to operator-friendly labels', () => {
+    expect(getPaymentStatusLabel('pending')).toBe('Aguardando pagamento')
+    expect(getPaymentStatusLabel('pay_at_store')).toBe('Pagar na loja')
+    expect(getPaymentStatusLabel('confirmed')).toBe('Pagamento confirmado')
+  })
+})
+
+describe('getPaymentStatusBadgeClass', () => {
+  it('has a badge class for every payment status', () => {
+    expect(getPaymentStatusBadgeClass('pending')).toBeTruthy()
+    expect(getPaymentStatusBadgeClass('pay_at_store')).toBeTruthy()
+    expect(getPaymentStatusBadgeClass('confirmed')).toBeTruthy()
   })
 })
 

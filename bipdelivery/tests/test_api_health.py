@@ -866,10 +866,14 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(response.data["subtotal"], "85.00")
         self.assertEqual(response.data["delivery_fee"], "12.00")
         self.assertEqual(response.data["total"], "97.00")
+        self.assertEqual(response.data["payment_status"], "pending")
+        self.assertTrue(response.data["payment_reference"].startswith("PIX-"))
+        self.assertTrue(response.data["payment_display_code"].startswith("BIPFLOW-PIX-"))
         self.assertTrue(
             response.data["whatsapp_url"].startswith("https://wa.me/5571999999999?text=")
         )
         self.assertIn("Pedido BipFlow", response.data["message"])
+        self.assertIn("Codigo pagamento: PIX-", response.data["message"])
         self.assertEqual(response.data["items"][0]["product_name"], "Combo Executivo")
         self.assertTrue(
             SaleOrder.objects.filter(order_reference=response.data["order_reference"]).exists()
@@ -1226,6 +1230,8 @@ class CheckoutWhatsAppAPITest(TestCase):
             checkout_response.data["order_reference"],
         )
         self.assertEqual(response.data["results"][0]["item_count"], 1)
+        self.assertEqual(response.data["results"][0]["payment_status"], "pending")
+        self.assertTrue(response.data["results"][0]["payment_reference"].startswith("CARD-"))
 
     def test_dashboard_writer_can_update_sale_order_status(self) -> None:
         """Dashboard operators should move orders through operational states."""

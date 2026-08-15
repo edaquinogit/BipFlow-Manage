@@ -64,6 +64,17 @@ const defaultCustomer: CartCustomer = {
   city: '',
 }
 
+function normalizeCustomer(value: Partial<CartCustomer>): CartCustomer {
+  const paymentMethod = value.paymentMethod === 'card' ? 'card' : 'pix'
+
+  return {
+    ...defaultCustomer,
+    ...value,
+    deliveryMethod: 'delivery',
+    paymentMethod,
+  }
+}
+
 const items = ref<CartItem[]>([])
 const customer = ref<CartCustomer>({ ...defaultCustomer })
 const hasHydrated = ref(false)
@@ -130,10 +141,7 @@ function loadPersistedState(): void {
 
     if (storedCustomer && !isCustomerExpired) {
       const parsedCustomer = JSON.parse(storedCustomer) as Partial<CartCustomer>
-      customer.value = {
-        ...defaultCustomer,
-        ...parsedCustomer,
-      }
+      customer.value = normalizeCustomer(parsedCustomer)
     } else if (storedCustomer) {
       // Past its TTL (or missing a timestamp -- legacy data written before
       // this check existed): drop it rather than trust stale PII.
@@ -193,7 +201,7 @@ export function useCart() {
   const isEmpty = computed(() => items.value.length === 0)
 
   const deliveryFee = computed(() =>
-    customer.value.deliveryMethod === 'delivery' && items.value.length > 0
+    items.value.length > 0
       ? Number(customer.value.deliveryRegionFee ?? 0)
       : 0
   )
@@ -248,14 +256,14 @@ export function useCart() {
   }
 
   const updateCustomer = (patch: Partial<CartCustomer>): void => {
-    customer.value = {
+    customer.value = normalizeCustomer({
       ...customer.value,
       ...patch,
-    }
+    })
   }
 
   const resetCustomer = (): void => {
-    customer.value = { ...defaultCustomer }
+    customer.value = normalizeCustomer({})
   }
 
   const getProductQuantity = (productId: number): number => {

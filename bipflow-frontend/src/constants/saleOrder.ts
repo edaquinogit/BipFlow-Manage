@@ -1,4 +1,4 @@
-import type { SaleOrder, SaleOrderChannel, SaleOrderStatus } from '@/types/sales';
+import type { SaleOrder, SaleOrderChannel, SaleOrderPaymentStatus, SaleOrderStatus } from '@/types/sales';
 
 export const SALE_STATUS_OPTIONS: { value: SaleOrderStatus; label: string }[] = [
   { value: 'prepared', label: 'Novo' },
@@ -36,7 +36,10 @@ export function getSaleStatusBadgeClass(status: SaleOrderStatus): string {
 
 // Etapa 1 of the pedidos/NF/envio evolution: the 3rd timeline step
 // (Novo -> Enviado -> Entregue).
-export const SALE_TIMELINE_STEPS: { value: Exclude<SaleOrderStatus, 'cancelled'>; label: string }[] = [
+export const SALE_TIMELINE_STEPS: {
+  value: Exclude<SaleOrderStatus, 'cancelled'>;
+  label: string;
+}[] = [
   { value: 'prepared', label: 'Novo' },
   { value: 'sent', label: 'Enviado' },
   { value: 'delivered', label: 'Entregue' },
@@ -50,6 +53,26 @@ const PAYMENT_METHOD_LABELS: Record<SaleOrder['payment_method'], string> = {
 
 export function getPaymentLabel(paymentMethod: SaleOrder['payment_method']): string {
   return PAYMENT_METHOD_LABELS[paymentMethod];
+}
+
+const PAYMENT_STATUS_LABELS: Record<SaleOrderPaymentStatus, string> = {
+  pending: 'Aguardando pagamento',
+  pay_at_store: 'Pagar na loja',
+  confirmed: 'Pagamento confirmado',
+};
+
+export function getPaymentStatusLabel(status: SaleOrderPaymentStatus): string {
+  return PAYMENT_STATUS_LABELS[status];
+}
+
+const PAYMENT_STATUS_BADGE_CLASS: Record<SaleOrderPaymentStatus, string> = {
+  pending: 'border-amber-200 bg-amber-50 text-amber-800',
+  pay_at_store: 'border-zinc-200 bg-zinc-50 text-zinc-700',
+  confirmed: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+};
+
+export function getPaymentStatusBadgeClass(status: SaleOrderPaymentStatus): string {
+  return PAYMENT_STATUS_BADGE_CLASS[status];
 }
 
 export function getDeliveryMethodLabel(deliveryMethod: SaleOrder['delivery_method']): string {
@@ -69,7 +92,10 @@ export function getChannelLabel(channel: SaleOrderChannel): string {
 // Etapa 0 of the pedidos/NF/envio evolution: the backend already supported
 // ?channel= on the orders list (Etapa 5 of the QR-code stock-exit
 // evolution), but no screen exposed it as a filter until now.
-export const CHANNEL_FILTER_OPTIONS: { value: SaleOrderChannel; label: string }[] = [
+export const CHANNEL_FILTER_OPTIONS: {
+  value: SaleOrderChannel;
+  label: string;
+}[] = [
   { value: 'virtual', label: 'Virtual' },
   { value: 'loja_fisica', label: 'Loja fisica' },
 ];

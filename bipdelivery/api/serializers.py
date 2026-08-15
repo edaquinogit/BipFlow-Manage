@@ -912,6 +912,10 @@ class CheckoutResponseSerializer(serializers.Serializer):
     """Serializer for the checkout preparation response."""
 
     order_reference = serializers.CharField()
+    payment_status = serializers.ChoiceField(choices=["pending", "pay_at_store", "confirmed"])
+    payment_reference = serializers.CharField(allow_blank=True)
+    payment_display_code = serializers.CharField(allow_blank=True)
+    payment_instructions = serializers.CharField(allow_blank=True)
     items = CheckoutItemResponseSerializer(many=True)
     customer = CheckoutCustomerResponseSerializer()
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
@@ -960,6 +964,9 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "customer_email",
             "delivery_method",
             "payment_method",
+            "payment_status",
+            "payment_reference",
+            "payment_display_code",
             "subtotal",
             "delivery_fee",
             "delivery_region_name",
@@ -990,6 +997,7 @@ class SaleOrderDetailSerializer(SaleOrderSerializer):
             "neighborhood",
             "city",
             "notes",
+            "payment_instructions",
             "message",
             "whatsapp_url",
             "carrier_name",
@@ -1135,11 +1143,9 @@ class RegisterUserSerializer(serializers.Serializer):
     store_slug = serializers.SlugField(required=False)
     full_name = serializers.CharField(max_length=160, trim_whitespace=True, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, trim_whitespace=True, required=False, allow_blank=True)
-    # Optional at registration for every context; only required for
-    # storefront_customer (validated below), and even then only full_name
-    # and phone -- address stays optional here the same way it always was
-    # optional in the pre-profile checkout form (only required later, at
-    # checkout time, if the customer picks delivery over pickup).
+    # Optional at the field level for dashboard owners, but required below
+    # for storefront_customer so the public order screen can use the saved
+    # profile address instead of collecting address data in the cart drawer.
     address = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
     neighborhood = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
     city = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
@@ -1206,6 +1212,21 @@ class RegisterUserSerializer(serializers.Serializer):
             if not phone:
                 raise serializers.ValidationError({"phone": "Informe seu WhatsApp."})
             attrs["phone"] = phone
+
+            address = (attrs.get("address") or "").strip()
+            if not address:
+                raise serializers.ValidationError({"address": "Informe seu endereco."})
+            attrs["address"] = address
+
+            neighborhood = (attrs.get("neighborhood") or "").strip()
+            if not neighborhood:
+                raise serializers.ValidationError({"neighborhood": "Informe seu bairro."})
+            attrs["neighborhood"] = neighborhood
+
+            city = (attrs.get("city") or "").strip()
+            if not city:
+                raise serializers.ValidationError({"city": "Informe sua cidade."})
+            attrs["city"] = city
 
         return attrs
 
@@ -1289,6 +1310,27 @@ class CustomerProfileSerializer(serializers.Serializer):
         if not DeliveryRegion.objects.filter(id=value, store=store, is_active=True).exists():
             raise serializers.ValidationError("Selected delivery region is unavailable")
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = self.instance
+        final_address = attrs.get("address", instance.address if instance else "")
+        final_neighborhood = attrs.get("neighborhood", instance.neighborhood if instance else "")
+        final_city = attrs.get("city", instance.city if instance else "")
+
+        missing_fields = {}
+        if not str(final_address or "").strip():
+            missing_fields["address"] = "Informe seu endereco."
+        if not str(final_neighborhood or "").strip():
+            missing_fields["neighborhood"] = "Informe seu bairro."
+        if not str(final_city or "").strip():
+            missing_fields["city"] = "Informe sua cidade."
+
+        if missing_fields:
+            raise serializers.ValidationError(missing_fields)
+
+        return attrs
 
     def update(self, instance: "CustomerProfile", validated_data):
         for field_name in ("full_name", "phone", "address", "neighborhood", "city"):

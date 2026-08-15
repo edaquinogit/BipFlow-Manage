@@ -30,6 +30,9 @@ function buildOrder(overrides: Partial<SaleOrder> = {}): SaleOrder {
     customer_email: '',
     delivery_method: 'pickup',
     payment_method: 'pix',
+    payment_status: 'pending',
+    payment_reference: 'PIX-2606200001',
+    payment_display_code: 'BIPFLOW-PIX-2606200001-5000',
     delivery_region_name: '',
     performed_by_username: null,
     subtotal: '50.00',
@@ -49,6 +52,7 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     neighborhood: 'Centro',
     city: 'Salvador',
     notes: 'Sem cebola, por favor',
+    payment_instructions: 'Codigo Pix interno para conferencia do pedido.',
     message: 'Pedido via WhatsApp',
     whatsapp_url: 'https://wa.me/5571999990000',
     carrier_name: '',
@@ -60,10 +64,7 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
   }
 }
 
-function buildResponse(
-  results: SaleOrder[],
-  overrides: Partial<PaginatedSalesOrdersResponse> = {}
-): PaginatedSalesOrdersResponse {
+function buildResponse(results: SaleOrder[], overrides: Partial<PaginatedSalesOrdersResponse> = {}): PaginatedSalesOrdersResponse {
   return {
     count: results.length,
     next: null,
@@ -80,14 +81,22 @@ describe('DashboardOrdersView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(useCurrentStore).mockReturnValue({ selectedStore: ref(null) } as any)
-    vi.mocked(useCurrentUser).mockReturnValue({ canManageOrders: ref(true) } as any)
+    vi.mocked(useCurrentStore).mockReturnValue({
+      selectedStore: ref(null),
+    } as any)
+    vi.mocked(useCurrentUser).mockReturnValue({
+      canManageOrders: ref(true),
+    } as any)
     vi.mocked(useToast).mockReturnValue(toastState as any)
   })
 
   it('shows the loading skeleton while the history request is in flight', async () => {
     let resolveList: (value: PaginatedSalesOrdersResponse) => void = () => {}
-    vi.mocked(salesService.list).mockReturnValue(new Promise((resolve) => { resolveList = resolve }))
+    vi.mocked(salesService.list).mockReturnValue(
+      new Promise((resolve) => {
+        resolveList = resolve
+      }),
+    )
 
     const wrapper = mount(DashboardOrdersView)
     await flushPromises()
@@ -129,10 +138,18 @@ describe('DashboardOrdersView', () => {
     expect(wrapper.text()).toContain('Novo')
   })
 
+  it('shows payment status and reference on each order card', async () => {
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
+
+    const wrapper = mount(DashboardOrdersView)
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="sale-payment-status-badge"]').text()).toContain('Aguardando pagamento')
+    expect(wrapper.find('[data-cy="sale-payment-reference-badge"]').text()).toContain('PIX-2606200001')
+  })
+
   it('shows a channel badge distinguishing PDV sales from virtual orders (Etapa 3/5 of the QR-code stock-exit evolution)', async () => {
-    vi.mocked(salesService.list).mockResolvedValue(
-      buildResponse([buildOrder({ id: 1, channel: 'loja_fisica' }), buildOrder({ id: 2, channel: 'virtual' })])
-    )
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ id: 1, channel: 'loja_fisica' }), buildOrder({ id: 2, channel: 'virtual' })]))
 
     const wrapper = mount(DashboardOrdersView)
     await flushPromises()
@@ -144,10 +161,22 @@ describe('DashboardOrdersView', () => {
   it('shows the operator badge only for PDV sales with a known operator (Etapa R3 of the QR-code stock-exit refinement)', async () => {
     vi.mocked(salesService.list).mockResolvedValue(
       buildResponse([
-        buildOrder({ id: 1, channel: 'loja_fisica', performed_by_username: 'caixa1' }),
-        buildOrder({ id: 2, channel: 'loja_fisica', performed_by_username: null }),
-        buildOrder({ id: 3, channel: 'virtual', performed_by_username: 'caixa1' }),
-      ])
+        buildOrder({
+          id: 1,
+          channel: 'loja_fisica',
+          performed_by_username: 'caixa1',
+        }),
+        buildOrder({
+          id: 2,
+          channel: 'loja_fisica',
+          performed_by_username: null,
+        }),
+        buildOrder({
+          id: 3,
+          channel: 'virtual',
+          performed_by_username: 'caixa1',
+        }),
+      ]),
     )
 
     const wrapper = mount(DashboardOrdersView)
@@ -159,15 +188,13 @@ describe('DashboardOrdersView', () => {
   })
 
   it('marks a pickup order as delivered directly from the detail modal (Etapa 1 of the pedidos/NF/envio evolution)', async () => {
-    vi.mocked(salesService.list).mockResolvedValue(
-      buildResponse([buildOrder({ delivery_method: 'pickup' })])
-    )
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ delivery_method: 'pickup' })]))
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ delivery_method: 'pickup' }))
-    vi.mocked(salesService.updateStatus).mockResolvedValue(
-      buildOrderDetail({ delivery_method: 'pickup', status: 'delivered' })
-    )
+    vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrderDetail({ delivery_method: 'pickup', status: 'delivered' }))
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -181,9 +208,7 @@ describe('DashboardOrdersView', () => {
   })
 
   it('marks a delivery order as shipped via the ship form in the detail modal', async () => {
-    vi.mocked(salesService.list).mockResolvedValue(
-      buildResponse([buildOrder({ delivery_method: 'delivery' })])
-    )
+    vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ delivery_method: 'delivery' })]))
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ delivery_method: 'delivery' }))
     vi.mocked(salesService.updateStatus).mockResolvedValue(
       buildOrderDetail({
@@ -191,10 +216,12 @@ describe('DashboardOrdersView', () => {
         status: 'sent',
         carrier_name: 'Correios',
         tracking_code: 'AB123456789BR',
-      })
+      }),
     )
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -205,9 +232,10 @@ describe('DashboardOrdersView', () => {
     await wrapper.find('[data-cy="ship-form-submit"]').trigger('click')
     await flushPromises()
 
-    expect(salesService.updateStatus).toHaveBeenCalledWith(
-      1, 'sent', { carrierName: 'Correios', trackingCode: 'AB123456789BR' }
-    )
+    expect(salesService.updateStatus).toHaveBeenCalledWith(1, 'sent', {
+      carrierName: 'Correios',
+      trackingCode: 'AB123456789BR',
+    })
     expect(toastState.success).toHaveBeenCalledWith('Pedido marcado como enviado.')
   })
 
@@ -215,7 +243,9 @@ describe('DashboardOrdersView', () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder({ item_count: 2 })]))
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail({ item_count: 2 }))
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -234,7 +264,9 @@ describe('DashboardOrdersView', () => {
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
     vi.mocked(salesService.updateStatus).mockResolvedValue(buildOrderDetail({ status: 'cancelled' }))
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -255,7 +287,9 @@ describe('DashboardOrdersView', () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -281,14 +315,15 @@ describe('DashboardOrdersView', () => {
     await wrapper.find('[data-cy="sales-channel-filter"]').setValue('loja_fisica')
     await flushPromises()
 
-    expect(salesService.list).toHaveBeenLastCalledWith(
-      expect.objectContaining({ channel: 'loja_fisica', page: 1 })
-    )
+    expect(salesService.list).toHaveBeenLastCalledWith(expect.objectContaining({ channel: 'loja_fisica', page: 1 }))
   })
 
   it('shows pagination controls and requests the next page (Etapa 0 of the pedidos/NF/envio evolution)', async () => {
     vi.mocked(salesService.list).mockResolvedValue(
-      buildResponse([buildOrder()], { next: 'http://api/v1/sales-orders/?page=2', total_pages: 2 })
+      buildResponse([buildOrder()], {
+        next: 'http://api/v1/sales-orders/?page=2',
+        total_pages: 2,
+      }),
     )
 
     const wrapper = mount(DashboardOrdersView)
@@ -319,7 +354,9 @@ describe('DashboardOrdersView', () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
     vi.mocked(salesService.get).mockResolvedValue(buildOrderDetail())
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')
@@ -335,7 +372,9 @@ describe('DashboardOrdersView', () => {
     vi.mocked(salesService.list).mockResolvedValue(buildResponse([buildOrder()]))
     vi.mocked(salesService.get).mockRejectedValue(new Error('network down'))
 
-    const wrapper = mount(DashboardOrdersView, { global: { stubs: { teleport: true } } })
+    const wrapper = mount(DashboardOrdersView, {
+      global: { stubs: { teleport: true } },
+    })
     await flushPromises()
 
     await wrapper.find('[data-cy="sale-detail-button"]').trigger('click')

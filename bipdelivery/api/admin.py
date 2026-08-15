@@ -173,8 +173,29 @@ class SaleOrderItemInline(admin.TabularInline):
 
 @admin.register(SaleOrder)
 class SaleOrderAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
-    list_display = ("order_reference", "store", "customer_name", "total", "status", "created_at")
-    list_filter = ("store", "status", "delivery_method", "payment_method", "created_at")
-    search_fields = ("order_reference", "customer_name", "customer_phone", "items__product_name")
+    list_display = (
+        "order_reference",
+        "store",
+        "customer_name",
+        "total",
+        "status",
+        "payment_status",
+        "created_at",
+    )
+    list_filter = (
+        "store",
+        "status",
+        "delivery_method",
+        "payment_method",
+        "payment_status",
+        "created_at",
+    )
+    search_fields = (
+        "order_reference",
+        "payment_reference",
+        "customer_name",
+        "customer_phone",
+        "items__product_name",
+    )
     readonly_fields = ("order_reference", "created_at", "updated_at")
     inlines = [SaleOrderItemInline]

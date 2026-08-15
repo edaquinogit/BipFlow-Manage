@@ -87,6 +87,7 @@ describe('orderService.checkoutViaWhatsApp', () => {
       customer: Record<string, unknown>
     }
     expect(payload.customer).toMatchObject({
+      delivery_method: 'delivery',
       full_name: 'Maria Convidada',
       phone: '11988887777',
       email: 'maria@example.com',
@@ -94,6 +95,28 @@ describe('orderService.checkoutViaWhatsApp', () => {
       neighborhood: 'Centro',
       city: 'Salvador',
     })
+  })
+
+  it('forces the public checkout payload to delivery even when old cart state says pickup', async () => {
+    const items: CartItem[] = [{ product: buildProduct(), quantity: 1 }]
+
+    await orderService.checkoutViaWhatsApp(items, buildCustomer({ deliveryMethod: 'pickup' }))
+
+    const payload = vi.mocked(api.post).mock.calls[0]?.[1] as {
+      customer: Record<string, unknown>
+    }
+    expect(payload.customer.delivery_method).toBe('delivery')
+  })
+
+  it('does not send cash as a public checkout payment method', async () => {
+    const items: CartItem[] = [{ product: buildProduct(), quantity: 1 }]
+
+    await orderService.checkoutViaWhatsApp(items, buildCustomer({ paymentMethod: 'cash' }))
+
+    const payload = vi.mocked(api.post).mock.calls[0]?.[1] as {
+      customer: Record<string, unknown>
+    }
+    expect(payload.customer.payment_method).toBe('pix')
   })
 })
 
@@ -115,6 +138,11 @@ describe('extractCheckoutErrorMessage', () => {
   it('maps guest_address_incomplete to a specific message', () => {
     expect(extractCheckoutErrorMessage(axiosError('guest_address_incomplete')))
       .toBe('Informe endereco, bairro e cidade para receber em casa.')
+  })
+
+  it('maps cash_payment_store_only to a specific message', () => {
+    expect(extractCheckoutErrorMessage(axiosError('cash_payment_store_only')))
+      .toBe('Pagamento em dinheiro esta disponivel apenas no caixa da loja.')
   })
 
   it('falls back to a generic message for unknown errors', () => {

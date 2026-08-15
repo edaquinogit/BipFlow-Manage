@@ -46,7 +46,8 @@ def verify_turnstile(token: str | None, remote_ip: str) -> bool:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        # URL is the constant HTTPS Cloudflare Turnstile endpoint above.
+        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310
             result = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         return False

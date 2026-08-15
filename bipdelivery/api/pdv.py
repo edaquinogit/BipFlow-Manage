@@ -37,7 +37,7 @@ from rest_framework.views import APIView
 
 from .errors import not_found_error
 from .models import Product, SaleOrder, SaleOrderItem, StockMovement, Store
-from .order_reference import build_sale_order_reference
+from .order_reference import build_payment_reference_details, build_sale_order_reference
 from .permissions import has_dashboard_write_access
 from .store_scope import resolve_request_store
 from .throttling import PdvReceiptEmailThrottle
@@ -225,6 +225,12 @@ class PdvSaleView(APIView):
         validated = serializer.validated_data
 
         order_reference = build_sale_order_reference("PDV")
+        payment_details = build_payment_reference_details(
+            order_reference,
+            validated["payment_method"],
+            Decimal("0.00"),
+            confirmed=True,
+        )
         customer_name = validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
         customer_phone = validated.get("customer_phone", "").strip()
         customer_email = validated.get("customer_email", "").strip()
@@ -246,6 +252,10 @@ class PdvSaleView(APIView):
                 customer_email=customer_email,
                 delivery_method="pickup",
                 payment_method=validated["payment_method"],
+                payment_status=payment_details.status,
+                payment_reference=payment_details.reference,
+                payment_display_code=payment_details.display_code,
+                payment_instructions=payment_details.instructions,
                 notes=notes,
                 subtotal=rounded_subtotal,
                 delivery_fee=Decimal("0.00"),

@@ -14,6 +14,9 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     customer_email: 'cliente@example.com',
     delivery_method: 'delivery',
     payment_method: 'pix',
+    payment_status: 'pending',
+    payment_reference: 'PIX-2606200001',
+    payment_display_code: 'BIPFLOW-PIX-2606200001-5500',
     delivery_region_name: 'Centro',
     performed_by_username: null,
     subtotal: '50.00',
@@ -22,12 +25,21 @@ function buildOrderDetail(overrides: Partial<SaleOrderDetail> = {}): SaleOrderDe
     created_at: '2026-06-20T10:00:00Z',
     item_count: 1,
     items: [
-      { id: 1, product_id: 9, product_name: 'Pizza Margherita', sku: '', quantity: 1, unit_price: '50.00', line_total: '50.00' },
+      {
+        id: 1,
+        product_id: 9,
+        product_name: 'Pizza Margherita',
+        sku: '',
+        quantity: 1,
+        unit_price: '50.00',
+        line_total: '50.00',
+      },
     ],
     address: 'Rua das Flores, 123',
     neighborhood: 'Centro',
     city: 'Salvador',
     notes: 'Sem cebola, por favor',
+    payment_instructions: 'Codigo Pix interno para conferencia do pedido.',
     message: 'Pedido via WhatsApp',
     whatsapp_url: 'https://wa.me/5571999990000',
     carrier_name: '',
@@ -88,7 +100,13 @@ describe('SaleOrderDetailModal', () => {
   })
 
   it('does not render the notify-customer link before the order has shipped', () => {
-    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', carrier_name: '', tracking_code: '' }) })
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        status: 'prepared',
+        carrier_name: '',
+        tracking_code: '',
+      }),
+    })
 
     expect(wrapper.find('[data-cy="notify-customer-link"]').exists()).toBe(false)
   })
@@ -102,9 +120,22 @@ describe('SaleOrderDetailModal', () => {
     expect(wrapper.find('a[href="https://wa.me/5571999990000"]').exists()).toBe(true)
   })
 
+  it('renders payment status, display code and instructions', () => {
+    const wrapper = mountModal()
+
+    expect(wrapper.text()).toContain('Aguardando pagamento')
+    expect(wrapper.find('[data-cy="order-payment-code"]').text()).toContain('BIPFLOW-PIX-2606200001-5500')
+    expect(wrapper.text()).toContain('Codigo Pix interno para conferencia do pedido.')
+  })
+
   it('does not render delivery address fields for a pickup order', () => {
     const wrapper = mountModal({
-      order: buildOrderDetail({ delivery_method: 'pickup', address: '', neighborhood: '', city: '' }),
+      order: buildOrderDetail({
+        delivery_method: 'pickup',
+        address: '',
+        neighborhood: '',
+        city: '',
+      }),
     })
 
     expect(wrapper.text()).not.toContain('Rua das Flores, 123')
@@ -118,7 +149,10 @@ describe('SaleOrderDetailModal', () => {
   })
 
   it('shows an error message instead of order content', () => {
-    const wrapper = mountModal({ error: 'Não foi possível carregar os detalhes deste pedido.', order: null })
+    const wrapper = mountModal({
+      error: 'Não foi possível carregar os detalhes deste pedido.',
+      order: null,
+    })
 
     expect(wrapper.text()).toContain('Não foi possível carregar os detalhes deste pedido.')
   })
@@ -139,24 +173,36 @@ describe('SaleOrderDetailModal', () => {
 
   it('shows the ship action for a prepared delivery order and hides it once shipped', () => {
     const preparedDelivery = mountModal({
-      order: buildOrderDetail({ status: 'prepared', delivery_method: 'delivery' }),
+      order: buildOrderDetail({
+        status: 'prepared',
+        delivery_method: 'delivery',
+      }),
     })
     expect(preparedDelivery.find('[data-cy="mark-shipped-button"]').exists()).toBe(true)
 
-    const alreadySent = mountModal({ order: buildOrderDetail({ status: 'sent', delivery_method: 'delivery' }) })
+    const alreadySent = mountModal({
+      order: buildOrderDetail({ status: 'sent', delivery_method: 'delivery' }),
+    })
     expect(alreadySent.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
     expect(alreadySent.find('[data-cy="mark-delivered-button"]').exists()).toBe(true)
   })
 
   it('shows deliver directly (no ship step) for a prepared pickup order', () => {
-    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', delivery_method: 'pickup' }) })
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        status: 'prepared',
+        delivery_method: 'pickup',
+      }),
+    })
 
     expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-cy="mark-delivered-button"]').exists()).toBe(true)
   })
 
   it('hides every action once the order is delivered', () => {
-    const wrapper = mountModal({ order: buildOrderDetail({ status: 'delivered' }) })
+    const wrapper = mountModal({
+      order: buildOrderDetail({ status: 'delivered' }),
+    })
 
     expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-cy="mark-delivered-button"]').exists()).toBe(false)
@@ -164,14 +210,22 @@ describe('SaleOrderDetailModal', () => {
   })
 
   it('hides every action when the viewer cannot manage orders', () => {
-    const wrapper = mountModal({ canManage: false, order: buildOrderDetail({ status: 'prepared' }) })
+    const wrapper = mountModal({
+      canManage: false,
+      order: buildOrderDetail({ status: 'prepared' }),
+    })
 
     expect(wrapper.find('[data-cy="mark-shipped-button"]').exists()).toBe(false)
     expect(wrapper.find('[data-cy="cancel-order-button"]').exists()).toBe(false)
   })
 
   it('requires carrier and tracking code before emitting ship', async () => {
-    const wrapper = mountModal({ order: buildOrderDetail({ status: 'prepared', delivery_method: 'delivery' }) })
+    const wrapper = mountModal({
+      order: buildOrderDetail({
+        status: 'prepared',
+        delivery_method: 'delivery',
+      }),
+    })
 
     await wrapper.find('[data-cy="mark-shipped-button"]').trigger('click')
     await wrapper.find('[data-cy="ship-form-submit"]').trigger('click')

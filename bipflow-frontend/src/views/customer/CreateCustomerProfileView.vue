@@ -60,6 +60,9 @@ const isFormReady = computed(() =>
   Boolean(form.full_name.trim())
   && Boolean(form.phone.trim())
   && Boolean(form.email.trim())
+  && Boolean(form.address.trim())
+  && Boolean(form.neighborhood.trim())
+  && Boolean(form.city.trim())
   && isPasswordValid.value
   && confirmRule.value.passed
 )
@@ -107,7 +110,7 @@ async function handleSubmit(): Promise<void> {
   errorMessage.value = ''
 
   if (!isFormReady.value) {
-    validationHint.value = 'Preencha nome, WhatsApp, email e uma senha segura.'
+    validationHint.value = 'Preencha nome, WhatsApp, email, endereco completo e uma senha segura.'
     return
   }
 
@@ -262,12 +265,13 @@ onMounted(async () => {
 
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-              Endereço <span class="normal-case text-[#9CA3AF]">(opcional agora, necessário para entrega)</span>
+              Endereco
             </span>
             <input
               v-model="form.address"
               type="text"
               autocomplete="street-address"
+              required
               class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               placeholder="Rua, número e complemento"
             />
@@ -280,6 +284,7 @@ onMounted(async () => {
                 v-model="form.neighborhood"
                 type="text"
                 autocomplete="address-level3"
+                required
                 class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                 placeholder="Bairro"
               />
@@ -291,6 +296,7 @@ onMounted(async () => {
                 v-model="form.city"
                 type="text"
                 autocomplete="address-level2"
+                required
                 class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                 placeholder="Cidade"
               />

@@ -78,6 +78,35 @@ class CheckoutGuestAndProfileTest(TestCase):
         self.assertEqual(order.customer_name, "Convidado Teste")
         self.assertEqual(order.customer_phone, "11977776666")
         self.assertEqual(order.customer_email, "convidado@example.com")
+        self.assertEqual(order.payment_status, SaleOrder.PAYMENT_STATUS_PENDING)
+        self.assertTrue(order.payment_reference.startswith("PIX-"))
+        self.assertTrue(response.data["payment_display_code"].startswith("BIPFLOW-PIX-"))
+
+    def test_cash_checkout_is_rejected_for_public_delivery_flow(self) -> None:
+        response = APIClient().post(
+            "/api/v1/checkout/whatsapp/",
+            self._payload(payment_method="cash", **self._guest_identity()),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "cash_payment_store_only")
+        self.assertEqual(SaleOrder.objects.count(), 0)
+
+    def test_checkout_ignores_client_supplied_payment_tracking_fields(self) -> None:
+        payload = self._payload(payment_method="card", **self._guest_identity())
+        payload["payment_status"] = "confirmed"
+        payload["payment_reference"] = "FAKE-PAID"
+        payload["customer"]["payment_status"] = "confirmed"
+        payload["customer"]["payment_reference"] = "FAKE-PAID"
+
+        response = APIClient().post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(order.payment_status, SaleOrder.PAYMENT_STATUS_PENDING)
+        self.assertTrue(order.payment_reference.startswith("CARD-"))
+        self.assertNotEqual(order.payment_reference, "FAKE-PAID")
 
     def test_anonymous_guest_missing_name_or_phone_is_rejected(self) -> None:
         response = APIClient().post(

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { authService } from '@/services/auth.service'
@@ -23,6 +23,7 @@ const { profile, fetchCustomerProfile } = useCustomerProfile()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
+const validationHint = ref('')
 
 const form = reactive({
   full_name: '',
@@ -31,6 +32,14 @@ const form = reactive({
   neighborhood: '',
   city: '',
 })
+
+const isFormReady = computed(() =>
+  Boolean(form.full_name.trim())
+  && Boolean(form.phone.trim())
+  && Boolean(form.address.trim())
+  && Boolean(form.neighborhood.trim())
+  && Boolean(form.city.trim())
+)
 
 function extractErrorMessage(error: unknown): string {
   const data = (error as ApiError).response?.data
@@ -41,6 +50,13 @@ function extractErrorMessage(error: unknown): string {
 }
 
 async function handleSave(): Promise<void> {
+  validationHint.value = ''
+
+  if (!isFormReady.value) {
+    validationHint.value = 'Preencha nome, WhatsApp e endereco completo.'
+    return
+  }
+
   isSaving.value = true
 
   try {
@@ -112,11 +128,19 @@ onMounted(async () => {
         </div>
 
         <form class="space-y-4" @submit.prevent="handleSave">
+          <div
+            v-if="validationHint"
+            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+          >
+            {{ validationHint }}
+          </div>
+
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Nome</span>
             <input
               v-model="form.full_name"
               type="text"
+              required
               class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             />
           </label>
@@ -127,6 +151,7 @@ onMounted(async () => {
               v-model="form.phone"
               type="tel"
               inputmode="tel"
+              required
               class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             />
           </label>
@@ -137,6 +162,7 @@ onMounted(async () => {
               v-model="form.address"
               type="text"
               autocomplete="street-address"
+              required
               class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
             />
           </label>
@@ -147,6 +173,7 @@ onMounted(async () => {
               <input
                 v-model="form.neighborhood"
                 type="text"
+                required
                 class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               />
             </label>
@@ -156,6 +183,7 @@ onMounted(async () => {
               <input
                 v-model="form.city"
                 type="text"
+                required
                 class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
               />
             </label>
@@ -163,7 +191,7 @@ onMounted(async () => {
 
           <button
             type="submit"
-            :disabled="isSaving"
+            :disabled="isSaving || !isFormReady"
             class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
           >
             {{ isSaving ? 'Salvando...' : 'Salvar' }}

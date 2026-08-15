@@ -11,7 +11,7 @@ vi.mock('vue-router', () => ({
 }))
 
 const buildCustomer = (overrides: Partial<CartCustomer> = {}): CartCustomer => ({
-  deliveryMethod: 'pickup',
+  deliveryMethod: 'delivery',
   paymentMethod: 'pix',
   deliveryRegionId: null,
   deliveryRegionName: '',
@@ -85,90 +85,85 @@ describe('CartDrawer', () => {
     vi.resetModules()
   })
 
-  it('shows guest identity and address fields when there is no profile', () => {
-    const wrapper = mountDrawer({ customer: buildCustomer({ deliveryMethod: 'delivery' }) })
+  it('asks the shopper to create a profile instead of showing guest identity/address fields', () => {
+    const wrapper = mountDrawer()
 
-    expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Crie seu perfil para finalizar este pedido.')
+    expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
   })
 
-  it('hides identity and address fields and shows the saved-address hint when the profile is complete', () => {
-    const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery' }),
-      profile: buildProfile(),
-    })
+  it('shows the saved profile address and keeps the order form compact', () => {
+    const wrapper = mountDrawer({ profile: buildProfile() })
 
     expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Entregamos no endereço salvo no seu perfil.')
+    expect(wrapper.text()).toContain('Maria Cliente - 11988887777')
+    expect(wrapper.text()).toContain('Rua das Flores, 42, Jardim, Sao Paulo')
+    expect(wrapper.text()).not.toContain('Retirar na loja')
   })
 
-  it('hides identity fields but still shows address fields when the profile has no saved address', () => {
+  it('asks an authenticated shopper to complete the saved address', () => {
     const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery' }),
       profile: buildProfile({ address: '', neighborhood: '', city: '' }),
     })
 
     expect(wrapper.find('input[autocomplete="name"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
-    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(true)
-    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('Entregamos no endereço salvo no seu perfil.')
-  })
-
-  it('requires guest name and phone before allowing submission when there is no profile', () => {
-    const wrapper = mountDrawer({ customer: buildCustomer({ fullName: '', phone: '' }) })
-
-    expect(wrapper.text()).toContain('Informe seu nome e telefone para finalizar o pedido.')
+    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Complete o endereco do perfil para finalizar.')
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
   })
 
-  it('requires guest address before allowing submission of a delivery order with no profile', () => {
-    const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery', address: '', neighborhood: '', city: '' }),
-    })
+  it('requires a profile before allowing submission', () => {
+    const wrapper = mountDrawer()
 
-    expect(wrapper.text()).toContain('Informe endereco, bairro e cidade para receber em casa.')
+    expect(wrapper.text()).toContain('Crie seu perfil para finalizar o pedido.')
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
   })
 
   it('does not require guest fields when a complete profile is present', () => {
     const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery', fullName: '', phone: '', address: '' }),
+      customer: buildCustomer({ fullName: '', phone: '', address: '' }),
       profile: buildProfile(),
     })
 
     expect(wrapper.find('footer button').attributes('disabled')).toBeUndefined()
   })
 
-  it('still lets the customer choose delivery method, payment method and notes', () => {
-    const wrapper = mountDrawer()
+  it('keeps only payment and notes as per-order fields', () => {
+    const wrapper = mountDrawer({ profile: buildProfile() })
 
-    expect(wrapper.text()).toContain('Entrega')
+    expect(wrapper.text()).not.toContain('Entrega')
     expect(wrapper.text()).toContain('Pagamento')
     expect(wrapper.text()).toContain('Observacoes')
   })
 
-  it('requires a delivery region to be picked when regions exist for a delivery order', () => {
+  it('shows Pix code guidance and keeps cash as store-only guidance', () => {
+    const pixWrapper = mountDrawer({ profile: buildProfile() })
+    expect(pixWrapper.find('[data-cy="checkout-payment-panel"]').text()).toContain('Codigo gerado no fechamento')
+    expect(pixWrapper.find('option[value="cash"]').exists()).toBe(false)
+    expect(pixWrapper.find('[data-cy="checkout-cash-store-only"]').text()).toContain('Dinheiro somente no caixa da loja.')
+  })
+
+  it('requires a region to be picked when active regions exist', () => {
     const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery' }),
+      profile: buildProfile(),
       deliveryRegions: [buildRegion()],
     })
 
-    expect(wrapper.text()).toContain('Selecione a regiao de entrega.')
+    expect(wrapper.text()).toContain('Selecione a regiao.')
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
   })
 
-  it('allows submitting a delivery order once a region is selected', () => {
+  it('allows submitting once a region is selected', () => {
     const wrapper = mountDrawer({
-      customer: buildCustomer({ deliveryMethod: 'delivery', deliveryRegionId: 1 }),
+      customer: buildCustomer({ deliveryRegionId: 1 }),
+      profile: buildProfile(),
       deliveryRegions: [buildRegion()],
     })
 
@@ -176,7 +171,7 @@ describe('CartDrawer', () => {
   })
 
   it('emits submitOrder when the footer button is clicked while valid', async () => {
-    const wrapper = mountDrawer()
+    const wrapper = mountDrawer({ profile: buildProfile() })
 
     await wrapper.find('footer button').trigger('click')
 
@@ -184,21 +179,22 @@ describe('CartDrawer', () => {
   })
 
   it('emits updateCustomer with the notes text on input', async () => {
-    const wrapper = mountDrawer()
+    const wrapper = mountDrawer({ profile: buildProfile() })
 
     await wrapper.find('textarea').setValue('Sem cebola')
 
-    expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({ notes: 'Sem cebola' })
+    expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({
+      notes: 'Sem cebola',
+    })
   })
 
-  it('emits updateCustomer with guest identity fields on input', async () => {
-    const wrapper = mountDrawer()
+  it('emits updateCustomer with the payment method on change', async () => {
+    const wrapper = mountDrawer({ profile: buildProfile() })
 
-    await wrapper.find('input[autocomplete="name"]').setValue('Joao Convidado')
-    await wrapper.find('input[autocomplete="tel"]').setValue('11955554444')
+    await wrapper.find('select').setValue('card')
 
-    const emitted = wrapper.emitted('updateCustomer') ?? []
-    expect(emitted).toContainEqual([{ fullName: 'Joao Convidado' }])
-    expect(emitted).toContainEqual([{ phone: '11955554444' }])
+    expect(wrapper.emitted('updateCustomer')?.[0]?.[0]).toEqual({
+      paymentMethod: 'card',
+    })
   })
 })

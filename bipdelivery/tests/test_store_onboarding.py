@@ -47,7 +47,9 @@ class RegistrationCreatesStoreTest(TestCase):
         payload.update(overrides)
         return self.client.post("/api/auth/register/", payload, format="json")
 
-    def _register_customer(self, *, email: str = "customer@example.com", store_slug: str = "default"):
+    def _register_customer(
+        self, *, email: str = "customer@example.com", store_slug: str = "default", **overrides
+    ):
         payload = {
             "email": email,
             "password": "SenhaForte123",
@@ -56,7 +58,11 @@ class RegistrationCreatesStoreTest(TestCase):
             "store_slug": store_slug,
             "full_name": "Cliente Loja",
             "phone": "11999999999",
+            "address": "Rua Cliente, 100",
+            "neighborhood": "Centro",
+            "city": "Salvador",
         }
+        payload.update(overrides)
         return self.client.post("/api/auth/register/", payload, format="json")
 
     def test_registration_creates_a_store_owned_by_the_new_user(self) -> None:
@@ -134,6 +140,20 @@ class RegistrationCreatesStoreTest(TestCase):
         self.assertFalse(StoreMembership.objects.filter(user=user).exists())
         self.assertTrue(CustomerProfile.objects.filter(user=user, store=store).exists())
         self.assertEqual(response.data["profile_kind"], "customer")
+
+        profile = CustomerProfile.objects.get(user=user, store=store)
+        self.assertEqual(profile.address, "Rua Cliente, 100")
+        self.assertEqual(profile.neighborhood, "Centro")
+        self.assertEqual(profile.city, "Salvador")
+
+    def test_storefront_customer_registration_requires_complete_address(self) -> None:
+        store = Store.get_default()
+
+        response = self._register_customer(store_slug=store.slug, address="", neighborhood="", city="")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("address", response.data)
+        self.assertFalse(User.objects.filter(email="customer@example.com").exists())
 
     def test_storefront_customer_cannot_access_dashboard(self) -> None:
         store = Store.get_default()

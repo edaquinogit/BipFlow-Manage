@@ -48,16 +48,22 @@ prepare_runtime_dirs() {
 }
 
 validate_secrets() {
-    # POSTGRES_PASSWORD/REDIS_PASSWORD are NOT required here on purpose:
-    # Django never reads them directly (see build_database_config() in
-    # settings.py), they only exist to let docker-compose interpolate
-    # DATABASE_URL/CACHE_URL in docker-compose*.yml. Managed-DB topologies
-    # (Render + Neon/Upstash) hand over a complete DATABASE_URL/CACHE_URL
-    # with no separate POSTGRES_PASSWORD/REDIS_PASSWORD env var at all, so
-    # requiring them here would fail closed for a perfectly valid setup.
+    # POSTGRES_PASSWORD/REDIS_PASSWORD are optional here on purpose:
+    # managed-DB topologies (Render + Neon/Upstash) hand over a complete
+    # DATABASE_URL/CACHE_URL with no separate POSTGRES_PASSWORD/REDIS_PASSWORD.
+    # When Compose injects them, validate their strength too; money-adjacent
+    # order data should never run behind placeholder cache/database passwords.
     require_secret "DJANGO_SECRET_KEY"
     require_secret "DATABASE_URL"
     require_secret "CACHE_URL"
+
+    if [ -n "${POSTGRES_PASSWORD:-}" ]; then
+        require_secret "POSTGRES_PASSWORD"
+    fi
+
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+        require_secret "REDIS_PASSWORD"
+    fi
 }
 
 seed_admin_user() {

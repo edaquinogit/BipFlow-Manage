@@ -2,11 +2,7 @@
   <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
     <header class="storefront-header border-b">
       <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <button
-          type="button"
-          class="storefront-outline-button inline-flex h-10 w-fit items-center gap-2 rounded-xl border bg-white px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition min-[390px]:text-xs"
-          @click="goBackToCatalog"
-        >
+        <button type="button" class="storefront-outline-button inline-flex h-10 w-fit items-center gap-2 rounded-xl border bg-white px-4 text-[11px] font-bold uppercase tracking-[0.14em] transition min-[390px]:text-xs" @click="goBackToCatalog">
           <ArrowLeftIcon class="h-4 w-4" aria-hidden="true" />
           Voltar ao catalogo
         </button>
@@ -14,15 +10,15 @@
         <div class="flex items-center justify-between gap-2.5 min-[390px]:gap-3">
           <div class="flex min-w-0 items-center gap-2.5 min-[390px]:gap-3">
             <div class="flex h-11 w-28 shrink-0 items-center justify-center overflow-hidden min-[390px]:h-12 min-[390px]:w-32">
-              <img
-                :src="storeBranding.logoUrl"
-                :alt="storeBranding.name"
-                class="h-full w-full object-contain"
-              />
+              <img :src="storeBranding.logoUrl" :alt="storeBranding.name" class="h-full w-full object-contain" />
             </div>
             <div class="min-w-0">
-              <p class="brand-wordmark brand-wordmark-premium truncate text-base min-[390px]:text-lg">{{ storeBranding.name }}</p>
-              <p class="storefront-muted truncate text-[11px] min-[390px]:text-xs">{{ storeBranding.tagline }}</p>
+              <p class="brand-wordmark brand-wordmark-premium truncate text-base min-[390px]:text-lg">
+                {{ storeBranding.name }}
+              </p>
+              <p class="storefront-muted truncate text-[11px] min-[390px]:text-xs">
+                {{ storeBranding.tagline }}
+              </p>
             </div>
           </div>
 
@@ -46,10 +42,7 @@
         </div>
       </div>
 
-      <div
-        v-else-if="errorMessage || !product"
-        class="mx-auto max-w-xl py-24 text-center"
-      >
+      <div v-else-if="errorMessage || !product" class="mx-auto max-w-xl py-24 text-center">
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
           <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zm8.25-.75a8.25 8.25 0 10-16.5 0 8.25 8.25 0 0016.5 0z" />
@@ -60,83 +53,29 @@
           {{ errorMessage || 'O produto pode ter sido removido ou esta temporariamente indisponivel.' }}
         </p>
         <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <button
-            type="button"
-            class="inline-flex items-center justify-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
-            @click="loadProduct"
-          >
-            Tentar novamente
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
-            @click="goBackToCatalog"
-          >
-            Voltar ao catalogo
-          </button>
+          <button type="button" class="inline-flex items-center justify-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]" @click="loadProduct">Tentar novamente</button>
+          <button type="button" class="inline-flex items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]" @click="goBackToCatalog">Voltar ao catalogo</button>
         </div>
       </div>
 
       <div v-else class="grid gap-6 min-[390px]:gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
         <section class="min-w-0 space-y-3.5 min-[390px]:space-y-4">
-          <div
-            class="w-full overflow-hidden rounded-[1.15rem] bg-[#F4F1F3] min-[390px]:rounded-lg"
-            @mouseenter="pauseCarousel"
-            @mouseleave="resumeCarousel"
-          >
-            <div
-              class="relative aspect-[4/5] overflow-hidden bg-[#F4F1F3] touch-pan-y"
-              @pointerdown="handlePointerDown"
-              @pointermove="handlePointerMove"
-              @pointerup="handlePointerUp"
-              @pointercancel="handlePointerCancel"
-              @pointerleave="handlePointerLeave"
-            >
+          <div class="w-full overflow-hidden rounded-[1.15rem] bg-[#F4F1F3] min-[390px]:rounded-lg" @mouseenter="pauseCarousel" @mouseleave="resumeCarousel">
+            <div class="relative aspect-[4/5] overflow-hidden bg-[#F4F1F3] touch-pan-y" @pointerdown="handlePointerDown" @pointermove="handlePointerMove" @pointerup="handlePointerUp" @pointercancel="handlePointerCancel" @pointerleave="handlePointerLeave">
               <Transition :name="slideTransitionName" mode="out-in">
-                <img
-                  :key="activeImageSource"
-                  :src="activeImageSource"
-                  :alt="`Imagem do produto ${product.name}`"
-                  class="h-full w-full select-none object-contain p-4 min-[390px]:p-5 sm:p-8"
-                  loading="eager"
-                  draggable="false"
-                  @error="handleImageError"
-                />
+                <img :key="activeImageSource" :src="activeImageSource" :alt="`Imagem do produto ${product.name}`" class="h-full w-full select-none object-contain p-4 min-[390px]:p-5 sm:p-8" loading="eager" draggable="false" @error="handleImageError" />
               </Transition>
 
-              <div
-                v-if="productImages.length > 1"
-                class="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 px-4 py-4"
-              >
-                <span
-                  v-for="(imageUrl, index) in productImages"
-                  :key="`${imageUrl}-${index}`"
-                  class="h-1.5 rounded-full transition-all duration-300"
-                  :class="imageUrl === activeImageSource ? 'w-8 bg-white' : 'w-2.5 bg-white/55'"
-                />
+              <div v-if="productImages.length > 1" class="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 px-4 py-4">
+                <span v-for="(imageUrl, index) in productImages" :key="`${imageUrl}-${index}`" class="h-1.5 rounded-full transition-all duration-300" :class="imageUrl === activeImageSource ? 'w-8 bg-white' : 'w-2.5 bg-white/55'" />
               </div>
             </div>
           </div>
 
           <div v-if="productImages.length > 1" class="flex gap-2.5 overflow-x-auto pb-1 min-[390px]:gap-3">
-            <button
-              v-for="imageUrl in productImages"
-              :key="imageUrl"
-              type="button"
-                class="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-[1rem] border bg-white transition min-[390px]:h-20 min-[390px]:w-20 min-[390px]:rounded-lg sm:h-24 sm:w-24"
-              :class="imageUrl === activeImageSource
-                ? 'border-[#D81B60]'
-                : 'border-[#E5E7EB] hover:border-[#D81B60]'"
-              :aria-label="`Selecionar imagem do produto ${product.name}`"
-              @click="handleSelectImage(imageUrl)"
-            >
+            <button v-for="imageUrl in productImages" :key="imageUrl" type="button" class="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-[1rem] border bg-white transition min-[390px]:h-20 min-[390px]:w-20 min-[390px]:rounded-lg sm:h-24 sm:w-24" :class="imageUrl === activeImageSource ? 'border-[#D81B60]' : 'border-[#E5E7EB] hover:border-[#D81B60]'" :aria-label="`Selecionar imagem do produto ${product.name}`" @click="handleSelectImage(imageUrl)">
               <div class="aspect-square overflow-hidden bg-slate-100">
-                <img
-                  :src="imageUrl"
-                  :alt="`Miniatura do produto ${product.name}`"
-                  class="h-full w-full object-contain p-1.5"
-                  loading="lazy"
-                />
+                <img :src="imageUrl" :alt="`Miniatura do produto ${product.name}`" class="h-full w-full object-contain p-1.5" loading="lazy" />
               </div>
             </button>
           </div>
@@ -149,32 +88,12 @@
                 {{ product.category.name }}
               </p>
               <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-10 min-[390px]:w-10"
-                  :class="isShareCopied
-                    ? 'border-[#D81B60] bg-[#D81B60] text-white shadow-[0_12px_24px_-18px_rgba(216,27,96,0.6)]'
-                    : 'storefront-outline-button hover:border-[#D81B60] hover:text-[#D81B60]'"
-                  :aria-label="isShareCopied ? 'Link do produto copiado' : 'Compartilhar produto'"
-                  :title="isShareCopied ? 'Link copiado' : 'Compartilhar produto'"
-                  @click="void handleShareProduct()"
-                >
-                  <CheckIcon
-                    v-if="isShareCopied"
-                    class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]"
-                    aria-hidden="true"
-                  />
-                  <ShareIcon
-                    v-else
-                    class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]"
-                    aria-hidden="true"
-                  />
+                <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-10 min-[390px]:w-10" :class="isShareCopied ? 'border-[#D81B60] bg-[#D81B60] text-white shadow-[0_12px_24px_-18px_rgba(216,27,96,0.6)]' : 'storefront-outline-button hover:border-[#D81B60] hover:text-[#D81B60]'" :aria-label="isShareCopied ? 'Link do produto copiado' : 'Compartilhar produto'" :title="isShareCopied ? 'Link copiado' : 'Compartilhar produto'" @click="void handleShareProduct()">
+                  <CheckIcon v-if="isShareCopied" class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]" aria-hidden="true" />
+                  <ShareIcon v-else class="h-4 w-4 min-[390px]:h-[18px] min-[390px]:w-[18px]" aria-hidden="true" />
                 </button>
 
-                <span
-                  class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] min-[390px]:text-xs"
-                  :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
-                >
+                <span class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] min-[390px]:text-xs" :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'">
                   {{ availabilityLabel }}
                 </span>
               </div>
@@ -195,11 +114,15 @@
             <dl class="mt-5 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-[13px] text-[#6B7280] min-[390px]:mt-6 min-[390px]:text-sm">
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Tamanho</dt>
-                <dd class="text-right font-semibold text-[#05050A]">{{ product.size || 'Sob consulta' }}</dd>
+                <dd class="text-right font-semibold text-[#05050A]">
+                  {{ product.size || 'Sob consulta' }}
+                </dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>SKU</dt>
-                <dd class="text-right font-semibold text-[#05050A]">{{ product.sku || 'Nao informado' }}</dd>
+                <dd class="text-right font-semibold text-[#05050A]">
+                  {{ product.sku || 'Nao informado' }}
+                </dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Estoque</dt>
@@ -213,48 +136,26 @@
               <div class="flex flex-col gap-3.5 min-[390px]:gap-4">
                 <div class="flex items-center justify-between gap-3 min-[390px]:gap-4">
                   <div>
-                    <p class="text-sm font-semibold text-[#05050A]">
-                      Quantidade
-                    </p>
+                    <p class="text-sm font-semibold text-[#05050A]">Quantidade</p>
                     <p class="mt-1 text-[13px] text-slate-600 min-[390px]:text-sm">
                       {{ cartQuantity > 0 ? `${cartQuantity} ja no pedido` : 'Selecione e confirme em um toque.' }}
                     </p>
                   </div>
 
                   <div class="inline-flex h-11 items-center rounded-[0.95rem] border border-[#D8DDE5] bg-white shadow-[0_12px_28px_-24px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl">
-                    <button
-                      type="button"
-                      class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
-                      :disabled="!product.is_available || quantity <= 1"
-                      aria-label="Diminuir quantidade"
-                      @click="decrementQuantity"
-                    >
+                    <button type="button" class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl" :disabled="!product.is_available || quantity <= 1" aria-label="Diminuir quantidade" @click="decrementQuantity">
                       <MinusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
                     <span class="min-w-8 text-center text-[15px] font-semibold text-[#05050A] min-[390px]:min-w-11 min-[390px]:text-base">
                       {{ quantity }}
                     </span>
-                    <button
-                      type="button"
-                      class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
-                      :disabled="!product.is_available || quantity >= product.stock_quantity"
-                      aria-label="Aumentar quantidade"
-                      @click="incrementQuantity"
-                    >
+                    <button type="button" class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl" :disabled="!product.is_available || quantity >= product.stock_quantity" aria-label="Aumentar quantidade" @click="incrementQuantity">
                       <PlusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm"
-                  :class="product.is_available
-                    ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]'
-                    : 'cursor-not-allowed bg-slate-200 text-slate-500'"
-                  :disabled="!product.is_available"
-                  @click="handleAddToCart"
-                >
+                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm" :class="product.is_available ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]' : 'cursor-not-allowed bg-slate-200 text-slate-500'" :disabled="!product.is_available" @click="handleAddToCart">
                   <ShoppingBagIcon class="h-5 w-5 shrink-0" aria-hidden="true" />
                   {{ addToCartLabel }}
                 </button>
@@ -265,44 +166,15 @@
       </div>
     </main>
 
-    <FloatingCartButton
-      :item-count="itemCount"
-      @open-cart="openCart"
-    />
+    <FloatingCartButton :item-count="itemCount" @open-cart="openCart" />
 
-    <CartDrawer
-      :is-open="isCartOpen"
-      :items="items"
-      :item-count="itemCount"
-      :subtotal="subtotal"
-      :delivery-fee="deliveryFee"
-      :total="total"
-      :customer="customer"
-      :delivery-regions="deliveryRegions"
-      :is-delivery-regions-loading="isDeliveryRegionsLoading"
-      :is-submitting="isSubmittingOrder"
-      :is-whats-app-configured="isWhatsAppConfigured"
-      :profile="customerProfile"
-      @close="isCartOpen = false"
-      @clear-cart="clearCart"
-      @remove-item="removeItem"
-      @update-quantity="updateQuantity"
-      @update-customer="updateCustomer"
-      @submit-order="handleSubmitOrder"
-    />
+    <CartDrawer :is-open="isCartOpen" :items="items" :item-count="itemCount" :subtotal="subtotal" :delivery-fee="deliveryFee" :total="total" :customer="customer" :delivery-regions="deliveryRegions" :is-delivery-regions-loading="isDeliveryRegionsLoading" :is-submitting="isSubmittingOrder" :is-whats-app-configured="isWhatsAppConfigured" :profile="customerProfile" @close="isCartOpen = false" @clear-cart="clearCart" @remove-item="removeItem" @update-quantity="updateQuantity" @update-customer="updateCustomer" @submit-order="handleSubmitOrder" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  ArrowLeftIcon,
-  CheckIcon,
-  MinusIcon,
-  PlusIcon,
-  ShoppingBagIcon,
-  ShareIcon,
-} from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, CheckIcon, MinusIcon, PlusIcon, ShoppingBagIcon, ShareIcon } from '@heroicons/vue/24/outline'
 import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
 import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
@@ -380,42 +252,17 @@ const activePointerId = ref<number | null>(null)
 let carouselInterval: ReturnType<typeof setInterval> | null = null
 let shareFeedbackTimeout: ReturnType<typeof setTimeout> | null = null
 
-const {
-  items,
-  customer,
-  itemCount,
-  subtotal,
-  deliveryFee,
-  total,
-  addItem,
-  removeItem,
-  updateQuantity,
-  clearCart,
-  updateCustomer,
-  resetCustomer,
-  getProductQuantity,
-} = useCart()
+const { items, customer, itemCount, subtotal, deliveryFee, total, addItem, removeItem, updateQuantity, clearCart, updateCustomer, resetCustomer, getProductQuantity } = useCart()
 
-const productDescription = computed(() => (
-  product.value?.description?.trim()
-    || 'Peca selecionada para uma compra simples, com informacoes essenciais reunidas em uma unica tela.'
-))
+const productDescription = computed(() => product.value?.description?.trim() || 'Peca selecionada para uma compra simples, com informacoes essenciais reunidas em uma unica tela.')
 
 const productImages = computed(() => {
-  const productGallery = product.value?.images?.length
-    ? product.value.images
-    : product.value?.image
-      ? [product.value.image]
-      : []
+  const productGallery = product.value?.images?.length ? product.value.images : product.value?.image ? [product.value.image] : []
 
   return productGallery.length > 0 ? productGallery : [FALLBACK_IMAGE_URL]
 })
 
-const activeImageSource = computed(() => (
-  activeImage.value && productImages.value.includes(activeImage.value)
-    ? activeImage.value
-    : productImages.value[0]
-))
+const activeImageSource = computed(() => (activeImage.value && productImages.value.includes(activeImage.value) ? activeImage.value : productImages.value[0]))
 
 function stopCarousel(): void {
   if (!carouselInterval) {
@@ -427,9 +274,7 @@ function stopCarousel(): void {
 }
 
 function setActiveImageByIndex(nextIndex: number, direction: 'next' | 'prev'): void {
-  slideTransitionName.value = direction === 'next'
-    ? 'carousel-slide-next'
-    : 'carousel-slide-prev'
+  slideTransitionName.value = direction === 'next' ? 'carousel-slide-next' : 'carousel-slide-prev'
   activeImage.value = productImages.value[nextIndex] ?? FALLBACK_IMAGE_URL
 }
 
@@ -439,9 +284,7 @@ function goToNextImage(): void {
   }
 
   const currentIndex = productImages.value.findIndex((imageUrl) => imageUrl === activeImageSource.value)
-  const nextIndex = currentIndex >= 0
-    ? (currentIndex + 1) % productImages.value.length
-    : 0
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % productImages.value.length : 0
 
   setActiveImageByIndex(nextIndex, 'next')
 }
@@ -452,9 +295,7 @@ function goToPreviousImage(): void {
   }
 
   const currentIndex = productImages.value.findIndex((imageUrl) => imageUrl === activeImageSource.value)
-  const previousIndex = currentIndex >= 0
-    ? (currentIndex - 1 + productImages.value.length) % productImages.value.length
-    : 0
+  const previousIndex = currentIndex >= 0 ? (currentIndex - 1 + productImages.value.length) % productImages.value.length : 0
 
   setActiveImageByIndex(previousIndex, 'prev')
 }
@@ -475,9 +316,7 @@ function handleSelectImage(imageUrl: string): void {
   const currentIndex = productImages.value.findIndex((item) => item === activeImageSource.value)
   const nextIndex = productImages.value.findIndex((item) => item === imageUrl)
 
-  slideTransitionName.value = nextIndex >= currentIndex
-    ? 'carousel-slide-next'
-    : 'carousel-slide-prev'
+  slideTransitionName.value = nextIndex >= currentIndex ? 'carousel-slide-next' : 'carousel-slide-prev'
 
   activeImage.value = imageUrl
   startCarousel()
@@ -550,9 +389,7 @@ function handlePointerLeave(event: PointerEvent): void {
   finalizePointerInteraction()
 }
 
-const cartQuantity = computed(() => (
-  product.value ? getProductQuantity(product.value.id) : 0
-))
+const cartQuantity = computed(() => (product.value ? getProductQuantity(product.value.id) : 0))
 
 const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
 
@@ -564,9 +401,7 @@ const availabilityLabel = computed(() => {
   return isLowStock(product.value) ? 'Ultimas unidades' : 'Disponivel'
 })
 
-const availabilityToneClass = computed(() => (
-  product.value?.is_available ? 'text-[#D81B60]' : 'text-slate-600'
-))
+const availabilityToneClass = computed(() => (product.value?.is_available ? 'text-[#D81B60]' : 'text-slate-600'))
 
 const addToCartLabel = computed(() => {
   if (!product.value?.is_available) {
@@ -589,19 +424,18 @@ function getProductShareUrl(): string {
   const slug = typeof route.params.slug === 'string' ? route.params.slug : ''
   const code = typeof route.params.code === 'string' ? route.params.code : ''
 
-  return buildPublicProductUrl({
-    runtimeOrigin: window.location.origin,
-    storeSlug,
-    productSlug: slug,
-    productCode: code,
-  }) || ''
+  return (
+    buildPublicProductUrl({
+      runtimeOrigin: window.location.origin,
+      storeSlug,
+      productSlug: slug,
+      productCode: code,
+    }) || ''
+  )
 }
 
 function isShareAbortError(error: unknown): boolean {
-  return typeof error === 'object'
-    && error !== null
-    && 'name' in error
-    && error.name === 'AbortError'
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 }
 
 function clearShareCopiedFeedback(): void {
@@ -699,9 +533,7 @@ async function loadProduct(): Promise<void> {
   errorMessage.value = ''
 
   try {
-    product.value = code
-      ? await productService.getPublicByCode(code)
-      : await productService.getPublicBySlug(slug)
+    product.value = code ? await productService.getPublicByCode(code) : await productService.getPublicBySlug(slug)
     activeImage.value = product.value.images?.[0] || product.value.image || FALLBACK_IMAGE_URL
     quantity.value = 1
     isCarouselPaused.value = false
@@ -738,9 +570,7 @@ async function loadDeliveryRegions(): Promise<void> {
   try {
     deliveryRegions.value = await deliveryRegionService.getActive()
 
-    const selectedRegion = deliveryRegions.value.find(
-      (region) => region.id === customer.value.deliveryRegionId
-    )
+    const selectedRegion = deliveryRegions.value.find((region) => region.id === customer.value.deliveryRegionId)
 
     if (customer.value.deliveryRegionId && !selectedRegion) {
       updateCustomer({
@@ -750,11 +580,7 @@ async function loadDeliveryRegions(): Promise<void> {
       })
     }
 
-    if (
-      customer.value.deliveryMethod === 'delivery'
-      && !customer.value.deliveryRegionId
-      && deliveryRegions.value.length === 1
-    ) {
+    if (customer.value.deliveryMethod === 'delivery' && !customer.value.deliveryRegionId && deliveryRegions.value.length === 1) {
       const [region] = deliveryRegions.value
       if (!region) {
         return
@@ -777,11 +603,7 @@ async function loadDeliveryRegions(): Promise<void> {
 }
 
 onMounted(() => {
-  void Promise.allSettled([
-    fetchCurrentStore(),
-    loadDeliveryRegions(),
-    loadStoreSettings(),
-  ])
+  void Promise.allSettled([fetchCurrentStore(), loadDeliveryRegions(), loadStoreSettings()])
 })
 
 watch(productImages, () => {
@@ -793,7 +615,7 @@ watch(
   () => {
     void loadProduct()
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 // Separate watcher (not merged with the one above) because Vue's watch only
@@ -806,7 +628,7 @@ watch(
     if (typeof code === 'string' && code.trim()) {
       void loadProduct()
     }
-  }
+  },
 )
 
 watch(
@@ -814,14 +636,9 @@ watch(
   (storeSlug) => {
     if (typeof storeSlug === 'string' && storeSlug.trim()) {
       setSelectedStoreSlug(storeSlug)
-      void Promise.allSettled([
-        fetchCurrentStore(true),
-        loadDeliveryRegions(),
-        loadStoreSettings(),
-        loadProduct(),
-      ])
+      void Promise.allSettled([fetchCurrentStore(true), loadDeliveryRegions(), loadStoreSettings(), loadProduct()])
     }
-  }
+  },
 )
 
 function handleImageError(event: Event): void {
@@ -857,11 +674,7 @@ function handleAddToCart(): void {
 function goBackToCatalog(): void {
   const storeSlug = typeof route.params.storeSlug === 'string' ? route.params.storeSlug : ''
 
-  void router.push(
-    storeSlug
-      ? { name: PublicRoutes.StoreProducts, params: { storeSlug } }
-      : { name: PublicRoutes.Products }
-  )
+  void router.push(storeSlug ? { name: PublicRoutes.StoreProducts, params: { storeSlug } } : { name: PublicRoutes.Products })
 }
 
 function canOpenWhatsAppCheckout(): boolean {
@@ -882,13 +695,14 @@ async function handleSubmitOrder(): Promise<void> {
 
   try {
     const checkout = await orderService.checkoutViaWhatsApp(items.value, customer.value)
+    const paymentNotice = checkout.payment_reference ? ` Codigo: ${checkout.payment_reference}.` : checkout.payment_display_code ? ` Pagamento: ${checkout.payment_display_code}.` : ''
 
     if (checkout.whatsapp_url) {
       const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
       if (!openedWindow) {
         window.location.href = checkout.whatsapp_url
       }
-      toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
+      toast.success(`Pedido ${checkout.order_reference} registrado.${paymentNotice} Abrimos o WhatsApp para atendimento.`)
     } else {
       toast.error('Pedido registrado, mas o WhatsApp da loja nao esta configurado.')
     }
@@ -942,7 +756,9 @@ onBeforeUnmount(() => {
 .carousel-slide-next-leave-active,
 .carousel-slide-prev-enter-active,
 .carousel-slide-prev-leave-active {
-  transition: transform 0.4s ease, opacity 0.4s ease;
+  transition:
+    transform 0.4s ease,
+    opacity 0.4s ease;
 }
 
 .carousel-slide-next-enter-from {
