@@ -360,7 +360,7 @@ export function useProducts() {
           ),
         })
       );
-      toast.error("Nao foi possivel salvar o produto. Tente novamente.");
+      toast.error(`Nao foi possivel salvar o produto: ${errorMessage}`);
       throw err;
     } finally {
       loading.value = false;
@@ -401,7 +401,7 @@ export function useProducts() {
           productId: id,
         })
       );
-      toast.error("Nao foi possivel salvar o produto. Tente novamente.");
+      toast.error(`Nao foi possivel salvar o produto: ${errorMessage}`);
       throw err;
     } finally {
       loading.value = false;

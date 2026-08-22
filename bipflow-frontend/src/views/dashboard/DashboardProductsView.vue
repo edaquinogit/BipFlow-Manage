@@ -105,7 +105,8 @@ const handleSave = async (payload: Partial<Product>): Promise<void> => {
     // doubling exposure to a slow/cold backend for no benefit.
     handleClosePanel();
   } catch {
-    toastError('Não foi possível salvar o produto. Tente novamente.');
+    // createProduct/updateProduct already show the backend's specific error.
+    // Avoid replacing it with a second generic toast that hides the cause.
   } finally {
     isSaving.value = false;
   }
