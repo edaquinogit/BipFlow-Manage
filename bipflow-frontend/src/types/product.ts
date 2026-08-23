@@ -19,6 +19,15 @@ export interface ProductCategory {
   slug: string | null
 }
 
+export interface ProductVariant {
+  id: number
+  name: string
+  color_hex: string
+  image: string | null
+  is_active: boolean
+  position: number
+}
+
 /**
  * Product for customer display (simplified from admin schema)
  */
@@ -34,6 +43,7 @@ export interface Product {
   category: ProductCategory
   image: string | null
   images?: string[]
+  variants?: ProductVariant[]
   stock_quantity: number
   low_stock_threshold?: number | null
   is_available: boolean
@@ -67,6 +77,7 @@ export type ProductSortOption =
 export interface CartItem {
   product: Product
   quantity: number
+  variant?: ProductVariant | null
 }
 
 // Guest checkout reinstated: identity/address (fullName, phone, email,
@@ -91,6 +102,7 @@ export interface CartCustomer {
 
 export interface CheckoutPayloadItem {
   product_id: number
+  variant_id?: number | null
   quantity: number
 }
 
@@ -115,7 +127,11 @@ export interface CheckoutPayload {
 
 export interface CheckoutResponseItem {
   product_id: number
+  variant_id: number | null
   product_name: string
+  variant_name: string
+  variant_color_hex: string
+  variant_image_url: string
   sku: string
   quantity: number
   unit_price: string
@@ -173,6 +189,15 @@ export const ProductCategorySchema = z.object({
   slug: z.string().nullable(),
 })
 
+export const ProductVariantSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  image: z.string().url().nullable().optional().default(null),
+  is_active: z.boolean(),
+  position: z.number(),
+})
+
 export const ProductSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -185,6 +210,7 @@ export const ProductSchema = z.object({
   category: ProductCategorySchema,
   image: z.string().url().nullable(),
   images: z.array(z.string().url()).optional().default([]),
+  variants: z.array(ProductVariantSchema).optional().default([]),
   stock_quantity: z.number(),
   low_stock_threshold: z.number().nullable().optional(),
   is_available: z.boolean(),

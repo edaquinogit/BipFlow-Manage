@@ -5,6 +5,7 @@ import { ProductFormSchema, type Product, type ProductFormData } from '@/schemas
 import IdentitySection from '@/components/dashboard/product-form/sections/IdentitySection.vue';
 import ValuationSection from '@/components/dashboard/product-form/sections/ValuationSection.vue';
 import MediaSection from '@/components/dashboard/product-form/sections/MediaSection.vue';
+import ProductVariantsSection from '@/components/dashboard/product-form/sections/ProductVariantsSection.vue';
 import { useDialogA11y } from '@/composables/useDialogA11y';
 
 interface Props {
@@ -43,6 +44,7 @@ type ProductFormState = {
   size: string;
   image: ProductFormData['image'];
   images: ProductFormData['images'];
+  variants: ProductFormData['variants'];
   description: string;
   is_available?: boolean;
 };
@@ -56,6 +58,7 @@ const createEmptyForm = (): ProductFormState => ({
   size: '',
   image: null,
   images: [],
+  variants: [],
   description: '',
 });
 
@@ -90,6 +93,18 @@ const normalizeInitialFormData = (
   const galleryImages = coverImage
     ? productImages.filter((imageUrl) => imageUrl !== coverImage)
     : productImages;
+  const variants = Array.isArray(product.variants)
+    ? [...product.variants]
+      .sort((left, right) => left.position - right.position || (left.id ?? 0) - (right.id ?? 0))
+      .map((variant, index) => ({
+        id: variant.id,
+        name: variant.name ?? '',
+        color_hex: variant.color_hex ?? '#000000',
+        image: variant.image ?? null,
+        is_active: variant.is_active ?? true,
+        position: index,
+      }))
+    : [];
 
   return {
     name: product.name ?? '',
@@ -100,6 +115,7 @@ const normalizeInitialFormData = (
     size: product.size ?? '',
     image: product.image ?? null,
     images: galleryImages.slice(0, 2),
+    variants,
     description: product.description ?? '',
     is_available: product.is_available ?? true,
   };
@@ -225,6 +241,11 @@ const submitLabel = computed(() => {
             v-model:cover-image="form.image"
             v-model:gallery-images="form.images"
             :error="errors.image?.[0] || errors.images?.[0] || errors.uploaded_images?.[0]"
+          />
+
+          <ProductVariantsSection
+            v-model:variants="form.variants"
+            :error="errors.variants?.[0]"
           />
         </form>
 

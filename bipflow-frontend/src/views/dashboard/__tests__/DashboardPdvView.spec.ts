@@ -533,7 +533,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
             {
               id: 1,
               product_id: 7,
+              variant_id: null,
               product_name: 'Coxinha premium',
+              variant_name: '',
+              variant_color_hex: '',
+              variant_image_url: '',
               sku: '',
               quantity: 1,
               unit_price: '18.50',

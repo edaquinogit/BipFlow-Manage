@@ -290,6 +290,58 @@ describe('ProductDetailView', () => {
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/l/default/p/ABC123XYZ`)
   })
 
+  it('switches the gallery image and cart payload when a color variant is selected', async () => {
+    wrapper.unmount()
+    cartState.addItem.mockClear()
+    vi.mocked(productService.getPublicBySlug).mockResolvedValue({
+      ...productDetail,
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#000000',
+          image: 'https://example.com/preto.jpg',
+          is_active: true,
+          position: 0,
+        },
+        {
+          id: 11,
+          name: 'Azul',
+          color_hex: '#3366FF',
+          image: 'https://example.com/azul.jpg',
+          is_active: true,
+          position: 1,
+        },
+      ],
+    } as any)
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('img[alt="Imagem do produto Premium Burger"]').attributes('src'))
+      .toBe('https://example.com/preto.jpg')
+
+    await wrapper.find('[aria-label="Selecionar cor Azul"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('img[alt="Imagem do produto Premium Burger"]').attributes('src'))
+      .toBe('https://example.com/azul.jpg')
+
+    const addButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('Adicionar ao pedido')
+    )
+    expect(addButton).toBeDefined()
+
+    await addButton!.trigger('click')
+
+    expect(cartState.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 7 }),
+      1,
+      expect.objectContaining({ id: 11, name: 'Azul' }),
+    )
+  })
+
   it('falls back to copying the public product link when native share fails', async () => {
     const share = vi.fn().mockRejectedValue(new Error('share_failed'))
     const writeText = vi.fn().mockResolvedValue(undefined)

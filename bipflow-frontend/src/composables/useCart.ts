@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import type { CartCustomer, CartItem, Product } from '@/types/product'
+import type { CartCustomer, CartItem, Product, ProductVariant } from '@/types/product'
 import { getSelectedStoreSlug } from '@/services/store-scope'
 
 // Etapa 3 of the multi-tenant evolution: the cart key is scoped per store so
@@ -80,6 +80,34 @@ function clampQuantity(product: Product, quantity: number): number {
 function parsePrice(price: string | number): number {
   const numericPrice = typeof price === 'string' ? Number.parseFloat(price) : price
   return Number.isFinite(numericPrice) ? numericPrice : 0
+}
+
+function normalizeVariantId(variantId?: number | null): number | null {
+  return typeof variantId === 'number' && Number.isFinite(variantId) ? variantId : null
+}
+
+function itemVariantId(item: CartItem): number | null {
+  return item.variant?.id ?? null
+}
+
+export function getCartItemKey(productId: number, variantId?: number | null): string {
+  return `${productId}:${normalizeVariantId(variantId) ?? 'default'}`
+}
+
+function matchesCartLine(
+  item: CartItem,
+  productId: number,
+  variantId?: number | null,
+): boolean {
+  if (item.product.id !== productId) {
+    return false
+  }
+
+  if (variantId === undefined) {
+    return true
+  }
+
+  return itemVariantId(item) === normalizeVariantId(variantId)
 }
 
 function migrateLegacyCartOnce(itemsKey: string, customerKey: string): void {
@@ -200,12 +228,15 @@ export function useCart() {
 
   const total = computed(() => subtotal.value + deliveryFee.value)
 
-  const addItem = (product: Product, quantity = 1): void => {
+  const addItem = (product: Product, quantity = 1, variant: ProductVariant | null = null): void => {
     if (!product.is_available || product.stock_quantity <= 0) {
       return
     }
 
-    const existingItem = items.value.find((item) => item.product.id === product.id)
+    const variantId = variant?.id ?? null
+    const existingItem = items.value.find((item) =>
+      matchesCartLine(item, product.id, variantId)
+    )
 
     if (existingItem) {
       existingItem.quantity = clampQuantity(
@@ -219,24 +250,27 @@ export function useCart() {
       ...items.value,
       {
         product,
+        variant,
         quantity: clampQuantity(product, quantity),
       },
     ]
   }
 
-  const removeItem = (productId: number): void => {
-    items.value = items.value.filter((item) => item.product.id !== productId)
+  const removeItem = (productId: number, variantId?: number | null): void => {
+    items.value = items.value.filter((item) => !matchesCartLine(item, productId, variantId))
   }
 
-  const updateQuantity = (productId: number, quantity: number): void => {
-    const targetItem = items.value.find((item) => item.product.id === productId)
+  const updateQuantity = (productId: number, quantity: number, variantId?: number | null): void => {
+    const targetItem = items.value.find((item) =>
+      matchesCartLine(item, productId, variantId)
+    )
 
     if (!targetItem) {
       return
     }
 
     if (quantity <= 0) {
-      removeItem(productId)
+      removeItem(productId, variantId)
       return
     }
 
@@ -258,8 +292,14 @@ export function useCart() {
     customer.value = { ...defaultCustomer }
   }
 
-  const getProductQuantity = (productId: number): number => {
-    return items.value.find((item) => item.product.id === productId)?.quantity ?? 0
+  const getProductQuantity = (productId: number, variantId?: number | null): number => {
+    return items.value.reduce((total, item) => {
+      if (!matchesCartLine(item, productId, variantId)) {
+        return total
+      }
+
+      return total + item.quantity
+    }, 0)
   }
 
   return {

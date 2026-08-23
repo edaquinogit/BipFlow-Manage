@@ -1,7 +1,11 @@
 export interface SaleOrderItem {
   id: number
   product_id: number | null
+  variant_id: number | null
   product_name: string
+  variant_name: string
+  variant_color_hex: string
+  variant_image_url: string
   sku: string
   quantity: number
   unit_price: string

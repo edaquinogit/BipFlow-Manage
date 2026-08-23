@@ -35,6 +35,33 @@ const ProductGalleryImageSchema = z.union([
     .refine((file) => ACCEPTED_IMAGE_TYPES.includes(file.type), "Only .jpg, .png and .webp formats are supported."),
 ]);
 
+const ProductVariantImageSchema = z
+  .union([
+    z.string().url(),
+    z
+      .instanceof(File)
+      .refine((file) => file.size <= MAX_FILE_SIZE, `Image too heavy. Max limit is 2MB.`)
+      .refine((file) => ACCEPTED_IMAGE_TYPES.includes(file.type), "Only .jpg, .png and .webp formats are supported."),
+    z.null(),
+  ])
+  .optional();
+
+const ProductVariantSchema = z.object({
+  id: z.number().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Variant name is required")
+    .max(80, "Variant name is too long"),
+  color_hex: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color, like #D81B60")
+    .transform((value) => value.toUpperCase()),
+  image: ProductVariantImageSchema,
+  is_active: z.boolean().default(true),
+  position: z.coerce.number().int().nonnegative().default(0),
+});
+
 const OptionalCategoryReferenceSchema = z.preprocess(
   (value) => (value === "" || value === null ? undefined : value),
   z.union([
@@ -121,6 +148,8 @@ const productBase = {
     .max(3, "You can upload up to 3 images per product.")
     .optional()
     .default([]),
+
+  variants: z.array(ProductVariantSchema).optional().default([]),
 };
 
 // Schema de Leitura (API Response)
@@ -182,6 +211,7 @@ export const CreateOrderSchema = z.object({
 
 export type Product = z.infer<typeof ProductSchema>;
 export type Category = z.infer<typeof CategorySchema>;
+export type ProductVariant = z.infer<typeof ProductVariantSchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
 export type ProductFormDraft = Partial<Omit<ProductFormData, "category">> & {
   category?: ProductFormData["category"] | null;
@@ -198,5 +228,6 @@ export const createEmptyProduct = (): ProductFormDraft => ({
   size: "",
   image: null,
   images: [],
+  variants: [],
   description: "",
 });

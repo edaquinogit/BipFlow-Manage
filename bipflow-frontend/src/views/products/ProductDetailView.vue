@@ -211,6 +211,41 @@
 
             <div class="mt-5 border-t border-[#E5E7EB] pt-4 min-[390px]:mt-6 min-[390px]:pt-5">
               <div class="flex flex-col gap-3.5 min-[390px]:gap-4">
+                <div
+                  v-if="activeVariants.length > 0"
+                  class="flex flex-col gap-3 border-b border-[#E5E7EB] pb-4"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-[#05050A]">Cor</p>
+                      <p class="mt-1 truncate text-[13px] text-slate-600 min-[390px]:text-sm">
+                        {{ selectedVariant?.name || 'Selecione uma cor' }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="variant in activeVariants"
+                      :key="variant.id"
+                      type="button"
+                      class="inline-flex h-11 min-w-11 items-center justify-center rounded-full border bg-white p-1 transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                      :class="selectedVariant?.id === variant.id
+                        ? 'border-[#D81B60] shadow-[0_12px_24px_-18px_rgba(216,27,96,0.65)]'
+                        : 'border-[#D8DDE5] hover:border-[#D81B60]'"
+                      :aria-label="`Selecionar cor ${variant.name}`"
+                      :title="variant.name"
+                      @click="handleSelectVariant(variant)"
+                    >
+                      <span
+                        class="h-8 w-8 rounded-full border border-black/10"
+                        :style="{ backgroundColor: variant.color_hex }"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                </div>
+
                 <div class="flex items-center justify-between gap-3 min-[390px]:gap-4">
                   <div>
                     <p class="text-sm font-semibold text-[#05050A]">
@@ -321,7 +356,7 @@ import productService from '@/services/product.service'
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
-import type { ProductDetail } from '@/types/product'
+import type { ProductDetail, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 import { buildPublicProductUrl } from '@/utils/publicStorefrontUrl'
 import { isLowStock } from '@/utils/stockAlerts'
@@ -351,6 +386,7 @@ const product = ref<ProductDetail | null>(null)
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const activeImage = ref<string | null>(null)
+const selectedVariantId = ref<number | null>(null)
 const isLoading = ref(true)
 const isCartOpen = ref(false)
 
@@ -400,14 +436,32 @@ const productDescription = computed(() => (
     || 'Peca selecionada para uma compra simples, com informacoes essenciais reunidas em uma unica tela.'
 ))
 
+const activeVariants = computed<ProductVariant[]>(() =>
+  [...(product.value?.variants ?? [])]
+    .filter((variant) => variant.is_active)
+    .sort((left, right) => left.position - right.position || left.id - right.id)
+)
+
+const selectedVariant = computed<ProductVariant | null>(() => {
+  if (selectedVariantId.value === null) {
+    return null
+  }
+
+  return activeVariants.value.find((variant) => variant.id === selectedVariantId.value) ?? null
+})
+
 const productImages = computed(() => {
   const productGallery = product.value?.images?.length
     ? product.value.images
     : product.value?.image
       ? [product.value.image]
       : []
+  const variantImage = selectedVariant.value?.image || null
+  const gallery = variantImage
+    ? [variantImage, ...productGallery.filter((imageUrl) => imageUrl !== variantImage)]
+    : productGallery
 
-  return productGallery.length > 0 ? productGallery : [FALLBACK_IMAGE_URL]
+  return gallery.length > 0 ? gallery : [FALLBACK_IMAGE_URL]
 })
 
 const activeImageSource = computed(() => (
@@ -492,6 +546,16 @@ function resumeCarousel(): void {
   startCarousel()
 }
 
+function selectInitialVariant(): void {
+  selectedVariantId.value = activeVariants.value[0]?.id ?? null
+}
+
+function handleSelectVariant(variant: ProductVariant): void {
+  selectedVariantId.value = variant.id
+  activeImage.value = variant.image || productImages.value[0] || FALLBACK_IMAGE_URL
+  startCarousel()
+}
+
 function handlePointerDown(event: PointerEvent): void {
   if (productImages.value.length <= 1) {
     return
@@ -550,7 +614,7 @@ function handlePointerLeave(event: PointerEvent): void {
 }
 
 const cartQuantity = computed(() => (
-  product.value ? getProductQuantity(product.value.id) : 0
+  product.value ? getProductQuantity(product.value.id, selectedVariant.value?.id ?? null) : 0
 ))
 
 const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
@@ -701,7 +765,8 @@ async function loadProduct(): Promise<void> {
     product.value = code
       ? await productService.getPublicByCode(code)
       : await productService.getPublicBySlug(slug)
-    activeImage.value = product.value.images?.[0] || product.value.image || FALLBACK_IMAGE_URL
+    selectInitialVariant()
+    activeImage.value = productImages.value[0] || FALLBACK_IMAGE_URL
     quantity.value = 1
     isCarouselPaused.value = false
     startCarousel()
@@ -783,7 +848,10 @@ onMounted(() => {
   ])
 })
 
-watch(productImages, () => {
+watch(productImages, (nextImages) => {
+  if (!nextImages.includes(activeImage.value || '')) {
+    activeImage.value = nextImages[0] || FALLBACK_IMAGE_URL
+  }
   startCarousel()
 })
 
@@ -848,8 +916,9 @@ function handleAddToCart(): void {
     return
   }
 
-  addItem(product.value, quantity.value)
-  toast.success(`${quantity.value} unidade(s) de ${product.value.name} adicionada(s) ao pedido.`)
+  addItem(product.value, quantity.value, selectedVariant.value)
+  const variantLabel = selectedVariant.value?.name ? ` - ${selectedVariant.value.name}` : ''
+  toast.success(`${quantity.value} unidade(s) de ${product.value.name}${variantLabel} adicionada(s) ao pedido.`)
   quantity.value = 1
 }
 

@@ -367,7 +367,12 @@ import { extractCheckoutErrorMessage, orderService } from '@/services/order.serv
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
-import type { Product, ProductFilters as ProductFilterState, ProductSortOption } from '@/types/product'
+import type {
+  Product,
+  ProductFilters as ProductFilterState,
+  ProductSortOption,
+  ProductVariant,
+} from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 
 function parseNumberParam(
@@ -757,9 +762,18 @@ function retryFetch(): void {
   void fetchProducts()
 }
 
-function handleAddToCart(product: Product, quantity: number): void {
-  addItem(product, quantity)
-  toast.success(`${quantity} unidade(s) de ${product.name} adicionada(s) ao pedido.`)
+function handleAddToCart(
+  product: Product,
+  quantity: number,
+  variant: ProductVariant | null = null,
+): void {
+  if (variant) {
+    addItem(product, quantity, variant)
+  } else {
+    addItem(product, quantity)
+  }
+  const variantLabel = variant?.name ? ` - ${variant.name}` : ''
+  toast.success(`${quantity} unidade(s) de ${product.name}${variantLabel} adicionada(s) ao pedido.`)
 }
 
 function handleOpenDetails(product: Product): void {

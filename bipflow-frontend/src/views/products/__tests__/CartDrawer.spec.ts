@@ -201,4 +201,28 @@ describe('CartDrawer', () => {
     expect(emitted).toContainEqual([{ fullName: 'Joao Convidado' }])
     expect(emitted).toContainEqual([{ phone: '11955554444' }])
   })
+
+  it('renders variant details and emits exact variant line actions', async () => {
+    const item = {
+      ...buildItem(),
+      variant: {
+        id: 9,
+        name: 'Azul',
+        color_hex: '#3366FF',
+        image: 'https://example.com/azul.jpg',
+        is_active: true,
+        position: 0,
+      },
+    }
+    const wrapper = mountDrawer({ items: [item] })
+
+    expect(wrapper.text()).toContain('Azul')
+    expect(wrapper.find('img').attributes('src')).toBe('https://example.com/azul.jpg')
+
+    await wrapper.find('[aria-label="Aumentar quantidade de Combo Executivo - Azul"]').trigger('click')
+    await wrapper.find('[aria-label="Remover Combo Executivo - Azul do pedido"]').trigger('click')
+
+    expect(wrapper.emitted('updateQuantity')?.[0]).toEqual([1, 2, 9])
+    expect(wrapper.emitted('removeItem')?.[0]).toEqual([1, 9])
+  })
 })

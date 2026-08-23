@@ -75,6 +75,19 @@
           <p class="mt-1 text-[12px] text-slate-500 min-[390px]:text-sm">
             {{ stockStatusLabel }}
           </p>
+          <div
+            v-if="activeVariants.length > 0"
+            class="mt-2 flex h-4 items-center gap-1.5"
+            aria-label="Cores disponiveis"
+          >
+            <span
+              v-for="variant in activeVariants.slice(0, 4)"
+              :key="variant.id"
+              class="h-3 w-3 rounded-full border border-black/10"
+              :style="{ backgroundColor: variant.color_hex }"
+              :title="variant.name"
+            />
+          </div>
         </div>
 
         <button
@@ -169,7 +182,7 @@ import {
   PlusIcon,
   ShoppingBagIcon,
 } from '@heroicons/vue/24/outline'
-import type { Product } from '@/types/product'
+import type { Product, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 import { isLowStock } from '@/utils/stockAlerts'
 
@@ -184,7 +197,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  addToCart: [product: Product, quantity: number]
+  addToCart: [product: Product, quantity: number, variant?: ProductVariant | null]
   openDetails: [product: Product]
 }>()
 
@@ -215,9 +228,19 @@ watch(
   },
 )
 
-const imageSource = computed(() => props.product.image || FALLBACK_IMAGE_URL)
+const activeVariants = computed(() =>
+  [...(props.product.variants ?? [])]
+    .filter((variant) => variant.is_active)
+    .sort((left, right) => left.position - right.position || left.id - right.id)
+)
 
-const hasProductImage = computed(() => Boolean(props.product.image))
+const defaultVariant = computed(() => activeVariants.value[0] ?? null)
+
+const imageSource = computed(() =>
+  defaultVariant.value?.image || props.product.image || FALLBACK_IMAGE_URL
+)
+
+const hasProductImage = computed(() => Boolean(defaultVariant.value?.image || props.product.image))
 
 const stockStatusLabel = computed(() => {
   if (!props.product.is_available) {
@@ -287,7 +310,11 @@ const handleAddToCart = () => {
     return
   }
 
-  emit('addToCart', props.product, quantity.value)
+  if (defaultVariant.value) {
+    emit('addToCart', props.product, quantity.value, defaultVariant.value)
+  } else {
+    emit('addToCart', props.product, quantity.value)
+  }
   quantity.value = 1
 }
 

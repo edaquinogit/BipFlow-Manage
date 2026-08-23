@@ -69,6 +69,65 @@ describe('useCart - customer PII TTL', () => {
   })
 })
 
+describe('useCart - product variants', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    window.localStorage.clear()
+  })
+
+  const product = {
+    id: 1,
+    name: 'Camiseta',
+    price: '59.90',
+    stock_quantity: 8,
+    is_available: true,
+  } as any
+
+  const black = {
+    id: 10,
+    name: 'Preto',
+    color_hex: '#000000',
+    image: 'https://example.com/preto.jpg',
+    is_active: true,
+    position: 0,
+  }
+
+  const blue = {
+    id: 11,
+    name: 'Azul',
+    color_hex: '#3366FF',
+    image: null,
+    is_active: true,
+    position: 1,
+  }
+
+  it('keeps different variants of the same product as separate cart lines', async () => {
+    const cart = await loadCart()
+
+    cart.addItem(product, 1, black)
+    cart.addItem(product, 2, blue)
+
+    expect(cart.items.value).toHaveLength(2)
+    expect(cart.getProductQuantity(product.id)).toBe(3)
+    expect(cart.getProductQuantity(product.id, black.id)).toBe(1)
+    expect(cart.getProductQuantity(product.id, blue.id)).toBe(2)
+  })
+
+  it('updates and removes only the requested variant line', async () => {
+    const cart = await loadCart()
+
+    cart.addItem(product, 1, black)
+    cart.addItem(product, 2, blue)
+
+    cart.updateQuantity(product.id, 4, black.id)
+    cart.removeItem(product.id, blue.id)
+
+    expect(cart.items.value).toHaveLength(1)
+    expect(cart.items.value[0]?.variant?.id).toBe(black.id)
+    expect(cart.items.value[0]?.quantity).toBe(4)
+  })
+})
+
 describe('clearAllPersistedCartCustomerData', () => {
   beforeEach(() => {
     vi.resetModules()

@@ -39,6 +39,7 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
   const payload: CheckoutPayload = {
     items: items.map((item) => ({
       product_id: item.product.id,
+      variant_id: item.variant?.id ?? null,
       quantity: item.quantity,
     })),
     customer: {
@@ -67,8 +68,9 @@ function buildWhatsAppHandoffMessage(items: CartItem[], subtotal: number): strin
   const itemLines = items.map((item, index) => {
     const lineTotal = Number(item.product.price) * item.quantity
     const sku = item.product.sku ? ` (${item.product.sku})` : ''
+    const variant = item.variant?.name ? ` - ${item.variant.name}` : ''
 
-    return `${index + 1}. ${item.product.name}${sku} x${item.quantity} - ${formatBRL(lineTotal)}`
+    return `${index + 1}. ${item.product.name}${variant}${sku} x${item.quantity} - ${formatBRL(lineTotal)}`
   })
 
   return [

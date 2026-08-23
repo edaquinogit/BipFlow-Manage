@@ -61,13 +61,13 @@
             <div class="divide-y divide-[#E5E7EB]">
               <article
                 v-for="item in items"
-                :key="item.product.id"
+                :key="getCartItemKey(item.product.id, item.variant?.id ?? null)"
                 class="py-5 first:pt-2 last:pb-1"
               >
                 <div class="flex gap-3 sm:gap-4">
                   <img
-                    :src="item.product.image || fallbackImageUrl"
-                    :alt="`Imagem do produto ${item.product.name}`"
+                    :src="cartItemImage(item)"
+                    :alt="`Imagem do produto ${cartItemLabel(item)}`"
                     class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-[#F4F1F3] object-cover sm:h-20 sm:w-20"
                     loading="lazy"
                   />
@@ -81,6 +81,17 @@
                         <h4 class="mt-1 line-clamp-2 text-[15px] font-bold leading-5 text-[#05050A] sm:text-base sm:leading-6">
                           {{ item.product.name }}
                         </h4>
+                        <p
+                          v-if="item.variant"
+                          class="mt-1.5 inline-flex min-w-0 items-center gap-2 text-[12px] font-semibold text-[#4B5563] sm:text-[13px]"
+                        >
+                          <span
+                            class="h-3 w-3 shrink-0 rounded-full border border-black/10"
+                            :style="{ backgroundColor: item.variant.color_hex }"
+                            aria-hidden="true"
+                          />
+                          <span class="truncate">{{ item.variant.name }}</span>
+                        </p>
                         <p class="mt-1 text-[13px] text-[#6B7280] sm:text-sm">
                           {{ formatBRL(item.product.price) }} / unidade
                         </p>
@@ -89,8 +100,8 @@
                       <button
                         type="button"
                         class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-100"
-                        :aria-label="`Remover ${item.product.name} do pedido`"
-                        @click="$emit('removeItem', item.product.id)"
+                        :aria-label="`Remover ${cartItemLabel(item)} do pedido`"
+                        @click="$emit('removeItem', item.product.id, item.variant?.id ?? null)"
                       >
                         <TrashIcon class="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -101,8 +112,8 @@
                         <button
                           type="button"
                           class="inline-flex h-11 w-11 items-center justify-center rounded-l-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
-                          :aria-label="`Diminuir quantidade de ${item.product.name}`"
-                          @click="$emit('updateQuantity', item.product.id, item.quantity - 1)"
+                          :aria-label="`Diminuir quantidade de ${cartItemLabel(item)}`"
+                          @click="$emit('updateQuantity', item.product.id, item.quantity - 1, item.variant?.id ?? null)"
                         >
                           <MinusIcon class="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -112,8 +123,8 @@
                         <button
                           type="button"
                           class="inline-flex h-11 w-11 items-center justify-center rounded-r-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
-                          :aria-label="`Aumentar quantidade de ${item.product.name}`"
-                          @click="$emit('updateQuantity', item.product.id, item.quantity + 1)"
+                          :aria-label="`Aumentar quantidade de ${cartItemLabel(item)}`"
+                          @click="$emit('updateQuantity', item.product.id, item.quantity + 1, item.variant?.id ?? null)"
                         >
                           <PlusIcon class="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -368,6 +379,7 @@ import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 import { useDialogA11y } from '@/composables/useDialogA11y'
+import { getCartItemKey } from '@/composables/useCart'
 
 const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
@@ -400,8 +412,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: []
   clearCart: []
-  removeItem: [productId: number]
-  updateQuantity: [productId: number, quantity: number]
+  removeItem: [productId: number, variantId?: number | null]
+  updateQuantity: [productId: number, quantity: number, variantId?: number | null]
   updateCustomer: [patch: Partial<CartCustomer>]
   submitOrder: []
 }>()
@@ -480,6 +492,16 @@ const submitButtonLabel = computed(() => {
 
   return props.isWhatsAppConfigured ? 'Registrar e abrir WhatsApp' : 'Registrar pedido'
 })
+
+function cartItemImage(item: CartItem): string {
+  return item.variant?.image || item.product.image || fallbackImageUrl
+}
+
+function cartItemLabel(item: CartItem): string {
+  return item.variant?.name
+    ? `${item.product.name} - ${item.variant.name}`
+    : item.product.name
+}
 
 function getInputValue(event: Event): string {
   return (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value

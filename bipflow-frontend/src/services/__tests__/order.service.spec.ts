@@ -95,6 +95,50 @@ describe('orderService.checkoutViaWhatsApp', () => {
       city: 'Salvador',
     })
   })
+
+  it('includes the selected product variant in the checkout item payload', async () => {
+    const variant = {
+      id: 9,
+      name: 'Azul',
+      color_hex: '#3366FF',
+      image: null,
+      is_active: true,
+      position: 0,
+    }
+    const items: CartItem[] = [{ product: buildProduct(), variant, quantity: 1 }]
+
+    await orderService.checkoutViaWhatsApp(items, buildCustomer())
+
+    const payload = vi.mocked(api.post).mock.calls[0]?.[1] as {
+      items: Array<Record<string, unknown>>
+    }
+    expect(payload.items[0]).toMatchObject({
+      product_id: 1,
+      variant_id: 9,
+      quantity: 1,
+    })
+  })
+})
+
+describe('orderService.buildWhatsAppHandoffMessage', () => {
+  it('includes the selected variant name in manual WhatsApp handoff lines', () => {
+    const variant = {
+      id: 9,
+      name: 'Azul',
+      color_hex: '#3366FF',
+      image: null,
+      is_active: true,
+      position: 0,
+    }
+    const product = buildProduct()
+
+    const message = orderService.buildWhatsAppHandoffMessage(
+      [{ product, variant, quantity: 2 }],
+      85,
+    )
+
+    expect(message).toContain('Combo Executivo - Azul')
+  })
 })
 
 describe('extractCheckoutErrorMessage', () => {

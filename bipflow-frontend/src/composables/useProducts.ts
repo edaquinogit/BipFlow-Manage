@@ -100,6 +100,56 @@ export function useProducts() {
 
       if (value === null || value === undefined || value === "") return;
 
+      if (key === "variants" && Array.isArray(value)) {
+        const variantsPayload: Array<Record<string, unknown>> = [];
+
+        value.forEach((entry, entryIndex) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return;
+          }
+
+          const variant = entry as Record<string, unknown>;
+          const name = typeof variant.name === "string" ? variant.name.trim() : "";
+
+          if (!name) {
+            return;
+          }
+
+          const payloadIndex = variantsPayload.length;
+          const position = Number(variant.position);
+          const payload: Record<string, unknown> = {
+            name,
+            color_hex: String(variant.color_hex || "#000000").toUpperCase(),
+            is_active: variant.is_active !== false,
+            position: Number.isFinite(position) ? Math.trunc(position) : entryIndex,
+          };
+
+          const id = Number(variant.id);
+          if (Number.isInteger(id) && id > 0) {
+            payload.id = id;
+          }
+
+          const image = variant.image;
+          if (image instanceof File) {
+            if (image.size > MAX_FILE_SIZE) {
+              throw new Error("Image file size cannot exceed 2MB.");
+            }
+
+            formData.append(`variant_images[${payloadIndex}]`, image);
+            payload.image_upload_index = payloadIndex;
+          } else if (typeof image === "string" && image.trim()) {
+            payload.image = image.trim();
+          } else if (image === null) {
+            payload.image = null;
+          }
+
+          variantsPayload.push(payload);
+        });
+
+        formData.append("variants_payload", JSON.stringify(variantsPayload));
+        return;
+      }
+
       // Handle cover image file validation
       if (key === "image") {
         if (value instanceof File) {

@@ -114,6 +114,47 @@ describe("useProducts Composable", () => {
       expect(result!.image).toMatch(/^http.*media/);
     });
 
+    it("should serialize color variants into JSON and attach variant image uploads", async () => {
+      const { createProduct } = createComposable();
+      const variantFile = new File(["variant-image"], "camiseta-preta.png", {
+        type: "image/png",
+      });
+
+      const serviceSpy = vi.spyOn(ProductService, "create").mockResolvedValue({
+        id: 102,
+        name: "Camiseta",
+        image: null,
+      } as any);
+
+      await createProduct({
+        name: "Camiseta",
+        price: 89.9,
+        stock_quantity: 4,
+        category: 2,
+        variants: [
+          {
+            name: "Preto",
+            color_hex: "#000000",
+            image: variantFile,
+            is_active: true,
+            position: 0,
+          },
+        ],
+      } as any);
+
+      const sentPayload = serviceSpy.mock.calls[0]?.[0] as FormData;
+      expect(JSON.parse(String(sentPayload.get("variants_payload")))).toEqual([
+        {
+          name: "Preto",
+          color_hex: "#000000",
+          is_active: true,
+          position: 0,
+          image_upload_index: 0,
+        },
+      ]);
+      expect(sentPayload.get("variant_images[0]")).toBeInstanceOf(File);
+    });
+
     /**
      * Verify error handling when product creation fails
      *
