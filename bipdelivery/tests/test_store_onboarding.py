@@ -11,6 +11,7 @@ The other half tested here is the store switcher's security boundary:
 to a store they actually belong to. Trusting the header unconditionally
 for authenticated requests would reopen exactly the leak Etapa 3 closed.
 """
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -23,6 +24,7 @@ from rest_framework.test import APIClient
 from bipdelivery.api.models import (
     Category,
     CustomerProfile,
+    LabelSettings,
     Product,
     Store,
     StoreMembership,
@@ -47,7 +49,9 @@ class RegistrationCreatesStoreTest(TestCase):
         payload.update(overrides)
         return self.client.post("/api/auth/register/", payload, format="json")
 
-    def _register_customer(self, *, email: str = "customer@example.com", store_slug: str = "default"):
+    def _register_customer(
+        self, *, email: str = "customer@example.com", store_slug: str = "default"
+    ):
         payload = {
             "email": email,
             "password": "SenhaForte123",
@@ -83,7 +87,11 @@ class RegistrationCreatesStoreTest(TestCase):
         response = self._register(email="dono2@example.com")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        slugs = set(Store.objects.filter(name="Pizzaria da Nova Loja").values_list("slug", flat=True))
+        slugs = set(
+            Store.objects.filter(name="Pizzaria da Nova Loja").values_list(
+                "slug", flat=True
+            )
+        )
         self.assertEqual(len(slugs), 2)
 
     def test_newly_registered_owner_can_access_the_dashboard(self) -> None:
@@ -99,7 +107,9 @@ class RegistrationCreatesStoreTest(TestCase):
         self.assertTrue(response.data["can_manage_catalog"])
         self.assertTrue(response.data["can_manage_orders"])
 
-    def test_newly_registered_owner_can_create_a_product_in_their_own_store(self) -> None:
+    def test_newly_registered_owner_can_create_a_product_in_their_own_store(
+        self,
+    ) -> None:
         self._register()
         user = User.objects.get(email="nova.loja@example.com")
         store = Store.objects.get(owner=user)
@@ -120,11 +130,17 @@ class RegistrationCreatesStoreTest(TestCase):
             format="json",
         )
 
-        self.assertEqual(product_response.status_code, status.HTTP_201_CREATED, msg=product_response.data)
+        self.assertEqual(
+            product_response.status_code,
+            status.HTTP_201_CREATED,
+            msg=product_response.data,
+        )
         created = Product.objects.get(id=product_response.data["id"])
         self.assertEqual(created.store_id, store.id)
 
-    def test_storefront_customer_registration_creates_customer_profile_only(self) -> None:
+    def test_storefront_customer_registration_creates_customer_profile_only(
+        self,
+    ) -> None:
         store = Store.get_default()
 
         response = self._register_customer(store_slug=store.slug)
@@ -155,29 +171,43 @@ class StoreSwitchSecurityTest(TestCase):
         self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
         self.user = User.objects.create_user(username="owner_a", password="testpass123")
-        StoreMembership.objects.create(store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER)
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
 
         self.client = APIClient()
-        self.client.force_authenticate(user=self.user, token={"store_id": self.store_a.id})
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
 
     def test_header_cannot_move_a_user_into_a_store_they_do_not_belong_to(self) -> None:
-        response = self.client.get("/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug)
+        response = self.client.get(
+            "/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug
+        )
 
         self.assertEqual(response.data["slug"], self.store_a.slug)
 
     def test_header_can_move_a_user_between_their_own_stores(self) -> None:
-        StoreMembership.objects.create(store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER)
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
 
-        response = self.client.get("/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug)
+        response = self.client.get(
+            "/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug
+        )
 
         self.assertEqual(response.data["slug"], self.store_b.slug)
 
     def test_superuser_can_use_the_header_without_an_explicit_membership(self) -> None:
-        superuser = User.objects.create_superuser(username="root", password="testpass123", email="root@example.com")
+        superuser = User.objects.create_superuser(
+            username="root", password="testpass123", email="root@example.com"
+        )
         client = APIClient()
         client.force_authenticate(user=superuser, token={"store_id": self.store_a.id})
 
-        response = client.get("/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug)
+        response = client.get(
+            "/api/v1/store/current/", HTTP_X_STORE_SLUG=self.store_b.slug
+        )
 
         self.assertEqual(response.data["slug"], self.store_b.slug)
 
@@ -186,14 +216,22 @@ class MyStoresEndpointTest(TestCase):
     def setUp(self) -> None:
         self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
-        self.user = User.objects.create_user(username="multi_owner", password="testpass123")
-        StoreMembership.objects.create(store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER)
-        StoreMembership.objects.create(store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER)
+        self.user = User.objects.create_user(
+            username="multi_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
 
         self.other_store = Store.objects.create(name="Loja C", slug="loja-c")
 
         self.client = APIClient()
-        self.client.force_authenticate(user=self.user, token={"store_id": self.store_a.id})
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
 
     def test_lists_only_stores_the_user_belongs_to(self) -> None:
         response = self.client.get("/api/v1/store/mine/")
@@ -203,7 +241,9 @@ class MyStoresEndpointTest(TestCase):
         self.assertNotIn(self.other_store.slug, slugs)
 
     def test_can_create_an_additional_store_and_becomes_its_owner(self) -> None:
-        response = self.client.post("/api/v1/store/mine/", {"name": "Loja Nova do Dono"}, format="json")
+        response = self.client.post(
+            "/api/v1/store/mine/", {"name": "Loja Nova do Dono"}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         created = Store.objects.get(id=response.data["id"])
@@ -221,7 +261,9 @@ class MyStoresEndpointTest(TestCase):
 
     def test_owner_can_rename_their_store(self) -> None:
         response = self.client.patch(
-            f"/api/v1/store/mine/{self.store_a.slug}/", {"name": "Boutique Fitness"}, format="json"
+            f"/api/v1/store/mine/{self.store_a.slug}/",
+            {"name": "Boutique Fitness"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -230,7 +272,9 @@ class MyStoresEndpointTest(TestCase):
 
     def test_viewer_role_cannot_rename_the_store(self) -> None:
         response = self.client.patch(
-            f"/api/v1/store/mine/{self.store_b.slug}/", {"name": "Nome Indevido"}, format="json"
+            f"/api/v1/store/mine/{self.store_b.slug}/",
+            {"name": "Nome Indevido"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -239,18 +283,24 @@ class MyStoresEndpointTest(TestCase):
 
     def test_user_without_membership_cannot_rename_the_store(self) -> None:
         response = self.client.patch(
-            f"/api/v1/store/mine/{self.other_store.slug}/", {"name": "Nome Indevido"}, format="json"
+            f"/api/v1/store/mine/{self.other_store.slug}/",
+            {"name": "Nome Indevido"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_rename_rejects_blank_name(self) -> None:
-        response = self.client.patch(f"/api/v1/store/mine/{self.store_a.slug}/", {"name": "  "}, format="json")
+        response = self.client.patch(
+            f"/api/v1/store/mine/{self.store_a.slug}/", {"name": "  "}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_rename_unknown_store_returns_404(self) -> None:
-        response = self.client.patch("/api/v1/store/mine/does-not-exist/", {"name": "Qualquer"}, format="json")
+        response = self.client.patch(
+            "/api/v1/store/mine/does-not-exist/", {"name": "Qualquer"}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -265,14 +315,22 @@ class StoreReceiptSettingsEndpointTest(TestCase):
     def setUp(self) -> None:
         self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
-        self.user = User.objects.create_user(username="receipt_owner", password="testpass123")
-        StoreMembership.objects.create(store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER)
-        StoreMembership.objects.create(store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER)
+        self.user = User.objects.create_user(
+            username="receipt_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
 
         self.other_store = Store.objects.create(name="Loja C", slug="loja-c")
 
         self.client = APIClient()
-        self.client.force_authenticate(user=self.user, token={"store_id": self.store_a.id})
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
 
     def _url(self, slug: str) -> str:
         return f"/api/v1/store/mine/{slug}/receipt-settings/"
@@ -280,7 +338,10 @@ class StoreReceiptSettingsEndpointTest(TestCase):
     def test_owner_can_update_both_fields(self) -> None:
         response = self.client.patch(
             self._url(self.store_a.slug),
-            {"receipt_exchange_policy": "Trocas em ate 15 dias.", "receipt_paper_format": "58mm"},
+            {
+                "receipt_exchange_policy": "Trocas em ate 15 dias.",
+                "receipt_paper_format": "58mm",
+            },
             format="json",
         )
 
@@ -294,13 +355,17 @@ class StoreReceiptSettingsEndpointTest(TestCase):
         self.store_a.save(update_fields=["receipt_paper_format"])
 
         response = self.client.patch(
-            self._url(self.store_a.slug), {"receipt_exchange_policy": "Trocas em ate 30 dias."}, format="json"
+            self._url(self.store_a.slug),
+            {"receipt_exchange_policy": "Trocas em ate 30 dias."},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.store_a.refresh_from_db()
         self.assertEqual(self.store_a.receipt_exchange_policy, "Trocas em ate 30 dias.")
-        self.assertEqual(self.store_a.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_A4)
+        self.assertEqual(
+            self.store_a.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_A4
+        )
 
     def test_blank_exchange_policy_is_allowed(self) -> None:
         """Blank means the printed receipt shows no policy line at all."""
@@ -314,38 +379,232 @@ class StoreReceiptSettingsEndpointTest(TestCase):
 
     def test_invalid_paper_format_is_rejected(self) -> None:
         response = self.client.patch(
-            self._url(self.store_a.slug), {"receipt_paper_format": "letter"}, format="json"
+            self._url(self.store_a.slug),
+            {"receipt_paper_format": "letter"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_viewer_role_cannot_update_receipt_settings(self) -> None:
         response = self.client.patch(
-            self._url(self.store_b.slug), {"receipt_paper_format": "58mm"}, format="json"
+            self._url(self.store_b.slug),
+            {"receipt_paper_format": "58mm"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.store_b.refresh_from_db()
-        self.assertEqual(self.store_b.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_80MM)
+        self.assertEqual(
+            self.store_b.receipt_paper_format, Store.RECEIPT_PAPER_FORMAT_80MM
+        )
 
     def test_user_without_membership_cannot_update_receipt_settings(self) -> None:
         response = self.client.patch(
-            self._url(self.other_store.slug), {"receipt_paper_format": "58mm"}, format="json"
+            self._url(self.other_store.slug),
+            {"receipt_paper_format": "58mm"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_unknown_store_returns_404(self) -> None:
         response = self.client.patch(
-            "/api/v1/store/mine/does-not-exist/receipt-settings/", {"receipt_paper_format": "58mm"}, format="json"
+            "/api/v1/store/mine/does-not-exist/receipt-settings/",
+            {"receipt_paper_format": "58mm"},
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_requires_authentication(self) -> None:
         response = APIClient().patch(
-            self._url(self.store_a.slug), {"receipt_paper_format": "58mm"}, format="json"
+            self._url(self.store_a.slug),
+            {"receipt_paper_format": "58mm"},
+            format="json",
         )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class StoreLabelSettingsEndpointTest(TestCase):
+    """Printable product-label settings are tenant-scoped and editable by managers."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(
+            username="label_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
+        self.other_store = Store.objects.create(name="Loja C", slug="loja-c")
+
+        self.client = APIClient()
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
+
+    def _url(self, slug: str) -> str:
+        return f"/api/v1/store/mine/{slug}/label-settings/"
+
+    def test_member_can_read_default_label_settings(self) -> None:
+        response = self.client.get(self._url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["page_format"], "a4")
+        self.assertEqual(response.data["columns"], 2)
+        self.assertEqual(response.data["rows"], 5)
+        self.assertEqual(response.data["labels_per_page"], 10)
+        self.assertTrue(LabelSettings.objects.filter(store=self.store_a).exists())
+
+    def test_owner_can_update_label_settings(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {
+                "columns": 3,
+                "rows": 7,
+                "margin_mm": 8,
+                "cell_padding_mm": 3,
+                "qr_size_mm": 24,
+                "show_price": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        settings = LabelSettings.objects.get(store=self.store_a)
+        self.assertEqual(settings.columns, 3)
+        self.assertEqual(settings.rows, 7)
+        self.assertEqual(settings.labels_per_page, 21)
+        self.assertFalse(settings.show_price)
+
+    def test_viewer_can_read_but_not_update_label_settings(self) -> None:
+        read_response = self.client.get(self._url(self.store_b.slug))
+        write_response = self.client.patch(
+            self._url(self.store_b.slug),
+            {"columns": 3},
+            format="json",
+        )
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(write_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_invalid_label_settings_are_rejected(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {"columns": 99},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_user_without_membership_cannot_read_label_settings(self) -> None:
+        response = self.client.get(self._url(self.other_store.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unknown_store_returns_404(self) -> None:
+        response = self.client.get("/api/v1/store/mine/does-not-exist/label-settings/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_requires_authentication(self) -> None:
+        response = APIClient().get(self._url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class StoreAppearanceSettingsEndpointTest(TestCase):
+    """Theme engine writes are allowlisted and tenant-scoped."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(
+            username="appearance_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
+        self.other_store = Store.objects.create(name="Loja C", slug="loja-c")
+
+        self.client = APIClient()
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
+
+    def _url(self, slug: str) -> str:
+        return f"/api/v1/store/mine/{slug}/appearance/"
+
+    def test_owner_can_update_storefront_appearance(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {
+                "logo_url": "https://example.com/logo.png",
+                "tagline": "Nova vitrine",
+                "theme": {
+                    "primary": "#111111",
+                    "accent": "#22aaee",
+                    "ignored": "#FFFFFF",
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.logo_url, "https://example.com/logo.png")
+        self.assertEqual(self.store_a.tagline, "Nova vitrine")
+        self.assertEqual(self.store_a.theme["primary"], "#111111")
+        self.assertEqual(self.store_a.theme["accent"], "#22AAEE")
+        self.assertNotIn("ignored", self.store_a.theme)
+        self.assertEqual(
+            response.data["theme"], Store.normalize_theme(self.store_a.theme)
+        )
+
+    def test_invalid_theme_values_fall_back_to_defaults(self) -> None:
+        response = self.client.patch(
+            self._url(self.store_a.slug),
+            {"theme": {"primary": "red", "accent": "#123456"}},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.theme["primary"], Store.DEFAULT_THEME["primary"])
+        self.assertEqual(self.store_a.theme["accent"], "#123456")
+
+    def test_viewer_can_read_but_not_update_appearance(self) -> None:
+        read_response = self.client.get(self._url(self.store_b.slug))
+        write_response = self.client.patch(
+            self._url(self.store_b.slug),
+            {"tagline": "Indevido"},
+            format="json",
+        )
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(write_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_user_without_membership_cannot_read_appearance(self) -> None:
+        response = self.client.get(self._url(self.other_store.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unknown_store_returns_404(self) -> None:
+        response = self.client.get("/api/v1/store/mine/does-not-exist/appearance/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_requires_authentication(self) -> None:
+        response = APIClient().get(self._url(self.store_a.slug))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -373,13 +632,19 @@ class AdminStoreScopingTest(TestCase):
         self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
 
-        self.category_a = Category.objects.create(name="Categoria A", store=self.store_a)
-        self.category_b = Category.objects.create(name="Categoria B", store=self.store_b)
+        self.category_a = Category.objects.create(
+            name="Categoria A", store=self.store_a
+        )
+        self.category_b = Category.objects.create(
+            name="Categoria B", store=self.store_b
+        )
 
         self.staff_a = User.objects.create_user(
             username="staff_a", password="testpass123", is_staff=True
         )
-        StoreMembership.objects.create(store=self.store_a, user=self.staff_a, role=StoreMembership.ROLE_OWNER)
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.staff_a, role=StoreMembership.ROLE_OWNER
+        )
         # Django admin gates by model permission first, independent of the
         # store-scoping under test here -- grant the standard view permission
         # so the request reaches CategoryAdmin.get_queryset() at all.

@@ -15,6 +15,8 @@ from .views import (
     PublicStoreSettingsView,
     SaleOrderViewSet,
     StockMovementViewSet,
+    StoreAppearanceSettingsView,
+    StoreLabelSettingsView,
     StoreReceiptSettingsView,
     StoreSettingsView,
 )
@@ -43,6 +45,16 @@ urlpatterns = [
     path("store/current/", CurrentStoreView.as_view(), name="store-current"),
     path("store/mine/", MyStoresView.as_view(), name="store-mine"),
     path("store/mine/<slug:slug>/", MyStoreDetailView.as_view(), name="store-mine-detail"),
+    path(
+        "store/mine/<slug:slug>/appearance/",
+        StoreAppearanceSettingsView.as_view(),
+        name="store-mine-appearance",
+    ),
+    path(
+        "store/mine/<slug:slug>/label-settings/",
+        StoreLabelSettingsView.as_view(),
+        name="store-mine-label-settings",
+    ),
     path(
         "store/mine/<slug:slug>/receipt-settings/",
         StoreReceiptSettingsView.as_view(),

@@ -7,6 +7,7 @@ from .models import (
     Category,
     CustomerProfile,
     DeliveryRegion,
+    LabelSettings,
     LoginAttempt,
     MFABackupCode,
     Product,
@@ -37,7 +38,9 @@ class StoreScopedAdminMixin:
     def save_model(self, request, obj, form, change):
         if not change and not obj.store_id and not request.user.is_superuser:
             membership = (
-                StoreMembership.objects.filter(user=request.user).select_related("store").first()
+                StoreMembership.objects.filter(user=request.user)
+                .select_related("store")
+                .first()
             )
             if membership is not None:
                 obj.store = membership.store
@@ -92,6 +95,21 @@ class StoreMembershipAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "user__email")
 
 
+@admin.register(LabelSettings)
+class LabelSettingsAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "store",
+        "page_format",
+        "columns",
+        "rows",
+        "qr_size_mm",
+        "updated_at",
+    )
+    list_filter = ("page_format", "store")
+    readonly_fields = ("created_at", "updated_at")
+
+
 @admin.register(CustomerProfile)
 class CustomerProfileAdmin(admin.ModelAdmin):
     list_display = ("id", "store", "user", "full_name", "phone", "city")
@@ -107,12 +125,25 @@ class StoreSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(LoginAttempt)
 class LoginAttemptAdmin(admin.ModelAdmin):
-    list_display = ("identifier", "succeeded", "failure_reason", "ip_address", "user", "created_at")
+    list_display = (
+        "identifier",
+        "succeeded",
+        "failure_reason",
+        "ip_address",
+        "user",
+        "created_at",
+    )
     list_filter = ("succeeded", "failure_reason", "created_at")
     search_fields = ("identifier", "ip_address", "user__username", "user__email")
     readonly_fields = (
-        "user", "identifier", "ip_address", "user_agent", "succeeded",
-        "failure_reason", "store_id", "created_at",
+        "user",
+        "identifier",
+        "ip_address",
+        "user_agent",
+        "succeeded",
+        "failure_reason",
+        "store_id",
+        "created_at",
     )
 
     def has_add_permission(self, request) -> bool:
@@ -192,8 +223,20 @@ class SaleOrderItemInline(admin.TabularInline):
 
 @admin.register(SaleOrder)
 class SaleOrderAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
-    list_display = ("order_reference", "store", "customer_name", "total", "status", "created_at")
+    list_display = (
+        "order_reference",
+        "store",
+        "customer_name",
+        "total",
+        "status",
+        "created_at",
+    )
     list_filter = ("store", "status", "delivery_method", "payment_method", "created_at")
-    search_fields = ("order_reference", "customer_name", "customer_phone", "items__product_name")
+    search_fields = (
+        "order_reference",
+        "customer_name",
+        "customer_phone",
+        "items__product_name",
+    )
     readonly_fields = ("order_reference", "created_at", "updated_at")
     inlines = [SaleOrderItemInline]

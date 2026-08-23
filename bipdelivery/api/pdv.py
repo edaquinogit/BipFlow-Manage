@@ -20,6 +20,7 @@ different products in one transaction, so per-item locking (the single-item
 apply_stock_movement() chokepoint used by the dashboard's manual
 entrada/saida form) isn't the right fit here either.
 """
+
 from __future__ import annotations
 
 import base64
@@ -36,7 +37,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .errors import not_found_error
-from .models import Product, SaleOrder, SaleOrderItem, StockMovement, Store
+from .models import (
+    Product,
+    ProductVariant,
+    SaleOrder,
+    SaleOrderItem,
+    StockMovement,
+    Store,
+)
 from .order_reference import build_sale_order_reference
 from .permissions import has_dashboard_write_access
 from .store_scope import resolve_request_store
@@ -56,6 +64,7 @@ class PdvSaleItemInputSerializer(serializers.Serializer):
     """One scanned/typed line of the cashier's running cart."""
 
     public_code = serializers.CharField(max_length=12)
+    variant_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     quantity = serializers.IntegerField(min_value=1)
 
 
@@ -84,13 +93,19 @@ class PdvSaleRequestSerializer(serializers.Serializer):
     # already exists on the model (populated by the WhatsApp/checkout flow's
     # CheckoutCustomerInputSerializer.email) but the PDV never wrote to it --
     # capturing it here is what lets the cashier email the printed receipt.
-    customer_email = serializers.EmailField(required=False, allow_blank=True, default="")
-    notes = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
+    customer_email = serializers.EmailField(
+        required=False, allow_blank=True, default=""
+    )
+    notes = serializers.CharField(
+        required=False, allow_blank=True, max_length=1000, default=""
+    )
 
     def validate_items(self, value):
         """Ensure the cart has at least one item."""
         if not value:
-            raise serializers.ValidationError("Informe ao menos um item para registrar a venda.")
+            raise serializers.ValidationError(
+                "Informe ao menos um item para registrar a venda."
+            )
         return value
 
 
@@ -98,7 +113,11 @@ class PdvSaleItemResponseSerializer(serializers.Serializer):
     """Normalized item details returned after a PDV sale completes."""
 
     product_id = serializers.IntegerField()
+    variant_id = serializers.IntegerField(allow_null=True)
     product_name = serializers.CharField()
+    variant_name = serializers.CharField(allow_blank=True)
+    variant_color_hex = serializers.CharField(allow_blank=True)
+    variant_image_url = serializers.CharField(allow_blank=True)
     public_code = serializers.CharField()
     quantity = serializers.IntegerField(min_value=1)
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -132,18 +151,22 @@ class PdvSaleView(APIView):
     """
 
     @staticmethod
-    def _aggregate_quantities(items: list[dict]) -> dict[str, int]:
-        quantities_by_code: dict[str, int] = {}
+    def _aggregate_quantities(items: list[dict]) -> dict[tuple[str, int | None], int]:
+        quantities_by_item: dict[tuple[str, int | None], int] = {}
 
         for item in items:
             code = item["public_code"].strip().upper()
-            quantities_by_code[code] = quantities_by_code.get(code, 0) + item["quantity"]
+            variant_id = item.get("variant_id")
+            key = (code, variant_id)
+            quantities_by_item[key] = quantities_by_item.get(key, 0) + item["quantity"]
 
-        return quantities_by_code
+        return quantities_by_item
 
     @staticmethod
-    def _lock_products(quantities_by_code: dict[str, int], store: Store) -> dict[str, Product]:
-        codes = sorted(quantities_by_code)
+    def _lock_products(
+        quantities_by_item: dict[tuple[str, int | None], int], store: Store
+    ) -> dict[str, Product]:
+        codes = sorted({code for code, _variant_id in quantities_by_item})
         products = (
             Product.objects.select_for_update()
             .filter(public_code__in=codes, store=store)
@@ -154,35 +177,100 @@ class PdvSaleView(APIView):
 
         if missing_codes:
             raise serializers.ValidationError(
-                {"items": [f'Código(s) não encontrado(s) nesta loja: {", ".join(missing_codes)}']}
+                {
+                    "items": [
+                        f'Código(s) não encontrado(s) nesta loja: {", ".join(missing_codes)}'
+                    ]
+                }
             )
 
         return products_by_code
 
+    @staticmethod
+    def _lock_active_variants(
+        products_by_code: dict[str, Product],
+    ) -> tuple[dict[int, ProductVariant], dict[int, list[ProductVariant]]]:
+        variants = list(
+            ProductVariant.objects.select_for_update()
+            .filter(
+                product_id__in=[product.id for product in products_by_code.values()],
+                is_active=True,
+            )
+            .order_by("id")
+        )
+        variants_by_id = {variant.id: variant for variant in variants}
+        variants_by_product_id: dict[int, list[ProductVariant]] = {}
+        for variant in variants:
+            variants_by_product_id.setdefault(variant.product_id, []).append(variant)
+
+        return variants_by_id, variants_by_product_id
+
     def _reserve_stock(
         self, items: list[dict], store: Store
     ) -> tuple[list[dict], Decimal, dict[str, Product]]:
-        quantities_by_code = self._aggregate_quantities(items)
-        products_by_code = self._lock_products(quantities_by_code, store)
+        quantities_by_item = self._aggregate_quantities(items)
+        products_by_code = self._lock_products(quantities_by_item, store)
+        variants_by_id, variants_by_product_id = self._lock_active_variants(
+            products_by_code
+        )
 
         normalized_items = []
         subtotal = Decimal("0.00")
         timestamp = timezone.now()
 
-        for code, quantity in quantities_by_code.items():
+        for (code, variant_id), quantity in quantities_by_item.items():
             product = products_by_code[code]
+            active_variants = variants_by_product_id.get(product.id, [])
+            selected_variant = None
 
-            if not product.is_available or product.stock_quantity <= 0:
+            if active_variants:
+                if variant_id is None:
+                    raise serializers.ValidationError(
+                        {
+                            "items": [
+                                f'Produto "{product.name}" possui variantes. Informe a variante.'
+                            ]
+                        }
+                    )
+
+                selected_variant = variants_by_id.get(variant_id)
+                if (
+                    selected_variant is None
+                    or selected_variant.product_id != product.id
+                ):
+                    raise serializers.ValidationError(
+                        {"items": [f'Variante nao encontrada para "{product.name}".']}
+                    )
+
+                previous_stock = selected_variant.stock_quantity
+                if previous_stock <= 0:
+                    raise serializers.ValidationError(
+                        {
+                            "items": [
+                                f'Variante "{selected_variant.name}" de "{product.name}" esta indisponivel.'
+                            ]
+                        }
+                    )
+            else:
+                if variant_id is not None:
+                    raise serializers.ValidationError(
+                        {"items": [f'Variante nao encontrada para "{product.name}".']}
+                    )
+                previous_stock = product.stock_quantity
+
+            if selected_variant is None and (
+                not product.is_available or product.stock_quantity <= 0
+            ):
                 raise serializers.ValidationError(
-                    {"items": [f'Produto "{product.name}" está indisponível.']}
+                    {"items": [f'Produto "{product.name}" esta indisponivel.']}
                 )
 
-            if quantity > product.stock_quantity:
+            if quantity > previous_stock:
                 raise serializers.ValidationError(
                     {
                         "items": [
                             f'Quantidade solicitada para "{product.name}" excede o '
-                            f"estoque disponível ({product.stock_quantity})."
+                            f"estoque disponivel ({previous_stock})."
                         ]
                     }
                 )
@@ -190,33 +278,67 @@ class PdvSaleView(APIView):
             unit_price = Decimal(product.price).quantize(Decimal("0.01"))
             line_total = (unit_price * quantity).quantize(Decimal("0.01"))
             subtotal += line_total
+            new_stock = previous_stock - quantity
+
+            variant_image_url = ""
+            if selected_variant is not None and selected_variant.image:
+                variant_image_url = selected_variant.image.url
 
             normalized_items.append(
                 {
                     "product_id": product.id,
+                    "variant_id": (
+                        selected_variant.id if selected_variant is not None else None
+                    ),
                     "product_name": product.name,
+                    "variant_name": (
+                        selected_variant.name if selected_variant is not None else ""
+                    ),
+                    "variant_color_hex": (
+                        selected_variant.color_hex
+                        if selected_variant is not None
+                        else ""
+                    ),
+                    "variant_image_url": variant_image_url,
                     "public_code": product.public_code,
                     "sku": product.sku or "",
                     "quantity": quantity,
                     "unit_price": unit_price,
                     "line_total": line_total,
+                    "previous_stock": previous_stock,
+                    "new_stock": new_stock,
                 }
             )
 
-            product.stock_quantity -= quantity
-            product.is_available = product.stock_quantity > 0
-            product.updated_at = timestamp
+            if selected_variant is not None:
+                selected_variant.stock_quantity = new_stock
+                selected_variant.updated_at = timestamp
+                product.stock_quantity = sum(
+                    variant.stock_quantity for variant in active_variants
+                )
+                product.is_available = product.stock_quantity > 0
+                product.updated_at = timestamp
+            else:
+                product.stock_quantity = new_stock
+                product.is_available = new_stock > 0
+                product.updated_at = timestamp
 
         Product.objects.bulk_update(
-            list(products_by_code.values()), ["stock_quantity", "is_available", "updated_at"]
+            list(products_by_code.values()),
+            ["stock_quantity", "is_available", "updated_at"],
         )
+        if variants_by_id:
+            ProductVariant.objects.bulk_update(
+                list(variants_by_id.values()), ["stock_quantity", "updated_at"]
+            )
 
         return normalized_items, subtotal, products_by_code
 
     def post(self, request, *args, **kwargs):
         if not has_dashboard_write_access(request.user):
             self.permission_denied(
-                request, message="Você não possui permissão para registrar vendas no PDV."
+                request,
+                message="Você não possui permissão para registrar vendas no PDV.",
             )
 
         store = resolve_request_store(request)
@@ -225,7 +347,9 @@ class PdvSaleView(APIView):
         validated = serializer.validated_data
 
         order_reference = build_sale_order_reference("PDV")
-        customer_name = validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
+        customer_name = (
+            validated.get("customer_name", "").strip() or DEFAULT_PDV_CUSTOMER_NAME
+        )
         customer_phone = validated.get("customer_phone", "").strip()
         customer_email = validated.get("customer_email", "").strip()
         notes = validated.get("notes", "").strip()
@@ -257,8 +381,12 @@ class PdvSaleView(APIView):
                     SaleOrderItem(
                         order=sale_order,
                         product=products_by_code.get(item["public_code"]),
+                        variant_id=item["variant_id"],
                         product_name=item["product_name"],
                         sku=item["sku"],
+                        variant_name=item["variant_name"],
+                        variant_color_hex=item["variant_color_hex"],
+                        variant_image_url=item["variant_image_url"],
                         quantity=item["quantity"],
                         unit_price=item["unit_price"],
                         line_total=item["line_total"],
@@ -276,16 +404,17 @@ class PdvSaleView(APIView):
                     StockMovement(
                         store=store,
                         product=products_by_code[item["public_code"]],
+                        variant_id=item["variant_id"],
                         movement_type=StockMovement.TYPE_SAIDA,
                         quantity=item["quantity"],
-                        previous_stock=(
-                            products_by_code[item["public_code"]].stock_quantity + item["quantity"]
-                        ),
-                        new_stock=products_by_code[item["public_code"]].stock_quantity,
+                        previous_stock=item["previous_stock"],
+                        new_stock=item["new_stock"],
                         reason=StockMovement.REASON_VENDA,
                         source=StockMovement.SOURCE_PDV,
                         sale_order=sale_order,
-                        performed_by=request.user if request.user.is_authenticated else None,
+                        performed_by=(
+                            request.user if request.user.is_authenticated else None
+                        ),
                     )
                     for item in normalized_items
                 ]
@@ -324,10 +453,14 @@ class PdvReceiptEmailSerializer(serializers.Serializer):
             raise serializers.ValidationError("O PDF enviado está vazio.")
 
         if len(pdf_bytes) > MAX_RECEIPT_PDF_BYTES:
-            raise serializers.ValidationError("O PDF enviado excede o tamanho máximo permitido (5MB).")
+            raise serializers.ValidationError(
+                "O PDF enviado excede o tamanho máximo permitido (5MB)."
+            )
 
         if not pdf_bytes.startswith(PDF_MAGIC_NUMBER):
-            raise serializers.ValidationError("O arquivo enviado não parece ser um PDF válido.")
+            raise serializers.ValidationError(
+                "O arquivo enviado não parece ser um PDF válido."
+            )
 
         return pdf_bytes
 
@@ -374,7 +507,9 @@ class PdvReceiptEmailView(APIView):
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[email],
         )
-        message.attach(f"{sale_order.order_reference}.pdf", pdf_bytes, "application/pdf")
+        message.attach(
+            f"{sale_order.order_reference}.pdf", pdf_bytes, "application/pdf"
+        )
         message.send(fail_silently=False)
 
         return Response({"sent": True}, status=status.HTTP_200_OK)

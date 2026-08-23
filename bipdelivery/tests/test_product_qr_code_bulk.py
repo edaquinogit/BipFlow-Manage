@@ -8,6 +8,7 @@ an extra store-B product, since TwoStoreFixtureMixin only creates one
 product per store and a batch endpoint needs more than that to be tested
 meaningfully.
 """
+
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -15,7 +16,7 @@ from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Product, StoreMembership
+from bipdelivery.api.models import LabelSettings, Product, StoreMembership
 from bipdelivery.api.product_labels import MAX_BULK_LABEL_IDS
 from bipdelivery.tests.test_store_active_isolation import TwoStoreFixtureMixin
 
@@ -31,7 +32,10 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
         self.product_b.size = "M"
         self.product_b.save(update_fields=["size"])
         self.product_b2 = Product.objects.create(
-            name="Produto B2", price=Decimal("15.00"), category=self.category_b, store=self.store_b
+            name="Produto B2",
+            price=Decimal("15.00"),
+            category=self.category_b,
+            store=self.store_b,
         )
 
     def _bulk_url(self, ids) -> str:
@@ -40,7 +44,9 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
 
     @override_settings(FRONTEND_BASE_URL="https://example-store.bipflow.app")
     def test_bulk_returns_labels_for_requested_ids(self) -> None:
-        response = self.client.get(self._bulk_url([self.product_b.id, self.product_b2.id]))
+        response = self.client.get(
+            self._bulk_url([self.product_b.id, self.product_b2.id])
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         labels = response.data["labels"]
@@ -64,8 +70,29 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["labels"][0]["size"])
 
+    def test_bulk_returns_the_active_stores_label_settings(self) -> None:
+        LabelSettings.objects.create(
+            store=self.store_b,
+            columns=3,
+            rows=7,
+            margin_mm=8,
+            cell_padding_mm=3,
+            qr_size_mm=24,
+            show_size=False,
+        )
+
+        response = self.client.get(self._bulk_url([self.product_b.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["settings"]["columns"], 3)
+        self.assertEqual(response.data["settings"]["rows"], 7)
+        self.assertEqual(response.data["settings"]["labels_per_page"], 21)
+        self.assertFalse(response.data["settings"]["show_size"])
+
     def test_bulk_silently_excludes_cross_store_ids(self) -> None:
-        response = self.client.get(self._bulk_url([self.product_b.id, self.product_a.id]))
+        response = self.client.get(
+            self._bulk_url([self.product_b.id, self.product_a.id])
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = {label["id"] for label in response.data["labels"]}
@@ -102,7 +129,9 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_bulk_dedupes_repeated_ids(self) -> None:
-        response = self.client.get(self._bulk_url([self.product_b.id, self.product_b.id]))
+        response = self.client.get(
+            self._bulk_url([self.product_b.id, self.product_b.id])
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["labels"]), 1)
@@ -115,7 +144,9 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_bulk_regular_authenticated_user_without_role_is_forbidden(self) -> None:
-        plain_user = User.objects.create_user(username="qr_bulk_plain", password="testpass123")
+        plain_user = User.objects.create_user(
+            username="qr_bulk_plain", password="testpass123"
+        )
         client = APIClient()
         client.force_authenticate(user=plain_user, token={"store_id": self.store_b.id})
 
@@ -124,7 +155,9 @@ class ProductQrCodesBulkAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_bulk_viewer_role_can_read(self) -> None:
-        viewer = User.objects.create_user(username="qr_bulk_viewer_b", password="testpass123")
+        viewer = User.objects.create_user(
+            username="qr_bulk_viewer_b", password="testpass123"
+        )
         StoreMembership.objects.create(
             store=self.store_b, user=viewer, role=StoreMembership.ROLE_VIEWER
         )

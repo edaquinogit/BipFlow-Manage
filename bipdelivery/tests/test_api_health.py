@@ -58,7 +58,9 @@ from bipdelivery.api.models import (  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
-TEST_TEMP_ROOT = Path(__file__).resolve().parents[2] / ".codex-tmp" / "django-test-media"
+TEST_TEMP_ROOT = (
+    Path(__file__).resolve().parents[2] / ".codex-tmp" / "django-test-media"
+)
 TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 
@@ -289,7 +291,9 @@ class ProductAPIHealthTest(TestCase):
 
     def test_regular_authenticated_user_cannot_create_product(self) -> None:
         """Registered non-staff users should not receive catalog write access."""
-        regular_user = User.objects.create_user(username="regular", password="testpass123")
+        regular_user = User.objects.create_user(
+            username="regular", password="testpass123"
+        )
         self.client.force_authenticate(user=regular_user)
         payload = {
             "name": "Blocked Product",
@@ -307,7 +311,9 @@ class ProductAPIHealthTest(TestCase):
     def test_manager_group_user_can_create_product(self) -> None:
         """Manager group members should be able to mutate catalog resources."""
         manager_group = Group.objects.create(name="manager")
-        manager_user = User.objects.create_user(username="manager", password="testpass123")
+        manager_user = User.objects.create_user(
+            username="manager", password="testpass123"
+        )
         manager_user.groups.add(manager_group)
         self.client.force_authenticate(user=manager_user)
         payload = {
@@ -424,7 +430,9 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["low_stock_threshold"], 15)
 
-    def test_low_stock_threshold_is_editable_via_patch_unlike_stock_quantity(self) -> None:
+    def test_low_stock_threshold_is_editable_via_patch_unlike_stock_quantity(
+        self,
+    ) -> None:
         """The Etapa 1 lock on stock_quantity must not spill over onto this field --
         low_stock_threshold is a preference, not an audited quantity."""
         self.client.force_authenticate(user=self.user)
@@ -478,9 +486,13 @@ class ProductAPIHealthTest(TestCase):
             "uploaded_images[2]": build_test_image("gallery-2.png"),
         }
 
-        response: Any = self.client.post("/api/v1/products/", payload, format="multipart")
+        response: Any = self.client.post(
+            "/api/v1/products/", payload, format="multipart"
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
         self.assertEqual(len(response.data["images"]), 3)
         self.assertIn("cover", response.data["images"][0])
         self.assertIn("gallery-1", response.data["images"][1])
@@ -518,16 +530,26 @@ class ProductAPIHealthTest(TestCase):
             "variant_images[0]": build_test_image("camiseta-preta.png"),
         }
 
-        response: Any = self.client.post("/api/v1/products/", payload, format="multipart")
+        response: Any = self.client.post(
+            "/api/v1/products/", payload, format="multipart"
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
         product = Product.objects.get(id=response.data["id"])
         variants = list(product.variants.order_by("position"))
+        self.assertEqual(product.stock_quantity, 3)
         self.assertEqual(
-            [(variant.name, variant.color_hex, variant.stock_quantity) for variant in variants],
+            [
+                (variant.name, variant.color_hex, variant.stock_quantity)
+                for variant in variants
+            ],
             [("Preto", "#000000", 3), ("Azul", "#3366FF", 1)],
         )
-        self.assertTrue(variants[0].image.name.startswith(f"products/{product.store_id}/variants/"))
+        self.assertTrue(
+            variants[0].image.name.startswith(f"products/{product.store_id}/variants/")
+        )
         self.assertIn("camiseta-preta", response.data["variants"][0]["image"])
         self.assertEqual(response.data["variants"][0]["stock_quantity"], 3)
         self.assertFalse(response.data["variants"][1]["is_active"])
@@ -550,7 +572,9 @@ class ProductAPIHealthTest(TestCase):
             "/api/v1/products/", create_payload, format="multipart"
         )
         self.assertEqual(
-            create_response.status_code, status.HTTP_201_CREATED, msg=create_response.data
+            create_response.status_code,
+            status.HTTP_201_CREATED,
+            msg=create_response.data,
         )
 
         product_id = create_response.data["id"]
@@ -569,7 +593,9 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.data["name"], "Pizza Premium Atualizada")
         self.assertEqual(len(response.data["images"]), 3)
 
-    def test_product_update_preserves_variant_stock_when_legacy_payload_omits_it(self) -> None:
+    def test_product_update_preserves_variant_stock_when_legacy_payload_omits_it(
+        self,
+    ) -> None:
         """Older clients updating variant metadata should not zero existing variant stock."""
         self.client.force_authenticate(user=self.user)
         variant = ProductVariant.objects.create(
@@ -598,7 +624,167 @@ class ProductAPIHealthTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
         variant.refresh_from_db()
+        self.product.refresh_from_db()
         self.assertEqual(variant.stock_quantity, 5)
+        self.assertEqual(self.product.stock_quantity, 5)
+        self.assertFalse(StockMovement.objects.filter(product=self.product).exists())
+
+    def test_product_create_with_variant_stock_creates_variant_initial_movements(
+        self,
+    ) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Camiseta Variada",
+                "sku": "CAM-100",
+                "price": "89.90",
+                "category": self.category.id,
+                "variants_payload": [
+                    {
+                        "name": "Preto",
+                        "color_hex": "#111111",
+                        "stock_quantity": 4,
+                        "position": 0,
+                        "is_active": True,
+                    },
+                    {
+                        "name": "Azul",
+                        "color_hex": "#3366FF",
+                        "stock_quantity": 2,
+                        "position": 1,
+                        "is_active": True,
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
+        product = Product.objects.get(id=response.data["id"])
+        self.assertEqual(product.stock_quantity, 6)
+
+        movements = StockMovement.objects.filter(product=product).order_by(
+            "variant__position"
+        )
+        self.assertEqual(movements.count(), 2)
+        self.assertFalse(movements.filter(variant__isnull=True).exists())
+        self.assertEqual(
+            [
+                (
+                    movement.variant.name,
+                    movement.movement_type,
+                    movement.quantity,
+                    movement.previous_stock,
+                    movement.new_stock,
+                    movement.reason,
+                    movement.performed_by,
+                )
+                for movement in movements
+            ],
+            [
+                (
+                    "Preto",
+                    StockMovement.TYPE_ENTRADA,
+                    4,
+                    0,
+                    4,
+                    StockMovement.REASON_ENTRADA_INICIAL,
+                    self.user,
+                ),
+                (
+                    "Azul",
+                    StockMovement.TYPE_ENTRADA,
+                    2,
+                    0,
+                    2,
+                    StockMovement.REASON_ENTRADA_INICIAL,
+                    self.user,
+                ),
+            ],
+        )
+
+    def test_product_update_variant_stock_creates_adjustment_movement(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Preto",
+            color_hex="#000000",
+            stock_quantity=5,
+            position=0,
+        )
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {
+                "variants_payload": [
+                    {
+                        "id": variant.id,
+                        "name": "Preto",
+                        "color_hex": "#000000",
+                        "stock_quantity": 8,
+                        "position": 0,
+                        "is_active": True,
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        variant.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertEqual(variant.stock_quantity, 8)
+        self.assertEqual(self.product.stock_quantity, 8)
+
+        movement = StockMovement.objects.get(product=self.product)
+        self.assertEqual(movement.variant_id, variant.id)
+        self.assertEqual(movement.movement_type, StockMovement.TYPE_ENTRADA)
+        self.assertEqual(movement.quantity, 3)
+        self.assertEqual(movement.previous_stock, 5)
+        self.assertEqual(movement.new_stock, 8)
+        self.assertEqual(movement.reason, StockMovement.REASON_AJUSTE_INVENTARIO)
+        self.assertEqual(movement.source, StockMovement.SOURCE_MANUAL)
+        self.assertEqual(movement.performed_by, self.user)
+
+    def test_product_update_variant_stock_decrease_creates_saida_movement(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Preto",
+            color_hex="#000000",
+            stock_quantity=5,
+            position=0,
+        )
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {
+                "variants_payload": [
+                    {
+                        "id": variant.id,
+                        "name": "Preto",
+                        "color_hex": "#000000",
+                        "stock_quantity": 2,
+                        "position": 0,
+                        "is_active": True,
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        movement = StockMovement.objects.get(product=self.product)
+        self.assertEqual(movement.variant_id, variant.id)
+        self.assertEqual(movement.movement_type, StockMovement.TYPE_SAIDA)
+        self.assertEqual(movement.quantity, 3)
+        self.assertEqual(movement.previous_stock, 5)
+        self.assertEqual(movement.new_stock, 2)
+        self.assertEqual(movement.reason, StockMovement.REASON_AJUSTE_INVENTARIO)
 
     def test_product_delete(self) -> None:
         """Should delete product via DELETE endpoint."""
@@ -677,12 +863,16 @@ class DashboardRoleSeedCommandTest(TestCase):
         self.assertTrue(user.check_password("admin123"))
         self.assertTrue(user.groups.filter(name="admin").exists())
 
-    def test_seed_dashboard_roles_reads_password_from_env_when_flag_omitted(self) -> None:
+    def test_seed_dashboard_roles_reads_password_from_env_when_flag_omitted(
+        self,
+    ) -> None:
         """DJANGO_BOOTSTRAP_ADMIN_PASSWORD must work without --password on argv --
         see docker/backend-entrypoint.sh's seed_admin_user(), which deliberately
         omits --password so the plaintext value never appears in the container's
         process list."""
-        with patch.dict(os.environ, {"DJANGO_BOOTSTRAP_ADMIN_PASSWORD": "env-only-pass123"}):
+        with patch.dict(
+            os.environ, {"DJANGO_BOOTSTRAP_ADMIN_PASSWORD": "env-only-pass123"}
+        ):
             call_command(
                 "seed_dashboard_roles",
                 email="envpass@example.com",
@@ -732,7 +922,9 @@ class StoreSettingsAPITest(TestCase):
 
     def test_public_store_settings_exposes_only_catalog_contact(self) -> None:
         """Public catalog should read the configured WhatsApp without private metadata."""
-        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571999999999"
+        )
 
         response: Any = self.client.get("/api/v1/store-settings/public/")
 
@@ -745,14 +937,15 @@ class StoreSettingsAPITest(TestCase):
 
     def test_public_store_settings_reads_store_level_whatsapp(self) -> None:
         """Public catalog contact must match the store used by checkout."""
-        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5588999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5588999999999"
+        )
 
         response: Any = self.client.get("/api/v1/store-settings/public/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["whatsapp_phone_digits"], "5588999999999")
         self.assertTrue(response.data["is_whatsapp_configured"])
-        self.assertEqual(StoreSettings.objects.count(), 0)
 
     def test_public_store_settings_does_not_create_empty_settings_row(self) -> None:
         """Anonymous catalog reads should not mutate settings storage."""
@@ -761,7 +954,60 @@ class StoreSettingsAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["whatsapp_phone_digits"], "")
         self.assertFalse(response.data["is_whatsapp_configured"])
-        self.assertEqual(StoreSettings.objects.count(), 0)
+
+    def test_public_store_settings_never_falls_back_to_another_store_phone(
+        self,
+    ) -> None:
+        """A blank Store B must not inherit Store A's WhatsApp from legacy settings."""
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571000000000"
+        )
+        store_b = Store.objects.create(name="Loja B", slug="loja-b", whatsapp_phone="")
+
+        response: Any = self.client.get(
+            "/api/v1/store-settings/public/",
+            HTTP_X_STORE_SLUG=store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "")
+        self.assertFalse(response.data["is_whatsapp_configured"])
+
+    def test_public_store_settings_ignores_legacy_singleton_for_non_default_store(
+        self,
+    ) -> None:
+        """The legacy singleton cannot become Store B's public WhatsApp fallback."""
+        StoreSettings.objects.create(whatsapp_phone="5571000000000")
+        store_b = Store.objects.create(name="Loja B", slug="loja-b", whatsapp_phone="")
+
+        response: Any = self.client.get(
+            "/api/v1/store-settings/public/",
+            HTTP_X_STORE_SLUG=store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "")
+        self.assertFalse(response.data["is_whatsapp_configured"])
+
+    def test_public_store_settings_resolves_the_requested_store_phone(self) -> None:
+        """Public Store B settings should return B's contact, never the default store's."""
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571000000000"
+        )
+        store_b = Store.objects.create(
+            name="Loja B",
+            slug="loja-b",
+            whatsapp_phone="5572000000000",
+        )
+
+        response: Any = self.client.get(
+            "/api/v1/store-settings/public/",
+            HTTP_X_STORE_SLUG=store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5572000000000")
+        self.assertTrue(response.data["is_whatsapp_configured"])
 
     def test_dashboard_user_can_update_store_whatsapp(self) -> None:
         """Dashboard writers should be able to persist the store WhatsApp number."""
@@ -777,13 +1023,15 @@ class StoreSettingsAPITest(TestCase):
         self.assertEqual(response.data["whatsapp_phone"], "5571999999999")
         self.assertEqual(response.data["whatsapp_phone_digits"], "5571999999999")
         self.assertTrue(response.data["is_whatsapp_configured"])
-        self.assertEqual(StoreSettings.get_solo().whatsapp_phone, "5571999999999")
         self.assertEqual(Store.get_default().whatsapp_phone, "5571999999999")
+        self.assertEqual(StoreSettings.objects.count(), 0)
 
     def test_dashboard_store_settings_reflects_store_level_whatsapp(self) -> None:
         """Dashboard settings should not show stale blank data after store migration."""
         self.client.force_authenticate(user=self.user)
-        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5571888888888")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571888888888"
+        )
 
         response: Any = self.client.get("/api/v1/store-settings/")
 
@@ -792,9 +1040,49 @@ class StoreSettingsAPITest(TestCase):
         self.assertEqual(response.data["whatsapp_phone_digits"], "5571888888888")
         self.assertTrue(response.data["is_whatsapp_configured"])
 
+    def test_dashboard_store_settings_are_scoped_to_authenticated_store(self) -> None:
+        """A manager of Store B must never see Store A's dashboard settings value."""
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571000000000"
+        )
+        store_b = Store.objects.create(
+            name="Loja B",
+            slug="loja-b",
+            whatsapp_phone="5572000000000",
+        )
+        self.client.force_authenticate(user=self.user, token={"store_id": store_b.id})
+
+        response: Any = self.client.get("/api/v1/store-settings/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone"], "5572000000000")
+        self.assertEqual(response.data["whatsapp_phone_digits"], "5572000000000")
+
+    def test_dashboard_store_settings_update_only_current_store(self) -> None:
+        """Patching Store B settings must not overwrite Store A's WhatsApp."""
+        store_a = Store.get_default()
+        Store.objects.filter(id=store_a.id).update(whatsapp_phone="5571000000000")
+        store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.client.force_authenticate(user=self.user, token={"store_id": store_b.id})
+
+        response: Any = self.client.patch(
+            "/api/v1/store-settings/",
+            {"whatsapp_phone": "+55 (72) 99999-0000"},
+            format="json",
+        )
+
+        store_a.refresh_from_db()
+        store_b.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["whatsapp_phone"], "5572999990000")
+        self.assertEqual(store_a.whatsapp_phone, "5571000000000")
+        self.assertEqual(store_b.whatsapp_phone, "5572999990000")
+
     def test_regular_user_cannot_update_store_settings(self) -> None:
         """Regular authenticated users should not mutate operational settings."""
-        regular_user = User.objects.create_user(username="regularsettings", password="testpass123")
+        regular_user = User.objects.create_user(
+            username="regularsettings", password="testpass123"
+        )
         self.client.force_authenticate(user=regular_user)
 
         response: Any = self.client.patch(
@@ -804,7 +1092,6 @@ class StoreSettingsAPITest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(StoreSettings.objects.count(), 0)
 
 
 class GoLiveReadinessCommandTest(TestCase):
@@ -840,7 +1127,9 @@ class GoLiveReadinessCommandTest(TestCase):
             city="Salvador",
             delivery_fee=Decimal("12.00"),
         )
-        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571999999999"
+        )
         output = StringIO()
 
         call_command("check_go_live_readiness", stdout=output)
@@ -869,7 +1158,9 @@ class GoLiveReadinessCommandTest(TestCase):
             city="Salvador",
             delivery_fee=Decimal("12.00"),
         )
-        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5571999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571999999999"
+        )
         output = StringIO()
 
         call_command("check_go_live_readiness", stdout=output)
@@ -926,7 +1217,9 @@ class CheckoutWhatsAppAPITest(TestCase):
         `self.client` other tests in this class rely on (e.g.
         test_sales_history_requires_authentication).
         """
-        user = User.objects.create_user(username=email, email=email, password="testpass123")
+        user = User.objects.create_user(
+            username=email, email=email, password="testpass123"
+        )
         CustomerProfile.objects.create(
             user=user,
             store=Store.get_default(),
@@ -973,19 +1266,25 @@ class CheckoutWhatsAppAPITest(TestCase):
                     "notes": "Sem cebola",
                 },
             }
-            response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+            response: Any = client.post(
+                "/api/v1/checkout/whatsapp/", payload, format="json"
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["subtotal"], "85.00")
         self.assertEqual(response.data["delivery_fee"], "12.00")
         self.assertEqual(response.data["total"], "97.00")
         self.assertTrue(
-            response.data["whatsapp_url"].startswith("https://wa.me/5571999999999?text=")
+            response.data["whatsapp_url"].startswith(
+                "https://wa.me/5571999999999?text="
+            )
         )
         self.assertIn("Pedido BipFlow", response.data["message"])
         self.assertEqual(response.data["items"][0]["product_name"], "Combo Executivo")
         self.assertTrue(
-            SaleOrder.objects.filter(order_reference=response.data["order_reference"]).exists()
+            SaleOrder.objects.filter(
+                order_reference=response.data["order_reference"]
+            ).exists()
         )
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 6)
@@ -994,13 +1293,21 @@ class CheckoutWhatsAppAPITest(TestCase):
     def test_checkout_creates_a_stock_movement_per_product(self) -> None:
         """Checkout should leave an auditable saida movement behind the decrement."""
         client = self._checkout_client()
-        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 2}])
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 2}]
+        )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
-        movements = list(StockMovement.objects.filter(product=self.product, sale_order=sale_order))
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
+        movements = list(
+            StockMovement.objects.filter(product=self.product, sale_order=sale_order)
+        )
 
         self.assertEqual(len(movements), 1)
         movement = movements[0]
@@ -1008,34 +1315,52 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(movement.source, StockMovement.SOURCE_VENDA)
         self.assertEqual(movement.reason, StockMovement.REASON_VENDA)
         self.assertEqual(movement.quantity, 2)
-        self.assertEqual(movement.previous_stock - movement.quantity, movement.new_stock)
+        self.assertEqual(
+            movement.previous_stock - movement.quantity, movement.new_stock
+        )
         self.assertEqual(movement.new_stock, 6)
 
     def test_checkout_links_a_bot_conversation_to_the_resulting_order(self) -> None:
         """A bot_session_id on checkout should mark that conversation as converted."""
         client = self._checkout_client()
-        bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        bot_response: Any = self.client.post(
+            "/api/v1/bot/messages/", {"message": "Oi"}, format="json"
+        )
         session_id = bot_response.data["session_id"]
 
-        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 1}]
+        )
         payload["bot_session_id"] = session_id
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
         self.assertIsNotNone(conversation.sale_order)
-        self.assertEqual(conversation.sale_order.order_reference, response.data["order_reference"])
+        self.assertEqual(
+            conversation.sale_order.order_reference, response.data["order_reference"]
+        )
 
-    def test_checkout_without_a_bot_session_id_leaves_conversations_unlinked(self) -> None:
+    def test_checkout_without_a_bot_session_id_leaves_conversations_unlinked(
+        self,
+    ) -> None:
         """Checkout should still work for customers who never used the bot."""
         client = self._checkout_client()
-        bot_response: Any = self.client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        bot_response: Any = self.client.post(
+            "/api/v1/bot/messages/", {"message": "Oi"}, format="json"
+        )
         session_id = bot_response.data["session_id"]
 
-        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 1}]
+        )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
@@ -1044,7 +1369,9 @@ class CheckoutWhatsAppAPITest(TestCase):
     def test_checkout_ignores_a_bot_session_id_from_another_store(self) -> None:
         """A session id from a different tenant must never be linked across stores."""
         client = self._checkout_client()
-        other_store = Store.objects.create(name="Outra loja", slug="outra-loja-checkout")
+        other_store = Store.objects.create(
+            name="Outra loja", slug="outra-loja-checkout"
+        )
         bot_client = APIClient()
         bot_response: Any = bot_client.post(
             "/api/v1/bot/messages/",
@@ -1054,10 +1381,14 @@ class CheckoutWhatsAppAPITest(TestCase):
         )
         session_id = bot_response.data["session_id"]
 
-        payload = self._build_pickup_payload([{"product_id": self.product.id, "quantity": 1}])
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 1}]
+        )
         payload["bot_session_id"] = session_id
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         conversation = BotConversation.objects.get(session_id=session_id)
@@ -1072,7 +1403,9 @@ class CheckoutWhatsAppAPITest(TestCase):
         test_dashboard_user_can_update_store_whatsapp).
         """
         client = self._checkout_client()
-        Store.objects.filter(id=Store.get_default().id).update(whatsapp_phone="5588999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5588999999999"
+        )
         payload = self._build_pickup_payload(
             [
                 {
@@ -1091,7 +1424,9 @@ class CheckoutWhatsAppAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(
-            response.data["whatsapp_url"].startswith("https://wa.me/5588999999999?text=")
+            response.data["whatsapp_url"].startswith(
+                "https://wa.me/5588999999999?text="
+            )
         )
 
     def test_checkout_marks_product_unavailable_when_stock_is_consumed(self) -> None:
@@ -1106,14 +1441,18 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 0)
         self.assertFalse(self.product.is_available)
 
-    def test_checkout_merges_duplicate_product_lines_before_reserving_stock(self) -> None:
+    def test_checkout_merges_duplicate_product_lines_before_reserving_stock(
+        self,
+    ) -> None:
         """Duplicate cart lines should become one reserved quantity for the product."""
         client = self._checkout_client()
         payload = self._build_pickup_payload(
@@ -1129,7 +1468,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["items"][0]["quantity"], 5)
@@ -1155,7 +1496,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 2}]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
         self.assertEqual(response.data["items"][0]["variant_id"], variant.id)
@@ -1171,8 +1514,14 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(order_item.quantity, 2)
         variant.refresh_from_db()
         self.assertEqual(variant.stock_quantity, 1)
+        movement = StockMovement.objects.get(product=self.product, sale_order=order)
+        self.assertEqual(movement.variant_id, variant.id)
+        self.assertEqual(movement.previous_stock, 3)
+        self.assertEqual(movement.new_stock, 1)
 
-    def test_checkout_keeps_variant_lines_separate_and_reserves_variant_stock(self) -> None:
+    def test_checkout_keeps_variant_lines_separate_and_reserves_variant_stock(
+        self,
+    ) -> None:
         """Different variants should be separate order lines sharing product stock."""
         client = self._checkout_client()
         black = ProductVariant.objects.create(
@@ -1196,7 +1545,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
         self.assertEqual(len(response.data["items"]), 2)
@@ -1230,7 +1581,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 1}]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -1239,7 +1592,9 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(variant.stock_quantity, 5)
         self.assertFalse(SaleOrder.objects.exists())
 
-    def test_checkout_rejects_variant_stock_exceeded_without_reserving_stock(self) -> None:
+    def test_checkout_rejects_variant_stock_exceeded_without_reserving_stock(
+        self,
+    ) -> None:
         """A selected variant cannot sell more units than that color has."""
         client = self._checkout_client()
         variant = ProductVariant.objects.create(
@@ -1253,7 +1608,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 2}]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -1276,7 +1633,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             [{"product_id": self.product.id, "quantity": 1}]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -1304,7 +1663,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 1}]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -1331,7 +1692,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             ]
         )
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.product.refresh_from_db()
@@ -1363,17 +1726,23 @@ class CheckoutWhatsAppAPITest(TestCase):
             },
         }
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["delivery_fee"], "18.50")
         self.assertEqual(response.data["total"], "61.00")
-        self.assertEqual(response.data["customer"]["delivery_region_name"], "Centro expandido")
+        self.assertEqual(
+            response.data["customer"]["delivery_region_name"], "Centro expandido"
+        )
         self.assertIn("Regiao: Centro expandido", response.data["message"])
 
     def test_public_delivery_regions_returns_only_active_regions(self) -> None:
         """Public active regions endpoint should hide inactive options."""
-        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Centro", city="Salvador", delivery_fee=Decimal("12.00")
+        )
         DeliveryRegion.objects.create(
             name="Inativa",
             city="Salvador",
@@ -1389,7 +1758,9 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_delivery_region_list_hides_inactive_for_anonymous_users(self) -> None:
         """Public delivery region list should not expose inactive regions."""
-        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Centro", city="Salvador", delivery_fee=Decimal("12.00")
+        )
         DeliveryRegion.objects.create(
             name="Inativa",
             city="Salvador",
@@ -1403,10 +1774,16 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["name"], "Centro")
 
-    def test_delivery_region_list_hides_inactive_for_regular_authenticated_users(self) -> None:
+    def test_delivery_region_list_hides_inactive_for_regular_authenticated_users(
+        self,
+    ) -> None:
         """Authenticated users without dashboard role should only see active regions."""
-        user = User.objects.create_user(username="regularregion", password="testpass123")
-        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        user = User.objects.create_user(
+            username="regularregion", password="testpass123"
+        )
+        DeliveryRegion.objects.create(
+            name="Centro", city="Salvador", delivery_fee=Decimal("12.00")
+        )
         DeliveryRegion.objects.create(
             name="Inativa",
             city="Salvador",
@@ -1428,7 +1805,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             password="testpass123",
             is_staff=True,
         )
-        DeliveryRegion.objects.create(name="Centro", city="Salvador", delivery_fee=Decimal("12.00"))
+        DeliveryRegion.objects.create(
+            name="Centro", city="Salvador", delivery_fee=Decimal("12.00")
+        )
         DeliveryRegion.objects.create(
             name="Inativa",
             city="Salvador",
@@ -1446,7 +1825,9 @@ class CheckoutWhatsAppAPITest(TestCase):
 
     def test_regular_authenticated_user_cannot_create_delivery_region(self) -> None:
         """Registered non-dashboard users should not mutate freight rules."""
-        user = User.objects.create_user(username="regularfreight", password="testpass123")
+        user = User.objects.create_user(
+            username="regularfreight", password="testpass123"
+        )
         self.client.force_authenticate(user=user)
         payload = {
             "name": "Bloqueada",
@@ -1455,7 +1836,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             "is_active": True,
         }
 
-        response: Any = self.client.post("/api/v1/delivery-regions/", payload, format="json")
+        response: Any = self.client.post(
+            "/api/v1/delivery-regions/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(DeliveryRegion.objects.filter(name="Bloqueada").exists())
@@ -1533,7 +1916,11 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.client.force_authenticate(user=user)
         response: Any = self.client.patch(
             f"/api/v1/sales-orders/{order.id}/status/",
-            {"status": "sent", "carrier_name": "Correios", "tracking_code": "AB123456789BR"},
+            {
+                "status": "sent",
+                "carrier_name": "Correios",
+                "tracking_code": "AB123456789BR",
+            },
             format="json",
         )
 
@@ -1620,13 +2007,17 @@ class CheckoutWhatsAppAPITest(TestCase):
                 "notes": "",
             },
         }
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["code"], "guest_address_incomplete")
         self.assertEqual(SaleOrder.objects.count(), 0)
 
-    def test_checkout_saves_submitted_delivery_address_to_customer_profile(self) -> None:
+    def test_checkout_saves_submitted_delivery_address_to_customer_profile(
+        self,
+    ) -> None:
         """The first checkout address for a logged-in customer becomes the saved default."""
         email = "cliente-endereco@teste.com"
         client = self._checkout_client(email=email)  # profile starts without address
@@ -1653,7 +2044,9 @@ class CheckoutWhatsAppAPITest(TestCase):
             },
         }
 
-        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
         profile = CustomerProfile.objects.get(user__email=email)
@@ -1675,7 +2068,9 @@ class SaleOrderSummaryAPITest(TestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    def _make_order(self, total: Decimal, days_ago: int, order_status: str = "prepared") -> SaleOrder:
+    def _make_order(
+        self, total: Decimal, days_ago: int, order_status: str = "prepared"
+    ) -> SaleOrder:
         order = SaleOrder.objects.create(
             order_reference=f"BPF-{uuid4().hex[:8].upper()}",
             customer_name="Cliente Teste",
@@ -1743,7 +2138,9 @@ class SaleOrderSummaryAPITest(TestCase):
 
     def test_summary_requires_dashboard_read_role(self) -> None:
         """Registered users without a dashboard role should not see revenue data."""
-        viewer = User.objects.create_user(username="summaryregular", password="testpass123")
+        viewer = User.objects.create_user(
+            username="summaryregular", password="testpass123"
+        )
         client = APIClient()
         client.force_authenticate(user=viewer)
 
@@ -1763,7 +2160,9 @@ class SaleOrderTimeseriesAPITest(TestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    def _make_order(self, total: Decimal, days_ago: int, order_status: str = "prepared") -> SaleOrder:
+    def _make_order(
+        self, total: Decimal, days_ago: int, order_status: str = "prepared"
+    ) -> SaleOrder:
         order = SaleOrder.objects.create(
             order_reference=f"BPF-{uuid4().hex[:8].upper()}",
             customer_name="Cliente Teste",
@@ -1792,8 +2191,12 @@ class SaleOrderTimeseriesAPITest(TestCase):
         revenue_by_date = {point["date"]: point["revenue"] for point in response.data}
         today_local = timezone.localtime(timezone.now()).date()
         self.assertEqual(revenue_by_date[today_local.isoformat()], "50.00")
-        self.assertEqual(revenue_by_date[(today_local - timedelta(days=2)).isoformat()], "30.00")
-        self.assertEqual(revenue_by_date[(today_local - timedelta(days=1)).isoformat()], "0.00")
+        self.assertEqual(
+            revenue_by_date[(today_local - timedelta(days=2)).isoformat()], "30.00"
+        )
+        self.assertEqual(
+            revenue_by_date[(today_local - timedelta(days=1)).isoformat()], "0.00"
+        )
 
     def test_timeseries_excludes_cancelled_orders(self) -> None:
         """A cancelled order's total should not inflate the trend chart."""
@@ -1807,7 +2210,9 @@ class SaleOrderTimeseriesAPITest(TestCase):
 
     def test_timeseries_unknown_period_falls_back_to_30d(self) -> None:
         """An invalid period query param should not error out the dashboard."""
-        response: Any = self.client.get("/api/v1/sales-orders/timeseries/?period=invalid")
+        response: Any = self.client.get(
+            "/api/v1/sales-orders/timeseries/?period=invalid"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 30)
@@ -1884,12 +2289,15 @@ class SaleOrderBreakdownAPITest(TestCase):
         """Active orders should be grouped by how the customer paid."""
         self._make_order(Decimal("40.00"), payment_method="pix")
         self._make_order(Decimal("60.00"), payment_method="card")
-        self._make_order(Decimal("999.00"), payment_method="cash", order_status="cancelled")
+        self._make_order(
+            Decimal("999.00"), payment_method="cash", order_status="cancelled"
+        )
 
         response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
 
         by_payment_method = {
-            row["payment_method"]: row["revenue_total"] for row in response.data["by_payment_method"]
+            row["payment_method"]: row["revenue_total"]
+            for row in response.data["by_payment_method"]
         }
         self.assertEqual(by_payment_method, {"card": "60.00", "pix": "40.00"})
 
@@ -1900,18 +2308,26 @@ class SaleOrderBreakdownAPITest(TestCase):
 
         response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
 
-        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        by_status = {
+            row["status"]: row["orders_count"] for row in response.data["by_status"]
+        }
         self.assertEqual(by_status, {"prepared": 1, "cancelled": 1})
 
     def test_breakdown_groups_revenue_by_delivery_region(self) -> None:
         """Pickup orders, named regions and unnamed deliveries each bucket separately."""
         self._make_order(Decimal("30.00"), delivery_method="pickup")
-        self._make_order(Decimal("50.00"), delivery_method="delivery", delivery_region_name="Centro")
-        self._make_order(Decimal("20.00"), delivery_method="delivery", delivery_region_name="")
+        self._make_order(
+            Decimal("50.00"), delivery_method="delivery", delivery_region_name="Centro"
+        )
+        self._make_order(
+            Decimal("20.00"), delivery_method="delivery", delivery_region_name=""
+        )
 
         response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=30d")
 
-        by_region = {row["region"]: row["revenue_total"] for row in response.data["by_region"]}
+        by_region = {
+            row["region"]: row["revenue_total"] for row in response.data["by_region"]
+        }
         self.assertEqual(
             by_region,
             {"Retirada na loja": "30.00", "Centro": "50.00", "Sem regiao": "20.00"},
@@ -1919,12 +2335,16 @@ class SaleOrderBreakdownAPITest(TestCase):
 
     def test_breakdown_unknown_period_falls_back_to_30d(self) -> None:
         """An invalid period query param should not error out the dashboard."""
-        response: Any = self.client.get("/api/v1/sales-orders/breakdown/?period=invalid")
+        response: Any = self.client.get(
+            "/api/v1/sales-orders/breakdown/?period=invalid"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["period"], "30d")
 
-    def test_breakdown_accepts_90d_to_match_the_trend_chart_period_switcher(self) -> None:
+    def test_breakdown_accepts_90d_to_match_the_trend_chart_period_switcher(
+        self,
+    ) -> None:
         """The dashboard's period switcher offers 7d/30d/90d for both endpoints."""
         self._make_order(Decimal("40.00"), days_ago=45)
 
@@ -1932,7 +2352,9 @@ class SaleOrderBreakdownAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["period"], "90d")
-        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        by_status = {
+            row["status"]: row["orders_count"] for row in response.data["by_status"]
+        }
         self.assertEqual(by_status, {"prepared": 1})
 
 
@@ -2004,7 +2426,9 @@ class SaleOrderAggregateCacheTest(TestCase):
             username="salescacheother", password="testpass123", is_staff=True
         )
         other_client = APIClient()
-        other_client.force_authenticate(user=other_user, token={"store_id": other_store.id})
+        other_client.force_authenticate(
+            user=other_user, token={"store_id": other_store.id}
+        )
 
         response: Any = other_client.get("/api/v1/sales-orders/summary/?period=30d")
         self.assertEqual(response.data["revenue_total"], "0.00")
@@ -2038,7 +2462,11 @@ class SaleOrderCustomRangeAPITest(TestCase):
         return order
 
     def _date_str(self, days_ago: int) -> str:
-        return (timezone.localtime(timezone.now()) - timedelta(days=days_ago)).date().isoformat()
+        return (
+            (timezone.localtime(timezone.now()) - timedelta(days=days_ago))
+            .date()
+            .isoformat()
+        )
 
     def test_summary_uses_custom_range_instead_of_period(self) -> None:
         self._make_order(Decimal("40.00"), days_ago=10)
@@ -2073,7 +2501,9 @@ class SaleOrderCustomRangeAPITest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["period"], "custom")
-        by_status = {row["status"]: row["orders_count"] for row in response.data["by_status"]}
+        by_status = {
+            row["status"]: row["orders_count"] for row in response.data["by_status"]
+        }
         self.assertEqual(by_status, {"prepared": 1})
 
     def test_invalid_custom_range_falls_back_to_default_period(self) -> None:
@@ -2134,7 +2564,9 @@ class SaleOrderCustomerInsightsAPITest(TestCase):
         )
         return order
 
-    def _make_conversation(self, days_ago: int = 0, converted: bool = False) -> BotConversation:
+    def _make_conversation(
+        self, days_ago: int = 0, converted: bool = False
+    ) -> BotConversation:
         conversation = BotConversation.objects.create(store=Store.get_default())
         if converted:
             conversation.sale_order = self._make_order("71900000000", days_ago=days_ago)
@@ -2186,7 +2618,9 @@ class SaleOrderCustomerInsightsAPITest(TestCase):
 
     def test_unknown_period_falls_back_to_30d(self) -> None:
         """An invalid period query param should not error out the dashboard."""
-        response: Any = self.client.get("/api/v1/sales-orders/customers/?period=invalid")
+        response: Any = self.client.get(
+            "/api/v1/sales-orders/customers/?period=invalid"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["period"], "30d")

@@ -6,6 +6,7 @@ See docs/architecture/stock-movement-evolution.md. Reuses TwoStoreFixtureMixin
 authenticated as store B's manager (is_staff=True), `self.product_a`/
 `self.product_b` belong to store A/B respectively.
 """
+
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -13,7 +14,12 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Product, StockMovement, StoreMembership
+from bipdelivery.api.models import (
+    Product,
+    ProductVariant,
+    StockMovement,
+    StoreMembership,
+)
 from bipdelivery.tests.test_store_active_isolation import TwoStoreFixtureMixin
 
 
@@ -45,6 +51,95 @@ class StockMovementAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(movement.previous_stock, 10)
         self.assertEqual(movement.new_stock, 15)
         self.assertEqual(movement.performed_by, self.user_b)
+
+    def test_manual_variant_entrada_updates_variant_and_product_aggregate(self) -> None:
+        black = ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=4,
+            position=0,
+        )
+        ProductVariant.objects.create(
+            product=self.product_b,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=6,
+            position=1,
+        )
+
+        response = self.client.post(
+            self._movements_url(self.product_b),
+            {
+                "movement_type": "entrada",
+                "variant_id": black.id,
+                "quantity": 2,
+                "reason": "compra",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        black.refresh_from_db()
+        self.product_b.refresh_from_db()
+        self.assertEqual(black.stock_quantity, 6)
+        self.assertEqual(self.product_b.stock_quantity, 12)
+        self.assertEqual(response.data["product"]["stock_quantity"], 12)
+
+        movement = StockMovement.objects.get(product=self.product_b)
+        self.assertEqual(movement.variant_id, black.id)
+        self.assertEqual(movement.previous_stock, 4)
+        self.assertEqual(movement.new_stock, 6)
+
+    def test_manual_movement_requires_variant_for_variant_managed_product(self) -> None:
+        ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=4,
+            position=0,
+        )
+
+        response = self.client.post(
+            self._movements_url(self.product_b),
+            {"movement_type": "entrada", "quantity": 2, "reason": "compra"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product_b.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 10)
+        self.assertFalse(StockMovement.objects.filter(product=self.product_b).exists())
+
+    def test_manual_movement_rejects_variant_from_another_product(self) -> None:
+        other_variant = ProductVariant.objects.create(
+            product=self.product_a,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=3,
+            position=0,
+        )
+        ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=4,
+            position=0,
+        )
+
+        response = self.client.post(
+            self._movements_url(self.product_b),
+            {
+                "movement_type": "entrada",
+                "variant_id": other_variant.id,
+                "quantity": 2,
+                "reason": "compra",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(StockMovement.objects.filter(product=self.product_b).exists())
 
     def test_manual_saida_decreases_stock_and_creates_movement(self) -> None:
         response = self.client.post(
@@ -304,7 +399,9 @@ class StockMovementLedgerAPITest(TwoStoreFixtureMixin, TestCase):
         )
 
     def test_ledger_includes_product_name_and_sale_order_reference(self) -> None:
-        response = self.client.get(self.LEDGER_URL, {"product": self.other_product_b.id})
+        response = self.client.get(
+            self.LEDGER_URL, {"product": self.other_product_b.id}
+        )
 
         row = response.data["results"][0]
         self.assertEqual(row["product_name"], "Outro Produto B")
@@ -326,12 +423,16 @@ class StockMovementLedgerAPITest(TwoStoreFixtureMixin, TestCase):
         far_future_movement.created_at = "2999-01-01T00:00:00Z"
         far_future_movement.save(update_fields=["created_at"])
 
-        response = self.client.get(self.LEDGER_URL, {"start": "2000-01-01", "end": "2000-01-02"})
+        response = self.client.get(
+            self.LEDGER_URL, {"start": "2000-01-01", "end": "2000-01-02"}
+        )
 
         self.assertEqual(response.data["count"], 0)
 
     def test_ledger_viewer_role_can_read(self) -> None:
-        viewer = User.objects.create_user(username="ledger_viewer_b", password="testpass123")
+        viewer = User.objects.create_user(
+            username="ledger_viewer_b", password="testpass123"
+        )
         StoreMembership.objects.create(
             store=self.store_b, user=viewer, role=StoreMembership.ROLE_VIEWER
         )
@@ -350,7 +451,9 @@ class StockMovementLedgerAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_ledger_regular_authenticated_user_without_role_is_forbidden(self) -> None:
-        plain_user = User.objects.create_user(username="ledger_plain", password="testpass123")
+        plain_user = User.objects.create_user(
+            username="ledger_plain", password="testpass123"
+        )
         client = APIClient()
         client.force_authenticate(user=plain_user, token={"store_id": self.store_b.id})
 
@@ -361,7 +464,12 @@ class StockMovementLedgerAPITest(TwoStoreFixtureMixin, TestCase):
     def test_ledger_cannot_create_movements(self) -> None:
         response = self.client.post(
             self.LEDGER_URL,
-            {"movement_type": "entrada", "quantity": 1, "reason": "compra", "product": self.product_b.id},
+            {
+                "movement_type": "entrada",
+                "quantity": 1,
+                "reason": "compra",
+                "product": self.product_b.id,
+            },
             format="json",
         )
 

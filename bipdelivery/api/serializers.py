@@ -19,6 +19,7 @@ from .models import (
     Category,
     CustomerProfile,
     DeliveryRegion,
+    LabelSettings,
     Product,
     ProductGalleryImage,
     ProductVariant,
@@ -35,6 +36,7 @@ from .permissions import (
     has_dashboard_read_access,
     has_dashboard_write_access,
 )
+from .stock import sync_product_stock_from_variants
 
 User = get_user_model()
 
@@ -139,7 +141,9 @@ class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        membership = StoreMembership.objects.filter(user=user).select_related("store").first()
+        membership = (
+            StoreMembership.objects.filter(user=user).select_related("store").first()
+        )
 
         if membership is not None:
             token["store_id"] = membership.store.id
@@ -173,7 +177,15 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductVariant
-        fields = ["id", "name", "color_hex", "stock_quantity", "image", "is_active", "position"]
+        fields = [
+            "id",
+            "name",
+            "color_hex",
+            "stock_quantity",
+            "image",
+            "is_active",
+            "position",
+        ]
 
     def get_image(self, instance: ProductVariant) -> str | None:
         if not instance.image:
@@ -249,7 +261,9 @@ class ProductSerializer(serializers.ModelSerializer):
             uploaded_images = attrs.get("uploaded_images", [])
             existing_images = attrs.get("existing_images", [])
             direct_image = attrs.get("image")
-            total_images = len(uploaded_images) + len(existing_images) + (1 if direct_image else 0)
+            total_images = (
+                len(uploaded_images) + len(existing_images) + (1 if direct_image else 0)
+            )
 
         if total_images > 3:
             raise serializers.ValidationError(
@@ -301,7 +315,9 @@ class ProductSerializer(serializers.ModelSerializer):
                     stock_quantity = int(raw_stock_quantity or 0)
                 except (TypeError, ValueError):
                     raise serializers.ValidationError(
-                        {"variants_payload": "A quantidade da variante deve ser numerica."}
+                        {
+                            "variants_payload": "A quantidade da variante deve ser numerica."
+                        }
                     )
 
             if not name:
@@ -321,19 +337,25 @@ class ProductSerializer(serializers.ModelSerializer):
 
             if stock_quantity is not None and stock_quantity < 0:
                 raise serializers.ValidationError(
-                    {"variants_payload": "A quantidade da variante nao pode ser negativa."}
+                    {
+                        "variants_payload": "A quantidade da variante nao pode ser negativa."
+                    }
                 )
 
             normalized_name = name.casefold()
             if normalized_name in seen_names:
                 raise serializers.ValidationError(
-                    {"variants_payload": "Nomes de variantes nao podem se repetir no produto."}
+                    {
+                        "variants_payload": "Nomes de variantes nao podem se repetir no produto."
+                    }
                 )
             seen_names.add(normalized_name)
 
             if position in seen_positions:
                 raise serializers.ValidationError(
-                    {"variants_payload": "Posicoes de variantes nao podem se repetir no produto."}
+                    {
+                        "variants_payload": "Posicoes de variantes nao podem se repetir no produto."
+                    }
                 )
             seen_positions.add(position)
 
@@ -363,7 +385,13 @@ class ProductSerializer(serializers.ModelSerializer):
             if isinstance(raw_is_active, bool):
                 is_active = raw_is_active
             elif isinstance(raw_is_active, str):
-                is_active = raw_is_active.strip().lower() not in {"", "0", "false", "no", "off"}
+                is_active = raw_is_active.strip().lower() not in {
+                    "",
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                }
             else:
                 is_active = bool(raw_is_active)
 
@@ -407,7 +435,9 @@ class ProductSerializer(serializers.ModelSerializer):
                 position=index,
             )
 
-    def _build_current_image_lookup(self, instance: Product | None) -> dict[str, object]:
+    def _build_current_image_lookup(
+        self, instance: Product | None
+    ) -> dict[str, object]:
         if not instance:
             return {}
 
@@ -447,7 +477,9 @@ class ProductSerializer(serializers.ModelSerializer):
         normalized_path = urlparse(normalized_url).path
         return current_by_url.get(normalized_url) or current_by_url.get(normalized_path)
 
-    def _resolve_existing_images(self, instance: Product | None, urls: list[str]) -> list:
+    def _resolve_existing_images(
+        self, instance: Product | None, urls: list[str]
+    ) -> list:
         resolved_files = []
 
         for url in urls:
@@ -473,7 +505,9 @@ class ProductSerializer(serializers.ModelSerializer):
                 continue
 
             index = int(match.group(1))
-            values = source.getlist(key) if hasattr(source, "getlist") else [source.get(key)]
+            values = (
+                source.getlist(key) if hasattr(source, "getlist") else [source.get(key)]
+            )
 
             for value in values:
                 if value in (None, ""):
@@ -519,7 +553,9 @@ class ProductSerializer(serializers.ModelSerializer):
 
         if hasattr(request.FILES, "getlist"):
             fallback_entries.extend(
-                value for value in request.FILES.getlist("uploaded_images") if value is not None
+                value
+                for value in request.FILES.getlist("uploaded_images")
+                if value is not None
             )
 
         return fallback_entries or None
@@ -559,7 +595,10 @@ class ProductSerializer(serializers.ModelSerializer):
         if normalized_url in {relative_url, absolute_url}:
             return variant.image
 
-        if normalized_path in {urlparse(relative_url).path, urlparse(absolute_url).path}:
+        if normalized_path in {
+            urlparse(relative_url).path,
+            urlparse(absolute_url).path,
+        }:
             return variant.image
 
         return None
@@ -574,14 +613,58 @@ class ProductSerializer(serializers.ModelSerializer):
 
         return request.FILES.get(f"variant_images[{image_upload_index}]")
 
-    def _sync_variants(self, product: Product, variants_payload: list[dict] | None) -> None:
+    def _stock_movement_user(self):
+        request = self.context.get("request")
+        if request is not None and request.user.is_authenticated:
+            return request.user
+        return None
+
+    def _record_variant_stock_movement(
+        self,
+        *,
+        product: Product,
+        variant: ProductVariant,
+        previous_stock: int,
+        new_stock: int,
+        reason: str,
+        notes: str,
+    ) -> None:
+        if previous_stock == new_stock:
+            return
+
+        movement_type = (
+            StockMovement.TYPE_ENTRADA
+            if new_stock > previous_stock
+            else StockMovement.TYPE_SAIDA
+        )
+
+        StockMovement.objects.create(
+            store=product.store,
+            product=product,
+            variant=variant,
+            movement_type=movement_type,
+            quantity=abs(new_stock - previous_stock),
+            previous_stock=previous_stock,
+            new_stock=new_stock,
+            reason=reason,
+            source=StockMovement.SOURCE_MANUAL,
+            performed_by=self._stock_movement_user(),
+            notes=notes,
+        )
+
+    def _sync_variants(
+        self,
+        product: Product,
+        variants_payload: list[dict] | None,
+        *,
+        audit_stock_changes: bool = False,
+        stock_movement_reason: str = StockMovement.REASON_AJUSTE_INVENTARIO,
+        stock_movement_notes: str = "",
+    ) -> None:
         if variants_payload is None:
             return
 
-        existing_by_id = {
-            variant.id: variant
-            for variant in product.variants.all()
-        }
+        existing_by_id = {variant.id: variant for variant in product.variants.all()}
         submitted_ids = {
             variant_data["id"]
             for variant_data in variants_payload
@@ -590,7 +673,9 @@ class ProductSerializer(serializers.ModelSerializer):
         invalid_ids = submitted_ids - set(existing_by_id)
         if invalid_ids:
             raise serializers.ValidationError(
-                {"variants_payload": "Uma ou mais variantes nao pertencem a este produto."}
+                {
+                    "variants_payload": "Uma ou mais variantes nao pertencem a este produto."
+                }
             )
 
         with transaction.atomic():
@@ -602,9 +687,16 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.position = 1000 + index
                 variant.save(update_fields=["name", "position", "updated_at"])
 
-            for variant_data in sorted(variants_payload, key=lambda item: item["position"]):
+            for variant_data in sorted(
+                variants_payload, key=lambda item: item["position"]
+            ):
                 variant_id = variant_data["id"]
-                variant = existing_by_id.get(variant_id) if variant_id is not None else ProductVariant(product=product)
+                variant = (
+                    existing_by_id.get(variant_id)
+                    if variant_id is not None
+                    else ProductVariant(product=product)
+                )
+                previous_stock = variant.stock_quantity if variant_id is not None else 0
 
                 variant.product = product
                 variant.name = variant_data["name"]
@@ -616,18 +708,34 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.is_active = variant_data["is_active"]
                 variant.position = variant_data["position"]
 
-                uploaded_image = self._get_variant_upload(variant_data["image_upload_index"])
+                uploaded_image = self._get_variant_upload(
+                    variant_data["image_upload_index"]
+                )
                 if uploaded_image is not None:
                     variant.image = uploaded_image
                 elif variant_data["image"] is None:
                     variant.image = None
                 elif isinstance(variant_data["image"], str):
-                    resolved_image = self._resolve_variant_image(variant, variant_data["image"])
+                    resolved_image = self._resolve_variant_image(
+                        variant, variant_data["image"]
+                    )
                     if resolved_image is not None:
                         variant.image = resolved_image
 
                 variant.full_clean(exclude=["product"])
                 variant.save()
+
+                if audit_stock_changes:
+                    self._record_variant_stock_movement(
+                        product=product,
+                        variant=variant,
+                        previous_stock=previous_stock,
+                        new_stock=variant.stock_quantity,
+                        reason=stock_movement_reason,
+                        notes=stock_movement_notes,
+                    )
+
+            sync_product_stock_from_variants(product)
 
             if hasattr(product, "_prefetched_objects_cache"):
                 product._prefetched_objects_cache.pop("variants", None)
@@ -642,7 +750,13 @@ class ProductSerializer(serializers.ModelSerializer):
         if ordered_request_images is not None:
             product = super().create(validated_data)
             self._replace_gallery(product, ordered_request_images[:3])
-            self._sync_variants(product, variants_payload)
+            self._sync_variants(
+                product,
+                variants_payload,
+                audit_stock_changes=True,
+                stock_movement_reason=StockMovement.REASON_ENTRADA_INICIAL,
+                stock_movement_notes="Entrada inicial de variante no cadastro do produto.",
+            )
             return product
 
         if direct_image:
@@ -650,7 +764,13 @@ class ProductSerializer(serializers.ModelSerializer):
 
         product = super().create(validated_data)
         self._replace_gallery(product, uploaded_images[:3])
-        self._sync_variants(product, variants_payload)
+        self._sync_variants(
+            product,
+            variants_payload,
+            audit_stock_changes=True,
+            stock_movement_reason=StockMovement.REASON_ENTRADA_INICIAL,
+            stock_movement_notes="Entrada inicial de variante no cadastro do produto.",
+        )
         return product
 
     def update(self, instance, validated_data):
@@ -664,7 +784,12 @@ class ProductSerializer(serializers.ModelSerializer):
 
         if ordered_request_images is not None:
             self._replace_gallery(product, ordered_request_images[:3])
-            self._sync_variants(product, variants_payload)
+            self._sync_variants(
+                product,
+                variants_payload,
+                audit_stock_changes=True,
+                stock_movement_notes="Ajuste direto de estoque da variante pelo formulario de produto.",
+            )
             return product
 
         next_images = self._resolve_existing_images(product, existing_images)
@@ -675,7 +800,12 @@ class ProductSerializer(serializers.ModelSerializer):
         if existing_images or uploaded_images or direct_image is not None:
             self._replace_gallery(product, next_images[:3])
 
-        self._sync_variants(product, variants_payload)
+        self._sync_variants(
+            product,
+            variants_payload,
+            audit_stock_changes=True,
+            stock_movement_notes="Ajuste direto de estoque da variante pelo formulario de produto.",
+        )
         return product
 
     def to_representation(self, instance):
@@ -716,8 +846,12 @@ class StockMovementSerializer(serializers.ModelSerializer):
     source_display = serializers.CharField(source="get_source_display", read_only=True)
     product_name = serializers.ReadOnlyField(source="product.name")
     product_sku = serializers.ReadOnlyField(source="product.sku")
+    variant_name = serializers.ReadOnlyField(source="variant.name")
+    variant_color_hex = serializers.ReadOnlyField(source="variant.color_hex")
     performed_by_username = serializers.ReadOnlyField(source="performed_by.username")
-    sale_order_reference = serializers.ReadOnlyField(source="sale_order.order_reference")
+    sale_order_reference = serializers.ReadOnlyField(
+        source="sale_order.order_reference"
+    )
 
     class Meta:
         model = StockMovement
@@ -726,6 +860,9 @@ class StockMovementSerializer(serializers.ModelSerializer):
             "product",
             "product_name",
             "product_sku",
+            "variant",
+            "variant_name",
+            "variant_color_hex",
             "movement_type",
             "movement_type_display",
             "quantity",
@@ -754,13 +891,16 @@ class StockMovementCreateSerializer(serializers.Serializer):
     """
 
     movement_type = serializers.ChoiceField(choices=StockMovement.TYPE_CHOICES)
+    variant_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     quantity = serializers.IntegerField(min_value=1)
     reason = serializers.ChoiceField(choices=StockMovement.REASON_CHOICES)
     notes = serializers.CharField(required=False, allow_blank=True, max_length=2000)
 
     def validate_reason(self, value):
         if value in StockMovement.SYSTEM_ONLY_REASONS:
-            raise serializers.ValidationError("Este motivo é de uso exclusivo do sistema.")
+            raise serializers.ValidationError(
+                "Este motivo é de uso exclusivo do sistema."
+            )
         return value
 
 
@@ -789,6 +929,7 @@ class StoreSerializer(serializers.ModelSerializer):
     """Resolved tenant identity. Etapa 1: always the single default store."""
 
     status = serializers.SerializerMethodField()
+    theme = serializers.SerializerMethodField()
 
     class Meta:
         model = Store
@@ -810,6 +951,51 @@ class StoreSerializer(serializers.ModelSerializer):
     def get_status(self, store: Store) -> str:
         return "active" if store.is_active else "inactive"
 
+    def get_theme(self, store: Store) -> dict[str, str]:
+        return Store.normalize_theme(store.theme)
+
+
+class LabelSettingsSerializer(serializers.ModelSerializer):
+    """Printable product-label sheet settings scoped to one store."""
+
+    labels_per_page = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = LabelSettings
+        fields = [
+            "page_format",
+            "columns",
+            "rows",
+            "margin_mm",
+            "cell_padding_mm",
+            "qr_size_mm",
+            "show_price",
+            "show_size",
+            "show_public_code",
+            "labels_per_page",
+        ]
+        read_only_fields = ["labels_per_page"]
+
+
+class StoreAppearanceSettingsSerializer(serializers.Serializer):
+    """Validate storefront appearance updates controlled by the theme engine."""
+
+    logo_url = serializers.URLField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+    )
+    tagline = serializers.CharField(
+        max_length=160,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+    theme = serializers.JSONField(required=False)
+
+    def validate_theme(self, value):
+        return Store.normalize_theme(value)
+
 
 class StoreRenameSerializer(serializers.Serializer):
     """Validate a store rename request (Etapa 4: owners can fix a store's name)."""
@@ -819,7 +1005,9 @@ class StoreRenameSerializer(serializers.Serializer):
     def validate_name(self, value: str) -> str:
         normalized_name = value.strip()
         if len(normalized_name) < 2:
-            raise serializers.ValidationError("Informe um nome de loja com pelo menos 2 caracteres.")
+            raise serializers.ValidationError(
+                "Informe um nome de loja com pelo menos 2 caracteres."
+            )
         return normalized_name
 
 
@@ -900,9 +1088,13 @@ class BotMessageRequestSerializer(serializers.Serializer):
     """Incoming public message handled by the rule-based bot MVP."""
 
     message = serializers.CharField(max_length=500, trim_whitespace=True)
-    conversation_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    conversation_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
     session_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
-    customer_phone = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    customer_phone = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
     channel = serializers.ChoiceField(
         choices=["web", "whatsapp"],
         default="web",
@@ -1067,23 +1259,45 @@ class CheckoutCustomerInputSerializer(serializers.Serializer):
 
     delivery_method = serializers.ChoiceField(choices=["delivery", "pickup"])
     payment_method = serializers.ChoiceField(choices=["pix", "card", "cash"])
-    delivery_region_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    delivery_region_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
     full_name = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        default="",
     )
     phone = serializers.CharField(
-        max_length=32, required=False, allow_blank=True, trim_whitespace=True, default=""
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        default="",
     )
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     address = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        default="",
     )
     neighborhood = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        default="",
     )
     city = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, trim_whitespace=True, default=""
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+        default="",
     )
 
 
@@ -1117,7 +1331,9 @@ class CheckoutRequestSerializer(serializers.Serializer):
     def validate(self, attrs):
         """Reject autofilled honeypot fields without changing the public contract."""
         initial_data = self.initial_data if hasattr(self, "initial_data") else {}
-        customer_data = initial_data.get("customer", {}) if hasattr(initial_data, "get") else {}
+        customer_data = (
+            initial_data.get("customer", {}) if hasattr(initial_data, "get") else {}
+        )
 
         for field_name in CHECKOUT_HONEYPOT_FIELDS:
             if self._submitted_text(initial_data, field_name) or self._submitted_text(
@@ -1166,11 +1382,15 @@ class CheckoutResponseSerializer(serializers.Serializer):
     order_reference = serializers.CharField()
     items = CheckoutItemResponseSerializer(many=True)
     customer = CheckoutCustomerResponseSerializer()
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    subtotal = serializers.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
     delivery_fee = serializers.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal("0.00")
     )
-    total = serializers.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    total = serializers.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
     message = serializers.CharField()
     whatsapp_url = serializers.CharField(allow_blank=True)
 
@@ -1268,17 +1488,25 @@ class SaleOrderStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=[choice[0] for choice in SaleOrder.STATUS_CHOICES],
     )
-    carrier_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
-    tracking_code = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    carrier_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=120
+    )
+    tracking_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=64
+    )
 
 
 class SaleOrderSummarySerializer(serializers.Serializer):
     """Aggregated real sales revenue for the dashboard's revenue card."""
 
     period = serializers.CharField()
-    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     orders_count = serializers.IntegerField()
-    average_ticket = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    average_ticket = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     comparison_previous_period = serializers.DecimalField(
         max_digits=6, decimal_places=2, allow_null=True
     )
@@ -1291,7 +1519,9 @@ class SaleOrderTimeseriesPointSerializer(serializers.Serializer):
     """One day of aggregated sales for the dashboard's revenue trend chart."""
 
     date = serializers.DateField()
-    revenue = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     orders_count = serializers.IntegerField()
 
 
@@ -1302,14 +1532,18 @@ class TopProductBreakdownSerializer(serializers.Serializer):
     product_name = serializers.CharField()
     image_url = serializers.CharField(allow_null=True)
     quantity_total = serializers.IntegerField()
-    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
 
 
 class PaymentMethodBreakdownSerializer(serializers.Serializer):
     """Revenue share for a single payment method within the period."""
 
     payment_method = serializers.CharField()
-    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     orders_count = serializers.IntegerField()
 
 
@@ -1324,7 +1558,9 @@ class RegionBreakdownSerializer(serializers.Serializer):
     """Revenue share for a single delivery region (or pickup) within the period."""
 
     region = serializers.CharField()
-    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     orders_count = serializers.IntegerField()
 
 
@@ -1337,7 +1573,9 @@ class ChannelBreakdownSerializer(serializers.Serializer):
     """
 
     channel = serializers.CharField()
-    revenue_total = serializers.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    revenue_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
     orders_count = serializers.IntegerField()
 
 
@@ -1360,7 +1598,9 @@ class SaleOrderCustomerInsightsSerializer(serializers.Serializer):
     returning_customers = serializers.IntegerField()
     bot_conversations_count = serializers.IntegerField()
     bot_converted_count = serializers.IntegerField()
-    bot_conversion_rate = serializers.DecimalField(max_digits=6, decimal_places=2, allow_null=True)
+    bot_conversion_rate = serializers.DecimalField(
+        max_digits=6, decimal_places=2, allow_null=True
+    )
 
 
 class RegisterUserSerializer(serializers.Serializer):
@@ -1380,25 +1620,41 @@ class RegisterUserSerializer(serializers.Serializer):
     )
 
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
-    confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    password = serializers.CharField(
+        write_only=True, min_length=8, trim_whitespace=False
+    )
+    confirm_password = serializers.CharField(
+        write_only=True, min_length=8, trim_whitespace=False
+    )
     registration_context = serializers.ChoiceField(
         choices=CONTEXT_CHOICES,
         required=False,
         default=CONTEXT_DASHBOARD_OWNER,
     )
-    store_name = serializers.CharField(max_length=120, trim_whitespace=True, required=False)
+    store_name = serializers.CharField(
+        max_length=120, trim_whitespace=True, required=False
+    )
     store_slug = serializers.SlugField(required=False)
-    full_name = serializers.CharField(max_length=160, trim_whitespace=True, required=False, allow_blank=True)
-    phone = serializers.CharField(max_length=32, trim_whitespace=True, required=False, allow_blank=True)
+    full_name = serializers.CharField(
+        max_length=160, trim_whitespace=True, required=False, allow_blank=True
+    )
+    phone = serializers.CharField(
+        max_length=32, trim_whitespace=True, required=False, allow_blank=True
+    )
     # Optional at registration for every context; only required for
     # storefront_customer (validated below), and even then only full_name
     # and phone -- address stays optional here the same way it always was
     # optional in the pre-profile checkout form (only required later, at
     # checkout time, if the customer picks delivery over pickup).
-    address = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
-    neighborhood = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
-    city = serializers.CharField(max_length=255, trim_whitespace=True, required=False, allow_blank=True)
+    address = serializers.CharField(
+        max_length=255, trim_whitespace=True, required=False, allow_blank=True
+    )
+    neighborhood = serializers.CharField(
+        max_length=255, trim_whitespace=True, required=False, allow_blank=True
+    )
+    city = serializers.CharField(
+        max_length=255, trim_whitespace=True, required=False, allow_blank=True
+    )
 
     def validate_store_name(self, value: str) -> str:
         normalized_name = value.strip()
@@ -1409,7 +1665,9 @@ class RegisterUserSerializer(serializers.Serializer):
     def validate_email(self, value: str) -> str:
         normalized_email = value.strip().lower()
         if User.objects.filter(email__iexact=normalized_email).exists():
-            raise serializers.ValidationError("Ja existe uma conta cadastrada com este email.")
+            raise serializers.ValidationError(
+                "Ja existe uma conta cadastrada com este email."
+            )
         return normalized_email
 
     def validate(self, attrs):
@@ -1431,24 +1689,32 @@ class RegisterUserSerializer(serializers.Serializer):
         try:
             validate_password(password, user=preview_user)
         except DjangoValidationError as error:
-            raise serializers.ValidationError({"password": list(error.messages)}) from error
+            raise serializers.ValidationError(
+                {"password": list(error.messages)}
+            ) from error
 
         context = attrs.get("registration_context", self.CONTEXT_DASHBOARD_OWNER)
 
         if context == self.CONTEXT_DASHBOARD_OWNER:
             store_name = (attrs.get("store_name") or "").strip()
             if not store_name:
-                raise serializers.ValidationError({"store_name": "Informe o nome da sua loja."})
+                raise serializers.ValidationError(
+                    {"store_name": "Informe o nome da sua loja."}
+                )
             attrs["store_name"] = store_name
 
         if context == self.CONTEXT_STOREFRONT_CUSTOMER:
             store_slug = (attrs.get("store_slug") or "").strip().lower()
             if not store_slug:
-                raise serializers.ValidationError({"store_slug": "Informe a loja para criar o perfil de cliente."})
+                raise serializers.ValidationError(
+                    {"store_slug": "Informe a loja para criar o perfil de cliente."}
+                )
 
             store = Store.objects.filter(slug=store_slug, is_active=True).first()
             if store is None:
-                raise serializers.ValidationError({"store_slug": "Loja nao encontrada ou inativa."})
+                raise serializers.ValidationError(
+                    {"store_slug": "Loja nao encontrada ou inativa."}
+                )
 
             attrs["store_slug"] = store_slug
             attrs["resolved_store"] = store
@@ -1468,7 +1734,9 @@ class RegisterUserSerializer(serializers.Serializer):
     def create(self, validated_data):
         email = validated_data["email"]
         password = validated_data["password"]
-        context = validated_data.get("registration_context", self.CONTEXT_DASHBOARD_OWNER)
+        context = validated_data.get(
+            "registration_context", self.CONTEXT_DASHBOARD_OWNER
+        )
 
         with transaction.atomic():
             user = User.objects.create_user(
@@ -1525,7 +1793,9 @@ class CustomerProfileSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=160, required=False)
     phone = serializers.CharField(max_length=32, required=False)
     address = serializers.CharField(max_length=255, required=False, allow_blank=True)
-    neighborhood = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    neighborhood = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
     city = serializers.CharField(max_length=255, required=False, allow_blank=True)
     delivery_region_id = serializers.IntegerField(required=False, allow_null=True)
     delivery_region_name = serializers.SerializerMethodField(read_only=True)
@@ -1542,7 +1812,9 @@ class CustomerProfileSerializer(serializers.Serializer):
             return value
 
         store = self.context["store"]
-        if not DeliveryRegion.objects.filter(id=value, store=store, is_active=True).exists():
+        if not DeliveryRegion.objects.filter(
+            id=value, store=store, is_active=True
+        ).exists():
             raise serializers.ValidationError("Selected delivery region is unavailable")
         return value
 
@@ -1572,8 +1844,12 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     uid = serializers.CharField()
     token = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
-    confirm_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    password = serializers.CharField(
+        write_only=True, min_length=8, trim_whitespace=False
+    )
+    confirm_password = serializers.CharField(
+        write_only=True, min_length=8, trim_whitespace=False
+    )
 
     default_error_messages = {
         "invalid_link": "O link de recuperacao e invalido ou expirou.",
@@ -1591,10 +1867,14 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             user_id = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=user_id)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({"uid": self.error_messages["invalid_link"]})
+            raise serializers.ValidationError(
+                {"uid": self.error_messages["invalid_link"]}
+            )
 
         if not default_token_generator.check_token(user, token):
-            raise serializers.ValidationError({"token": self.error_messages["invalid_link"]})
+            raise serializers.ValidationError(
+                {"token": self.error_messages["invalid_link"]}
+            )
 
         if password != confirm_password:
             raise serializers.ValidationError(
@@ -1604,7 +1884,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         try:
             validate_password(password, user=user)
         except DjangoValidationError as error:
-            raise serializers.ValidationError({"password": list(error.messages)}) from error
+            raise serializers.ValidationError(
+                {"password": list(error.messages)}
+            ) from error
 
         attrs["user"] = user
         return attrs
