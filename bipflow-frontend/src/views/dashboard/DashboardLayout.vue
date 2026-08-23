@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
@@ -20,6 +20,7 @@ const {
 const { currentUserName, fetchCurrentUser } = useCurrentUser();
 const { success } = useToast();
 const router = useRouter();
+const isDashboardScopeReady = ref(false);
 
 const handleSelectStore = (storeSlug: string): void => {
   if (storeSlug === selectedStore.value?.slug) {
@@ -43,6 +44,7 @@ onMounted(async () => {
   }
 
   await fetchCurrentStore();
+  isDashboardScopeReady.value = true;
 });
 </script>
 
@@ -68,7 +70,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <main class="max-w-7xl mx-auto px-6 py-12">
+    <main v-if="isDashboardScopeReady" class="max-w-7xl mx-auto px-6 py-12">
       <RouterView />
     </main>
   </div>

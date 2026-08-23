@@ -2,7 +2,11 @@ import { computed, ref } from "vue";
 import type { Store } from "@/types/store";
 import { authService } from "@/services/auth.service";
 import { storeService } from "@/services/store.service";
-import { getSelectedStoreSlug, setSelectedStoreSlug } from "@/services/store-scope";
+import {
+  getSelectedStoreSlug,
+  setSelectedStoreSlug,
+  subscribeStoreScopeChange,
+} from "@/services/store-scope";
 import { buildStoreBranding } from "@/composables/useStoreBranding";
 
 // Singleton compartilhado pelo dashboard e pelo catalogo publico. `getMine()`
@@ -15,18 +19,46 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const lastFetched = ref<number | null>(null);
 
+subscribeStoreScopeChange((slug) => {
+  selectedStoreSlug.value = slug;
+
+  if (slug) {
+    return;
+  }
+
+  store.value = null;
+  stores.value = [];
+  error.value = null;
+  lastFetched.value = null;
+});
+
+function applySelectedStore(nextStore: Store, availableStores: Store[] = [nextStore]): void {
+  store.value = nextStore;
+  stores.value = availableStores;
+  selectedStoreSlug.value = nextStore.slug;
+  setSelectedStoreSlug(nextStore.slug);
+  lastFetched.value = Date.now();
+}
+
 export function useCurrentStore() {
   const selectedStore = computed(() => {
     if (!stores.value.length) {
       return store.value;
     }
 
-    return (
-      stores.value.find((item) => item.slug === selectedStoreSlug.value)
-      ?? store.value
-      ?? stores.value[0]
-      ?? null
-    );
+    const selectedFromMemberships = stores.value.find((item) => item.slug === selectedStoreSlug.value);
+    if (selectedFromMemberships) {
+      return selectedFromMemberships;
+    }
+
+    if (store.value) {
+      const currentFromMemberships = stores.value.find((item) => item.slug === store.value?.slug);
+      if (currentFromMemberships) {
+        return currentFromMemberships;
+      }
+    }
+
+    return stores.value[0] ?? null;
   });
 
   const storefrontPath = computed(() => (
@@ -47,24 +79,24 @@ export function useCurrentStore() {
     error.value = null;
 
     try {
-      const resolvedStore = await storeService.getCurrent();
-      store.value = resolvedStore;
-      stores.value = [resolvedStore];
-      selectedStoreSlug.value = resolvedStore.slug;
-      setSelectedStoreSlug(resolvedStore.slug);
-      lastFetched.value = Date.now();
-
       if (authService.isAuthenticated()) {
-        try {
-          const myStores = await storeService.getMine();
-          if (myStores.length) {
-            stores.value = myStores;
+        const myStores = await storeService.getMine();
+        if (myStores.length) {
+          const fallbackStore = myStores[0];
+          if (!fallbackStore) {
+            return;
           }
-        } catch (err) {
-          // Non-fatal: the dashboard still works with just the resolved
-          // store, same as before the switcher existed.
+
+          const trustedStore =
+            myStores.find((item) => item.slug === selectedStoreSlug.value)
+            ?? fallbackStore;
+          applySelectedStore(trustedStore, myStores);
+          return;
         }
       }
+
+      const resolvedStore = await storeService.getCurrent();
+      applySelectedStore(resolvedStore);
     } catch (err) {
       error.value = "Nao foi possivel carregar a loja atual.";
     } finally {
