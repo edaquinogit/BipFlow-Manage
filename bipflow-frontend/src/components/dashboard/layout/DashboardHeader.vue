@@ -24,11 +24,13 @@ const props = withDefaults(defineProps<{
   selectedStore?: Store | null
   isStoreLoading?: boolean
   storefrontPath?: string
+  isStorefrontLinkReady?: boolean
 }>(), {
   stores: () => [],
   selectedStore: null,
   isStoreLoading: false,
   storefrontPath: '/produtos',
+  isStorefrontLinkReady: true,
 });
 
 const emit = defineEmits<{
@@ -105,7 +107,10 @@ function closeMobileNav(): void {
         </div>
 
         <div class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:flex-nowrap lg:gap-2">
-          <DashboardHeaderStorefrontMenu :storefront-path="storefrontPath" />
+          <DashboardHeaderStorefrontMenu
+            :storefront-path="storefrontPath"
+            :is-ready="isStorefrontLinkReady"
+          />
 
           <div
             class="welcome-card hidden min-w-0 max-w-full flex-col items-end rounded-xl border border-white/65 bg-white/48 px-3.5 py-1.5 shadow-[0_10px_28px_-24px_rgba(5,5,10,0.45)] backdrop-blur-md xl:flex xl:max-w-[19rem] xl:px-3 xl:py-1"

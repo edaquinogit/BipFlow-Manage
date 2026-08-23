@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useCurrentUser } from '@/composables/useCurrentUser';
@@ -21,6 +21,9 @@ const { currentUserName, fetchCurrentUser } = useCurrentUser();
 const { success } = useToast();
 const router = useRouter();
 const isDashboardScopeReady = ref(false);
+const isStorefrontLinkReady = computed(() => (
+  isDashboardScopeReady.value && Boolean(selectedStore.value?.slug)
+));
 
 const handleSelectStore = (storeSlug: string): void => {
   if (storeSlug === selectedStore.value?.slug) {
@@ -55,7 +58,8 @@ onMounted(async () => {
       :stores="stores"
       :selected-store="selectedStore"
       :is-store-loading="isCurrentStoreLoading"
-      :storefront-path="storefrontPath"
+      :storefront-path="isStorefrontLinkReady ? storefrontPath : ''"
+      :is-storefront-link-ready="isStorefrontLinkReady"
       @select-store="handleSelectStore"
       @logout="handleLogout"
     />

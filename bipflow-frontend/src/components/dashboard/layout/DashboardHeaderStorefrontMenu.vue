@@ -9,9 +9,12 @@ import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
 import { buildPublicStorefrontUrl, isValidPublicStorefrontUrl } from '@/utils/publicStorefrontUrl';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   storefrontPath: string
-}>();
+  isReady?: boolean
+}>(), {
+  isReady: true,
+});
 
 const toast = useToast();
 
@@ -20,15 +23,24 @@ const isCopied = ref(false);
 const containerRef = ref<HTMLElement | null>(null);
 let copiedFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const absoluteStorefrontUrl = computed(() => buildPublicStorefrontUrl(props.storefrontPath, {
-  runtimeOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
-}));
+const absoluteStorefrontUrl = computed(() => (
+  props.isReady
+    ? buildPublicStorefrontUrl(props.storefrontPath, {
+        runtimeOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
+      })
+    : null
+));
 
 const hasValidStorefrontUrl = computed(() => (
-  Boolean(absoluteStorefrontUrl.value && isValidPublicStorefrontUrl(absoluteStorefrontUrl.value))
+  props.isReady
+  && Boolean(absoluteStorefrontUrl.value && isValidPublicStorefrontUrl(absoluteStorefrontUrl.value))
 ));
 
 function toggleMenu(): void {
+  if (!props.isReady) {
+    return;
+  }
+
   isOpen.value = !isOpen.value;
 }
 
@@ -116,7 +128,9 @@ onBeforeUnmount(() => {
       class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-bip-rose/20 bg-bip-blush/60 px-3.5 text-[clamp(0.7rem,0.65rem+0.2vw,0.8rem)] font-black uppercase tracking-[0.16em] text-bip-rose transition-all duration-200 hover:-translate-y-0.5 hover:border-bip-rose/40 hover:bg-bip-blush focus:outline-none focus:ring-2 focus:ring-bip-blush active:translate-y-0 active:scale-[0.98] lg:h-10 lg:px-3"
       aria-haspopup="dialog"
       :aria-expanded="isOpen"
-      title="Ver vitrine"
+      :title="isReady ? 'Ver vitrine' : 'Carregando loja'"
+      :disabled="!isReady"
+      :class="{ 'cursor-not-allowed opacity-55 hover:translate-y-0': !isReady }"
       @click="toggleMenu"
     >
       <ArrowTopRightOnSquareIcon class="h-4 w-4" />

@@ -129,6 +129,21 @@ describe('DashboardHeaderStorefrontMenu', () => {
     expect(toastMock.error).toHaveBeenCalledWith('Link da vitrine invalido. Revise a configuracao da URL publica.')
   })
 
+  it('keeps the storefront menu closed while the dashboard store scope is still resolving', async () => {
+    wrapper = mount(DashboardHeaderStorefrontMenu, {
+      props: { storefrontPath: STOREFRONT_PATH, isReady: false },
+      attachTo: document.body,
+    })
+
+    const trigger = wrapper.find('button[title="Carregando loja"]')
+    expect(trigger.attributes('disabled')).toBeDefined()
+
+    await trigger.trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(writeText).not.toHaveBeenCalled()
+  })
+
   it('links to the storefront in a new tab and closes the menu on click', async () => {
     wrapper = mountMenu()
     await openMenu(wrapper)
