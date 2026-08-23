@@ -12,6 +12,7 @@ export type PdvPaymentMethod = (typeof PDV_PAYMENT_METHODS)[number]
 
 export interface PdvSaleItemPayload {
   public_code: string
+  variant_id?: number | null
   quantity: number
 }
 
@@ -31,7 +32,11 @@ export interface PdvSaleRequestPayload {
 
 export const PdvSaleItemResponseSchema = z.object({
   product_id: z.number(),
+  variant_id: z.number().nullable().optional().default(null),
   product_name: z.string(),
+  variant_name: z.string().optional().default(''),
+  variant_color_hex: z.string().optional().default(''),
+  variant_image_url: z.string().optional().default(''),
   public_code: z.string(),
   quantity: z.number(),
   unit_price: z.union([z.string(), z.number()]).transform((value) => String(value)),

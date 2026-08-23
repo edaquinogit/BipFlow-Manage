@@ -30,8 +30,12 @@ describe('usePdvCart', () => {
 
     expect(cart.lines.value).toHaveLength(1)
     expect(cart.lines.value[0]).toMatchObject({
+      lineKey: '1:default',
       productId: 1,
       publicCode: 'ABCD2345',
+      variantId: null,
+      variantName: '',
+      variantColorHex: '',
       quantity: 1,
       unitPrice: 10,
     })
@@ -75,6 +79,109 @@ describe('usePdvCart', () => {
     expect(cart.lines.value).toHaveLength(0)
   })
 
+  it('rejects a variant-managed product without a selected variant', () => {
+    const cart = usePdvCart()
+
+    const result = cart.addProduct(
+      buildProduct({
+        variants: [
+          {
+            id: 10,
+            name: 'Preto',
+            color_hex: '#111111',
+            stock_quantity: 2,
+            image: null,
+            is_active: true,
+            position: 0,
+          },
+        ],
+      })
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'variant_required' })
+    expect(cart.lines.value).toHaveLength(0)
+  })
+
+  it('adds a selected variant as its own stock-limited line', () => {
+    const cart = usePdvCart()
+    const product = buildProduct({
+      stock_quantity: 5,
+      image_url: 'https://cdn.bipflow.app/produtos/camiseta.jpg',
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#111111',
+          stock_quantity: 2,
+          image: 'https://cdn.bipflow.app/produtos/camiseta-preta.jpg',
+          is_active: true,
+          position: 0,
+        },
+        {
+          id: 11,
+          name: 'Azul',
+          color_hex: '#3366FF',
+          stock_quantity: 3,
+          image: null,
+          is_active: true,
+          position: 1,
+        },
+      ],
+    })
+
+    const result = cart.addProduct(product, 1, product.variants?.[0] ?? null)
+
+    expect(result).toEqual({ ok: true })
+    expect(cart.lines.value).toHaveLength(1)
+    expect(cart.lines.value[0]).toMatchObject({
+      lineKey: '1:10',
+      productId: 1,
+      publicCode: 'ABCD2345',
+      variantId: 10,
+      variantName: 'Preto',
+      variantColorHex: '#111111',
+      availableStock: 2,
+      imageUrl: 'https://cdn.bipflow.app/produtos/camiseta-preta.jpg',
+    })
+  })
+
+  it('keeps different variants of the same product as separate PDV cart lines', () => {
+    const cart = usePdvCart()
+    const product = buildProduct({
+      stock_quantity: 5,
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#111111',
+          stock_quantity: 2,
+          image: null,
+          is_active: true,
+          position: 0,
+        },
+        {
+          id: 11,
+          name: 'Azul',
+          color_hex: '#3366FF',
+          stock_quantity: 3,
+          image: null,
+          is_active: true,
+          position: 1,
+        },
+      ],
+    })
+
+    cart.addProduct(product, 1, product.variants?.[0] ?? null)
+    cart.addProduct(product, 2, product.variants?.[1] ?? null)
+
+    expect(cart.lines.value).toHaveLength(2)
+    expect(cart.lines.value.map((line) => line.lineKey)).toEqual(['1:10', '1:11'])
+    expect(cart.toSaleItems()).toEqual([
+      { public_code: 'ABCD2345', variant_id: 10, quantity: 1 },
+      { public_code: 'ABCD2345', variant_id: 11, quantity: 2 },
+    ])
+  })
+
   it('rejects a scan that would exceed the known available stock', () => {
     const cart = usePdvCart()
 
@@ -109,7 +216,7 @@ describe('usePdvCart', () => {
     const cart = usePdvCart()
     cart.addProduct(buildProduct())
 
-    const result = cart.updateQuantity(1, 4)
+    const result = cart.updateQuantity(cart.lines.value[0]!.lineKey, 4)
 
     expect(result).toEqual({ ok: true })
     expect(cart.lines.value[0]?.quantity).toBe(4)
@@ -119,7 +226,7 @@ describe('usePdvCart', () => {
     const cart = usePdvCart()
     cart.addProduct(buildProduct({ stock_quantity: 3 }))
 
-    const result = cart.updateQuantity(1, 10)
+    const result = cart.updateQuantity(cart.lines.value[0]!.lineKey, 10)
 
     expect(result).toEqual({ ok: false, reason: 'exceeds_stock', availableStock: 3 })
     expect(cart.lines.value[0]?.quantity).toBe(3)
@@ -129,7 +236,7 @@ describe('usePdvCart', () => {
     const cart = usePdvCart()
     cart.addProduct(buildProduct())
 
-    cart.updateQuantity(1, 0)
+    cart.updateQuantity(cart.lines.value[0]!.lineKey, 0)
 
     expect(cart.lines.value).toHaveLength(0)
   })
@@ -138,7 +245,7 @@ describe('usePdvCart', () => {
     const cart = usePdvCart()
     cart.addProduct(buildProduct())
 
-    cart.removeLine(1)
+    cart.removeLine(cart.lines.value[0]!.lineKey)
 
     expect(cart.isEmpty.value).toBe(true)
   })

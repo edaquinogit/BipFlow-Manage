@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { CameraIcon, EyeIcon, MinusIcon, PlusIcon, QrCodeIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { CameraIcon, EyeIcon, MinusIcon, PlusIcon, QrCodeIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import { useCurrentUser } from '@/composables/useCurrentUser';
-import { usePdvCart, type PdvCartLine } from '@/composables/usePdvCart';
+import { usePdvCart, type PdvCartAddResult, type PdvCartLine } from '@/composables/usePdvCart';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useToast } from '@/composables/useToast';
 import ProductService from '@/services/product.service';
@@ -15,7 +15,7 @@ import { isAxiosError, buildErrorContext, type ApplicationError } from '@/types/
 import { PDV_PAYMENT_METHODS, type PdvPaymentMethod } from '@/types/pdvSale';
 import type { SaleOrder } from '@/types/sales';
 import type { ReceiptData } from '@/types/receipt';
-import type { Product } from '@/schemas/product.schema';
+import type { Product, ProductVariant } from '@/schemas/product.schema';
 import { extractPublicCodeFromScan } from '@/utils/pdvScan';
 import { playScanSuccessBeep } from '@/utils/sound';
 import PdvSaleReceiptModal from '@/components/dashboard/product-table/PdvSaleReceiptModal.vue';
@@ -119,8 +119,67 @@ const loadRecentPdvSales = async (): Promise<void> => {
 const lastCompletedSale = ref<ReceiptData | null>(null);
 const isReceiptOpen = ref(false);
 
+const normalizeStock = (value: unknown): number => {
+  const stock = Number(value);
+  return Number.isFinite(stock) ? Math.max(0, Math.trunc(stock)) : 0;
+};
+
+const activeVariantsForProduct = (product: Product | null): ProductVariant[] =>
+  [...(product?.variants ?? [])]
+    .filter((variant) => variant.is_active)
+    .sort((left, right) => left.position - right.position || (left.id ?? 0) - (right.id ?? 0));
+
+const variantAvailableStockForProduct = (product: Product, variant: ProductVariant): number => {
+  if (!product.is_available) {
+    return 0;
+  }
+
+  return Math.min(normalizeStock(product.stock_quantity), normalizeStock(variant.stock_quantity));
+};
+
+const variantImageUrl = (product: Product, variant: ProductVariant): string | null => {
+  if (typeof variant.image === 'string' && variant.image.length > 0) {
+    return variant.image;
+  }
+
+  return product.image_url ?? null;
+};
+
+const variantPickerProduct = ref<Product | null>(null);
+const activeVariantOptions = computed<ProductVariant[]>(() =>
+  activeVariantsForProduct(variantPickerProduct.value)
+);
+const variantPickerProductName = computed(() => variantPickerProduct.value?.name ?? '');
+
+const variantAvailableStock = (variant: ProductVariant): number =>
+  variantPickerProduct.value
+    ? variantAvailableStockForProduct(variantPickerProduct.value, variant)
+    : 0;
+
+const variantImageUrlForPicker = (variant: ProductVariant): string | null =>
+  variantPickerProduct.value ? variantImageUrl(variantPickerProduct.value, variant) : null;
+
 const focusScanInput = (): void => {
   void nextTick(() => scanInputRef.value?.focus());
+};
+
+const closeVariantPicker = (): void => {
+  variantPickerProduct.value = null;
+  focusScanInput();
+};
+
+type PdvCartAddFailure = Extract<PdvCartAddResult, { ok: false }>;
+
+const cartAddFailureMessage = (product: Product, result: PdvCartAddFailure): string => {
+  if (result.reason === 'exceeds_stock') {
+    return `Estoque insuficiente para "${product.name}": disponivel ${result.availableStock}.`;
+  }
+
+  if (result.reason === 'variant_required') {
+    return `Selecione uma variante de "${product.name}" antes de vender no PDV.`;
+  }
+
+  return `"${product.name}" esta indisponivel no momento.`;
 };
 
 /**
@@ -131,22 +190,44 @@ const focusScanInput = (): void => {
  * for a camera decode, whose raw text is the product's full deep-link URL,
  * not the bare `public_code` (see `utils/pdvScan.ts`).
  */
-type PdvScanOutcome = { ok: true; product: Product } | { ok: false; message: string };
+type PdvScanOutcome =
+  | { ok: true; product: Product; action: 'added' | 'variant_required' }
+  | { ok: false; message: string };
 
 const resolveScannedCode = async (raw: string): Promise<PdvScanOutcome> => {
   const code = extractPublicCodeFromScan(raw);
 
   try {
     const product = await ProductService.getByCode(code);
+    const activeVariants = activeVariantsForProduct(product);
+
+    if (activeVariants.length > 0) {
+      const hasAvailableVariant = activeVariants.some(
+        (variant) => variantAvailableStockForProduct(product, variant) > 0
+      );
+
+      if (!hasAvailableVariant) {
+        return {
+          ok: false,
+          message: `"${product.name}" esta indisponivel no momento.`,
+        };
+      }
+
+      variantPickerProduct.value = product;
+      return {
+        ok: true,
+        product,
+        action: 'variant_required',
+      };
+    }
+
+    variantPickerProduct.value = null;
     const result = cart.addProduct(product);
 
     if (!result.ok) {
       return {
         ok: false,
-        message:
-          result.reason === 'exceeds_stock'
-            ? `Estoque insuficiente para "${product.name}": disponível ${result.availableStock}.`
-            : `"${product.name}" está indisponível no momento.`,
+        message: cartAddFailureMessage(product, result),
       };
     }
 
@@ -154,7 +235,7 @@ const resolveScannedCode = async (raw: string): Promise<PdvScanOutcome> => {
     // confirmation beep, so HID/manual/camera scans all get the same
     // feedback instead of only the camera's vibration.
     playScanSuccessBeep();
-    return { ok: true, product };
+    return { ok: true, product, action: 'added' };
   } catch (error: unknown) {
     Logger.warn('PDV code lookup failed', buildErrorContext(error as ApplicationError, { code }));
     return { ok: false, message: `Código "${code}" não encontrado.` };
@@ -207,10 +288,32 @@ const handleCameraDecode = async (rawText: string): Promise<void> => {
 
   isLookingUp.value = true;
   const outcome = await resolveScannedCode(rawText);
-  cameraFeedback.value = outcome.ok
-    ? { type: 'success', message: `"${outcome.product.name}" adicionado ao carrinho.` }
-    : { type: 'error', message: outcome.message };
+  if (!outcome.ok) {
+    cameraFeedback.value = { type: 'error', message: outcome.message };
+  } else if (outcome.action === 'variant_required') {
+    cameraFeedback.value = { type: 'success', message: `Selecione a variante de "${outcome.product.name}".` };
+    isCameraScannerOpen.value = false;
+  } else {
+    cameraFeedback.value = { type: 'success', message: `"${outcome.product.name}" adicionado ao carrinho.` };
+  }
   isLookingUp.value = false;
+};
+
+const handleSelectVariant = (variant: ProductVariant): void => {
+  const product = variantPickerProduct.value;
+  if (!product) {
+    return;
+  }
+
+  const result = cart.addProduct(product, 1, variant);
+  if (!result.ok) {
+    scanError.value = cartAddFailureMessage(product, result);
+    return;
+  }
+
+  scanError.value = null;
+  playScanSuccessBeep();
+  closeVariantPicker();
 };
 
 /**
@@ -219,13 +322,13 @@ const handleCameraDecode = async (rawText: string): Promise<void> => {
  * a counter, and it can never be left in an invalid/empty intermediate
  * state the way a free-typed number field can.
  */
-const adjustQuantity = (productId: number, delta: number): void => {
-  const line = cart.lines.value.find((candidate) => candidate.productId === productId);
+const adjustQuantity = (lineKey: string, delta: number): void => {
+  const line = cart.lines.value.find((candidate) => candidate.lineKey === lineKey);
   if (!line) {
     return;
   }
 
-  const result = cart.updateQuantity(productId, line.quantity + delta);
+  const result = cart.updateQuantity(lineKey, line.quantity + delta);
   if (!result.ok) {
     toastWarning(`Quantidade ajustada para o estoque disponível: ${result.availableStock}.`);
   }
@@ -244,13 +347,14 @@ const isLineLowStock = (line: PdvCartLine): boolean =>
     low_stock_threshold: line.lowStockThreshold,
   });
 
-const handleRemoveLine = (productId: number): void => {
-  cart.removeLine(productId);
+const handleRemoveLine = (lineKey: string): void => {
+  cart.removeLine(lineKey);
   focusScanInput();
 };
 
 const resetSale = (): void => {
   cart.clear();
+  variantPickerProduct.value = null;
   customerName.value = '';
   customerPhone.value = '';
   customerEmail.value = '';
@@ -330,6 +434,12 @@ const handleGlobalKeydown = (event: KeyboardEvent): void => {
     if (!cart.isEmpty.value && !isSubmitting.value) {
       void handleFinalizeSale();
     }
+    return;
+  }
+
+  if (event.key === 'Escape' && variantPickerProduct.value) {
+    event.preventDefault();
+    closeVariantPicker();
     return;
   }
 
@@ -430,7 +540,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-[#E5E7EB]">
-              <tr v-for="line in cart.lines.value" :key="line.productId" data-cy="pdv-cart-row">
+              <tr v-for="line in cart.lines.value" :key="line.lineKey" data-cy="pdv-cart-row">
                 <td class="py-2 font-semibold">
                   <div class="flex items-center gap-3">
                     <img
@@ -449,6 +559,18 @@ onBeforeUnmount(() => {
                     <div class="min-w-0">
                       <p class="truncate">{{ line.name }}</p>
                       <span
+                        v-if="line.variantName"
+                        data-cy="pdv-cart-variant-name"
+                        class="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-[#05050A]"
+                      >
+                        <span
+                          class="h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+                          :style="{ backgroundColor: line.variantColorHex || '#D1D5DB' }"
+                          aria-hidden="true"
+                        />
+                        <span class="truncate">{{ line.variantName }}</span>
+                      </span>
+                      <span
                         v-if="isLineLowStock(line)"
                         data-cy="pdv-low-stock-badge"
                         class="mt-1 inline-block whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-700"
@@ -466,7 +588,7 @@ onBeforeUnmount(() => {
                       aria-label="Diminuir quantidade"
                       :disabled="line.quantity <= 1"
                       class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
-                      @click="adjustQuantity(line.productId, -1)"
+                      @click="adjustQuantity(line.lineKey, -1)"
                     >
                       <MinusIcon class="h-4 w-4" />
                     </button>
@@ -479,7 +601,7 @@ onBeforeUnmount(() => {
                       aria-label="Aumentar quantidade"
                       :disabled="line.quantity >= line.availableStock"
                       class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
-                      @click="adjustQuantity(line.productId, 1)"
+                      @click="adjustQuantity(line.lineKey, 1)"
                     >
                       <PlusIcon class="h-4 w-4" />
                     </button>
@@ -495,7 +617,7 @@ onBeforeUnmount(() => {
                     data-cy="pdv-cart-remove"
                     aria-label="Remover item"
                     class="flex h-9 w-9 items-center justify-center text-bip-muted hover:text-[#D81B60]"
-                    @click="handleRemoveLine(line.productId)"
+                    @click="handleRemoveLine(line.lineKey)"
                   >
                     <TrashIcon class="h-4 w-4" />
                   </button>
@@ -618,6 +740,84 @@ onBeforeUnmount(() => {
       </div>
       </div>
     </template>
+
+    <div
+      v-if="variantPickerProduct"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
+      data-cy="pdv-variant-picker"
+      role="presentation"
+      @click.self="closeVariantPicker"
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pdv-variant-picker-title"
+        class="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl shadow-black/20"
+      >
+        <header class="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-5 py-4">
+          <div class="min-w-0">
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted">
+              Selecionar variante
+            </p>
+            <h3
+              id="pdv-variant-picker-title"
+              class="mt-1 truncate text-lg font-black uppercase tracking-tight text-[#05050A]"
+            >
+              {{ variantPickerProductName }}
+            </h3>
+          </div>
+          <button
+            type="button"
+            data-cy="pdv-variant-picker-close"
+            aria-label="Fechar seletor de variantes"
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-bip-muted transition hover:bg-zinc-100 hover:text-[#05050A]"
+            @click="closeVariantPicker"
+          >
+            <XMarkIcon class="h-5 w-5" />
+          </button>
+        </header>
+
+        <div class="grid max-h-[62vh] gap-3 overflow-y-auto p-4 sm:grid-cols-2">
+          <button
+            v-for="variant in activeVariantOptions"
+            :key="variant.id ?? variant.name"
+            type="button"
+            data-cy="pdv-variant-option"
+            :data-variant-id="variant.id ?? ''"
+            :disabled="variantAvailableStock(variant) <= 0"
+            class="flex min-h-24 w-full items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white p-3 text-left transition hover:border-[#D81B60]/50 hover:bg-[#FDF2F8] disabled:cursor-not-allowed disabled:opacity-45"
+            @click="handleSelectVariant(variant)"
+          >
+            <img
+              v-if="variantImageUrlForPicker(variant)"
+              :src="variantImageUrlForPicker(variant) || ''"
+              :alt="variant.name"
+              class="h-14 w-14 shrink-0 rounded-lg border border-[#E5E7EB] object-cover"
+            />
+            <span
+              v-else
+              class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB]"
+              :style="{ backgroundColor: variant.color_hex }"
+              aria-hidden="true"
+            />
+
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center gap-2">
+                <span
+                  class="h-3 w-3 shrink-0 rounded-full border border-black/10"
+                  :style="{ backgroundColor: variant.color_hex }"
+                  aria-hidden="true"
+                />
+                <span class="truncate text-sm font-black text-[#05050A]">{{ variant.name }}</span>
+              </span>
+              <span class="mt-1 block text-xs font-semibold text-bip-muted">
+                {{ variantAvailableStock(variant) }} em estoque
+              </span>
+            </span>
+          </button>
+        </div>
+      </section>
+    </div>
 
     <PdvSaleReceiptModal
       :show="isReceiptOpen"

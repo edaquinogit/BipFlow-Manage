@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import type { Product } from "../schemas/product.schema";
+import type { Product, ProductVariant } from "../schemas/product.schema";
 import type { PdvSaleItemPayload } from "../types/pdvSale";
 
 /**
@@ -8,8 +8,12 @@ import type { PdvSaleItemPayload } from "../types/pdvSale";
  * state belongs to one screen instance, not to the whole dashboard session.
  */
 export interface PdvCartLine {
+  lineKey: string;
   productId: number;
   publicCode: string;
+  variantId: number | null;
+  variantName: string;
+  variantColorHex: string;
   name: string;
   unitPrice: number;
   quantity: number;
@@ -29,11 +33,48 @@ export interface PdvCartLine {
 export type PdvCartAddResult =
   | { ok: true }
   | { ok: false; reason: "unavailable" }
+  | { ok: false; reason: "variant_required" }
   | { ok: false; reason: "exceeds_stock"; availableStock: number };
 
 export type PdvCartQuantityResult =
   | { ok: true }
   | { ok: false; reason: "exceeds_stock"; availableStock: number };
+
+export function getPdvCartLineKey(productId: number, variantId: number | null = null): string {
+  return `${productId}:${variantId ?? "default"}`;
+}
+
+function normalizeStock(value: unknown): number {
+  const stock = Number(value);
+  return Number.isFinite(stock) ? Math.max(0, Math.trunc(stock)) : 0;
+}
+
+function normalizeQuantity(value: number): number {
+  return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
+}
+
+function activeProductVariants(product: Product): ProductVariant[] {
+  return [...(product.variants ?? [])]
+    .filter((variant) => variant.is_active)
+    .sort((left, right) => left.position - right.position || (left.id ?? 0) - (right.id ?? 0));
+}
+
+function availableStockForLine(product: Product, variant: ProductVariant | null): number {
+  const productStock = normalizeStock(product.stock_quantity);
+  if (!variant) {
+    return productStock;
+  }
+
+  return Math.min(productStock, normalizeStock(variant.stock_quantity));
+}
+
+function imageUrlForLine(product: Product, variant: ProductVariant | null): string | null {
+  if (typeof variant?.image === "string" && variant.image.length > 0) {
+    return variant.image;
+  }
+
+  return product.image_url ?? null;
+}
 
 export function usePdvCart() {
   const lines = ref<PdvCartLine[]>([]);
@@ -44,35 +85,64 @@ export function usePdvCart() {
    * row -- the same "aggregate by code" behavior the backend itself applies
    * (bipdelivery/api/pdv.py's _aggregate_quantities()).
    */
-  const addProduct = (product: Product, quantity = 1): PdvCartAddResult => {
-    if (!product.id || !product.public_code || !product.is_available || product.stock_quantity <= 0) {
+  const addProduct = (
+    product: Product,
+    quantity = 1,
+    variant: ProductVariant | null = null,
+  ): PdvCartAddResult => {
+    if (!product.id || !product.public_code || !product.is_available) {
       return { ok: false, reason: "unavailable" };
     }
 
-    const existingLine = lines.value.find((line) => line.productId === product.id);
-    const nextQuantity = (existingLine?.quantity ?? 0) + quantity;
+    const activeVariants = activeProductVariants(product);
+    let selectedVariant: ProductVariant | null = null;
 
-    if (nextQuantity > product.stock_quantity) {
-      return { ok: false, reason: "exceeds_stock", availableStock: product.stock_quantity };
+    if (activeVariants.length > 0) {
+      if (!variant?.id) {
+        return { ok: false, reason: "variant_required" };
+      }
+
+      selectedVariant = activeVariants.find((candidate) => candidate.id === variant.id) ?? null;
+      if (!selectedVariant) {
+        return { ok: false, reason: "unavailable" };
+      }
+    }
+
+    const availableStock = availableStockForLine(product, selectedVariant);
+    if (availableStock <= 0) {
+      return { ok: false, reason: "unavailable" };
+    }
+
+    const lineKey = getPdvCartLineKey(product.id, selectedVariant?.id ?? null);
+    const quantityToAdd = normalizeQuantity(quantity);
+    const existingLine = lines.value.find((line) => line.lineKey === lineKey);
+    const nextQuantity = (existingLine?.quantity ?? 0) + quantityToAdd;
+
+    if (nextQuantity > availableStock) {
+      return { ok: false, reason: "exceeds_stock", availableStock };
     }
 
     if (existingLine) {
       existingLine.quantity = nextQuantity;
-      existingLine.availableStock = product.stock_quantity;
+      existingLine.availableStock = availableStock;
       return { ok: true };
     }
 
     lines.value = [
       ...lines.value,
       {
+        lineKey,
         productId: product.id,
         publicCode: product.public_code,
+        variantId: selectedVariant?.id ?? null,
+        variantName: selectedVariant?.name ?? "",
+        variantColorHex: selectedVariant?.color_hex ?? "",
         name: product.name,
         unitPrice: Number(product.price),
-        quantity,
-        availableStock: product.stock_quantity,
+        quantity: quantityToAdd,
+        availableStock,
         lowStockThreshold: product.low_stock_threshold ?? null,
-        imageUrl: product.image_url ?? null,
+        imageUrl: imageUrlForLine(product, selectedVariant),
       },
     ];
     return { ok: true };
@@ -84,32 +154,32 @@ export function usePdvCart() {
    * courtesy, not the source of truth: the finalize call still re-validates
    * against the real, current stock under a row lock.
    */
-  const updateQuantity = (productId: number, quantity: number): PdvCartQuantityResult => {
+  const updateQuantity = (lineKey: string, quantity: number): PdvCartQuantityResult => {
     if (quantity <= 0) {
-      removeLine(productId);
+      removeLine(lineKey);
       return { ok: true };
     }
 
-    const line = lines.value.find((candidate) => candidate.productId === productId);
+    const line = lines.value.find((candidate) => candidate.lineKey === lineKey);
     if (!line) {
       return { ok: true };
     }
 
     if (quantity > line.availableStock) {
       lines.value = lines.value.map((candidate) =>
-        candidate.productId === productId ? { ...candidate, quantity: line.availableStock } : candidate
+        candidate.lineKey === lineKey ? { ...candidate, quantity: line.availableStock } : candidate
       );
       return { ok: false, reason: "exceeds_stock", availableStock: line.availableStock };
     }
 
     lines.value = lines.value.map((candidate) =>
-      candidate.productId === productId ? { ...candidate, quantity } : candidate
+      candidate.lineKey === lineKey ? { ...candidate, quantity } : candidate
     );
     return { ok: true };
   };
 
-  const removeLine = (productId: number): void => {
-    lines.value = lines.value.filter((line) => line.productId !== productId);
+  const removeLine = (lineKey: string): void => {
+    lines.value = lines.value.filter((line) => line.lineKey !== lineKey);
   };
 
   const clear = (): void => {
@@ -127,7 +197,16 @@ export function usePdvCart() {
   const isEmpty = computed(() => lines.value.length === 0);
 
   const toSaleItems = (): PdvSaleItemPayload[] =>
-    lines.value.map((line) => ({ public_code: line.publicCode, quantity: line.quantity }));
+    lines.value.map((line) => {
+      const item: PdvSaleItemPayload = {
+        public_code: line.publicCode,
+        quantity: line.quantity,
+      };
+      if (line.variantId !== null) {
+        item.variant_id = line.variantId;
+      }
+      return item;
+    });
 
   return {
     lines,

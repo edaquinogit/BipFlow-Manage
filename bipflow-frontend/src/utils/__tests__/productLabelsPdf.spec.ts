@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildProductLabelsPdf } from '../productLabelsPdf'
-import type { ProductBulkLabel } from '@/types/productLabel'
+import { DEFAULT_PRODUCT_LABEL_SETTINGS, type ProductBulkLabel } from '@/types/productLabel'
 
 function buildLabel(overrides: Partial<ProductBulkLabel> = {}): ProductBulkLabel {
   return {
@@ -34,6 +34,19 @@ describe('buildProductLabelsPdf', () => {
     const labels = Array.from({ length: 11 }, (_, index) => buildLabel({ id: index + 1 }))
 
     const doc = buildProductLabelsPdf(labels)
+
+    expect(doc.getNumberOfPages()).toBe(2)
+  })
+
+  it('uses the configured label grid capacity', () => {
+    const labels = Array.from({ length: 3 }, (_, index) => buildLabel({ id: index + 1 }))
+
+    const doc = buildProductLabelsPdf(labels, {
+      ...DEFAULT_PRODUCT_LABEL_SETTINGS,
+      columns: 1,
+      rows: 2,
+      labels_per_page: 2,
+    })
 
     expect(doc.getNumberOfPages()).toBe(2)
   })

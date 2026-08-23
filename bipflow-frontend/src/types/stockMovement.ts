@@ -24,6 +24,9 @@ export const StockMovementSchema = z.object({
   product: z.number(),
   product_name: z.string().nullable().optional(),
   product_sku: z.string().nullable().optional(),
+  variant: z.number().nullable().optional(),
+  variant_name: z.string().nullable().optional(),
+  variant_color_hex: z.string().nullable().optional(),
   movement_type: z.enum(STOCK_MOVEMENT_TYPES),
   movement_type_display: z.string(),
   quantity: z.number(),
@@ -75,6 +78,7 @@ export const STOCK_MOVEMENT_REASONS: Record<StockMovementType, Array<{ value: st
 
 export interface StockMovementInput {
   movement_type: StockMovementType
+  variant_id?: number | null
   quantity: number
   reason: string
   notes?: string

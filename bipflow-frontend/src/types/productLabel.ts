@@ -36,10 +36,38 @@ export const ProductBulkLabelSchema = z.object({
   }),
 })
 
+export const DEFAULT_PRODUCT_LABEL_SETTINGS = {
+  page_format: 'a4',
+  columns: 2,
+  rows: 5,
+  margin_mm: 10,
+  cell_padding_mm: 4,
+  qr_size_mm: 26,
+  show_price: true,
+  show_size: true,
+  show_public_code: true,
+  labels_per_page: 10,
+} as const
+
+export const ProductLabelSettingsSchema = z.object({
+  page_format: z.literal('a4').default(DEFAULT_PRODUCT_LABEL_SETTINGS.page_format),
+  columns: z.number().int().min(1).max(6).default(DEFAULT_PRODUCT_LABEL_SETTINGS.columns),
+  rows: z.number().int().min(1).max(12).default(DEFAULT_PRODUCT_LABEL_SETTINGS.rows),
+  margin_mm: z.number().int().min(0).max(30).default(DEFAULT_PRODUCT_LABEL_SETTINGS.margin_mm),
+  cell_padding_mm: z.number().int().min(0).max(20).default(DEFAULT_PRODUCT_LABEL_SETTINGS.cell_padding_mm),
+  qr_size_mm: z.number().int().min(12).max(80).default(DEFAULT_PRODUCT_LABEL_SETTINGS.qr_size_mm),
+  show_price: z.boolean().default(DEFAULT_PRODUCT_LABEL_SETTINGS.show_price),
+  show_size: z.boolean().default(DEFAULT_PRODUCT_LABEL_SETTINGS.show_size),
+  show_public_code: z.boolean().default(DEFAULT_PRODUCT_LABEL_SETTINGS.show_public_code),
+  labels_per_page: z.number().int().min(1).default(DEFAULT_PRODUCT_LABEL_SETTINGS.labels_per_page),
+})
+
 export const ProductQrCodesBulkResponseSchema = z.object({
   labels: z.array(ProductBulkLabelSchema),
   missing_ids: z.array(z.number()),
+  settings: ProductLabelSettingsSchema.optional().default(DEFAULT_PRODUCT_LABEL_SETTINGS),
 })
 
 export type ProductBulkLabel = z.infer<typeof ProductBulkLabelSchema>
+export type ProductLabelSettings = z.infer<typeof ProductLabelSettingsSchema>
 export type ProductQrCodesBulkResponse = z.infer<typeof ProductQrCodesBulkResponseSchema>
