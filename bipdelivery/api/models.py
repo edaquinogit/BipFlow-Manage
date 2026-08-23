@@ -3,6 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.validators import RegexValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -46,6 +47,11 @@ def product_image_upload_to(instance: "Product", filename: str) -> str:
 def product_gallery_image_upload_to(instance: "ProductGalleryImage", filename: str) -> str:
     """Scope a product's gallery image path by its parent product's store (Etapa 4)."""
     return f"products/{instance.product.store_id}/{timezone.now():%Y/%m}/{filename}"
+
+
+def product_variant_image_upload_to(instance: "ProductVariant", filename: str) -> str:
+    """Scope a variant image path by its parent product's store."""
+    return f"products/{instance.product.store_id}/variants/{timezone.now():%Y/%m}/{filename}"
 
 
 def get_default_store_id() -> int:
@@ -298,6 +304,45 @@ class ProductGalleryImage(models.Model):
     def __str__(self) -> str:
         """Return a compact identifier for admin/debug purposes."""
         return f"{self.product_id} - gallery image {self.position}"
+
+
+class ProductVariant(models.Model):
+    """Color variation of a product, optionally with its own image."""
+
+    COLOR_HEX_VALIDATOR = RegexValidator(
+        regex=r"^#[0-9A-Fa-f]{6}$",
+        message="Informe uma cor hexadecimal no formato #RRGGBB.",
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="variants",
+    )
+    name = models.CharField(max_length=80)
+    color_hex = models.CharField(max_length=7, validators=[COLOR_HEX_VALIDATOR])
+    image = models.ImageField(upload_to=product_variant_image_upload_to, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "name"],
+                name="unique_product_variant_name_per_product",
+            ),
+            models.UniqueConstraint(
+                fields=["product", "position"],
+                name="unique_product_variant_position_per_product",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Return the variant label for admin/debug purposes."""
+        return f"{self.product_id} - {self.name}"
 
 
 class DeliveryRegion(models.Model):
@@ -981,8 +1026,18 @@ class SaleOrderItem(models.Model):
         blank=True,
         related_name="sale_items",
     )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sale_items",
+    )
     product_name = models.CharField(max_length=255)
     sku = models.CharField(max_length=50, blank=True)
+    variant_name = models.CharField(max_length=80, blank=True)
+    variant_color_hex = models.CharField(max_length=7, blank=True)
+    variant_image_url = models.URLField(blank=True)
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     line_total = models.DecimalField(max_digits=10, decimal_places=2)

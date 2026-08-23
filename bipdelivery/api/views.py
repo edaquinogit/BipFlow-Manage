@@ -46,6 +46,7 @@ from .models import (
     LoginAttempt,
     MFABackupCode,
     Product,
+    ProductVariant,
     SaleOrder,
     SaleOrderItem,
     StockMovement,
@@ -178,7 +179,10 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         Returns:
             QuerySet: Optimized queryset with filters and select_related()
         """
-        queryset = Product.objects.select_related("category").prefetch_related("gallery_images")
+        queryset = Product.objects.select_related("category").prefetch_related(
+            "gallery_images",
+            "variants",
+        )
 
         # 🔍 TEXT SEARCH: Search in name, SKU, and description
         search_term = self.request.query_params.get("search", "").strip()
@@ -1629,7 +1633,7 @@ class CheckoutWhatsAppView(APIView):
         return "Delivery" if delivery_method == "delivery" else "Retirada"
 
     @staticmethod
-    def _aggregate_cart_quantities(cart_items) -> dict[int, int]:
+    def _aggregate_product_quantities(cart_items) -> dict[int, int]:
         quantities_by_product_id: dict[int, int] = {}
 
         for item in cart_items:
@@ -1639,6 +1643,16 @@ class CheckoutWhatsAppView(APIView):
             )
 
         return quantities_by_product_id
+
+    @staticmethod
+    def _aggregate_cart_lines(cart_items) -> dict[tuple[int, int | None], int]:
+        quantities_by_line: dict[tuple[int, int | None], int] = {}
+
+        for item in cart_items:
+            key = (item["product_id"], item.get("variant_id"))
+            quantities_by_line[key] = quantities_by_line.get(key, 0) + item["quantity"]
+
+        return quantities_by_line
 
     @staticmethod
     def _raise_missing_products_error(missing_ids: list[int]) -> None:
@@ -1669,15 +1683,73 @@ class CheckoutWhatsAppView(APIView):
         return products_by_id
 
     @staticmethod
+    def _lock_cart_variants(cart_items, store: Store) -> dict[int, ProductVariant]:
+        variant_ids = sorted(
+            {
+                item.get("variant_id")
+                for item in cart_items
+                if item.get("variant_id") is not None
+            }
+        )
+        if not variant_ids:
+            return {}
+
+        variants = (
+            ProductVariant.objects.select_related("product")
+            .filter(id__in=variant_ids, product__store=store)
+            .order_by("id")
+        )
+        variants_by_id = {variant.id: variant for variant in variants}
+        missing_ids = [variant_id for variant_id in variant_ids if variant_id not in variants_by_id]
+
+        if missing_ids:
+            raise serializers.ValidationError(
+                {
+                    "items": [
+                        f'Product variants not found: {", ".join(str(variant_id) for variant_id in missing_ids)}'
+                    ]
+                }
+            )
+
+        return variants_by_id
+
+    def _build_variant_image_url(self, variant: ProductVariant | None) -> str:
+        if variant is None or not variant.image:
+            return ""
+
+        return self.request.build_absolute_uri(variant.image.url)
+
+    @staticmethod
+    def _line_item_label(item: dict) -> str:
+        if item.get("variant_name"):
+            return f'{item["product_name"]} - {item["variant_name"]}'
+
+        return item["product_name"]
+
     def _normalize_reserved_items(
-        quantities_by_product_id: dict[int, int],
+        self,
+        cart_items,
         products_by_id: dict[int, Product],
+        variants_by_id: dict[int, ProductVariant],
     ) -> tuple[list[dict], Decimal]:
         normalized_items = []
         subtotal = Decimal("0.00")
+        quantities_by_line = self._aggregate_cart_lines(cart_items)
 
-        for product_id, quantity in quantities_by_product_id.items():
+        for (product_id, variant_id), quantity in quantities_by_line.items():
             product = products_by_id[product_id]
+            variant = variants_by_id.get(variant_id) if variant_id is not None else None
+
+            if variant_id is not None:
+                if variant is None or variant.product_id != product.id:
+                    raise serializers.ValidationError(
+                        {"items": ["A variante selecionada nao pertence ao produto informado."]}
+                    )
+
+                if not variant.is_active:
+                    raise serializers.ValidationError(
+                        {"items": [f'A variante "{variant.name}" esta indisponivel.']}
+                    )
 
             if not product.is_available or product.stock_quantity <= 0:
                 raise serializers.ValidationError(
@@ -1700,8 +1772,12 @@ class CheckoutWhatsAppView(APIView):
             normalized_items.append(
                 {
                     "product_id": product.id,
+                    "variant_id": variant.id if variant is not None else None,
                     "product_name": product.name,
                     "sku": product.sku or "",
+                    "variant_name": variant.name if variant is not None else "",
+                    "variant_color_hex": variant.color_hex if variant is not None else "",
+                    "variant_image_url": self._build_variant_image_url(variant),
                     "quantity": quantity,
                     "unit_price": unit_price,
                     "line_total": line_total,
@@ -1713,11 +1789,13 @@ class CheckoutWhatsAppView(APIView):
     def _reserve_cart_stock(
         self, cart_items, store: Store
     ) -> tuple[list[dict], Decimal, dict[int, Product]]:
-        quantities_by_product_id = self._aggregate_cart_quantities(cart_items)
+        quantities_by_product_id = self._aggregate_product_quantities(cart_items)
         products_by_id = self._lock_cart_products(quantities_by_product_id, store)
+        variants_by_id = self._lock_cart_variants(cart_items, store)
         normalized_items, subtotal = self._normalize_reserved_items(
-            quantities_by_product_id,
+            cart_items,
             products_by_id,
+            variants_by_id,
         )
         timestamp = timezone.now()
 
@@ -1838,7 +1916,7 @@ class CheckoutWhatsAppView(APIView):
                 "Itens do pedido:",
                 *[
                     (
-                        f'{index + 1}. {item["product_name"]} '
+                        f"{index + 1}. {self._line_item_label(item)} "
                         f'x{item["quantity"]} - R$ {item["line_total"]:.2f}'
                     )
                     for index, item in enumerate(normalized_items)
@@ -1902,8 +1980,12 @@ class CheckoutWhatsAppView(APIView):
                     SaleOrderItem(
                         order=sale_order,
                         product=products_by_id.get(item["product_id"]),
+                        variant_id=item["variant_id"],
                         product_name=item["product_name"],
                         sku=item["sku"],
+                        variant_name=item["variant_name"],
+                        variant_color_hex=item["variant_color_hex"],
+                        variant_image_url=item["variant_image_url"],
                         quantity=item["quantity"],
                         unit_price=item["unit_price"],
                         line_total=item["line_total"],

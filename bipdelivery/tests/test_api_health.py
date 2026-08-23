@@ -15,6 +15,7 @@ Run tests with:
     pytest tests/test_api_health.py -v (if using pytest)
 """
 
+import json
 import os
 from datetime import timedelta
 from decimal import Decimal
@@ -47,6 +48,7 @@ from bipdelivery.api.models import (  # noqa: E402
     CustomerProfile,
     DeliveryRegion,
     Product,
+    ProductVariant,
     SaleOrder,
     SaleOrderItem,
     StockMovement,
@@ -350,6 +352,33 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.data["slug"], self.product.slug)
         self.assertIn("images", response.data)
 
+    def test_product_response_includes_color_variants(self) -> None:
+        """Product payload should expose ordered color variants to the storefront."""
+        ProductVariant.objects.create(
+            product=self.product,
+            name="Preto",
+            color_hex="#000000",
+            position=0,
+        )
+        ProductVariant.objects.create(
+            product=self.product,
+            name="Azul",
+            color_hex="#3366FF",
+            position=1,
+            is_active=False,
+        )
+
+        response: Any = self.client.get(f"/api/v1/products/by-slug/{self.product.slug}/")  # type: ignore
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [
+                (variant["name"], variant["color_hex"], variant["is_active"])
+                for variant in response.data["variants"]
+            ],
+            [("Preto", "#000000", True), ("Azul", "#3366FF", False)],
+        )
+
     def test_product_update(self) -> None:
         """Should update product via PUT endpoint.
 
@@ -449,6 +478,46 @@ class ProductAPIHealthTest(TestCase):
         self.assertIn("cover", response.data["images"][0])
         self.assertIn("gallery-1", response.data["images"][1])
         self.assertIn("gallery-2", response.data["images"][2])
+
+    @override_settings(MEDIA_ROOT=build_test_media_root())
+    def test_product_create_syncs_color_variants_from_multipart_payload(self) -> None:
+        """Dashboard multipart saves variants as JSON plus scoped image uploads."""
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "name": "Camiseta Premium",
+            "sku": "CAM-900",
+            "price": "89.90",
+            "stock_quantity": 4,
+            "category": self.category.id,  # type: ignore[arg-type]
+            "variants_payload": json.dumps(
+                [
+                    {
+                        "name": "Preto",
+                        "color_hex": "#000000",
+                        "position": 0,
+                        "is_active": True,
+                        "image_upload_index": 0,
+                    },
+                    {
+                        "name": "Azul",
+                        "color_hex": "#3366FF",
+                        "position": 1,
+                        "is_active": False,
+                    },
+                ]
+            ),
+            "variant_images[0]": build_test_image("camiseta-preta.png"),
+        }
+
+        response: Any = self.client.post("/api/v1/products/", payload, format="multipart")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        product = Product.objects.get(id=response.data["id"])
+        variants = list(product.variants.order_by("position"))
+        self.assertEqual([(variant.name, variant.color_hex) for variant in variants], [("Preto", "#000000"), ("Azul", "#3366FF")])
+        self.assertTrue(variants[0].image.name.startswith(f"products/{product.store_id}/variants/"))
+        self.assertIn("camiseta-preta", response.data["variants"][0]["image"])
+        self.assertFalse(response.data["variants"][1]["is_active"])
 
     @override_settings(MEDIA_ROOT=build_test_media_root())
     def test_product_update_preserves_existing_absolute_image_urls(self) -> None:
@@ -1027,6 +1096,121 @@ class CheckoutWhatsAppAPITest(TestCase):
 
         order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
         self.assertEqual(order.items.get().quantity, 5)
+
+    def test_checkout_accepts_variant_id_and_persists_variant_snapshot(self) -> None:
+        """Checkout should carry the selected variant into the order item snapshot."""
+        client = self._checkout_client()
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Azul",
+            color_hex="#3366FF",
+            position=0,
+        )
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 2}]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data["items"][0]["variant_id"], variant.id)
+        self.assertEqual(response.data["items"][0]["variant_name"], "Azul")
+        self.assertEqual(response.data["items"][0]["variant_color_hex"], "#3366FF")
+        self.assertIn("Combo Executivo - Azul", response.data["message"])
+
+        order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        order_item = order.items.get()
+        self.assertEqual(order_item.variant_id, variant.id)
+        self.assertEqual(order_item.variant_name, "Azul")
+        self.assertEqual(order_item.variant_color_hex, "#3366FF")
+        self.assertEqual(order_item.quantity, 2)
+
+    def test_checkout_keeps_variant_lines_separate_but_reserves_product_stock(self) -> None:
+        """Different variants should be separate order lines sharing product stock."""
+        client = self._checkout_client()
+        black = ProductVariant.objects.create(
+            product=self.product,
+            name="Preto",
+            color_hex="#000000",
+            position=0,
+        )
+        blue = ProductVariant.objects.create(
+            product=self.product,
+            name="Azul",
+            color_hex="#3366FF",
+            position=1,
+        )
+        payload = self._build_pickup_payload(
+            [
+                {"product_id": self.product.id, "variant_id": black.id, "quantity": 2},
+                {"product_id": self.product.id, "variant_id": blue.id, "quantity": 3},
+            ]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(len(response.data["items"]), 2)
+        self.assertEqual(response.data["subtotal"], "212.50")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 3)
+
+        order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        self.assertEqual(order.items.count(), 2)
+        self.assertEqual(
+            sorted(order.items.values_list("variant_name", "quantity")),
+            [("Azul", 3), ("Preto", 2)],
+        )
+
+    def test_checkout_rejects_inactive_variant_without_reserving_stock(self) -> None:
+        """Inactive variants must not be orderable from stale cart state."""
+        client = self._checkout_client()
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Esgotada",
+            color_hex="#999999",
+            position=0,
+            is_active=False,
+        )
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 1}]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertFalse(SaleOrder.objects.exists())
+
+    def test_checkout_rejects_variant_from_another_product(self) -> None:
+        """A variant id cannot be paired with a different product id."""
+        client = self._checkout_client()
+        other_product = Product.objects.create(
+            name="Outro Combo",
+            sku="OUT-001",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+            category=self.category,
+        )
+        variant = ProductVariant.objects.create(
+            product=other_product,
+            name="Vermelho",
+            color_hex="#FF0000",
+            position=0,
+        )
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 1}]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        other_product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertEqual(other_product.stock_quantity, 5)
+        self.assertFalse(SaleOrder.objects.exists())
 
     def test_checkout_rejects_duplicate_lines_when_aggregated_quantity_exceeds_stock(
         self,

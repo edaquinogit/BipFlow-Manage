@@ -10,6 +10,7 @@ from .models import (
     LoginAttempt,
     MFABackupCode,
     Product,
+    ProductVariant,
     SaleOrder,
     SaleOrderItem,
     Store,
@@ -50,11 +51,18 @@ class CategoryAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
     list_filter = ("store",)
 
 
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 0
+    fields = ("name", "color_hex", "image", "is_active", "position")
+
+
 @admin.register(Product)
 class ProductAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
     list_display = ("name", "store", "category", "price", "is_available")
     list_filter = ("store", "category", "is_available")
     search_fields = ("name", "description")
+    inlines = [ProductVariantInline]
 
 
 @admin.register(DeliveryRegion)
@@ -167,7 +175,18 @@ class BotConversationAdmin(admin.ModelAdmin):
 class SaleOrderItemInline(admin.TabularInline):
     model = SaleOrderItem
     extra = 0
-    readonly_fields = ("product", "product_name", "sku", "quantity", "unit_price", "line_total")
+    readonly_fields = (
+        "product",
+        "variant",
+        "product_name",
+        "sku",
+        "variant_name",
+        "variant_color_hex",
+        "variant_image_url",
+        "quantity",
+        "unit_price",
+        "line_total",
+    )
     can_delete = False
 
 

@@ -21,6 +21,7 @@ from .models import (
     DeliveryRegion,
     Product,
     ProductGalleryImage,
+    ProductVariant,
     SaleOrder,
     SaleOrderItem,
     StockMovement,
@@ -165,6 +166,27 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "slug", "description"]
 
 
+class ProductVariantSerializer(serializers.ModelSerializer):
+    """Read-only product color variant payload."""
+
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductVariant
+        fields = ["id", "name", "color_hex", "image", "is_active", "position"]
+
+    def get_image(self, instance: ProductVariant) -> str | None:
+        if not instance.image:
+            return None
+
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(instance.image.url)
+
+        base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
+        return urljoin(base_url, instance.image.url)
+
+
 class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for Product model with nested category name.
@@ -187,6 +209,8 @@ class ProductSerializer(serializers.ModelSerializer):
         required=False,
         max_length=3,
     )
+    variants = ProductVariantSerializer(many=True, read_only=True)
+    variants_payload = serializers.JSONField(write_only=True, required=False)
 
     class Meta:
         model = Product
@@ -206,6 +230,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "images",
             "uploaded_images",
             "existing_images",
+            "variants",
+            "variants_payload",
             "category",
             "category_name",
             "created_at",
@@ -230,7 +256,114 @@ class ProductSerializer(serializers.ModelSerializer):
                 {"uploaded_images": "Cada produto pode ter no maximo 3 imagens."}
             )
 
+        if "variants_payload" in attrs:
+            attrs["variants_payload"] = self._validate_variants_payload(
+                attrs["variants_payload"]
+            )
+
         return attrs
+
+    def _validate_variants_payload(self, payload) -> list[dict]:
+        if payload in (None, ""):
+            return []
+
+        if not isinstance(payload, list):
+            raise serializers.ValidationError(
+                {"variants_payload": "Variantes devem ser enviadas como lista."}
+            )
+
+        normalized_variants = []
+        seen_names: set[str] = set()
+        seen_positions: set[int] = set()
+
+        for index, raw_variant in enumerate(payload):
+            if not isinstance(raw_variant, dict):
+                raise serializers.ValidationError(
+                    {"variants_payload": "Cada variante deve ser um objeto."}
+                )
+
+            name = str(raw_variant.get("name", "")).strip()
+            color_hex = str(raw_variant.get("color_hex", "")).strip().upper()
+            position = raw_variant.get("position", index)
+
+            try:
+                position = int(position)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError(
+                    {"variants_payload": "A posicao da variante deve ser numerica."}
+                )
+
+            if not name:
+                raise serializers.ValidationError(
+                    {"variants_payload": "Informe o nome da variante."}
+                )
+
+            if not re.fullmatch(r"#[0-9A-F]{6}", color_hex):
+                raise serializers.ValidationError(
+                    {"variants_payload": "Informe cores no formato #RRGGBB."}
+                )
+
+            if position < 0:
+                raise serializers.ValidationError(
+                    {"variants_payload": "A posicao da variante nao pode ser negativa."}
+                )
+
+            normalized_name = name.casefold()
+            if normalized_name in seen_names:
+                raise serializers.ValidationError(
+                    {"variants_payload": "Nomes de variantes nao podem se repetir no produto."}
+                )
+            seen_names.add(normalized_name)
+
+            if position in seen_positions:
+                raise serializers.ValidationError(
+                    {"variants_payload": "Posicoes de variantes nao podem se repetir no produto."}
+                )
+            seen_positions.add(position)
+
+            variant_id = raw_variant.get("id")
+            if variant_id in ("", None):
+                variant_id = None
+            else:
+                try:
+                    variant_id = int(variant_id)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {"variants_payload": "ID de variante invalido."}
+                    )
+
+            image_upload_index = raw_variant.get("image_upload_index")
+            if image_upload_index in ("", None):
+                image_upload_index = None
+            else:
+                try:
+                    image_upload_index = int(image_upload_index)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {"variants_payload": "Indice de imagem de variante invalido."}
+                    )
+
+            raw_is_active = raw_variant.get("is_active", True)
+            if isinstance(raw_is_active, bool):
+                is_active = raw_is_active
+            elif isinstance(raw_is_active, str):
+                is_active = raw_is_active.strip().lower() not in {"", "0", "false", "no", "off"}
+            else:
+                is_active = bool(raw_is_active)
+
+            normalized_variants.append(
+                {
+                    "id": variant_id,
+                    "name": name,
+                    "color_hex": color_hex,
+                    "image": raw_variant.get("image", serializers.empty),
+                    "image_upload_index": image_upload_index,
+                    "is_active": is_active,
+                    "position": position,
+                }
+            )
+
+        return normalized_variants
 
     def get_images(self, instance):
         request = self.context.get("request")
@@ -391,15 +524,104 @@ class ProductSerializer(serializers.ModelSerializer):
 
         return resolved_images[:3]
 
+    def _resolve_variant_image(self, variant: ProductVariant | None, image_url: str):
+        if not variant or not image_url or not variant.image:
+            return None
+
+        request = self.context.get("request")
+        base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
+        relative_url = variant.image.url
+        absolute_url = (
+            request.build_absolute_uri(relative_url)
+            if request is not None
+            else urljoin(base_url, relative_url)
+        )
+        normalized_url = image_url.strip()
+        normalized_path = urlparse(normalized_url).path
+
+        if normalized_url in {relative_url, absolute_url}:
+            return variant.image
+
+        if normalized_path in {urlparse(relative_url).path, urlparse(absolute_url).path}:
+            return variant.image
+
+        return None
+
+    def _get_variant_upload(self, image_upload_index: int | None):
+        if image_upload_index is None:
+            return None
+
+        request = self.context.get("request")
+        if request is None:
+            return None
+
+        return request.FILES.get(f"variant_images[{image_upload_index}]")
+
+    def _sync_variants(self, product: Product, variants_payload: list[dict] | None) -> None:
+        if variants_payload is None:
+            return
+
+        existing_by_id = {
+            variant.id: variant
+            for variant in product.variants.all()
+        }
+        submitted_ids = {
+            variant_data["id"]
+            for variant_data in variants_payload
+            if variant_data["id"] is not None
+        }
+        invalid_ids = submitted_ids - set(existing_by_id)
+        if invalid_ids:
+            raise serializers.ValidationError(
+                {"variants_payload": "Uma ou mais variantes nao pertencem a este produto."}
+            )
+
+        with transaction.atomic():
+            product.variants.exclude(id__in=submitted_ids).delete()
+
+            for index, variant_id in enumerate(sorted(submitted_ids)):
+                variant = existing_by_id[variant_id]
+                variant.name = f"__sync_variant_{variant.id}_{index}"
+                variant.position = 1000 + index
+                variant.save(update_fields=["name", "position", "updated_at"])
+
+            for variant_data in sorted(variants_payload, key=lambda item: item["position"]):
+                variant_id = variant_data["id"]
+                variant = existing_by_id.get(variant_id) if variant_id is not None else ProductVariant(product=product)
+
+                variant.product = product
+                variant.name = variant_data["name"]
+                variant.color_hex = variant_data["color_hex"]
+                variant.is_active = variant_data["is_active"]
+                variant.position = variant_data["position"]
+
+                uploaded_image = self._get_variant_upload(variant_data["image_upload_index"])
+                if uploaded_image is not None:
+                    variant.image = uploaded_image
+                elif variant_data["image"] is None:
+                    variant.image = None
+                elif isinstance(variant_data["image"], str):
+                    resolved_image = self._resolve_variant_image(variant, variant_data["image"])
+                    if resolved_image is not None:
+                        variant.image = resolved_image
+
+                variant.full_clean(exclude=["product"])
+                variant.save()
+
+            if hasattr(product, "_prefetched_objects_cache"):
+                product._prefetched_objects_cache.pop("variants", None)
+
     def create(self, validated_data):
         ordered_request_images = self._resolve_ordered_request_images(None)
         uploaded_images = list(validated_data.pop("uploaded_images", []))
         validated_data.pop("existing_images", [])
         direct_image = validated_data.pop("image", None)
+        variants_payload = validated_data.pop("variants_payload", None)
 
         if ordered_request_images is not None:
             product = super().create(validated_data)
             self._replace_gallery(product, ordered_request_images[:3])
+            self._sync_variants(product, variants_payload)
             return product
 
         if direct_image:
@@ -407,6 +629,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
         product = super().create(validated_data)
         self._replace_gallery(product, uploaded_images[:3])
+        self._sync_variants(product, variants_payload)
         return product
 
     def update(self, instance, validated_data):
@@ -414,11 +637,13 @@ class ProductSerializer(serializers.ModelSerializer):
         uploaded_images = list(validated_data.pop("uploaded_images", []))
         existing_images = list(validated_data.pop("existing_images", []))
         direct_image = validated_data.pop("image", None)
+        variants_payload = validated_data.pop("variants_payload", None)
 
         product = super().update(instance, validated_data)
 
         if ordered_request_images is not None:
             self._replace_gallery(product, ordered_request_images[:3])
+            self._sync_variants(product, variants_payload)
             return product
 
         next_images = self._resolve_existing_images(product, existing_images)
@@ -429,6 +654,7 @@ class ProductSerializer(serializers.ModelSerializer):
         if existing_images or uploaded_images or direct_image is not None:
             self._replace_gallery(product, next_images[:3])
 
+        self._sync_variants(product, variants_payload)
         return product
 
     def to_representation(self, instance):
@@ -801,6 +1027,7 @@ class CheckoutItemInputSerializer(serializers.Serializer):
     """Serializer for each cart item sent during checkout."""
 
     product_id = serializers.IntegerField(min_value=1)
+    variant_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     quantity = serializers.IntegerField(min_value=1)
 
 
@@ -885,8 +1112,12 @@ class CheckoutItemResponseSerializer(serializers.Serializer):
     """Normalized item details returned after checkout preparation."""
 
     product_id = serializers.IntegerField()
+    variant_id = serializers.IntegerField(allow_null=True, required=False)
     product_name = serializers.CharField()
     sku = serializers.CharField(allow_blank=True)
+    variant_name = serializers.CharField(allow_blank=True, required=False)
+    variant_color_hex = serializers.CharField(allow_blank=True, required=False)
+    variant_image_url = serializers.CharField(allow_blank=True, required=False)
     quantity = serializers.IntegerField(min_value=1)
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     line_total = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -933,8 +1164,12 @@ class SaleOrderItemSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "product_id",
+            "variant_id",
             "product_name",
             "sku",
+            "variant_name",
+            "variant_color_hex",
+            "variant_image_url",
             "quantity",
             "unit_price",
             "line_total",
