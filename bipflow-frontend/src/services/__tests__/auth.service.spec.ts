@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import api from '../api'
 import { authService } from '../auth.service'
+import { getSelectedStoreSlug, setSelectedStoreSlug } from '../store-scope'
 import { tokenStore } from '../token-store'
 
 vi.mock('../api', () => ({
@@ -36,11 +37,13 @@ describe('authService logout -- cart PII cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.localStorage.clear()
+    setSelectedStoreSlug(null)
     tokenStore.setAccessToken('fake-token')
   })
 
   it('logout() clears persisted cart customer PII across every store, but leaves cart items alone', async () => {
     seedCartStorage()
+    setSelectedStoreSlug('loja-a')
     vi.mocked(api.post).mockResolvedValue({ data: {} } as never)
 
     await authService.logout()
@@ -50,20 +53,25 @@ describe('authService logout -- cart PII cleanup', () => {
     expect(window.localStorage.getItem('bipflow_cart_other-store_customer')).toBeNull()
     expect(window.localStorage.getItem('bipflow_cart_other-store_customer_savedAt')).toBeNull()
     expect(window.localStorage.getItem('bipflow_cart_acme_items')).not.toBeNull()
+    expect(window.localStorage.getItem('bipflow_selected_store_slug')).toBeNull()
+    expect(getSelectedStoreSlug()).toBeNull()
     expect(tokenStore.hasAccessToken()).toBe(false)
   })
 
   it('logout() still clears cart PII even when the server revoke call fails', async () => {
     seedCartStorage()
+    setSelectedStoreSlug('loja-a')
     vi.mocked(api.post).mockRejectedValue(new Error('network down'))
 
     await authService.logout()
 
     expect(window.localStorage.getItem('bipflow_cart_acme_customer')).toBeNull()
+    expect(getSelectedStoreSlug()).toBeNull()
   })
 
   it('logoutAllDevices() clears persisted cart customer PII across every store', async () => {
     seedCartStorage()
+    setSelectedStoreSlug('loja-a')
     vi.mocked(api.post).mockResolvedValue({
       data: { message: 'ok', revoked_count: 2 },
     } as never)
@@ -73,5 +81,7 @@ describe('authService logout -- cart PII cleanup', () => {
     expect(window.localStorage.getItem('bipflow_cart_acme_customer')).toBeNull()
     expect(window.localStorage.getItem('bipflow_cart_other-store_customer')).toBeNull()
     expect(window.localStorage.getItem('bipflow_cart_acme_items')).not.toBeNull()
+    expect(window.localStorage.getItem('bipflow_selected_store_slug')).toBeNull()
+    expect(getSelectedStoreSlug()).toBeNull()
   })
 })

@@ -5,7 +5,7 @@ import DashboardHeaderStorefrontMenu from '../DashboardHeaderStorefrontMenu.vue'
 
 vi.mock('@/composables/useToast', () => ({ useToast: vi.fn() }))
 
-const STOREFRONT_PATH = '/l/minha-loja/produtos'
+const STOREFRONT_PATH = '/l/loja-b/produtos'
 const ABSOLUTE_URL = `${window.location.origin}${STOREFRONT_PATH}`
 
 const toastMock = { success: vi.fn(), error: vi.fn() }
