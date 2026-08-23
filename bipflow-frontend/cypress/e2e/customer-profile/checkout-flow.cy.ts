@@ -7,8 +7,9 @@
  * account requirement): finalizing a WhatsApp order never requires an
  * account. A logged-in customer with a saved profile still gets identity/
  * address prefilled from it -- and specifically for address, only when the
- * profile actually has one; an account with no address falls back to the
- * same inline fields a guest would use.
+ * profile actually has one. An account with no address falls back to the
+ * same inline fields a guest would use, then saves that first delivery
+ * address to avoid asking again on the next order.
  */
 
 // The entry welcome splash (IntroSplash.vue) is a full-screen `fixed inset-0
@@ -74,16 +75,16 @@ describe('Storefront checkout', () => {
     cy.location('pathname').should('eq', '/l/default/produtos')
   })
 
-  it('prefills identity and address from a complete profile, hiding the guest fields', () => {
+  it('saves the first checkout address to the profile and reuses it on the next order', () => {
     cy.visit('/l/default/perfil/criar')
 
     const email = `cliente.completo.${Date.now()}@example.com`
     cy.get('input[autocomplete="name"]').type('Cliente Perfil Completo')
     cy.get('input[autocomplete="tel"]').type('11988887777')
     cy.get('input[type="email"]').type(email)
-    cy.get('input[autocomplete="street-address"]').type('Rua Perfil, 10')
-    cy.get('input[autocomplete="address-level3"]').type('Bairro Perfil')
-    cy.get('input[autocomplete="address-level2"]').type('Cidade Perfil')
+    cy.get('input[autocomplete="street-address"]').should('not.exist')
+    cy.get('input[autocomplete="address-level3"]').should('not.exist')
+    cy.get('input[autocomplete="address-level2"]').should('not.exist')
     cy.get('input[autocomplete="new-password"]').eq(0).type('SenhaForte123')
     cy.get('input[autocomplete="new-password"]').eq(1).type('SenhaForte123')
     cy.contains('button', 'Criar perfil').click()
@@ -97,10 +98,16 @@ describe('Storefront checkout', () => {
       .click()
     cy.get('[data-cy="open-cart-button"]').click()
 
-    // Profile has a complete address: no guest fields, just the hint.
+    // The profile already supplies identity. The first delivery still needs
+    // an address, and the drawer promises to save it for future orders.
     cy.get('input[autocomplete="name"]').should('not.exist')
-    cy.get('input[autocomplete="street-address"]').should('not.exist')
-    cy.contains('Entregamos no endereço salvo no seu perfil.').should('exist')
+    cy.get('input[autocomplete="street-address"]').should('exist')
+    cy.contains('Ele será salvo no seu perfil para os próximos pedidos.').should('exist')
+    cy.get('[data-cy="checkout-submit-button"]').should('be.disabled')
+
+    cy.get('input[autocomplete="street-address"]').type('Rua Perfil, 10')
+    cy.get('input[autocomplete="address-level3"]').type('Bairro Perfil')
+    cy.get('input[autocomplete="address-level2"]').type('Cidade Perfil')
 
     stubWindowOpen()
 
@@ -113,6 +120,16 @@ describe('Storefront checkout', () => {
       expect(response?.body.customer.address).to.eq('Rua Perfil, 10')
     })
     cy.get('@windowOpen').should('have.been.calledOnce')
+
+    cy.get('[data-cy="add-to-cart-button"]:not([disabled])', { timeout: 15000 })
+      .first()
+      .click()
+    cy.get('[data-cy="open-cart-button"]').click()
+
+    cy.get('input[autocomplete="name"]').should('not.exist')
+    cy.get('input[autocomplete="street-address"]').should('not.exist')
+    cy.contains('Endereço salvo').should('exist')
+    cy.contains('Rua Perfil, 10').should('exist')
   })
 
   it('hides identity but still asks for an address when the profile has none saved', () => {
