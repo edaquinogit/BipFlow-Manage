@@ -1525,6 +1525,43 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(response.data["code"], "guest_address_incomplete")
         self.assertEqual(SaleOrder.objects.count(), 0)
 
+    def test_checkout_saves_submitted_delivery_address_to_customer_profile(self) -> None:
+        """The first checkout address for a logged-in customer becomes the saved default."""
+        email = "cliente-endereco@teste.com"
+        client = self._checkout_client(email=email)  # profile starts without address
+        region = DeliveryRegion.objects.create(
+            name="Pituba",
+            city="Salvador",
+            delivery_fee=Decimal("15.00"),
+        )
+        payload = {
+            "items": [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 1,
+                }
+            ],
+            "customer": {
+                "delivery_method": "delivery",
+                "payment_method": "pix",
+                "delivery_region_id": region.id,
+                "address": "Rua da Cliente, 123",
+                "neighborhood": "Pituba",
+                "city": "Salvador",
+                "notes": "",
+            },
+        }
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        profile = CustomerProfile.objects.get(user__email=email)
+        self.assertEqual(profile.address, "Rua da Cliente, 123")
+        self.assertEqual(profile.neighborhood, "Pituba")
+        self.assertEqual(profile.city, "Salvador")
+        self.assertEqual(profile.delivery_region_id, region.id)
+        self.assertEqual(response.data["customer"]["address"], "Rua da Cliente, 123")
+
 
 class SaleOrderSummaryAPITest(TestCase):
     """Real sales revenue aggregation backing the dashboard's revenue card."""

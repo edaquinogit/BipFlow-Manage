@@ -35,9 +35,6 @@ const form = reactive({
   email: '',
   password: '',
   confirm_password: '',
-  address: '',
-  neighborhood: '',
-  city: '',
 })
 
 const {
@@ -124,9 +121,6 @@ async function handleSubmit(): Promise<void> {
       store_slug: selectedStore.value?.slug || routeStoreSlug,
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
-      address: form.address.trim(),
-      neighborhood: form.neighborhood.trim(),
-      city: form.city.trim(),
     })
 
     await authService.login({ email, password: form.password })
@@ -202,7 +196,7 @@ onMounted(async () => {
           <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#D81B60]">Criar perfil</p>
           <h1 class="mt-2 text-2xl font-semibold text-[#05050A]">Seus dados para comprar mais rápido</h1>
           <p class="mt-2 text-sm leading-6 text-[#6B7280]">
-            Guardamos seu nome, WhatsApp e endereço para você não precisar redigitar em todo pedido.
+            Guardamos seu nome e WhatsApp. O endereço entra apenas quando você escolher entrega.
           </p>
         </div>
 
@@ -256,43 +250,6 @@ onMounted(async () => {
                 required
                 class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
                 placeholder="voce@email.com"
-              />
-            </label>
-          </div>
-
-          <label class="block">
-            <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
-              Endereço <span class="normal-case text-[#9CA3AF]">(opcional agora, necessário para entrega)</span>
-            </span>
-            <input
-              v-model="form.address"
-              type="text"
-              autocomplete="street-address"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-              placeholder="Rua, número e complemento"
-            />
-          </label>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <label class="block">
-              <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Bairro</span>
-              <input
-                v-model="form.neighborhood"
-                type="text"
-                autocomplete="address-level3"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                placeholder="Bairro"
-              />
-            </label>
-
-            <label class="block">
-              <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Cidade</span>
-              <input
-                v-model="form.city"
-                type="text"
-                autocomplete="address-level2"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-                placeholder="Cidade"
               />
             </label>
           </div>

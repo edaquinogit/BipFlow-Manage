@@ -7,6 +7,9 @@ import CreateCustomerProfileView from '../CreateCustomerProfileView.vue'
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
+  login: vi.fn().mockResolvedValue({ access: 'token' }),
+  register: vi.fn().mockResolvedValue({ message: 'ok', email: 'maria@example.com' }),
+  isAuthenticated: vi.fn(() => true),
   fetchCurrentStore: vi.fn().mockResolvedValue(undefined),
   fetchCustomerProfile: vi.fn().mockResolvedValue(false),
 }))
@@ -22,10 +25,10 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/services/auth.service', () => ({
   authService: {
-    isAuthenticated: vi.fn(() => true),
+    isAuthenticated: mocks.isAuthenticated,
     logout: mocks.logout,
-    register: vi.fn(),
-    login: vi.fn(),
+    register: mocks.register,
+    login: mocks.login,
   },
 }))
 
@@ -62,6 +65,9 @@ describe('CreateCustomerProfileView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.logout.mockResolvedValue(undefined)
+    mocks.login.mockResolvedValue({ access: 'token' })
+    mocks.register.mockResolvedValue({ message: 'ok', email: 'maria@example.com' })
+    mocks.isAuthenticated.mockReturnValue(true)
     mocks.fetchCurrentStore.mockResolvedValue(undefined)
     mocks.fetchCustomerProfile.mockResolvedValue(false)
   })
@@ -82,5 +88,44 @@ describe('CreateCustomerProfileView', () => {
     await wrapper.findAll('button')[0]!.trigger('click')
 
     expect(mocks.logout).toHaveBeenCalledWith('/l/default/perfil/criar?redirect=/l/default/produtos')
+  })
+
+  it('creates the storefront profile without asking for delivery address', async () => {
+    mocks.isAuthenticated.mockReturnValue(false)
+
+    const wrapper = mount(CreateCustomerProfileView, {
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(false)
+    expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(false)
+
+    await wrapper.find('input[autocomplete="name"]').setValue('Maria Cliente')
+    await wrapper.find('input[autocomplete="tel"]').setValue('71999990000')
+    await wrapper.find('input[autocomplete="email"]').setValue('maria@example.com')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('StrongPass123')
+    await wrapper.findAll('input[autocomplete="new-password"]')[1]!.setValue('StrongPass123')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(mocks.register).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'maria@example.com',
+      full_name: 'Maria Cliente',
+      phone: '71999990000',
+      registration_context: 'storefront_customer',
+      store_slug: 'default',
+    }))
+
+    const payload = mocks.register.mock.calls[0]![0]
+    expect(payload).not.toHaveProperty('address')
+    expect(payload).not.toHaveProperty('neighborhood')
+    expect(payload).not.toHaveProperty('city')
   })
 })

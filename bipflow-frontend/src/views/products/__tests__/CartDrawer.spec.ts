@@ -106,7 +106,8 @@ describe('CartDrawer', () => {
     expect(wrapper.find('input[autocomplete="tel"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="email"]').exists()).toBe(false)
     expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Entregamos no endereço salvo no seu perfil.')
+    expect(wrapper.text()).toContain('Endereço salvo')
+    expect(wrapper.text()).toContain('Rua das Flores, 42')
   })
 
   it('hides identity fields but still shows address fields when the profile has no saved address', () => {
@@ -120,7 +121,7 @@ describe('CartDrawer', () => {
     expect(wrapper.find('input[autocomplete="street-address"]').exists()).toBe(true)
     expect(wrapper.find('input[autocomplete="address-level3"]').exists()).toBe(true)
     expect(wrapper.find('input[autocomplete="address-level2"]').exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('Entregamos no endereço salvo no seu perfil.')
+    expect(wrapper.text()).toContain('Ele será salvo no seu perfil para os próximos pedidos.')
   })
 
   it('requires guest name and phone before allowing submission when there is no profile', () => {

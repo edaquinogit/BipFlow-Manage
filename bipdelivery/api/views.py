@@ -1613,9 +1613,12 @@ class CheckoutWhatsAppView(APIView):
     before docs/architecture/customer-profile-checkout-evolution.md made an
     account mandatory here. A profile, when present, always wins for
     identity -- submitted guest fields are only consulted as a fallback,
-    never used to override a resolved profile. This endpoint validates the
-    cart server-side, recalculates totals and returns a formatted order
-    message ready to be shared with the configured WhatsApp sales number.
+    never used to override a resolved profile. When a logged-in customer
+    fills a missing delivery address during checkout, the same transaction
+    saves it back to the profile so the next order does not ask again. This
+    endpoint validates the cart server-side, recalculates totals and returns
+    a formatted order message ready to be shared with the configured WhatsApp
+    sales number.
     """
 
     throttle_classes = [CheckoutIpThrottle, CheckoutCustomerThrottle]
@@ -1718,6 +1721,42 @@ class CheckoutWhatsAppView(APIView):
             return ""
 
         return self.request.build_absolute_uri(variant.image.url)
+
+    @staticmethod
+    def _profile_has_complete_address(profile: CustomerProfile | None) -> bool:
+        return (
+            profile is not None
+            and bool(profile.address.strip())
+            and bool(profile.neighborhood.strip())
+            and bool(profile.city.strip())
+        )
+
+    def _sync_profile_checkout_defaults(
+        self,
+        profile: CustomerProfile | None,
+        *,
+        address: str,
+        neighborhood: str,
+        city: str,
+        delivery_region: DeliveryRegion | None,
+    ) -> None:
+        if profile is None:
+            return
+
+        update_fields: list[str] = []
+
+        if not self._profile_has_complete_address(profile) and address and neighborhood and city:
+            profile.address = address
+            profile.neighborhood = neighborhood
+            profile.city = city
+            update_fields.extend(["address", "neighborhood", "city"])
+
+        if delivery_region is not None and profile.delivery_region_id != delivery_region.id:
+            profile.delivery_region = delivery_region
+            update_fields.append("delivery_region")
+
+        if update_fields:
+            profile.save(update_fields=update_fields)
 
     @staticmethod
     def _line_item_label(item: dict) -> str:
@@ -1847,12 +1886,7 @@ class CheckoutWhatsAppView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        profile_has_complete_address = (
-            profile is not None
-            and profile.address.strip()
-            and profile.neighborhood.strip()
-            and profile.city.strip()
-        )
+        profile_has_complete_address = self._profile_has_complete_address(profile)
 
         delivery_region = None
         delivery_region_id = customer.get("delivery_region_id")
@@ -1908,6 +1942,15 @@ class CheckoutWhatsAppView(APIView):
                     else settings.ORDER_DELIVERY_FEE
                 )
             total = subtotal + delivery_fee
+
+            if is_delivery:
+                self._sync_profile_checkout_defaults(
+                    profile,
+                    address=order_address,
+                    neighborhood=order_neighborhood,
+                    city=order_city,
+                    delivery_region=delivery_region,
+                )
 
             message_lines = [
                 "Pedido BipFlow",

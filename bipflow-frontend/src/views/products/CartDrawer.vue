@@ -247,14 +247,29 @@
                   </select>
                 </label>
 
-                <p v-if="hasCompleteProfileAddress" class="text-xs leading-5 text-[#6B7280]">
-                  Entregamos no endereço salvo no seu perfil.
-                  <RouterLink :to="accountRoute" class="font-semibold text-[#D81B60] hover:underline">
-                    Editar endereço
-                  </RouterLink>
-                </p>
+                <div
+                  v-if="hasCompleteProfileAddress"
+                  class="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-xs leading-5 text-emerald-900"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="font-bold">Endereço salvo</p>
+                      <p class="mt-1 text-emerald-800">{{ profileAddressSummary }}</p>
+                    </div>
+                    <RouterLink :to="accountRoute" class="shrink-0 font-semibold text-[#D81B60] hover:underline">
+                      Editar
+                    </RouterLink>
+                  </div>
+                </div>
 
                 <template v-else>
+                  <p
+                    v-if="shouldSaveCheckoutAddress"
+                    class="rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3 text-xs leading-5 text-sky-900"
+                  >
+                    Informe o endereço desta entrega. Ele será salvo no seu perfil para os próximos pedidos.
+                  </p>
+
                   <label class="block">
                     <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
                       Endereço
@@ -439,6 +454,23 @@ const hasCompleteProfileAddress = computed(() => (
   !!props.profile?.address?.trim()
   && !!props.profile?.neighborhood?.trim()
   && !!props.profile?.city?.trim()
+))
+
+const shouldSaveCheckoutAddress = computed(() => (
+  props.customer.deliveryMethod === 'delivery'
+  && hasProfileIdentity.value
+  && !hasCompleteProfileAddress.value
+))
+
+const profileAddressSummary = computed(() => (
+  [
+    props.profile?.address,
+    props.profile?.neighborhood,
+    props.profile?.city,
+  ]
+    .map((value) => value?.trim() ?? '')
+    .filter(Boolean)
+    .join(' - ')
 ))
 
 const deliveryRegionPlaceholder = computed(() => {
