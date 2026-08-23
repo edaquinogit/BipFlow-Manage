@@ -1,6 +1,6 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { Logger } from "./logger";
-import { getSelectedStoreSlug } from "./store-scope";
+import { clearSelectedStore, getRequestStoreSlug } from "./store-scope";
 import { tokenStore } from "./token-store";
 
 interface TokenRefreshPayload {
@@ -148,7 +148,7 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const selectedStoreSlug = getSelectedStoreSlug();
+    const selectedStoreSlug = getRequestStoreSlug();
     if (selectedStoreSlug && config.headers) {
       const headers = config.headers as typeof config.headers & {
         set?: (name: string, value: string) => void;
@@ -316,6 +316,7 @@ function handleAuthFailure() {
 
   // Clear authentication state through the centralized contract
   tokenStore.clearAccessToken();
+  clearSelectedStore();
 
   // Prevent redirect loops - check current location
   const currentPath = window.location.pathname;
