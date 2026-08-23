@@ -135,6 +135,7 @@ describe("useProducts Composable", () => {
           {
             name: "Preto",
             color_hex: "#000000",
+            stock_quantity: 2,
             image: variantFile,
             is_active: true,
             position: 0,
@@ -147,6 +148,7 @@ describe("useProducts Composable", () => {
         {
           name: "Preto",
           color_hex: "#000000",
+          stock_quantity: 2,
           is_active: true,
           position: 0,
           image_upload_index: 0,

@@ -1658,6 +1658,21 @@ class CheckoutWhatsAppView(APIView):
         return quantities_by_line
 
     @staticmethod
+    def _aggregate_variant_quantities(normalized_items) -> dict[int, int]:
+        quantities_by_variant_id: dict[int, int] = {}
+
+        for item in normalized_items:
+            variant_id = item.get("variant_id")
+            if variant_id is None:
+                continue
+
+            quantities_by_variant_id[variant_id] = (
+                quantities_by_variant_id.get(variant_id, 0) + item["quantity"]
+            )
+
+        return quantities_by_variant_id
+
+    @staticmethod
     def _raise_missing_products_error(missing_ids: list[int]) -> None:
         raise serializers.ValidationError(
             {
@@ -1698,7 +1713,8 @@ class CheckoutWhatsAppView(APIView):
             return {}
 
         variants = (
-            ProductVariant.objects.select_related("product")
+            ProductVariant.objects.select_for_update()
+            .select_related("product")
             .filter(id__in=variant_ids, product__store=store)
             .order_by("id")
         )
@@ -1715,6 +1731,20 @@ class CheckoutWhatsAppView(APIView):
             )
 
         return variants_by_id
+
+    @staticmethod
+    def _products_with_active_variants(products_by_id: dict[int, Product]) -> set[int]:
+        if not products_by_id:
+            return set()
+
+        return set(
+            ProductVariant.objects.filter(
+                product_id__in=products_by_id,
+                is_active=True,
+            )
+            .values_list("product_id", flat=True)
+            .distinct()
+        )
 
     def _build_variant_image_url(self, variant: ProductVariant | None) -> str:
         if variant is None or not variant.image:
@@ -1770,6 +1800,7 @@ class CheckoutWhatsAppView(APIView):
         cart_items,
         products_by_id: dict[int, Product],
         variants_by_id: dict[int, ProductVariant],
+        products_with_active_variants: set[int],
     ) -> tuple[list[dict], Decimal]:
         normalized_items = []
         subtotal = Decimal("0.00")
@@ -1778,6 +1809,11 @@ class CheckoutWhatsAppView(APIView):
         for (product_id, variant_id), quantity in quantities_by_line.items():
             product = products_by_id[product_id]
             variant = variants_by_id.get(variant_id) if variant_id is not None else None
+
+            if variant_id is None and product.id in products_with_active_variants:
+                raise serializers.ValidationError(
+                    {"items": [f'Selecione uma variacao para "{product.name}".']}
+                )
 
             if variant_id is not None:
                 if variant is None or variant.product_id != product.id:
@@ -1790,6 +1826,11 @@ class CheckoutWhatsAppView(APIView):
                         {"items": [f'A variante "{variant.name}" esta indisponivel.']}
                     )
 
+                if variant.stock_quantity <= 0:
+                    raise serializers.ValidationError(
+                        {"items": [f'A variante "{variant.name}" esta sem estoque.']}
+                    )
+
             if not product.is_available or product.stock_quantity <= 0:
                 raise serializers.ValidationError(
                     {"items": [f'Product "{product.name}" is currently unavailable']}
@@ -1800,6 +1841,18 @@ class CheckoutWhatsAppView(APIView):
                     {
                         "items": [
                             f'Requested quantity for "{product.name}" exceeds available stock ({product.stock_quantity})'
+                        ]
+                    }
+                )
+
+            if variant is not None and quantity > variant.stock_quantity:
+                raise serializers.ValidationError(
+                    {
+                        "items": [
+                            (
+                                f'Quantidade solicitada para "{product.name} - {variant.name}" '
+                                f'excede o estoque da variacao ({variant.stock_quantity})'
+                            )
                         ]
                     }
                 )
@@ -1831,10 +1884,12 @@ class CheckoutWhatsAppView(APIView):
         quantities_by_product_id = self._aggregate_product_quantities(cart_items)
         products_by_id = self._lock_cart_products(quantities_by_product_id, store)
         variants_by_id = self._lock_cart_variants(cart_items, store)
+        products_with_active_variants = self._products_with_active_variants(products_by_id)
         normalized_items, subtotal = self._normalize_reserved_items(
             cart_items,
             products_by_id,
             variants_by_id,
+            products_with_active_variants,
         )
         timestamp = timezone.now()
 
@@ -1848,6 +1903,18 @@ class CheckoutWhatsAppView(APIView):
             list(products_by_id.values()),
             ["stock_quantity", "is_available", "updated_at"],
         )
+
+        quantities_by_variant_id = self._aggregate_variant_quantities(normalized_items)
+        for variant_id, quantity in quantities_by_variant_id.items():
+            variant = variants_by_id[variant_id]
+            variant.stock_quantity -= quantity
+            variant.updated_at = timestamp
+
+        if quantities_by_variant_id:
+            ProductVariant.objects.bulk_update(
+                [variants_by_id[variant_id] for variant_id in quantities_by_variant_id],
+                ["stock_quantity", "updated_at"],
+            )
 
         return normalized_items, subtotal, products_by_id
 

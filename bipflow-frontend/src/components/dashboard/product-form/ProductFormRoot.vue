@@ -100,6 +100,7 @@ const normalizeInitialFormData = (
         id: variant.id,
         name: variant.name ?? '',
         color_hex: variant.color_hex ?? '#000000',
+        stock_quantity: Math.trunc(toNumberOrZero(variant.stock_quantity)),
         image: variant.image ?? null,
         is_active: variant.is_active ?? true,
         position: index,

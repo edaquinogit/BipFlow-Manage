@@ -210,6 +210,7 @@ describe('CartDrawer', () => {
         id: 9,
         name: 'Azul',
         color_hex: '#3366FF',
+        stock_quantity: 4,
         image: 'https://example.com/azul.jpg',
         is_active: true,
         position: 0,
@@ -225,5 +226,26 @@ describe('CartDrawer', () => {
 
     expect(wrapper.emitted('updateQuantity')?.[0]).toEqual([1, 2, 9])
     expect(wrapper.emitted('removeItem')?.[0]).toEqual([1, 9])
+  })
+
+  it('blocks checkout when a variant line exceeds that color stock', () => {
+    const item = {
+      ...buildItem(),
+      quantity: 3,
+      variant: {
+        id: 9,
+        name: 'Azul',
+        color_hex: '#3366FF',
+        stock_quantity: 2,
+        image: 'https://example.com/azul.jpg',
+        is_active: true,
+        position: 0,
+      },
+    }
+    const wrapper = mountDrawer({ items: [item], itemCount: 3 })
+
+    expect(wrapper.text()).toContain('2 disponiveis nesta cor')
+    expect(wrapper.text()).toContain('Ajuste a quantidade de Combo Executivo - Azul ao estoque disponivel.')
+    expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
   })
 })

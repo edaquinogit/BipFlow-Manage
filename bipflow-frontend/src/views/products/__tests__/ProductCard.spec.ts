@@ -79,6 +79,44 @@ describe('ProductCard', () => {
     expect(wrapper.emitted('addToCart')?.[0]).toEqual([mockProduct, 2])
   })
 
+  it('adds the first color variant with available stock from the catalog card', async () => {
+    const productWithVariants = {
+      ...mockProduct,
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#000000',
+          stock_quantity: 0,
+          image: 'https://example.com/preto.jpg',
+          is_active: true,
+          position: 0,
+        },
+        {
+          id: 11,
+          name: 'Azul',
+          color_hex: '#3366FF',
+          stock_quantity: 2,
+          image: 'https://example.com/azul.jpg',
+          is_active: true,
+          position: 1,
+        },
+      ],
+    }
+
+    await wrapper.setProps({ product: productWithVariants })
+
+    const addButton = wrapper.find('[data-cy="add-to-cart-button"]')
+    await addButton.trigger('click')
+
+    expect(wrapper.text()).toContain('2 nesta cor')
+    expect(wrapper.emitted('addToCart')?.at(-1)).toEqual([
+      productWithVariants,
+      1,
+      expect.objectContaining({ id: 11, name: 'Azul' }),
+    ])
+  })
+
   it('disables add to cart when product is unavailable', async () => {
     await wrapper.setProps({
       product: { ...mockProduct, is_available: false }

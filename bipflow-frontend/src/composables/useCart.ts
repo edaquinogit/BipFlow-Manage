@@ -72,8 +72,20 @@ function canUseBrowserStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 }
 
-function clampQuantity(product: Product, quantity: number): number {
-  const maxQuantity = Math.max(product.stock_quantity, 1)
+function availableStockForLine(product: Product, variant?: ProductVariant | null): number {
+  const productStock = Number(product.stock_quantity)
+  const normalizedProductStock = Number.isFinite(productStock) ? Math.max(0, Math.trunc(productStock)) : 0
+  const rawVariantStock = variant?.stock_quantity
+
+  if (typeof rawVariantStock !== 'number' || !Number.isFinite(rawVariantStock)) {
+    return normalizedProductStock
+  }
+
+  return Math.min(normalizedProductStock, Math.max(0, Math.trunc(rawVariantStock)))
+}
+
+function clampQuantity(product: Product, quantity: number, variant?: ProductVariant | null): number {
+  const maxQuantity = Math.max(availableStockForLine(product, variant), 1)
   return Math.min(Math.max(Math.trunc(quantity), 1), maxQuantity)
 }
 
@@ -229,7 +241,7 @@ export function useCart() {
   const total = computed(() => subtotal.value + deliveryFee.value)
 
   const addItem = (product: Product, quantity = 1, variant: ProductVariant | null = null): void => {
-    if (!product.is_available || product.stock_quantity <= 0) {
+    if (!product.is_available || availableStockForLine(product, variant) <= 0) {
       return
     }
 
@@ -241,7 +253,8 @@ export function useCart() {
     if (existingItem) {
       existingItem.quantity = clampQuantity(
         product,
-        existingItem.quantity + quantity
+        existingItem.quantity + quantity,
+        variant,
       )
       return
     }
@@ -251,7 +264,7 @@ export function useCart() {
       {
         product,
         variant,
-        quantity: clampQuantity(product, quantity),
+        quantity: clampQuantity(product, quantity, variant),
       },
     ]
   }
@@ -274,7 +287,7 @@ export function useCart() {
       return
     }
 
-    targetItem.quantity = clampQuantity(targetItem.product, quantity)
+    targetItem.quantity = clampQuantity(targetItem.product, quantity, targetItem.variant)
   }
 
   const clearCart = (): void => {

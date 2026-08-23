@@ -358,12 +358,14 @@ class ProductAPIHealthTest(TestCase):
             product=self.product,
             name="Preto",
             color_hex="#000000",
+            stock_quantity=7,
             position=0,
         )
         ProductVariant.objects.create(
             product=self.product,
             name="Azul",
             color_hex="#3366FF",
+            stock_quantity=0,
             position=1,
             is_active=False,
         )
@@ -373,10 +375,15 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(
             [
-                (variant["name"], variant["color_hex"], variant["is_active"])
+                (
+                    variant["name"],
+                    variant["color_hex"],
+                    variant["stock_quantity"],
+                    variant["is_active"],
+                )
                 for variant in response.data["variants"]
             ],
-            [("Preto", "#000000", True), ("Azul", "#3366FF", False)],
+            [("Preto", "#000000", 7, True), ("Azul", "#3366FF", 0, False)],
         )
 
     def test_product_update(self) -> None:
@@ -494,6 +501,7 @@ class ProductAPIHealthTest(TestCase):
                     {
                         "name": "Preto",
                         "color_hex": "#000000",
+                        "stock_quantity": 3,
                         "position": 0,
                         "is_active": True,
                         "image_upload_index": 0,
@@ -501,6 +509,7 @@ class ProductAPIHealthTest(TestCase):
                     {
                         "name": "Azul",
                         "color_hex": "#3366FF",
+                        "stock_quantity": 1,
                         "position": 1,
                         "is_active": False,
                     },
@@ -514,9 +523,13 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
         product = Product.objects.get(id=response.data["id"])
         variants = list(product.variants.order_by("position"))
-        self.assertEqual([(variant.name, variant.color_hex) for variant in variants], [("Preto", "#000000"), ("Azul", "#3366FF")])
+        self.assertEqual(
+            [(variant.name, variant.color_hex, variant.stock_quantity) for variant in variants],
+            [("Preto", "#000000", 3), ("Azul", "#3366FF", 1)],
+        )
         self.assertTrue(variants[0].image.name.startswith(f"products/{product.store_id}/variants/"))
         self.assertIn("camiseta-preta", response.data["variants"][0]["image"])
+        self.assertEqual(response.data["variants"][0]["stock_quantity"], 3)
         self.assertFalse(response.data["variants"][1]["is_active"])
 
     @override_settings(MEDIA_ROOT=build_test_media_root())
@@ -555,6 +568,37 @@ class ProductAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
         self.assertEqual(response.data["name"], "Pizza Premium Atualizada")
         self.assertEqual(len(response.data["images"]), 3)
+
+    def test_product_update_preserves_variant_stock_when_legacy_payload_omits_it(self) -> None:
+        """Older clients updating variant metadata should not zero existing variant stock."""
+        self.client.force_authenticate(user=self.user)
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Preto",
+            color_hex="#000000",
+            stock_quantity=5,
+            position=0,
+        )
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {
+                "variants_payload": [
+                    {
+                        "id": variant.id,
+                        "name": "Preto Premium",
+                        "color_hex": "#111111",
+                        "position": 0,
+                        "is_active": True,
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        variant.refresh_from_db()
+        self.assertEqual(variant.stock_quantity, 5)
 
     def test_product_delete(self) -> None:
         """Should delete product via DELETE endpoint."""
@@ -1104,6 +1148,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             product=self.product,
             name="Azul",
             color_hex="#3366FF",
+            stock_quantity=3,
             position=0,
         )
         payload = self._build_pickup_payload(
@@ -1124,20 +1169,24 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(order_item.variant_name, "Azul")
         self.assertEqual(order_item.variant_color_hex, "#3366FF")
         self.assertEqual(order_item.quantity, 2)
+        variant.refresh_from_db()
+        self.assertEqual(variant.stock_quantity, 1)
 
-    def test_checkout_keeps_variant_lines_separate_but_reserves_product_stock(self) -> None:
+    def test_checkout_keeps_variant_lines_separate_and_reserves_variant_stock(self) -> None:
         """Different variants should be separate order lines sharing product stock."""
         client = self._checkout_client()
         black = ProductVariant.objects.create(
             product=self.product,
             name="Preto",
             color_hex="#000000",
+            stock_quantity=4,
             position=0,
         )
         blue = ProductVariant.objects.create(
             product=self.product,
             name="Azul",
             color_hex="#3366FF",
+            stock_quantity=5,
             position=1,
         )
         payload = self._build_pickup_payload(
@@ -1153,7 +1202,11 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.assertEqual(len(response.data["items"]), 2)
         self.assertEqual(response.data["subtotal"], "212.50")
         self.product.refresh_from_db()
+        black.refresh_from_db()
+        blue.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 3)
+        self.assertEqual(black.stock_quantity, 2)
+        self.assertEqual(blue.stock_quantity, 2)
 
         order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
         self.assertEqual(order.items.count(), 2)
@@ -1169,11 +1222,58 @@ class CheckoutWhatsAppAPITest(TestCase):
             product=self.product,
             name="Esgotada",
             color_hex="#999999",
+            stock_quantity=5,
             position=0,
             is_active=False,
         )
         payload = self._build_pickup_payload(
             [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 1}]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        variant.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertEqual(variant.stock_quantity, 5)
+        self.assertFalse(SaleOrder.objects.exists())
+
+    def test_checkout_rejects_variant_stock_exceeded_without_reserving_stock(self) -> None:
+        """A selected variant cannot sell more units than that color has."""
+        client = self._checkout_client()
+        variant = ProductVariant.objects.create(
+            product=self.product,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=1,
+            position=0,
+        )
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "variant_id": variant.id, "quantity": 2}]
+        )
+
+        response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        variant.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertEqual(variant.stock_quantity, 1)
+        self.assertFalse(SaleOrder.objects.exists())
+
+    def test_checkout_requires_variant_when_product_has_active_variants(self) -> None:
+        """A cart line cannot bypass variant stock once the product has active variants."""
+        client = self._checkout_client()
+        ProductVariant.objects.create(
+            product=self.product,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=4,
+            position=0,
+        )
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 1}]
         )
 
         response: Any = client.post("/api/v1/checkout/whatsapp/", payload, format="json")
@@ -1197,6 +1297,7 @@ class CheckoutWhatsAppAPITest(TestCase):
             product=other_product,
             name="Vermelho",
             color_hex="#FF0000",
+            stock_quantity=3,
             position=0,
         )
         payload = self._build_pickup_payload(

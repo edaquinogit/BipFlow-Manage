@@ -1,7 +1,7 @@
 <template>
   <article
     class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-[#E9D7DF] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF9FB_100%)] shadow-[0_18px_40px_-30px_rgba(5,5,10,0.6)] transition duration-300 hover:-translate-y-1 hover:border-[#D81B60]/45 hover:shadow-[0_24px_60px_-34px_rgba(216,27,96,0.32)] min-[390px]:rounded-2xl"
-    :class="{ 'opacity-75': !product.is_available }"
+    :class="{ 'opacity-75': !canOrderProduct }"
   >
     <button
       type="button"
@@ -37,7 +37,7 @@
         />
 
         <div
-          v-if="!product.is_available"
+          v-if="!canOrderProduct"
           class="absolute inset-0 flex items-center justify-center bg-slate-950/50"
         >
           <span
@@ -116,7 +116,7 @@
               <button
                 type="button"
                 class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
-                :disabled="!product.is_available || quantity <= 1"
+                :disabled="!canOrderProduct || quantity <= 1"
                 aria-label="Diminuir quantidade"
                 @click.stop="decrementQuantity"
               >
@@ -130,9 +130,7 @@
               <button
                 type="button"
                 class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
-                :disabled="
-                  !product.is_available || quantity >= product.stock_quantity
-                "
+                :disabled="!canOrderProduct || quantity >= currentAvailableStock"
                 aria-label="Aumentar quantidade"
                 @click.stop="incrementQuantity"
               >
@@ -146,11 +144,11 @@
             data-cy="add-to-cart-button"
             class="inline-flex h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[0.95rem] px-2 text-[8px] font-bold uppercase leading-none tracking-[0.04em] shadow-[0_14px_30px_-22px_rgba(5,5,10,0.7)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-12 min-[390px]:gap-1.5 min-[390px]:rounded-xl min-[390px]:px-2.5 min-[390px]:text-[8px] min-[390px]:tracking-[0.05em] min-[480px]:gap-2 min-[480px]:px-3 min-[480px]:text-[9px] min-[480px]:tracking-[0.08em] sm:px-4 sm:text-[11px] sm:tracking-[0.1em]"
             :class="
-              product.is_available
+              canOrderProduct
                 ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_36px_-24px_rgba(216,27,96,0.65)]'
                 : 'cursor-not-allowed bg-slate-200 text-slate-500'
             "
-            :disabled="!product.is_available"
+            :disabled="!canOrderProduct"
             @click.stop="handleAddToCart"
           >
             <ShoppingBagIcon
@@ -221,20 +219,44 @@ watch(
   },
 )
 
-watch(
-  () => props.product.stock_quantity,
-  (nextStock) => {
-    quantity.value = Math.min(quantity.value, Math.max(nextStock, 1))
-  },
-)
-
 const activeVariants = computed(() =>
   [...(props.product.variants ?? [])]
     .filter((variant) => variant.is_active)
     .sort((left, right) => left.position - right.position || left.id - right.id)
 )
 
-const defaultVariant = computed(() => activeVariants.value[0] ?? null)
+const hasActiveVariants = computed(() => activeVariants.value.length > 0)
+
+function variantAvailableStock(variant: ProductVariant): number {
+  const variantStock = Math.max(0, Math.trunc(Number(variant.stock_quantity) || 0))
+  return Math.min(props.product.stock_quantity, variantStock)
+}
+
+const orderableVariants = computed(() =>
+  activeVariants.value.filter((variant) => variantAvailableStock(variant) > 0)
+)
+
+const defaultVariant = computed(() =>
+  orderableVariants.value[0] ?? activeVariants.value[0] ?? null
+)
+
+const currentAvailableStock = computed(() => {
+  if (!props.product.is_available) {
+    return 0
+  }
+
+  if (!hasActiveVariants.value) {
+    return props.product.stock_quantity
+  }
+
+  return defaultVariant.value ? variantAvailableStock(defaultVariant.value) : 0
+})
+
+const canOrderProduct = computed(() => currentAvailableStock.value > 0)
+
+watch(currentAvailableStock, (nextStock) => {
+  quantity.value = Math.min(quantity.value, Math.max(nextStock, 1))
+})
 
 const imageSource = computed(() =>
   defaultVariant.value?.image || props.product.image || FALLBACK_IMAGE_URL
@@ -243,8 +265,12 @@ const imageSource = computed(() =>
 const hasProductImage = computed(() => Boolean(defaultVariant.value?.image || props.product.image))
 
 const stockStatusLabel = computed(() => {
-  if (!props.product.is_available) {
+  if (!canOrderProduct.value) {
     return 'Indisponivel'
+  }
+
+  if (hasActiveVariants.value && defaultVariant.value) {
+    return `${currentAvailableStock.value} nesta cor`
   }
 
   if (isLowStock(props.product)) {
@@ -255,7 +281,7 @@ const stockStatusLabel = computed(() => {
 })
 
 const addToCartLabel = computed(() => {
-  if (!props.product.is_available) {
+  if (!canOrderProduct.value) {
     return 'Indisponivel'
   }
 
@@ -267,7 +293,7 @@ const addToCartLabel = computed(() => {
 })
 
 const mediumAddToCartLabel = computed(() => {
-  if (!props.product.is_available) {
+  if (!canOrderProduct.value) {
     return 'Indisp.'
   }
 
@@ -279,7 +305,7 @@ const mediumAddToCartLabel = computed(() => {
 })
 
 const compactAddToCartLabel = computed(() => {
-  if (!props.product.is_available) {
+  if (!canOrderProduct.value) {
     return 'Indisp.'
   }
 
@@ -298,7 +324,7 @@ const handleImageError = (event: Event) => {
 }
 
 const incrementQuantity = () => {
-  quantity.value = Math.min(quantity.value + 1, props.product.stock_quantity)
+  quantity.value = Math.min(quantity.value + 1, currentAvailableStock.value)
 }
 
 const decrementQuantity = () => {
@@ -306,7 +332,7 @@ const decrementQuantity = () => {
 }
 
 const handleAddToCart = () => {
-  if (!props.product.is_available) {
+  if (!canOrderProduct.value) {
     return
   }
 

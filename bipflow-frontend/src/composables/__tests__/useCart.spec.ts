@@ -87,6 +87,7 @@ describe('useCart - product variants', () => {
     id: 10,
     name: 'Preto',
     color_hex: '#000000',
+    stock_quantity: 3,
     image: 'https://example.com/preto.jpg',
     is_active: true,
     position: 0,
@@ -96,6 +97,7 @@ describe('useCart - product variants', () => {
     id: 11,
     name: 'Azul',
     color_hex: '#3366FF',
+    stock_quantity: 5,
     image: null,
     is_active: true,
     position: 1,
@@ -124,7 +126,16 @@ describe('useCart - product variants', () => {
 
     expect(cart.items.value).toHaveLength(1)
     expect(cart.items.value[0]?.variant?.id).toBe(black.id)
-    expect(cart.items.value[0]?.quantity).toBe(4)
+    expect(cart.items.value[0]?.quantity).toBe(3)
+  })
+
+  it('caps variant cart quantities by the selected variant stock', async () => {
+    const cart = await loadCart()
+
+    cart.addItem(product, 5, black)
+    cart.updateQuantity(product.id, 6, black.id)
+
+    expect(cart.items.value[0]?.quantity).toBe(3)
   })
 })
 

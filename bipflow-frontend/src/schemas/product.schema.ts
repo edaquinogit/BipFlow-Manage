@@ -57,6 +57,11 @@ const ProductVariantSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color, like #D81B60")
     .transform((value) => value.toUpperCase()),
+  stock_quantity: z.coerce
+    .number()
+    .int("Variant stock must be an integer")
+    .nonnegative("Variant stock cannot be negative")
+    .default(0),
   image: ProductVariantImageSchema,
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().nonnegative().default(0),

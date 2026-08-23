@@ -23,6 +23,7 @@ export interface ProductVariant {
   id: number
   name: string
   color_hex: string
+  stock_quantity: number
   image: string | null
   is_active: boolean
   position: number
@@ -193,6 +194,7 @@ export const ProductVariantSchema = z.object({
   id: z.number(),
   name: z.string(),
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  stock_quantity: z.number().int().nonnegative().default(0),
   image: z.string().url().nullable().optional().default(null),
   is_active: z.boolean(),
   position: z.number(),

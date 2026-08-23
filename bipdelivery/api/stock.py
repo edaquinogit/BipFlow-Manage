@@ -14,7 +14,7 @@ from __future__ import annotations
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Product, SaleOrder, StockMovement, Store
+from .models import Product, ProductVariant, SaleOrder, StockMovement, Store
 
 
 class StockMovementError(Exception):
@@ -109,10 +109,17 @@ def apply_order_cancellation(
     with transaction.atomic():
         items = list(order.items.all())
         product_ids = sorted({item.product_id for item in items if item.product_id})
+        variant_ids = sorted({item.variant_id for item in items if item.variant_id})
         products_by_id = {
             product.id: product
             for product in Product.objects.select_for_update()
             .filter(id__in=product_ids, store=store)
+            .order_by("id")
+        }
+        variants_by_id = {
+            variant.id: variant
+            for variant in ProductVariant.objects.select_for_update()
+            .filter(id__in=variant_ids, product__store=store)
             .order_by("id")
         }
 
@@ -137,6 +144,11 @@ def apply_order_cancellation(
             product.is_available = product.stock_quantity > 0
             product.updated_at = timestamp
 
+            variant = variants_by_id.get(item.variant_id)
+            if variant is not None:
+                variant.stock_quantity += item.quantity
+                variant.updated_at = timestamp
+
             movements.append(
                 StockMovement(
                     store=store,
@@ -155,6 +167,11 @@ def apply_order_cancellation(
         if products_by_id:
             Product.objects.bulk_update(
                 list(products_by_id.values()), ["stock_quantity", "is_available", "updated_at"]
+            )
+
+        if variants_by_id:
+            ProductVariant.objects.bulk_update(
+                list(variants_by_id.values()), ["stock_quantity", "updated_at"]
             )
 
         if movements:

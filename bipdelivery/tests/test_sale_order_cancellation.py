@@ -14,7 +14,14 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Product, SaleOrder, SaleOrderItem, StockMovement, StoreMembership
+from bipdelivery.api.models import (
+    Product,
+    ProductVariant,
+    SaleOrder,
+    SaleOrderItem,
+    StockMovement,
+    StoreMembership,
+)
 from bipdelivery.tests.test_store_active_isolation import TwoStoreFixtureMixin
 
 CANCEL_STATUS_PAYLOAD = {"status": "cancelled"}
@@ -87,6 +94,51 @@ class SaleOrderCancellationAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(movement.previous_stock, 7)
         self.assertEqual(movement.new_stock, 10)
         self.assertEqual(movement.performed_by, self.user_b)
+
+    def test_cancelling_a_variant_order_restocks_the_selected_variant(self) -> None:
+        variant = ProductVariant.objects.create(
+            product=self.product_b,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=4,
+            position=0,
+        )
+        order = SaleOrder.objects.create(
+            store=self.store_b,
+            order_reference=f"BPF-{uuid4().hex[:8].upper()}",
+            channel=SaleOrder.CHANNEL_VIRTUAL,
+            customer_name="Cliente Teste",
+            customer_phone="71999990000",
+            delivery_method="pickup",
+            payment_method="pix",
+            subtotal=Decimal("20.00"),
+            delivery_fee=Decimal("0.00"),
+            total=Decimal("20.00"),
+        )
+        SaleOrderItem.objects.create(
+            order=order,
+            product=self.product_b,
+            variant=variant,
+            product_name=self.product_b.name,
+            sku=self.product_b.sku or "",
+            variant_name=variant.name,
+            variant_color_hex=variant.color_hex,
+            quantity=2,
+            unit_price=self.product_b.price,
+            line_total=self.product_b.price * 2,
+        )
+        self.product_b.stock_quantity -= 2
+        self.product_b.save(update_fields=["stock_quantity", "is_available"])
+        variant.stock_quantity -= 2
+        variant.save(update_fields=["stock_quantity"])
+
+        response = self.client.patch(self._status_url(order), CANCEL_STATUS_PAYLOAD, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.product_b.refresh_from_db()
+        variant.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 10)
+        self.assertEqual(variant.stock_quantity, 4)
 
     def test_cancelling_a_pdv_order_restocks_with_pdv_source(self) -> None:
         order = self._make_order(channel=SaleOrder.CHANNEL_LOJA_FISICA, quantities={self.product_b: 2})

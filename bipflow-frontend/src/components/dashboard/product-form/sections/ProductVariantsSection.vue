@@ -21,6 +21,11 @@ const imageError = ref<string | null>(null);
 
 const hasVariants = computed(() => variants.value.length > 0);
 
+function normalizeVariantStock(value: unknown): number {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? Math.max(0, Math.trunc(numericValue)) : 0;
+}
+
 function revokePreview(url: string | null | undefined): void {
   if (!url || !url.startsWith('blob:')) {
     return;
@@ -76,6 +81,7 @@ function addVariant(): void {
     {
       name: '',
       color_hex: '#D81B60',
+      stock_quantity: 0,
       image: null,
       is_active: true,
       position: variants.value.length,
@@ -192,7 +198,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_6rem] sm:items-end">
+        <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_6rem] sm:items-end">
           <label class="block min-w-0">
             <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
               Nome da cor
@@ -209,6 +215,21 @@ onUnmounted(() => {
 
           <label class="block">
             <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
+              Qtd.
+            </span>
+            <input
+              :value="variant.stock_quantity"
+              type="number"
+              min="0"
+              step="1"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              :aria-label="`Quantidade em estoque da variante ${variant.name || index + 1}`"
+              @input="updateVariant(index, { stock_quantity: normalizeVariantStock(($event.target as HTMLInputElement).value) })"
+            />
+          </label>
+
+          <label class="block">
+            <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
               Cor
             </span>
             <input
@@ -220,7 +241,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-2">
+          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-3">
             <input
               :checked="variant.is_active"
               type="checkbox"

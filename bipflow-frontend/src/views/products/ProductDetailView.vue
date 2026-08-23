@@ -173,7 +173,7 @@
 
                 <span
                   class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] min-[390px]:text-xs"
-                  :class="product.is_available ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
+                  :class="canAddSelectedItem ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
                 >
                   {{ availabilityLabel }}
                 </span>
@@ -204,7 +204,7 @@
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Estoque</dt>
                 <dd class="text-right font-semibold" :class="availabilityToneClass">
-                  {{ product.is_available ? `${product.stock_quantity} un.` : 'Indisponivel' }}
+                  {{ currentAvailableStock > 0 ? `${currentAvailableStock} un.` : 'Indisponivel' }}
                 </dd>
               </div>
             </dl>
@@ -221,6 +221,13 @@
                       <p class="mt-1 truncate text-[13px] text-slate-600 min-[390px]:text-sm">
                         {{ selectedVariant?.name || 'Selecione uma cor' }}
                       </p>
+                      <p
+                        v-if="selectedVariant"
+                        class="mt-1 text-[12px] font-semibold min-[390px]:text-[13px]"
+                        :class="selectedVariantAvailableStock > 0 ? 'text-[#D81B60]' : 'text-slate-500'"
+                      >
+                        {{ selectedVariantAvailableStock > 0 ? `${selectedVariantAvailableStock} disponiveis` : 'Cor esgotada' }}
+                      </p>
                     </div>
                   </div>
 
@@ -233,12 +240,14 @@
                       :class="selectedVariant?.id === variant.id
                         ? 'border-[#D81B60] shadow-[0_12px_24px_-18px_rgba(216,27,96,0.65)]'
                         : 'border-[#D8DDE5] hover:border-[#D81B60]'"
+                      :disabled="variantAvailableStock(variant) <= 0"
                       :aria-label="`Selecionar cor ${variant.name}`"
                       :title="variant.name"
                       @click="handleSelectVariant(variant)"
                     >
                       <span
                         class="h-8 w-8 rounded-full border border-black/10"
+                        :class="{ 'opacity-35': variantAvailableStock(variant) <= 0 }"
                         :style="{ backgroundColor: variant.color_hex }"
                         aria-hidden="true"
                       />
@@ -260,7 +269,7 @@
                     <button
                       type="button"
                       class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
-                      :disabled="!product.is_available || quantity <= 1"
+                      :disabled="!canAddSelectedItem || quantity <= 1"
                       aria-label="Diminuir quantidade"
                       @click="decrementQuantity"
                     >
@@ -272,7 +281,7 @@
                     <button
                       type="button"
                       class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
-                      :disabled="!product.is_available || quantity >= product.stock_quantity"
+                      :disabled="!canAddSelectedItem || quantity >= currentAvailableStock"
                       aria-label="Aumentar quantidade"
                       @click="incrementQuantity"
                     >
@@ -284,10 +293,10 @@
                 <button
                   type="button"
                   class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm"
-                  :class="product.is_available
+                  :class="canAddSelectedItem
                     ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]'
                     : 'cursor-not-allowed bg-slate-200 text-slate-500'"
-                  :disabled="!product.is_available"
+                  :disabled="!canAddSelectedItem"
                   @click="handleAddToCart"
                 >
                   <ShoppingBagIcon class="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -442,6 +451,8 @@ const activeVariants = computed<ProductVariant[]>(() =>
     .sort((left, right) => left.position - right.position || left.id - right.id)
 )
 
+const hasActiveVariants = computed(() => activeVariants.value.length > 0)
+
 const selectedVariant = computed<ProductVariant | null>(() => {
   if (selectedVariantId.value === null) {
     return null
@@ -449,6 +460,33 @@ const selectedVariant = computed<ProductVariant | null>(() => {
 
   return activeVariants.value.find((variant) => variant.id === selectedVariantId.value) ?? null
 })
+
+function variantAvailableStock(variant: ProductVariant): number {
+  if (!product.value?.is_available) {
+    return 0
+  }
+
+  const variantStock = Math.max(0, Math.trunc(Number(variant.stock_quantity) || 0))
+  return Math.min(product.value.stock_quantity, variantStock)
+}
+
+const selectedVariantAvailableStock = computed(() => (
+  selectedVariant.value ? variantAvailableStock(selectedVariant.value) : 0
+))
+
+const currentAvailableStock = computed(() => {
+  if (!product.value?.is_available) {
+    return 0
+  }
+
+  if (!hasActiveVariants.value) {
+    return product.value.stock_quantity
+  }
+
+  return selectedVariantAvailableStock.value
+})
+
+const canAddSelectedItem = computed(() => currentAvailableStock.value > 0)
 
 const productImages = computed(() => {
   const productGallery = product.value?.images?.length
@@ -547,7 +585,10 @@ function resumeCarousel(): void {
 }
 
 function selectInitialVariant(): void {
-  selectedVariantId.value = activeVariants.value[0]?.id ?? null
+  selectedVariantId.value = (
+    activeVariants.value.find((variant) => variantAvailableStock(variant) > 0)
+    ?? activeVariants.value[0]
+  )?.id ?? null
 }
 
 function handleSelectVariant(variant: ProductVariant): void {
@@ -620,19 +661,23 @@ const cartQuantity = computed(() => (
 const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
 
 const availabilityLabel = computed(() => {
-  if (!product.value?.is_available) {
+  if (!product.value || !canAddSelectedItem.value) {
     return 'Indisponivel'
+  }
+
+  if (selectedVariant.value && selectedVariantAvailableStock.value <= 5) {
+    return 'Ultimas da cor'
   }
 
   return isLowStock(product.value) ? 'Ultimas unidades' : 'Disponivel'
 })
 
 const availabilityToneClass = computed(() => (
-  product.value?.is_available ? 'text-[#D81B60]' : 'text-slate-600'
+  canAddSelectedItem.value ? 'text-[#D81B60]' : 'text-slate-600'
 ))
 
 const addToCartLabel = computed(() => {
-  if (!product.value?.is_available) {
+  if (!canAddSelectedItem.value) {
     return 'Indisponivel'
   }
 
@@ -855,6 +900,10 @@ watch(productImages, (nextImages) => {
   startCarousel()
 })
 
+watch(currentAvailableStock, (nextStock) => {
+  quantity.value = Math.min(quantity.value, Math.max(nextStock, 1))
+})
+
 watch(
   () => route.params.slug,
   () => {
@@ -900,11 +949,11 @@ function handleImageError(event: Event): void {
 }
 
 function incrementQuantity(): void {
-  if (!product.value) {
+  if (!product.value || !canAddSelectedItem.value) {
     return
   }
 
-  quantity.value = Math.min(quantity.value + 1, product.value.stock_quantity)
+  quantity.value = Math.min(quantity.value + 1, currentAvailableStock.value)
 }
 
 function decrementQuantity(): void {
@@ -912,7 +961,7 @@ function decrementQuantity(): void {
 }
 
 function handleAddToCart(): void {
-  if (!product.value || !product.value.is_available) {
+  if (!product.value || !canAddSelectedItem.value) {
     return
   }
 

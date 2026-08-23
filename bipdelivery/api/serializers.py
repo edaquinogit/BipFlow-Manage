@@ -173,7 +173,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductVariant
-        fields = ["id", "name", "color_hex", "image", "is_active", "position"]
+        fields = ["id", "name", "color_hex", "stock_quantity", "image", "is_active", "position"]
 
     def get_image(self, instance: ProductVariant) -> str | None:
         if not instance.image:
@@ -285,6 +285,7 @@ class ProductSerializer(serializers.ModelSerializer):
             name = str(raw_variant.get("name", "")).strip()
             color_hex = str(raw_variant.get("color_hex", "")).strip().upper()
             position = raw_variant.get("position", index)
+            raw_stock_quantity = raw_variant.get("stock_quantity", serializers.empty)
 
             try:
                 position = int(position)
@@ -292,6 +293,16 @@ class ProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"variants_payload": "A posicao da variante deve ser numerica."}
                 )
+
+            if raw_stock_quantity is serializers.empty:
+                stock_quantity = None
+            else:
+                try:
+                    stock_quantity = int(raw_stock_quantity or 0)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {"variants_payload": "A quantidade da variante deve ser numerica."}
+                    )
 
             if not name:
                 raise serializers.ValidationError(
@@ -306,6 +317,11 @@ class ProductSerializer(serializers.ModelSerializer):
             if position < 0:
                 raise serializers.ValidationError(
                     {"variants_payload": "A posicao da variante nao pode ser negativa."}
+                )
+
+            if stock_quantity is not None and stock_quantity < 0:
+                raise serializers.ValidationError(
+                    {"variants_payload": "A quantidade da variante nao pode ser negativa."}
                 )
 
             normalized_name = name.casefold()
@@ -356,6 +372,7 @@ class ProductSerializer(serializers.ModelSerializer):
                     "id": variant_id,
                     "name": name,
                     "color_hex": color_hex,
+                    "stock_quantity": stock_quantity,
                     "image": raw_variant.get("image", serializers.empty),
                     "image_upload_index": image_upload_index,
                     "is_active": is_active,
@@ -592,6 +609,10 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.product = product
                 variant.name = variant_data["name"]
                 variant.color_hex = variant_data["color_hex"]
+                if variant_data["stock_quantity"] is not None:
+                    variant.stock_quantity = variant_data["stock_quantity"]
+                elif variant_id is None:
+                    variant.stock_quantity = 0
                 variant.is_active = variant_data["is_active"]
                 variant.position = variant_data["position"]
 

@@ -95,6 +95,12 @@
                         <p class="mt-1 text-[13px] text-[#6B7280] sm:text-sm">
                           {{ formatBRL(item.product.price) }} / unidade
                         </p>
+                        <p
+                          v-if="item.variant"
+                          class="mt-1 text-[12px] font-semibold text-[#6B7280] sm:text-[13px]"
+                        >
+                          {{ cartItemAvailableStock(item) }} disponiveis nesta cor
+                        </p>
                       </div>
 
                       <button
@@ -124,6 +130,7 @@
                           type="button"
                           class="inline-flex h-11 w-11 items-center justify-center rounded-r-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
                           :aria-label="`Aumentar quantidade de ${cartItemLabel(item)}`"
+                          :disabled="item.quantity >= cartItemAvailableStock(item)"
                           @click="$emit('updateQuantity', item.product.id, item.quantity + 1, item.variant?.id ?? null)"
                         >
                           <PlusIcon class="h-4 w-4" aria-hidden="true" />
@@ -483,9 +490,18 @@ const deliveryRegionPlaceholder = computed(() => {
     : 'Combinar entrega com a loja'
 })
 
+const stockLimitedItemLabel = computed(() => {
+  const item = props.items.find((entry) => entry.quantity > cartItemAvailableStock(entry))
+  return item ? cartItemLabel(item) : ''
+})
+
 const checkoutValidationMessage = computed(() => {
   if (props.itemCount === 0) {
     return 'Adicione ao menos um item ao pedido.'
+  }
+
+  if (stockLimitedItemLabel.value) {
+    return `Ajuste a quantidade de ${stockLimitedItemLabel.value} ao estoque disponivel.`
   }
 
   if (!hasProfileIdentity.value && (!props.customer.fullName.trim() || !props.customer.phone.trim())) {
@@ -533,6 +549,15 @@ function cartItemLabel(item: CartItem): string {
   return item.variant?.name
     ? `${item.product.name} - ${item.variant.name}`
     : item.product.name
+}
+
+function cartItemAvailableStock(item: CartItem): number {
+  const productStock = Math.max(0, Math.trunc(Number(item.product.stock_quantity) || 0))
+  const variantStock = item.variant
+    ? Math.max(0, Math.trunc(Number(item.variant.stock_quantity) || 0))
+    : productStock
+
+  return Math.min(productStock, variantStock)
 }
 
 function getInputValue(event: Event): string {

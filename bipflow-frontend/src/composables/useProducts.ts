@@ -117,9 +117,13 @@ export function useProducts() {
 
           const payloadIndex = variantsPayload.length;
           const position = Number(variant.position);
+          const stockQuantity = Number(variant.stock_quantity);
           const payload: Record<string, unknown> = {
             name,
             color_hex: String(variant.color_hex || "#000000").toUpperCase(),
+            stock_quantity: Number.isFinite(stockQuantity)
+              ? Math.max(0, Math.trunc(stockQuantity))
+              : 0,
             is_active: variant.is_active !== false,
             position: Number.isFinite(position) ? Math.trunc(position) : entryIndex,
           };

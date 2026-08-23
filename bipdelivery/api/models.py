@@ -321,6 +321,7 @@ class ProductVariant(models.Model):
     )
     name = models.CharField(max_length=80)
     color_hex = models.CharField(max_length=7, validators=[COLOR_HEX_VALIDATOR])
+    stock_quantity = models.PositiveIntegerField(default=0)
     image = models.ImageField(upload_to=product_variant_image_upload_to, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     position = models.PositiveSmallIntegerField(default=0)
