@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import BulkQrLabelsModal from '../BulkQrLabelsModal.vue'
 import ProductService from '@/services/product.service'
 import { buildProductLabelsPdf } from '@/utils/productLabelsPdf'
-import type { ProductBulkLabel } from '@/types/productLabel'
+import { DEFAULT_PRODUCT_LABEL_SETTINGS, type ProductBulkLabel } from '@/types/productLabel'
 
 vi.mock('@/services/product.service', () => ({
   default: { getQrCodesBulk: vi.fn() },
@@ -22,6 +22,15 @@ const buildLabel = (overrides: Partial<ProductBulkLabel> = {}): ProductBulkLabel
   url: 'https://loja.bipflow.app/l/loja-b/p/ABCD2345',
   qr_code: 'data:image/png;base64,AAAA',
   ...overrides,
+})
+
+const buildBulkResponse = (
+  labels: ProductBulkLabel[],
+  missingIds: number[] = []
+) => ({
+  labels,
+  missing_ids: missingIds,
+  settings: { ...DEFAULT_PRODUCT_LABEL_SETTINGS },
 })
 
 const mountModal = (props: Partial<{ show: boolean; productIds: number[] }> = {}) =>
@@ -50,10 +59,9 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('fetches and renders the label grid when opened', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({
-      labels: [buildLabel({ id: 1 }), buildLabel({ id: 2, name: 'Produto B' })],
-      missing_ids: [],
-    })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(
+      buildBulkResponse([buildLabel({ id: 1 }), buildLabel({ id: 2, name: 'Produto B' })])
+    )
 
     const wrapper = mountModal()
     await flushPromises()
@@ -64,10 +72,9 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('shows the size chip only for labels that have a size', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({
-      labels: [buildLabel({ id: 1, size: 'M' }), buildLabel({ id: 2, size: null })],
-      missing_ids: [],
-    })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(
+      buildBulkResponse([buildLabel({ id: 1, size: 'M' }), buildLabel({ id: 2, size: null })])
+    )
 
     const wrapper = mountModal()
     await flushPromises()
@@ -76,10 +83,9 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('shows a non-blocking warning when some selected products were not found', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({
-      labels: [buildLabel({ id: 1 })],
-      missing_ids: [2],
-    })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(
+      buildBulkResponse([buildLabel({ id: 1 })], [2])
+    )
 
     const wrapper = mountModal()
     await flushPromises()
@@ -90,10 +96,7 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('shows an empty state and disables actions when every selected product is missing', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({
-      labels: [],
-      missing_ids: [1, 2],
-    })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(buildBulkResponse([], [1, 2]))
 
     const wrapper = mountModal()
     await flushPromises()
@@ -113,7 +116,7 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('emits close when the close button is clicked', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({ labels: [buildLabel()], missing_ids: [] })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(buildBulkResponse([buildLabel()]))
 
     const wrapper = mountModal()
     await flushPromises()
@@ -123,7 +126,7 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
   })
 
   it('calls window.print() when the print button is clicked', async () => {
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({ labels: [buildLabel()], missing_ids: [] })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(buildBulkResponse([buildLabel()]))
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => undefined)
 
     const wrapper = mountModal()
@@ -135,7 +138,7 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
 
   it('builds and saves a PDF when the download button is clicked', async () => {
     const labels = [buildLabel()]
-    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue({ labels, missing_ids: [] })
+    vi.mocked(ProductService.getQrCodesBulk).mockResolvedValue(buildBulkResponse(labels))
     const saveSpy = vi.fn()
     vi.mocked(buildProductLabelsPdf).mockReturnValue({ save: saveSpy } as unknown as ReturnType<typeof buildProductLabelsPdf>)
 
@@ -143,7 +146,7 @@ describe('BulkQrLabelsModal (Etapa 6 of the QR-code stock-exit evolution)', () =
     await flushPromises()
     await wrapper.find('[data-cy="btn-download-labels-pdf"]').trigger('click')
 
-    expect(buildProductLabelsPdf).toHaveBeenCalledWith(labels)
+    expect(buildProductLabelsPdf).toHaveBeenCalledWith(labels, DEFAULT_PRODUCT_LABEL_SETTINGS)
     expect(saveSpy).toHaveBeenCalledWith('etiquetas-produtos.pdf')
   })
 })

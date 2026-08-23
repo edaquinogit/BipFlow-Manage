@@ -3,7 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
-from django.core.validators import RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -20,7 +20,9 @@ def generate_bot_session_id() -> str:
 # docs/architecture/qrcode-stock-exit-evolution.md): Product.public_code is a
 # system-generated identifier meant to be printed as a QR Code. When a product
 # is created without a merchant-provided SKU, the SKU mirrors this same code.
-PRODUCT_PUBLIC_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O/1/I/L, easy to read aloud
+PRODUCT_PUBLIC_CODE_ALPHABET = (
+    "23456789ABCDEFGHJKMNPQRSTUVWXYZ"  # no 0/O/1/I/L, easy to read aloud
+)
 PRODUCT_PUBLIC_CODE_LENGTH = 8
 PRODUCT_PUBLIC_CODE_MAX_ATTEMPTS = 8
 
@@ -35,7 +37,8 @@ def generate_product_public_code() -> str:
     concurrent insert.
     """
     return "".join(
-        secrets.choice(PRODUCT_PUBLIC_CODE_ALPHABET) for _ in range(PRODUCT_PUBLIC_CODE_LENGTH)
+        secrets.choice(PRODUCT_PUBLIC_CODE_ALPHABET)
+        for _ in range(PRODUCT_PUBLIC_CODE_LENGTH)
     )
 
 
@@ -44,7 +47,9 @@ def product_image_upload_to(instance: "Product", filename: str) -> str:
     return f"products/{instance.store_id}/{timezone.now():%Y/%m}/{filename}"
 
 
-def product_gallery_image_upload_to(instance: "ProductGalleryImage", filename: str) -> str:
+def product_gallery_image_upload_to(
+    instance: "ProductGalleryImage", filename: str
+) -> str:
     """Scope a product's gallery image path by its parent product's store (Etapa 4)."""
     return f"products/{instance.product.store_id}/{timezone.now():%Y/%m}/{filename}"
 
@@ -82,14 +87,18 @@ class Category(models.Model):
     )
     name = models.CharField(max_length=100)
     slug = models.SlugField(blank=True, null=True)
-    description = models.TextField(blank=True, null=True, help_text="Optional category description")
+    description = models.TextField(
+        blank=True, null=True, help_text="Optional category description"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ["name"]
         constraints = [
-            models.UniqueConstraint(fields=["store", "slug"], name="unique_category_slug_per_store"),
+            models.UniqueConstraint(
+                fields=["store", "slug"], name="unique_category_slug_per_store"
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -167,7 +176,7 @@ class Product(models.Model):
         help_text=(
             "Per-product low-stock alert threshold (Etapa 3 of the "
             "stock-movement evolution). Null means \"use the dashboard's "
-            "default threshold\" -- this is a preference, not an audited "
+            'default threshold" -- this is a preference, not an audited '
             "quantity, so unlike stock_quantity it stays freely editable."
         ),
     )
@@ -182,10 +191,15 @@ class Product(models.Model):
     class Meta:
         ordering = ["-created_at"]
         constraints = [
-            models.UniqueConstraint(fields=["store", "sku"], name="unique_product_sku_per_store"),
-            models.UniqueConstraint(fields=["store", "slug"], name="unique_product_slug_per_store"),
             models.UniqueConstraint(
-                fields=["store", "public_code"], name="unique_product_public_code_per_store"
+                fields=["store", "sku"], name="unique_product_sku_per_store"
+            ),
+            models.UniqueConstraint(
+                fields=["store", "slug"], name="unique_product_slug_per_store"
+            ),
+            models.UniqueConstraint(
+                fields=["store", "public_code"],
+                name="unique_product_public_code_per_store",
             ),
         ]
 
@@ -262,7 +276,10 @@ class Product(models.Model):
                 error_text = str(exc)
                 is_retryable_code_collision = "public_code" in error_text
                 is_retryable_auto_sku_collision = auto_sku and "sku" in error_text
-                if not (is_retryable_code_collision or is_retryable_auto_sku_collision) or is_last_attempt:
+                if (
+                    not (is_retryable_code_collision or is_retryable_auto_sku_collision)
+                    or is_last_attempt
+                ):
                     raise
 
     def __str__(self) -> str:
@@ -322,7 +339,9 @@ class ProductVariant(models.Model):
     name = models.CharField(max_length=80)
     color_hex = models.CharField(max_length=7, validators=[COLOR_HEX_VALIDATOR])
     stock_quantity = models.PositiveIntegerField(default=0)
-    image = models.ImageField(upload_to=product_variant_image_upload_to, null=True, blank=True)
+    image = models.ImageField(
+        upload_to=product_variant_image_upload_to, null=True, blank=True
+    )
     is_active = models.BooleanField(default=True)
     position = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -358,7 +377,9 @@ class DeliveryRegion(models.Model):
     )
     name = models.CharField(max_length=120)
     city = models.CharField(max_length=120, blank=True)
-    neighborhoods = models.TextField(blank=True, help_text="Optional comma-separated neighborhood hints")
+    neighborhoods = models.TextField(
+        blank=True, help_text="Optional comma-separated neighborhood hints"
+    )
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -367,7 +388,9 @@ class DeliveryRegion(models.Model):
     class Meta:
         ordering = ["name"]
         constraints = [
-            models.UniqueConstraint(fields=["store", "name"], name="unique_delivery_region_name_per_store"),
+            models.UniqueConstraint(
+                fields=["store", "name"], name="unique_delivery_region_name_per_store"
+            ),
         ]
 
     def __str__(self) -> str:
@@ -383,6 +406,16 @@ class Store(models.Model):
     """
 
     DEFAULT_SLUG = "default"
+
+    THEME_KEYS = ("primary", "accent", "background", "surface", "text", "muted")
+    DEFAULT_THEME = {
+        "primary": "#05050A",
+        "accent": "#D81B60",
+        "background": "#FAFAFA",
+        "surface": "#FFFFFF",
+        "text": "#05050A",
+        "muted": "#6B7280",
+    }
 
     # PDV receipt print-format presets (see docs/architecture/
     # pdv-camera-scanner-refinement.md's receipt/print-format follow-up):
@@ -454,7 +487,24 @@ class Store(models.Model):
         if self.whatsapp_phone_digits:
             return self.whatsapp_phone_digits
 
-        return StoreSettings.normalize_phone(getattr(settings, "WHATSAPP_ORDER_PHONE", ""))
+        return StoreSettings.normalize_phone(
+            getattr(settings, "WHATSAPP_ORDER_PHONE", "")
+        )
+
+    @classmethod
+    def normalize_theme(cls, theme: dict | None) -> dict[str, str]:
+        """Return the allowlisted storefront theme with safe defaults."""
+        if not isinstance(theme, dict):
+            theme = {}
+
+        normalized_theme: dict[str, str] = {}
+        for key in cls.THEME_KEYS:
+            value = str(theme.get(key, "") or "").strip()
+            if not ProductVariant.COLOR_HEX_VALIDATOR.regex.match(value):
+                value = cls.DEFAULT_THEME[key]
+            normalized_theme[key] = value.upper() if len(value) == 7 else value
+
+        return normalized_theme
 
     @classmethod
     def get_default(cls) -> "Store":
@@ -483,7 +533,9 @@ class Store(models.Model):
             slug = f"{base_slug}-{suffix}"
 
         store = cls.objects.create(name=name, slug=slug, owner=owner)
-        StoreMembership.objects.create(store=store, user=owner, role=StoreMembership.ROLE_OWNER)
+        StoreMembership.objects.create(
+            store=store, user=owner, role=StoreMembership.ROLE_OWNER
+        )
         return store
 
 
@@ -503,7 +555,9 @@ class StoreMembership(models.Model):
         (ROLE_VIEWER, "Viewer"),
     ]
 
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="memberships")
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name="memberships"
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -519,6 +573,67 @@ class StoreMembership(models.Model):
     def __str__(self) -> str:
         """Return a compact membership identifier for admin/debug purposes."""
         return f"{self.user_id} @ {self.store_id} ({self.role})"
+
+
+class LabelSettings(models.Model):
+    """Tenant-owned printable product-label sheet configuration."""
+
+    PAGE_FORMAT_A4 = "a4"
+    PAGE_FORMAT_CHOICES = [
+        (PAGE_FORMAT_A4, "A4"),
+    ]
+
+    store = models.OneToOneField(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="label_settings",
+    )
+    page_format = models.CharField(
+        max_length=8,
+        choices=PAGE_FORMAT_CHOICES,
+        default=PAGE_FORMAT_A4,
+    )
+    columns = models.PositiveSmallIntegerField(
+        default=2,
+        validators=[MinValueValidator(1), MaxValueValidator(6)],
+    )
+    rows = models.PositiveSmallIntegerField(
+        default=5,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+    )
+    margin_mm = models.PositiveSmallIntegerField(
+        default=10,
+        validators=[MinValueValidator(0), MaxValueValidator(30)],
+    )
+    cell_padding_mm = models.PositiveSmallIntegerField(
+        default=4,
+        validators=[MinValueValidator(0), MaxValueValidator(20)],
+    )
+    qr_size_mm = models.PositiveSmallIntegerField(
+        default=26,
+        validators=[MinValueValidator(12), MaxValueValidator(80)],
+    )
+    show_price = models.BooleanField(default=True)
+    show_size = models.BooleanField(default=True)
+    show_public_code = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Label settings"
+        verbose_name_plural = "Label settings"
+
+    @property
+    def labels_per_page(self) -> int:
+        return self.columns * self.rows
+
+    @classmethod
+    def get_for_store(cls, store: Store) -> "LabelSettings":
+        settings_instance, _created = cls.objects.get_or_create(store=store)
+        return settings_instance
+
+    def __str__(self) -> str:
+        return f"Label settings for {self.store_id}"
 
 
 class CustomerProfile(models.Model):
@@ -573,7 +688,9 @@ class CustomerProfile(models.Model):
 class StoreSettings(models.Model):
     """Singleton operational settings controlled from the dashboard."""
 
-    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    singleton_key = models.PositiveSmallIntegerField(
+        default=1, unique=True, editable=False
+    )
     whatsapp_phone = models.CharField(
         max_length=32,
         blank=True,
@@ -610,7 +727,9 @@ class StoreSettings(models.Model):
     def get_configured_whatsapp_phone(cls) -> str:
         """Return dashboard WhatsApp phone, falling back to the environment value."""
         settings_instance = cls.objects.filter(singleton_key=1).first()
-        dashboard_phone = settings_instance.whatsapp_phone_digits if settings_instance else ""
+        dashboard_phone = (
+            settings_instance.whatsapp_phone_digits if settings_instance else ""
+        )
 
         if dashboard_phone:
             return dashboard_phone
@@ -653,9 +772,13 @@ class BotConversation(models.Model):
         default=generate_bot_session_id,
         help_text="Public opaque identifier used by clients to continue the conversation.",
     )
-    channel = models.CharField(max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_WEB)
+    channel = models.CharField(
+        max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_WEB
+    )
     customer_phone = models.CharField(max_length=32, blank=True)
-    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    status = models.CharField(
+        max_length=24, choices=STATUS_CHOICES, default=STATUS_OPEN
+    )
     last_intent = models.CharField(max_length=32, blank=True)
     sale_order = models.ForeignKey(
         "SaleOrder",
@@ -759,8 +882,12 @@ class SaleOrder(models.Model):
         help_text="Tenant that received this order (Etapa 2 of the multi-tenant evolution).",
     )
     order_reference = models.CharField(max_length=32, unique=True, db_index=True)
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED)
-    channel = models.CharField(max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_VIRTUAL)
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_PREPARED
+    )
+    channel = models.CharField(
+        max_length=16, choices=CHANNEL_CHOICES, default=CHANNEL_VIRTUAL
+    )
     performed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -876,7 +1003,9 @@ class LoginAttempt(models.Model):
     ip_address = models.GenericIPAddressField()
     user_agent = models.CharField(max_length=512, blank=True)
     succeeded = models.BooleanField(default=False)
-    failure_reason = models.CharField(max_length=32, choices=FAILURE_CHOICES, blank=True)
+    failure_reason = models.CharField(
+        max_length=32, choices=FAILURE_CHOICES, blank=True
+    )
     store_id = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -981,7 +1110,9 @@ class MFABackupCode(models.Model):
 
     def __str__(self) -> str:
         """Return a compact identifier for admin/debug purposes."""
-        return f"Backup code for {self.user_id} ({'used' if self.used_at else 'unused'})"
+        return (
+            f"Backup code for {self.user_id} ({'used' if self.used_at else 'unused'})"
+        )
 
     @staticmethod
     def _generate_plain_code() -> str:
@@ -1115,6 +1246,13 @@ class StockMovement(models.Model):
         on_delete=models.CASCADE,
         related_name="stock_movements",
     )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="stock_movements",
+    )
     movement_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     quantity = models.PositiveIntegerField(
         help_text="Always positive; direction comes from movement_type."
@@ -1122,7 +1260,9 @@ class StockMovement(models.Model):
     previous_stock = models.PositiveIntegerField()
     new_stock = models.PositiveIntegerField()
     reason = models.CharField(max_length=20, choices=REASON_CHOICES)
-    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    source = models.CharField(
+        max_length=10, choices=SOURCE_CHOICES, default=SOURCE_MANUAL
+    )
     sale_order = models.ForeignKey(
         SaleOrder,
         on_delete=models.SET_NULL,
@@ -1144,6 +1284,7 @@ class StockMovement(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["store", "product", "created_at"]),
+            models.Index(fields=["store", "variant", "created_at"]),
             models.Index(fields=["store", "created_at"]),
         ]
         constraints = [
@@ -1155,4 +1296,5 @@ class StockMovement(models.Model):
 
     def __str__(self) -> str:
         """Return a compact movement summary."""
-        return f"{self.get_movement_type_display()} {self.quantity} - {self.product.name}"
+        variant_suffix = f" / {self.variant.name}" if self.variant_id else ""
+        return f"{self.get_movement_type_display()} {self.quantity} - {self.product.name}{variant_suffix}"

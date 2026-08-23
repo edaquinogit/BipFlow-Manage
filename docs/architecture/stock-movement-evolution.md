@@ -246,7 +246,37 @@ real (HMR sem erros, endpoint público confirmado).
 reflete o limite configurado pelo lojista). **Risco:** baixo — leitura
 aditiva, nenhuma mudança de contrato de API.
 
-## 7. Riscos e pontos de atenção
+## 7. Etapa 5 -- Ledger de estoque das variantes via formulario ✅ (concluida)
+
+Depois da introducao de variantes, `ProductVariant.stock_quantity` virou a
+fonte de verdade para produtos com variantes ativas. O formulario de produto
+ja sincronizava o agregado (`Product.stock_quantity`) a partir dessas
+variantes, mas uma edicao direta do numero da variante nao deixava rastro no
+`StockMovement`.
+
+Decisao: alteracoes de estoque feitas via `variants_payload` tambem geram
+ledger.
+
+Backend:
+
+- `ProductSerializer._sync_variants()` registra `StockMovement` com
+  `variant_id` quando o estoque de uma variante muda.
+- Criacao de produto com variantes estocadas gera uma `entrada_inicial` por
+  variante, nao uma entrada agregada no produto.
+- Edicao posterior de estoque da variante gera `ajuste_inventario`, com
+  direcao derivada do delta: aumento vira `entrada`; reducao vira `saida`.
+- Atualizacao apenas de metadados da variante (nome, cor, imagem, posicao)
+  nao cria movimento.
+- `performed_by` vem do `request.user` do dashboard.
+
+Testes: extensao de `ProductAPIHealthTest` cobrindo criacao inicial por
+variante, aumento, reducao e payload legado sem `stock_quantity`.
+
+**Visivel para o usuario final:** indiretamente, pelo historico de estoque
+mais fiel. **Risco:** baixo -- mantem o formulario atual, mas torna a
+mutacao auditavel.
+
+## 8. Riscos e pontos de atenção
 
 | Risco | Onde aparece | Mitigação |
 | --- | --- | --- |
@@ -258,8 +288,9 @@ aditiva, nenhuma mudança de contrato de API.
 | `low_stock_threshold` nulo virar `0` ao limpar o campo, ou ficar "preso" no valor antigo ao tentar limpar via FormData | Etapa 3 | Normalizador dedicado no formulário (`null`, nunca `0`, para "sem override") + branch próprio em `_preparePayload()` que envia string vazia explícita para esse campo especificamente, em vez de omitir a chave como todo outro campo nulo — confirmado contra o servidor real antes de implementar |
 | ~~Dois "5" hardcoded equivalentes na vitrine pública continuavam fixos, divergindo do limite configurável do painel~~ | Etapa 3 → resolvido na Etapa 4 | `ProductCard.vue`/`ProductDetailView.vue` agora usam `isLowStock()` do mesmo `utils/stockAlerts.ts` |
 | `utils/stockAlerts.ts` acoplado ao tipo `Product` do schema administrativo, incompatível com o `Product` da vitrine pública (`price` string vs. number) | Etapa 4 | Tipo estrutural mínimo (`StockAlertable`) em vez de importar o `Product` de um schema específico — funciona para os dois lados sem duplicar lógica |
+| Exclusao de variante com estoque ainda precisa de uma regra explicita | Etapa 5 | Edicoes numericas de estoque agora sao auditadas; excluir uma variante estocada e outro ciclo de vida, porque o FK `StockMovement.variant` e nullable e seria limpo apos a exclusao |
 
-## 8. Definição de pronto
+## 9. Definição de pronto
 
 ### Etapa 1
 
@@ -320,3 +351,13 @@ aditiva, nenhuma mudança de contrato de API.
 - [x] Testes backend (suíte completa, inalterada) e frontend
       (`ProductCard`, `stockAlerts`) verdes.
 - [x] Verificado contra o servidor de desenvolvimento real.
+
+### Etapa 5
+
+- [x] Criacao de produto com variantes estocadas cria movimentos iniciais por
+      variante.
+- [x] Edicao de estoque de variante cria movimento de ajuste com `variant_id`.
+- [x] Aumento usa `entrada`; reducao usa `saida`.
+- [x] Payload legado sem `stock_quantity` preserva estoque e nao cria
+      movimento.
+- [x] Produto agregado continua sincronizado a partir das variantes ativas.

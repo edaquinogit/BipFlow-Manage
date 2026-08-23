@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from django.db.models import Q, QuerySet
 
-from .models import DeliveryRegion, Product, StoreSettings
+from .models import DeliveryRegion, Product, Store
 
 
 @dataclass(frozen=True)
@@ -118,8 +118,8 @@ WHATSAPP_HANDOFF_ACTIONS = [
 ]
 
 
-def build_whatsapp_handoff_options() -> list[BotOption]:
-    whatsapp_phone = StoreSettings.get_configured_whatsapp_phone()
+def build_whatsapp_handoff_options(store: Store) -> list[BotOption]:
+    whatsapp_phone = store.get_configured_whatsapp_phone()
 
     if not whatsapp_phone:
         return []
@@ -140,8 +140,8 @@ def default_options() -> list[BotOption]:
     return [*DEFAULT_QUICK_OPTIONS]
 
 
-def support_options() -> list[BotOption]:
-    whatsapp_options = build_whatsapp_handoff_options()
+def support_options(store: Store) -> list[BotOption]:
+    whatsapp_options = build_whatsapp_handoff_options(store)
 
     if whatsapp_options:
         return whatsapp_options
@@ -152,7 +152,9 @@ def support_options() -> list[BotOption]:
 def normalize_message(message: str) -> str:
     """Make rule matching stable for accents and mixed casing."""
     normalized = unicodedata.normalize("NFKD", message)
-    without_accents = "".join(character for character in normalized if not unicodedata.combining(character))
+    without_accents = "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )
     return " ".join(without_accents.lower().split())
 
 
@@ -161,8 +163,12 @@ def message_has_any(message: str, terms: set[str]) -> bool:
     return any(term in message for term in normalized_terms)
 
 
-def available_products() -> QuerySet[Product]:
-    return Product.objects.filter(is_available=True, stock_quantity__gt=0).select_related("category")
+def available_products(store: Store) -> QuerySet[Product]:
+    return Product.objects.filter(
+        store=store,
+        is_available=True,
+        stock_quantity__gt=0,
+    ).select_related("category")
 
 
 def serialize_products(products: QuerySet[Product]) -> list[BotProductSuggestion]:
@@ -178,7 +184,9 @@ def serialize_products(products: QuerySet[Product]) -> list[BotProductSuggestion
     ]
 
 
-def serialize_regions(regions: QuerySet[DeliveryRegion]) -> list[BotDeliveryRegionSuggestion]:
+def serialize_regions(
+    regions: QuerySet[DeliveryRegion],
+) -> list[BotDeliveryRegionSuggestion]:
     return [
         BotDeliveryRegionSuggestion(
             id=region.id,
@@ -190,9 +198,11 @@ def serialize_regions(regions: QuerySet[DeliveryRegion]) -> list[BotDeliveryRegi
     ]
 
 
-def build_product_search(message: str) -> BotReply:
-    products = available_products().filter(
-        Q(name__icontains=message) | Q(sku__icontains=message) | Q(description__icontains=message)
+def build_product_search(message: str, store: Store) -> BotReply:
+    products = available_products(store).filter(
+        Q(name__icontains=message)
+        | Q(sku__icontains=message)
+        | Q(description__icontains=message)
     )[:5]
     product_suggestions = serialize_products(products)
 
@@ -216,7 +226,7 @@ def build_product_search(message: str) -> BotReply:
     )
 
 
-def build_bot_reply(message: str) -> BotReply:
+def build_bot_reply(message: str, store: Store) -> BotReply:
     normalized_message = normalize_message(message)
 
     if message_has_any(normalized_message, GREETING_TERMS):
@@ -229,7 +239,9 @@ def build_bot_reply(message: str) -> BotReply:
         )
 
     if message_has_any(normalized_message, DELIVERY_TERMS):
-        regions = DeliveryRegion.objects.filter(is_active=True).order_by("name")[:8]
+        regions = DeliveryRegion.objects.filter(store=store, is_active=True).order_by(
+            "name"
+        )[:8]
         reply = (
             "Estas sao as regioes de entrega ativas agora."
             if regions
@@ -255,7 +267,7 @@ def build_bot_reply(message: str) -> BotReply:
         )
 
     if message_has_any(normalized_message, HUMAN_SUPPORT_TERMS):
-        has_whatsapp = bool(StoreSettings.get_configured_whatsapp_phone())
+        has_whatsapp = bool(store.get_configured_whatsapp_phone())
         return BotReply(
             intent="human_support",
             reply=(
@@ -263,13 +275,13 @@ def build_bot_reply(message: str) -> BotReply:
                 if has_whatsapp
                 else "Claro. Vou deixar esta conversa marcada para atendimento humano, mas o WhatsApp da loja ainda nao esta configurado."
             ),
-            options=support_options(),
+            options=support_options(store),
             products=[],
             delivery_regions=[],
         )
 
     if message_has_any(normalized_message, CATALOG_TERMS):
-        products = available_products().order_by("-created_at")[:5]
+        products = available_products(store).order_by("-created_at")[:5]
         reply = (
             "Separei alguns produtos disponiveis agora."
             if products
@@ -284,7 +296,7 @@ def build_bot_reply(message: str) -> BotReply:
         )
 
     if len(normalized_message) >= 3:
-        return build_product_search(normalized_message)
+        return build_product_search(normalized_message, store)
 
     return BotReply(
         intent="fallback",

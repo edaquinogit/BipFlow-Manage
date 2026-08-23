@@ -6,6 +6,7 @@ See docs/architecture/qrcode-stock-exit-evolution.md. Reuses
 TwoStoreFixtureMixin (test_store_active_isolation.py) for cross-store
 isolation, same as test_stock_movements.py / test_product_public_code.py.
 """
+
 import base64
 from decimal import Decimal
 
@@ -15,7 +16,13 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from bipdelivery.api.models import Product, SaleOrder, StockMovement, StoreMembership
+from bipdelivery.api.models import (
+    Product,
+    ProductVariant,
+    SaleOrder,
+    StockMovement,
+    StoreMembership,
+)
 from bipdelivery.tests.test_store_active_isolation import TwoStoreFixtureMixin
 
 PDV_SALES_URL = "/api/v1/pdv/sales/"
@@ -68,7 +75,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.product_b.refresh_from_db()
         self.assertEqual(self.product_b.stock_quantity, 7)
 
-        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
         self.assertEqual(sale_order.channel, SaleOrder.CHANNEL_LOJA_FISICA)
         self.assertEqual(sale_order.store, self.store_b)
         self.assertEqual(sale_order.delivery_method, "pickup")
@@ -77,13 +86,133 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         # records who rang it up, unlike a public/WhatsApp checkout.
         self.assertEqual(sale_order.performed_by, self.user_b)
 
-        movement = StockMovement.objects.get(product=self.product_b, sale_order=sale_order)
+        movement = StockMovement.objects.get(
+            product=self.product_b, sale_order=sale_order
+        )
         self.assertEqual(movement.movement_type, StockMovement.TYPE_SAIDA)
         self.assertEqual(movement.source, StockMovement.SOURCE_PDV)
         self.assertEqual(movement.reason, StockMovement.REASON_VENDA)
         self.assertEqual(movement.previous_stock, 10)
         self.assertEqual(movement.new_stock, 7)
         self.assertEqual(movement.performed_by, self.user_b)
+
+    def test_variant_sale_decrements_variant_and_product_aggregate(self) -> None:
+        black = ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=4,
+            position=0,
+        )
+        ProductVariant.objects.create(
+            product=self.product_b,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=6,
+            position=1,
+        )
+
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [
+                    {
+                        "public_code": self.product_b.public_code,
+                        "variant_id": black.id,
+                        "quantity": 2,
+                    }
+                ],
+                "payment_method": "cash",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED, msg=response.data
+        )
+        self.assertEqual(response.data["items"][0]["variant_id"], black.id)
+        self.assertEqual(response.data["items"][0]["variant_name"], "Preto")
+        self.product_b.refresh_from_db()
+        black.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 8)
+        self.assertEqual(black.stock_quantity, 2)
+
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
+        order_item = sale_order.items.get()
+        self.assertEqual(order_item.variant_id, black.id)
+        self.assertEqual(order_item.variant_name, "Preto")
+
+        movement = StockMovement.objects.get(
+            product=self.product_b, sale_order=sale_order
+        )
+        self.assertEqual(movement.variant_id, black.id)
+        self.assertEqual(movement.previous_stock, 4)
+        self.assertEqual(movement.new_stock, 2)
+
+    def test_variant_managed_product_requires_variant_id(self) -> None:
+        variant = ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=4,
+            position=0,
+        )
+
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [{"public_code": self.product_b.public_code, "quantity": 1}],
+                "payment_method": "cash",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product_b.refresh_from_db()
+        variant.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 10)
+        self.assertEqual(variant.stock_quantity, 4)
+        self.assertFalse(StockMovement.objects.filter(product=self.product_b).exists())
+
+    def test_variant_sale_cannot_exceed_selected_variant_stock(self) -> None:
+        black = ProductVariant.objects.create(
+            product=self.product_b,
+            name="Preto",
+            color_hex="#111111",
+            stock_quantity=1,
+            position=0,
+        )
+        ProductVariant.objects.create(
+            product=self.product_b,
+            name="Azul",
+            color_hex="#3366FF",
+            stock_quantity=9,
+            position=1,
+        )
+
+        response = self.client.post(
+            PDV_SALES_URL,
+            {
+                "items": [
+                    {
+                        "public_code": self.product_b.public_code,
+                        "variant_id": black.id,
+                        "quantity": 2,
+                    }
+                ],
+                "payment_method": "cash",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product_b.refresh_from_db()
+        black.refresh_from_db()
+        self.assertEqual(self.product_b.stock_quantity, 10)
+        self.assertEqual(black.stock_quantity, 1)
+        self.assertFalse(StockMovement.objects.filter(product=self.product_b).exists())
 
     def test_multi_item_sale_is_atomic_across_products(self) -> None:
         response = self.client.post(
@@ -158,12 +287,17 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         self.other_product_b.refresh_from_db()
         self.assertEqual(self.product_b.stock_quantity, 10)
         self.assertEqual(self.other_product_b.stock_quantity, 4)
-        self.assertFalse(SaleOrder.objects.filter(channel=SaleOrder.CHANNEL_LOJA_FISICA).exists())
+        self.assertFalse(
+            SaleOrder.objects.filter(channel=SaleOrder.CHANNEL_LOJA_FISICA).exists()
+        )
 
     def test_unknown_code_is_rejected(self) -> None:
         response = self.client.post(
             PDV_SALES_URL,
-            {"items": [{"public_code": "DOESNOTEX", "quantity": 1}], "payment_method": "cash"},
+            {
+                "items": [{"public_code": "DOESNOTEX", "quantity": 1}],
+                "payment_method": "cash",
+            },
             format="json",
         )
 
@@ -173,7 +307,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         response = self.client.post(
             PDV_SALES_URL,
             {
-                "items": [{"public_code": self.product_b.public_code.lower(), "quantity": 1}],
+                "items": [
+                    {"public_code": self.product_b.public_code.lower(), "quantity": 1}
+                ],
                 "payment_method": "cash",
             },
             format="json",
@@ -207,14 +343,19 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
 
         response = client.post(
             PDV_SALES_URL,
-            {"items": [{"public_code": "ANYCODE1", "quantity": 1}], "payment_method": "cash"},
+            {
+                "items": [{"public_code": "ANYCODE1", "quantity": 1}],
+                "payment_method": "cash",
+            },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_viewer_role_cannot_register_a_sale(self) -> None:
-        viewer = User.objects.create_user(username="pdv_viewer_b", password="testpass123")
+        viewer = User.objects.create_user(
+            username="pdv_viewer_b", password="testpass123"
+        )
         StoreMembership.objects.create(
             store=self.store_b, user=viewer, role=StoreMembership.ROLE_VIEWER
         )
@@ -245,7 +386,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
         self.assertEqual(sale_order.customer_name, "Maria")
         self.assertEqual(sale_order.notes, "Cliente preferencial")
         self.assertEqual(sale_order.payment_method, "card")
@@ -266,7 +409,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
         self.assertEqual(sale_order.customer_phone, "71999998888")
 
     def test_optional_customer_email_is_persisted_and_returned(self) -> None:
@@ -285,7 +430,9 @@ class PdvSaleAPITest(TwoStoreFixtureMixin, TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["customer_email"], "cliente@example.com")
-        sale_order = SaleOrder.objects.get(order_reference=response.data["order_reference"])
+        sale_order = SaleOrder.objects.get(
+            order_reference=response.data["order_reference"]
+        )
         self.assertEqual(sale_order.customer_email, "cliente@example.com")
 
     def test_customer_email_defaults_to_blank(self) -> None:
@@ -373,7 +520,10 @@ class PdvReceiptEmailAPITest(TwoStoreFixtureMixin, TestCase):
     def test_non_pdf_payload_is_rejected(self) -> None:
         response = self.client.post(
             receipt_email_url(self.order_b.order_reference),
-            {"email": "cliente@example.com", "pdf_base64": fake_pdf_base64(b"not a pdf at all")},
+            {
+                "email": "cliente@example.com",
+                "pdf_base64": fake_pdf_base64(b"not a pdf at all"),
+            },
             format="json",
         )
 
@@ -399,8 +549,12 @@ class PdvReceiptEmailAPITest(TwoStoreFixtureMixin, TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_viewer_role_cannot_send_receipt_email(self) -> None:
-        viewer = User.objects.create_user(username="pdv_email_viewer_b", password="testpass123")
-        StoreMembership.objects.create(store=self.store_b, user=viewer, role=StoreMembership.ROLE_VIEWER)
+        viewer = User.objects.create_user(
+            username="pdv_email_viewer_b", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=viewer, role=StoreMembership.ROLE_VIEWER
+        )
         client = APIClient()
         client.force_authenticate(user=viewer, token={"store_id": self.store_b.id})
 

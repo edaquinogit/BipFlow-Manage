@@ -16,7 +16,6 @@ from bipdelivery.api.models import (
     Product,
     SaleOrder,
     Store,
-    StoreSettings,
 )
 
 pytestmark = pytest.mark.django_db
@@ -54,7 +53,9 @@ class BotMessageMVPTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["intent"], "greeting")
-        self.assertIn("produtos", {option["value"] for option in response.data["options"]})
+        self.assertIn(
+            "produtos", {option["value"] for option in response.data["options"]}
+        )
         self.assertEqual(response.data["products"], [])
 
     def test_bot_creates_conversation_and_persists_messages(self) -> None:
@@ -70,7 +71,10 @@ class BotMessageMVPTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["session_id"], conversation.session_id)
-        self.assertEqual(response.data["conversation_status"], BotConversation.STATUS_WAITING_CUSTOMER)
+        self.assertEqual(
+            response.data["conversation_status"],
+            BotConversation.STATUS_WAITING_CUSTOMER,
+        )
         self.assertEqual(conversation.channel, BotConversation.CHANNEL_WEB)
         self.assertEqual(conversation.last_intent, "greeting")
         self.assertEqual(len(messages), 2)
@@ -97,7 +101,9 @@ class BotMessageMVPTest(TestCase):
             format="json",
         )
 
-        conversation = BotConversation.objects.get(id=first_response.data["conversation_id"])
+        conversation = BotConversation.objects.get(
+            id=first_response.data["conversation_id"]
+        )
 
         self.assertEqual(second_response.status_code, status.HTTP_200_OK)
         self.assertEqual(second_response.data["conversation_id"], conversation.id)
@@ -124,7 +130,10 @@ class BotMessageMVPTest(TestCase):
         )
 
         self.assertEqual(second_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(second_response.data["conversation_id"], first_response.data["conversation_id"])
+        self.assertEqual(
+            second_response.data["conversation_id"],
+            first_response.data["conversation_id"],
+        )
         self.assertEqual(BotConversation.objects.count(), 1)
         self.assertEqual(BotMessage.objects.count(), 4)
 
@@ -144,7 +153,9 @@ class BotMessageMVPTest(TestCase):
 
     def test_bot_exposes_whatsapp_handoff_options_when_store_phone_exists(self) -> None:
         """The bot API should own WhatsApp handoff actions when the store is configured."""
-        StoreSettings.objects.create(whatsapp_phone="5571999999999")
+        Store.objects.filter(id=Store.get_default().id).update(
+            whatsapp_phone="5571999999999"
+        )
 
         response: Any = self.client.post(
             "/api/v1/bot/messages/",
@@ -153,7 +164,8 @@ class BotMessageMVPTest(TestCase):
         )
 
         whatsapp_options = [
-            option for option in response.data["options"]
+            option
+            for option in response.data["options"]
             if option["kind"] == "whatsapp_link"
         ]
         option_values = {option["value"] for option in whatsapp_options}
@@ -166,7 +178,10 @@ class BotMessageMVPTest(TestCase):
         self.assertIn("whatsapp:order", option_values)
         self.assertIn("whatsapp:human", option_values)
         self.assertTrue(
-            all(option["url"].startswith("https://wa.me/5571999999999?text=") for option in whatsapp_options)
+            all(
+                option["url"].startswith("https://wa.me/5571999999999?text=")
+                for option in whatsapp_options
+            )
         )
 
     def test_bot_catalog_lists_only_available_products(self) -> None:
@@ -277,7 +292,9 @@ class BotConversationDashboardAPITest(TestCase):
 
     def test_regular_user_cannot_read_bot_conversations(self) -> None:
         """Authenticated users without dashboard role should not see bot history."""
-        regular_user = User.objects.create_user(username="regularbot", password="testpass123")
+        regular_user = User.objects.create_user(
+            username="regularbot", password="testpass123"
+        )
         self.client.force_authenticate(user=regular_user)
 
         response: Any = self.client.get("/api/v1/bot-conversations/")
@@ -300,8 +317,12 @@ class BotConversationDashboardAPITest(TestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["id"], conversation_id)
         self.assertEqual(response.data["results"][0]["message_count"], 2)
-        self.assertEqual(response.data["results"][0]["status"], BotConversation.STATUS_WAITING_HUMAN)
-        self.assertIn("atendimento humano", response.data["results"][0]["last_message_preview"])
+        self.assertEqual(
+            response.data["results"][0]["status"], BotConversation.STATUS_WAITING_HUMAN
+        )
+        self.assertIn(
+            "atendimento humano", response.data["results"][0]["last_message_preview"]
+        )
         self.assertIsNone(response.data["results"][0]["sale_order"])
         self.assertNotIn("messages", response.data["results"][0])
 
@@ -325,11 +346,20 @@ class BotConversationDashboardAPITest(TestCase):
         self.client.force_authenticate(user=dashboard_user)
 
         list_response: Any = self.client.get("/api/v1/bot-conversations/")
-        detail_response: Any = self.client.get(f"/api/v1/bot-conversations/{conversation_id}/")
+        detail_response: Any = self.client.get(
+            f"/api/v1/bot-conversations/{conversation_id}/"
+        )
 
-        self.assertEqual(list_response.data["results"][0]["sale_order"]["order_reference"], "BPF-DASHTEST-0001")
-        self.assertEqual(list_response.data["results"][0]["sale_order"]["total"], "50.00")
-        self.assertEqual(detail_response.data["sale_order"]["order_reference"], "BPF-DASHTEST-0001")
+        self.assertEqual(
+            list_response.data["results"][0]["sale_order"]["order_reference"],
+            "BPF-DASHTEST-0001",
+        )
+        self.assertEqual(
+            list_response.data["results"][0]["sale_order"]["total"], "50.00"
+        )
+        self.assertEqual(
+            detail_response.data["sale_order"]["order_reference"], "BPF-DASHTEST-0001"
+        )
 
     def test_dashboard_user_can_retrieve_bot_conversation_messages(self) -> None:
         """Conversation details should include persisted user and bot messages."""
@@ -381,11 +411,16 @@ class BotConversationStoreIsolationTest(TestCase):
 
     def setUp(self) -> None:
         cache.clear()
+        self.store_a = Store.get_default()
         self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
 
-    def test_new_conversation_is_scoped_to_the_default_store_when_no_header_is_sent(self) -> None:
+    def test_new_conversation_is_scoped_to_the_default_store_when_no_header_is_sent(
+        self,
+    ) -> None:
         client = APIClient()
-        response: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        response: Any = client.post(
+            "/api/v1/bot/messages/", {"message": "Oi"}, format="json"
+        )
 
         conversation = BotConversation.objects.get(id=response.data["conversation_id"])
         self.assertEqual(conversation.store_id, Store.get_default().id)
@@ -402,10 +437,14 @@ class BotConversationStoreIsolationTest(TestCase):
         conversation = BotConversation.objects.get(id=response.data["conversation_id"])
         self.assertEqual(conversation.store_id, self.store_b.id)
 
-    def test_continuing_a_session_from_another_store_starts_a_fresh_conversation(self) -> None:
+    def test_continuing_a_session_from_another_store_starts_a_fresh_conversation(
+        self,
+    ) -> None:
         """A session id from store A must never be resumed by a request resolved to store B."""
         client = APIClient()
-        first: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        first: Any = client.post(
+            "/api/v1/bot/messages/", {"message": "Oi"}, format="json"
+        )
 
         second: Any = client.post(
             "/api/v1/bot/messages/",
@@ -414,7 +453,9 @@ class BotConversationStoreIsolationTest(TestCase):
             HTTP_X_STORE_SLUG=self.store_b.slug,
         )
 
-        self.assertNotEqual(second.data["conversation_id"], first.data["conversation_id"])
+        self.assertNotEqual(
+            second.data["conversation_id"], first.data["conversation_id"]
+        )
         self.assertEqual(BotConversation.objects.count(), 2)
 
     def test_dashboard_user_only_sees_their_own_stores_conversations(self) -> None:
@@ -426,15 +467,108 @@ class BotConversationStoreIsolationTest(TestCase):
             format="json",
             HTTP_X_STORE_SLUG=self.store_b.slug,
         )
-        own_conversation: Any = client.post("/api/v1/bot/messages/", {"message": "Oi"}, format="json")
+        own_conversation: Any = client.post(
+            "/api/v1/bot/messages/", {"message": "Oi"}, format="json"
+        )
 
         dashboard_user = User.objects.create_user(
             username="dashboardbotisolation", password="testpass123", is_staff=True
         )
-        client.force_authenticate(user=dashboard_user, token={"store_id": Store.get_default().id})
+        client.force_authenticate(
+            user=dashboard_user, token={"store_id": Store.get_default().id}
+        )
 
         response: Any = client.get("/api/v1/bot-conversations/")
 
         ids = {item["id"] for item in response.data["results"]}
         self.assertIn(own_conversation.data["conversation_id"], ids)
         self.assertEqual(response.data["count"], 1)
+
+    def test_bot_handoff_uses_the_resolved_stores_whatsapp(self) -> None:
+        """Store B's bot must never build WhatsApp links with Store A's phone."""
+        self.store_a.whatsapp_phone = "5571000000000"
+        self.store_a.save(update_fields=["whatsapp_phone"])
+        self.store_b.whatsapp_phone = "5572000000000"
+        self.store_b.save(update_fields=["whatsapp_phone"])
+
+        response: Any = APIClient().post(
+            "/api/v1/bot/messages/",
+            {"message": "Quero falar com atendente"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        whatsapp_urls = [
+            option["url"]
+            for option in response.data["options"]
+            if option["kind"] == "whatsapp_link"
+        ]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(whatsapp_urls)
+        self.assertTrue(
+            all(
+                url.startswith("https://wa.me/5572000000000?text=")
+                for url in whatsapp_urls
+            )
+        )
+        self.assertFalse(any("5571000000000" in url for url in whatsapp_urls))
+
+    def test_bot_catalog_replies_are_scoped_to_the_resolved_store(self) -> None:
+        """Catalog suggestions should come only from the request Store."""
+        category_a = Category.objects.create(name="Categoria A", store=self.store_a)
+        category_b = Category.objects.create(name="Categoria B", store=self.store_b)
+        Product.objects.create(
+            name="Produto A",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+            is_available=True,
+            category=category_a,
+            store=self.store_a,
+        )
+        Product.objects.create(
+            name="Produto B",
+            price=Decimal("20.00"),
+            stock_quantity=5,
+            is_available=True,
+            category=category_b,
+            store=self.store_b,
+        )
+
+        response: Any = APIClient().post(
+            "/api/v1/bot/messages/",
+            {"message": "catalogo"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        product_names = {product["name"] for product in response.data["products"]}
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(product_names, {"Produto B"})
+
+    def test_bot_delivery_replies_are_scoped_to_the_resolved_store(self) -> None:
+        """Delivery suggestions should not mix regions with the same name across stores."""
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("5.00"),
+            store=self.store_a,
+        )
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Feira",
+            delivery_fee=Decimal("7.00"),
+            store=self.store_b,
+        )
+
+        response: Any = APIClient().post(
+            "/api/v1/bot/messages/",
+            {"message": "entrega"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        regions = response.data["delivery_regions"]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(regions), 1)
+        self.assertEqual(regions[0]["city"], "Feira")
+        self.assertEqual(regions[0]["delivery_fee"], "7.00")

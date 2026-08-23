@@ -9,6 +9,7 @@ locks/decrements in bulk for its own hot path and only reuses StockMovement
 as a plain bulk_create afterwards -- but every other stock_quantity write
 should call apply_stock_movement().
 """
+
 from __future__ import annotations
 
 from django.db import transaction
@@ -28,6 +29,7 @@ def apply_stock_movement(
     movement_type: str,
     quantity: int,
     reason: str,
+    variant_id: int | None = None,
     performed_by=None,
     notes: str = "",
     source: str = StockMovement.SOURCE_MANUAL,
@@ -47,11 +49,36 @@ def apply_stock_movement(
 
     with transaction.atomic():
         try:
-            product = Product.objects.select_for_update().get(id=product_id, store=store)
+            product = Product.objects.select_for_update().get(
+                id=product_id, store=store
+            )
         except Product.DoesNotExist as exc:
             raise StockMovementError("Produto não encontrado.") from exc
 
-        previous_stock = product.stock_quantity
+        selected_variant = None
+        if variant_id is not None:
+            try:
+                selected_variant = ProductVariant.objects.select_for_update().get(
+                    id=variant_id,
+                    product=product,
+                )
+            except ProductVariant.DoesNotExist as exc:
+                raise StockMovementError(
+                    "Variante nao encontrada para este produto."
+                ) from exc
+
+        active_variants = list(
+            ProductVariant.objects.select_for_update()
+            .filter(product=product, is_active=True)
+            .order_by("id")
+        )
+        if active_variants and selected_variant is None:
+            raise StockMovementError(
+                "Este produto possui variantes ativas. Informe a variante para movimentar o estoque."
+            )
+
+        stock_target = selected_variant or product
+        previous_stock = stock_target.stock_quantity
 
         if movement_type == StockMovement.TYPE_ENTRADA:
             new_stock = previous_stock + quantity
@@ -62,14 +89,32 @@ def apply_stock_movement(
                     f"Estoque insuficiente. Disponível: {previous_stock}, solicitado: {quantity}."
                 )
 
-        product.stock_quantity = new_stock
-        product.is_available = new_stock > 0
-        product.updated_at = timezone.now()
-        product.save(update_fields=["stock_quantity", "is_available", "updated_at"])
+        timestamp = timezone.now()
+
+        if selected_variant is not None:
+            selected_variant.stock_quantity = new_stock
+            selected_variant.updated_at = timestamp
+            selected_variant.save(update_fields=["stock_quantity", "updated_at"])
+
+            if active_variants:
+                for variant in active_variants:
+                    if variant.id == selected_variant.id:
+                        variant.stock_quantity = selected_variant.stock_quantity
+                sync_product_stock_from_variants(
+                    product,
+                    variants=active_variants,
+                    timestamp=timestamp,
+                )
+        else:
+            product.stock_quantity = new_stock
+            product.is_available = new_stock > 0
+            product.updated_at = timestamp
+            product.save(update_fields=["stock_quantity", "is_available", "updated_at"])
 
         return StockMovement.objects.create(
             store=store,
             product=product,
+            variant=selected_variant,
             movement_type=movement_type,
             quantity=quantity,
             previous_stock=previous_stock,
@@ -80,6 +125,29 @@ def apply_stock_movement(
             performed_by=performed_by,
             notes=notes,
         )
+
+
+def sync_product_stock_from_variants(
+    product: Product,
+    *,
+    variants: list[ProductVariant] | None = None,
+    timestamp=None,
+) -> int:
+    """Sync a product's aggregate saleable stock from its active variants."""
+    if variants is None:
+        variants = list(product.variants.filter(is_active=True))
+    else:
+        variants = [variant for variant in variants if variant.is_active]
+
+    if not variants:
+        return product.stock_quantity
+
+    aggregate_stock = sum(variant.stock_quantity for variant in variants)
+    product.stock_quantity = aggregate_stock
+    product.is_available = aggregate_stock > 0
+    product.updated_at = timestamp or timezone.now()
+    product.save(update_fields=["stock_quantity", "is_available", "updated_at"])
+    return aggregate_stock
 
 
 def apply_order_cancellation(
@@ -139,24 +207,34 @@ def apply_order_cancellation(
                 # gets cancelled and restocked normally.
                 continue
 
-            previous_stock = product.stock_quantity
+            variant = variants_by_id.get(item.variant_id)
+            previous_stock = (
+                variant.stock_quantity
+                if variant is not None
+                else product.stock_quantity
+            )
             product.stock_quantity += item.quantity
             product.is_available = product.stock_quantity > 0
             product.updated_at = timestamp
 
-            variant = variants_by_id.get(item.variant_id)
             if variant is not None:
                 variant.stock_quantity += item.quantity
                 variant.updated_at = timestamp
+            new_stock = (
+                variant.stock_quantity
+                if variant is not None
+                else product.stock_quantity
+            )
 
             movements.append(
                 StockMovement(
                     store=store,
                     product=product,
+                    variant=variant,
                     movement_type=StockMovement.TYPE_ENTRADA,
                     quantity=item.quantity,
                     previous_stock=previous_stock,
-                    new_stock=product.stock_quantity,
+                    new_stock=new_stock,
                     reason=StockMovement.REASON_VENDA_CANCELADA,
                     source=source,
                     sale_order=order,
@@ -166,7 +244,8 @@ def apply_order_cancellation(
 
         if products_by_id:
             Product.objects.bulk_update(
-                list(products_by_id.values()), ["stock_quantity", "is_available", "updated_at"]
+                list(products_by_id.values()),
+                ["stock_quantity", "is_available", "updated_at"],
             )
 
         if variants_by_id:

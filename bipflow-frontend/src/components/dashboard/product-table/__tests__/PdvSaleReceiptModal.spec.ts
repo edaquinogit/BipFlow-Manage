@@ -31,7 +31,11 @@ function buildSale(overrides: Partial<PdvSaleResponse> = {}): PdvSaleResponse {
     items: [
       {
         product_id: 7,
+        variant_id: null,
         product_name: 'Coxinha premium',
+        variant_name: '',
+        variant_color_hex: '',
+        variant_image_url: '',
         public_code: 'ABCD2345',
         quantity: 2,
         unit_price: '18.50',

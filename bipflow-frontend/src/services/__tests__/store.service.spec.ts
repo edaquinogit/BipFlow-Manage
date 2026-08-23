@@ -6,6 +6,7 @@ vi.mock('../api', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
     interceptors: {
       request: { use: vi.fn() },
       response: { use: vi.fn() },
@@ -44,5 +45,49 @@ describe('StoreService', () => {
     expect(response.tagline).toBe('Catalogo online')
     expect(response.status).toBe('active')
     expect(response.is_active).toBe(true)
+  })
+
+  it('updates controlled storefront appearance', async () => {
+    vi.mocked(api.patch).mockResolvedValue({
+      data: {
+        id: 1,
+        name: 'Loja Principal',
+        slug: 'default',
+        whatsapp_phone: '',
+        theme: { primary: '#111111' },
+        is_active: true,
+        receipt_exchange_policy: '',
+        receipt_paper_format: '80mm',
+      },
+    } as never)
+
+    const payload = { tagline: 'Nova vitrine', theme: { primary: '#111111' } }
+    const response = await storeService.updateAppearance('default', payload)
+
+    expect(api.patch).toHaveBeenCalledWith('v1/store/mine/default/appearance/', payload)
+    expect(response.theme?.primary).toBe('#111111')
+  })
+
+  it('fetches and updates label settings', async () => {
+    const settings = {
+      page_format: 'a4' as const,
+      columns: 3,
+      rows: 7,
+      margin_mm: 8,
+      cell_padding_mm: 3,
+      qr_size_mm: 24,
+      show_price: true,
+      show_size: false,
+      show_public_code: true,
+      labels_per_page: 21,
+    }
+    vi.mocked(api.get).mockResolvedValueOnce({ data: settings } as never)
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: settings } as never)
+
+    await expect(storeService.getLabelSettings('default')).resolves.toEqual(settings)
+    await expect(storeService.updateLabelSettings('default', { columns: 3 })).resolves.toEqual(settings)
+
+    expect(api.get).toHaveBeenCalledWith('v1/store/mine/default/label-settings/')
+    expect(api.patch).toHaveBeenCalledWith('v1/store/mine/default/label-settings/', { columns: 3 })
   })
 })

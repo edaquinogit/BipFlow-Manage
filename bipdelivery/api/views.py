@@ -20,14 +20,22 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from rest_framework_simplejwt.tokens import RefreshToken, Token
 from rest_framework_simplejwt.utils import datetime_from_epoch
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .bot_engine import build_bot_reply
 from .captcha import verify_turnstile
-from .errors import business_logic_error, not_found_error, permission_denied_error, validation_error
+from .errors import (
+    business_logic_error,
+    not_found_error,
+    permission_denied_error,
+    validation_error,
+)
 from .mfa import (
     MFA_CHALLENGE_MAX_AGE_SECONDS,
     build_mfa_challenge_token,
@@ -43,6 +51,7 @@ from .models import (
     Category,
     CustomerProfile,
     DeliveryRegion,
+    LabelSettings,
     LoginAttempt,
     MFABackupCode,
     Product,
@@ -81,6 +90,7 @@ from .serializers import (
     CurrentUserSerializer,
     CustomerProfileSerializer,
     DeliveryRegionSerializer,
+    LabelSettingsSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProductSerializer,
@@ -95,6 +105,7 @@ from .serializers import (
     SaleOrderTimeseriesPointSerializer,
     StockMovementCreateSerializer,
     StockMovementSerializer,
+    StoreAppearanceSettingsSerializer,
     StoreReceiptSettingsSerializer,
     StoreRenameSerializer,
     StoreScopedTokenObtainPairSerializer,
@@ -122,6 +133,16 @@ from .throttling import (
 )
 
 User = get_user_model()
+
+
+def _store_settings_snapshot(store: Store) -> StoreSettings:
+    """Return the legacy settings payload backed by the resolved Store."""
+    return StoreSettings(
+        id=store.id,
+        whatsapp_phone=store.whatsapp_phone,
+        created_at=store.created_at,
+        updated_at=store.updated_at,
+    )
 
 
 class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
@@ -277,7 +298,8 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """
         if not has_dashboard_read_access(request.user):
             self.permission_denied(
-                request, message="Voce nao possui permissao para gerar o QR Code deste produto."
+                request,
+                message="Voce nao possui permissao para gerar o QR Code deste produto.",
             )
 
         product = self.get_object()
@@ -314,35 +336,46 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """
         if not has_dashboard_read_access(request.user):
             self.permission_denied(
-                request, message="Voce nao possui permissao para gerar etiquetas em lote."
+                request,
+                message="Voce nao possui permissao para gerar etiquetas em lote.",
             )
 
         raw_ids = request.query_params.get("ids", "").strip()
         if not raw_ids:
-            return validation_error("ids deve conter ao menos um identificador de produto.")
+            return validation_error(
+                "ids deve conter ao menos um identificador de produto."
+            )
 
         try:
             # dict.fromkeys(...) dedupes while preserving request order -- a
             # duplicate id would otherwise count twice against
             # MAX_BULK_LABEL_IDS.
             requested_ids = list(
-                dict.fromkeys(int(piece) for piece in raw_ids.split(",") if piece.strip())
+                dict.fromkeys(
+                    int(piece) for piece in raw_ids.split(",") if piece.strip()
+                )
             )
         except ValueError:
             return validation_error("Todos os ids devem ser numeros inteiros validos.")
 
         if not requested_ids:
-            return validation_error("ids deve conter ao menos um identificador de produto.")
+            return validation_error(
+                "ids deve conter ao menos um identificador de produto."
+            )
 
         if len(requested_ids) > MAX_BULK_LABEL_IDS:
-            return validation_error(f"Selecione no maximo {MAX_BULK_LABEL_IDS} produtos por vez.")
+            return validation_error(
+                f"Selecione no maximo {MAX_BULK_LABEL_IDS} produtos por vez."
+            )
 
         # Scoped to the requester's store via get_queryset(), same
         # chokepoint bulk_update_category relies on -- an id from another
         # tenant simply never matches, landing in missing_ids
         # indistinguishable from a nonexistent id (same non-leaking opacity
         # as by_code's cross-store 404).
-        products_by_id = {p.id: p for p in self.get_queryset().filter(id__in=requested_ids)}
+        products_by_id = {
+            p.id: p for p in self.get_queryset().filter(id__in=requested_ids)
+        }
 
         labels = [
             build_product_label_payload(products_by_id[pid])
@@ -350,8 +383,16 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
             if pid in products_by_id
         ]
         missing_ids = [pid for pid in requested_ids if pid not in products_by_id]
+        label_settings = LabelSettings.get_for_store(self.get_request_store())
 
-        return Response({"labels": labels, "missing_ids": missing_ids}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "labels": labels,
+                "missing_ids": missing_ids,
+                "settings": LabelSettingsSerializer(label_settings).data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["patch"])
     def bulk_update_category(self, request):
@@ -391,11 +432,15 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         try:
             new_category_id = int(new_category_id)
         except (ValueError, TypeError):
-            return validation_error("new_category_id deve ser um número inteiro válido.")
+            return validation_error(
+                "new_category_id deve ser um número inteiro válido."
+            )
 
         # Validate category exists within the requester's store
         try:
-            new_category = Category.objects.get(id=new_category_id, store=self.get_request_store())
+            new_category = Category.objects.get(
+                id=new_category_id, store=self.get_request_store()
+            )
         except Category.DoesNotExist:
             return not_found_error(f"Categoria com id {new_category_id} não existe.")
 
@@ -403,7 +448,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         try:
             product_ids = [int(pid) for pid in product_ids]
         except (ValueError, TypeError):
-            return validation_error("Todos os product_ids devem ser números inteiros válidos.")
+            return validation_error(
+                "Todos os product_ids devem ser números inteiros válidos."
+            )
 
         # Use atomic transaction for data integrity
         with transaction.atomic():
@@ -465,7 +512,8 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         store = self.get_request_store()
         product = serializer.save(store=store)
 
-        if product.stock_quantity > 0:
+        has_active_variants = product.variants.filter(is_active=True).exists()
+        if product.stock_quantity > 0 and not has_active_variants:
             StockMovement.objects.create(
                 store=store,
                 product=product,
@@ -475,7 +523,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
                 new_stock=product.stock_quantity,
                 reason=StockMovement.REASON_ENTRADA_INICIAL,
                 source=StockMovement.SOURCE_MANUAL,
-                performed_by=self.request.user if self.request.user.is_authenticated else None,
+                performed_by=(
+                    self.request.user if self.request.user.is_authenticated else None
+                ),
             )
 
     def perform_update(self, serializer) -> None:
@@ -524,7 +574,8 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
                 # request never authenticated at all, 403 once authenticated
                 # but lacking the role (see APIView.permission_denied()).
                 self.permission_denied(
-                    request, message="Voce nao possui permissao para ver o historico de estoque."
+                    request,
+                    message="Voce nao possui permissao para ver o historico de estoque.",
                 )
 
             # Override the viewset's pagination_class (ProductListPagination,
@@ -533,7 +584,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
             # no relation to that grid and should use the generic 20/page
             # StandardPagination instead.
             self.pagination_class = StandardPagination
-            queryset = product.stock_movements.select_related("product", "performed_by", "sale_order")
+            queryset = product.stock_movements.select_related(
+                "product", "variant", "performed_by", "sale_order"
+            )
             page = self.paginate_queryset(queryset)
             serializer = StockMovementSerializer(
                 page if page is not None else queryset, many=True
@@ -559,6 +612,7 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
                 movement_type=validated["movement_type"],
                 quantity=validated["quantity"],
                 reason=validated["reason"],
+                variant_id=validated.get("variant_id"),
                 performed_by=request.user if request.user.is_authenticated else None,
                 notes=validated.get("notes", ""),
             )
@@ -569,7 +623,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         return Response(
             {
                 "movement": StockMovementSerializer(movement).data,
-                "product": ProductSerializer(product, context={"request": request}).data,
+                "product": ProductSerializer(
+                    product, context={"request": request}
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -632,9 +688,11 @@ class DeliveryRegionViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """Return all regions to dashboard users and only active ones publicly."""
         queryset = DeliveryRegion.objects.all()
 
-        if self.request.method in ("GET", "HEAD", "OPTIONS") and not has_dashboard_read_access(
-            self.request.user
-        ):
+        if self.request.method in (
+            "GET",
+            "HEAD",
+            "OPTIONS",
+        ) and not has_dashboard_read_access(self.request.user):
             queryset = queryset.filter(is_active=True)
 
         return queryset
@@ -706,16 +764,23 @@ def _resolve_summary_period(period: str) -> tuple:
                 year=month_start_date.year - 1, month=12
             )
         else:
-            previous_month_start_date = month_start_date.replace(month=month_start_date.month - 1)
-        start = timezone.make_aware(datetime.combine(month_start_date, time_of_day.min), current_timezone)
+            previous_month_start_date = month_start_date.replace(
+                month=month_start_date.month - 1
+            )
+        start = timezone.make_aware(
+            datetime.combine(month_start_date, time_of_day.min), current_timezone
+        )
         previous_start = timezone.make_aware(
-            datetime.combine(previous_month_start_date, time_of_day.min), current_timezone
+            datetime.combine(previous_month_start_date, time_of_day.min),
+            current_timezone,
         )
         return start, previous_start
 
     days = {"today": 1, "7d": 7, "30d": 30, "90d": 90}[period]
     if period == "today":
-        start = timezone.make_aware(datetime.combine(today_local, time_of_day.min), current_timezone)
+        start = timezone.make_aware(
+            datetime.combine(today_local, time_of_day.min), current_timezone
+        )
     else:
         start = timezone.now() - timedelta(days=days)
     return start, start - timedelta(days=days)
@@ -742,8 +807,12 @@ def _resolve_custom_range(request) -> Optional[tuple]:
         return None
 
     current_timezone = timezone.get_current_timezone()
-    start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
-    end = timezone.make_aware(datetime.combine(end_date, time_of_day.min), current_timezone) + timedelta(days=1)
+    start = timezone.make_aware(
+        datetime.combine(start_date, time_of_day.min), current_timezone
+    )
+    end = timezone.make_aware(
+        datetime.combine(end_date, time_of_day.min), current_timezone
+    ) + timedelta(days=1)
     return start, end, start_param, end_param
 
 
@@ -858,7 +927,11 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         the one place that deliberately keeps cancelled orders, so it stays
         outside this helper.
         """
-        orders = self.get_queryset().exclude(status="cancelled").filter(created_at__gte=window.start)
+        orders = (
+            self.get_queryset()
+            .exclude(status="cancelled")
+            .filter(created_at__gte=window.start)
+        )
         if window.end is not None:
             orders = orders.filter(created_at__lt=window.end)
         return orders
@@ -906,11 +979,15 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 apply_order_cancellation(
                     order=order,
                     store=self.get_request_store(),
-                    performed_by=request.user if request.user.is_authenticated else None,
+                    performed_by=(
+                        request.user if request.user.is_authenticated else None
+                    ),
                 )
             elif next_status == SaleOrder.STATUS_SENT:
                 carrier_name = serializer.validated_data.get("carrier_name", "").strip()
-                tracking_code = serializer.validated_data.get("tracking_code", "").strip()
+                tracking_code = serializer.validated_data.get(
+                    "tracking_code", ""
+                ).strip()
                 if not carrier_name or not tracking_code:
                     raise serializers.ValidationError(
                         {
@@ -964,25 +1041,28 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
             revenue_total = current["revenue_total"] or Decimal("0.00")
             orders_count = current["orders_count"] or 0
-            average_ticket = (revenue_total / orders_count) if orders_count else Decimal("0.00")
-
-            previous_revenue = (
-                active_orders.filter(
-                    created_at__gte=window.previous_start, created_at__lt=window.previous_end
-                ).aggregate(revenue_total=Sum("total"))["revenue_total"]
-                or Decimal("0.00")
+            average_ticket = (
+                (revenue_total / orders_count) if orders_count else Decimal("0.00")
             )
-            comparison_previous_period = _percentage_change(revenue_total, previous_revenue)
 
-            last_year_end = _shift_one_year_back(window.end if window.end is not None else timezone.now())
+            previous_revenue = active_orders.filter(
+                created_at__gte=window.previous_start,
+                created_at__lt=window.previous_end,
+            ).aggregate(revenue_total=Sum("total"))["revenue_total"] or Decimal("0.00")
+            comparison_previous_period = _percentage_change(
+                revenue_total, previous_revenue
+            )
+
+            last_year_end = _shift_one_year_back(
+                window.end if window.end is not None else timezone.now()
+            )
             last_year_start = _shift_one_year_back(window.start)
-            last_year_revenue = (
-                active_orders.filter(created_at__gte=last_year_start, created_at__lt=last_year_end).aggregate(
-                    revenue_total=Sum("total")
-                )["revenue_total"]
-                or Decimal("0.00")
+            last_year_revenue = active_orders.filter(
+                created_at__gte=last_year_start, created_at__lt=last_year_end
+            ).aggregate(revenue_total=Sum("total"))["revenue_total"] or Decimal("0.00")
+            comparison_same_period_last_year = _percentage_change(
+                revenue_total, last_year_revenue
             )
-            comparison_same_period_last_year = _percentage_change(revenue_total, last_year_revenue)
 
             serializer = SaleOrderSummarySerializer(
                 {
@@ -997,7 +1077,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return serializer.data
 
         store_id = self.get_request_store().id
-        data = _cached_dashboard_aggregate("summary", store_id, window.cache_key, compute)
+        data = _cached_dashboard_aggregate(
+            "summary", store_id, window.cache_key, compute
+        )
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="timeseries")
@@ -1028,11 +1110,17 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             current_timezone = timezone.get_current_timezone()
             today_local = timezone.localtime(timezone.now()).date()
             start_date = today_local - timedelta(days=days - 1)
-            start = timezone.make_aware(datetime.combine(start_date, time_of_day.min), current_timezone)
+            start = timezone.make_aware(
+                datetime.combine(start_date, time_of_day.min), current_timezone
+            )
             cache_period_key = period
 
         def compute():
-            rows_qs = self.get_queryset().exclude(status="cancelled").filter(created_at__gte=start)
+            rows_qs = (
+                self.get_queryset()
+                .exclude(status="cancelled")
+                .filter(created_at__gte=start)
+            )
             if end_boundary is not None:
                 rows_qs = rows_qs.filter(created_at__lt=end_boundary)
 
@@ -1059,7 +1147,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             return serializer.data
 
         store_id = self.get_request_store().id
-        data = _cached_dashboard_aggregate("timeseries", store_id, cache_period_key, compute)
+        data = _cached_dashboard_aggregate(
+            "timeseries", store_id, cache_period_key, compute
+        )
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="breakdown")
@@ -1078,22 +1168,31 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 orders = orders.filter(created_at__lt=window.end)
             active_orders = self._active_orders_in_window(window)
 
-            items_qs = (
-                SaleOrderItem.objects.filter(order__store=store, order__created_at__gte=window.start)
-                .exclude(order__status="cancelled")
-            )
+            items_qs = SaleOrderItem.objects.filter(
+                order__store=store, order__created_at__gte=window.start
+            ).exclude(order__status="cancelled")
             if window.end is not None:
                 items_qs = items_qs.filter(order__created_at__lt=window.end)
 
             top_products_rows = (
                 items_qs.values("product_id", "product_name")
-                .annotate(quantity_total=Sum("quantity"), revenue_total=Sum("line_total"))
+                .annotate(
+                    quantity_total=Sum("quantity"), revenue_total=Sum("line_total")
+                )
                 .order_by("-revenue_total")[:5]
             )
 
-            product_ids = [row["product_id"] for row in top_products_rows if row["product_id"] is not None]
+            product_ids = [
+                row["product_id"]
+                for row in top_products_rows
+                if row["product_id"] is not None
+            ]
             image_by_product_id = {
-                product.id: request.build_absolute_uri(product.image.url) if product.image else None
+                product.id: (
+                    request.build_absolute_uri(product.image.url)
+                    if product.image
+                    else None
+                )
                 for product in Product.objects.filter(id__in=product_ids)
             }
 
@@ -1114,7 +1213,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 .order_by("-revenue_total")
             )
             by_status = list(
-                orders.values("status").annotate(orders_count=Count("id")).order_by("status")
+                orders.values("status")
+                .annotate(orders_count=Count("id"))
+                .order_by("status")
             )
             # Etapa 5 of the QR-code stock-exit evolution: turns
             # SaleOrder.channel (Etapa 3) into the business-facing
@@ -1126,9 +1227,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 .order_by("-revenue_total")
             )
 
-            region_rows = active_orders.values("delivery_method", "delivery_region_name").annotate(
-                revenue_total=Sum("total"), orders_count=Count("id")
-            )
+            region_rows = active_orders.values(
+                "delivery_method", "delivery_region_name"
+            ).annotate(revenue_total=Sum("total"), orders_count=Count("id"))
             region_totals: dict = {}
             for row in region_rows:
                 if row["delivery_method"] == "pickup":
@@ -1142,7 +1243,11 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                 bucket["orders_count"] += row["orders_count"]
             by_region = sorted(
                 (
-                    {"region": label, "revenue_total": totals["revenue_total"], "orders_count": totals["orders_count"]}
+                    {
+                        "region": label,
+                        "revenue_total": totals["revenue_total"],
+                        "orders_count": totals["orders_count"],
+                    }
                     for label, totals in region_totals.items()
                 ),
                 key=lambda entry: entry["revenue_total"],
@@ -1161,7 +1266,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
             return serializer.data
 
-        data = _cached_dashboard_aggregate("breakdown", store.id, window.cache_key, compute)
+        data = _cached_dashboard_aggregate(
+            "breakdown", store.id, window.cache_key, compute
+        )
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="customers")
@@ -1207,9 +1314,11 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             bot_conversations_count = conversations.count()
             bot_converted_count = conversations.filter(sale_order__isnull=False).count()
             bot_conversion_rate = (
-                (Decimal(bot_converted_count) / Decimal(bot_conversations_count) * 100).quantize(
-                    Decimal("0.01")
-                )
+                (
+                    Decimal(bot_converted_count)
+                    / Decimal(bot_conversations_count)
+                    * 100
+                ).quantize(Decimal("0.01"))
                 if bot_conversations_count
                 else None
             )
@@ -1226,7 +1335,9 @@ class SaleOrderViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
             )
             return serializer.data
 
-        data = _cached_dashboard_aggregate("customers", store.id, window.cache_key, compute)
+        data = _cached_dashboard_aggregate(
+            "customers", store.id, window.cache_key, compute
+        )
         return Response(data)
 
 
@@ -1245,7 +1356,9 @@ class StockMovementViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSe
 
     def get_base_queryset(self):
         """Apply the ledger's filters: product, type, source, reason, search, date range."""
-        queryset = StockMovement.objects.select_related("product", "performed_by", "sale_order")
+        queryset = StockMovement.objects.select_related(
+            "product", "performed_by", "sale_order"
+        )
 
         product_id = self.request.query_params.get("product", "").strip()
         if product_id:
@@ -1274,7 +1387,8 @@ class StockMovementViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSe
         search_term = self.request.query_params.get("search", "").strip()
         if search_term:
             queryset = queryset.filter(
-                Q(product__name__icontains=search_term) | Q(product__sku__icontains=search_term)
+                Q(product__name__icontains=search_term)
+                | Q(product__sku__icontains=search_term)
             )
 
         # Reuses the same custom-range resolver as SaleOrderViewSet's
@@ -1335,33 +1449,32 @@ class BotConversationViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelView
 
 
 class StoreSettingsView(APIView):
-    """Read and update singleton store settings from the dashboard."""
+    """Read and update the resolved store's operational settings."""
 
     permission_classes = [IsAuthenticated, DashboardReadWritePermission]
 
     def get(self, request, *args, **kwargs):
-        settings_instance = StoreSettings.get_solo()
         store = resolve_request_store(request)
-        if not settings_instance.whatsapp_phone and store.whatsapp_phone:
-            settings_instance.whatsapp_phone = store.whatsapp_phone
-        serializer = StoreSettingsSerializer(settings_instance)
+        serializer = StoreSettingsSerializer(_store_settings_snapshot(store))
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
-        settings_instance = StoreSettings.get_solo()
+        store = resolve_request_store(request)
         serializer = StoreSettingsSerializer(
-            settings_instance,
+            _store_settings_snapshot(store),
             data=request.data,
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        settings_instance = serializer.save()
-        # Etapa 3: sync to the requester's own store, not always the global
-        # default, so a future store-B admin can't overwrite store-A's number.
-        Store.objects.filter(id=resolve_request_store(request).id).update(
-            whatsapp_phone=settings_instance.whatsapp_phone
+
+        if "whatsapp_phone" in serializer.validated_data:
+            store.whatsapp_phone = serializer.validated_data["whatsapp_phone"]
+            store.save(update_fields=["whatsapp_phone", "updated_at"])
+
+        return Response(
+            StoreSettingsSerializer(_store_settings_snapshot(store)).data,
+            status=status.HTTP_200_OK,
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PublicStoreSettingsView(APIView):
@@ -1372,9 +1485,7 @@ class PublicStoreSettingsView(APIView):
 
     def get(self, request, *args, **kwargs):
         store = resolve_request_store(request)
-        whatsapp_phone = (
-            store.get_configured_whatsapp_phone() or StoreSettings.get_configured_whatsapp_phone()
-        )
+        whatsapp_phone = store.get_configured_whatsapp_phone()
         settings_instance = StoreSettings(whatsapp_phone=whatsapp_phone)
         serializer = PublicStoreSettingsSerializer(settings_instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1408,7 +1519,11 @@ class MyStoresView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        stores = Store.objects.filter(memberships__user=request.user).distinct().order_by("name")
+        stores = (
+            Store.objects.filter(memberships__user=request.user)
+            .distinct()
+            .order_by("name")
+        )
         serializer = StoreSerializer(stores, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1439,15 +1554,134 @@ class MyStoreDetailView(APIView):
             return not_found_error("Loja nao encontrada.")
 
         can_rename = store.memberships.filter(
-            user=request.user, role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER)
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
         ).exists()
         if not can_rename:
-            return permission_denied_error("Voce nao possui permissao para renomear esta loja.")
+            return permission_denied_error(
+                "Voce nao possui permissao para renomear esta loja."
+            )
 
         serializer = StoreRenameSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         store.name = serializer.validated_data["name"]
         store.save(update_fields=["name", "updated_at"])
+
+        return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
+class StoreLabelSettingsView(APIView):
+    """Read/update printable label settings for one of the user's stores."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _get_store(slug: str):
+        return Store.objects.filter(slug=slug).first()
+
+    @staticmethod
+    def _is_member(request, store: Store) -> bool:
+        return store.memberships.filter(user=request.user).exists()
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def get(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar as configuracoes de etiquetas desta loja."
+            )
+
+        settings_instance = LabelSettings.get_for_store(store)
+        return Response(
+            LabelSettingsSerializer(settings_instance).data, status=status.HTTP_200_OK
+        )
+
+    def patch(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar as configuracoes de etiquetas desta loja."
+            )
+
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para editar as configuracoes de etiquetas desta loja."
+            )
+
+        settings_instance = LabelSettings.get_for_store(store)
+        serializer = LabelSettingsSerializer(
+            settings_instance, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StoreAppearanceSettingsView(APIView):
+    """Read/update controlled storefront appearance for one of the user's stores."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _get_store(slug: str):
+        return Store.objects.filter(slug=slug).first()
+
+    @staticmethod
+    def _is_member(request, store: Store) -> bool:
+        return store.memberships.filter(user=request.user).exists()
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def get(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar a aparencia desta loja."
+            )
+
+        return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar a aparencia desta loja."
+            )
+
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para editar a aparencia desta loja."
+            )
+
+        serializer = StoreAppearanceSettingsSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        update_fields = ["updated_at"]
+        for field in ("logo_url", "tagline", "theme"):
+            if field in validated:
+                setattr(store, field, validated[field])
+                update_fields.append(field)
+        store.save(update_fields=update_fields)
 
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
 
@@ -1472,7 +1706,8 @@ class StoreReceiptSettingsView(APIView):
             return not_found_error("Loja nao encontrada.")
 
         can_edit = store.memberships.filter(
-            user=request.user, role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER)
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
         ).exists()
         if not can_edit:
             return permission_denied_error(
@@ -1528,10 +1763,14 @@ class BotMessageView(APIView):
         conversation = None
 
         if conversation_id:
-            conversation = BotConversation.objects.filter(id=conversation_id, store=store).first()
+            conversation = BotConversation.objects.filter(
+                id=conversation_id, store=store
+            ).first()
 
         if conversation is None and session_id:
-            conversation = BotConversation.objects.filter(session_id=session_id, store=store).first()
+            conversation = BotConversation.objects.filter(
+                session_id=session_id, store=store
+            ).first()
 
         if conversation is None:
             conversation = BotConversation.objects.create(
@@ -1563,7 +1802,7 @@ class BotMessageView(APIView):
         validated_data = input_serializer.validated_data
         user_message = validated_data["message"]
         conversation = self._resolve_conversation(validated_data, store)
-        bot_reply = build_bot_reply(user_message)
+        bot_reply = build_bot_reply(user_message, store)
 
         next_status = (
             BotConversation.STATUS_WAITING_HUMAN
@@ -1693,7 +1932,9 @@ class CheckoutWhatsAppView(APIView):
             .order_by("id")
         )
         products_by_id = {product.id: product for product in products}
-        missing_ids = [product_id for product_id in product_ids if product_id not in products_by_id]
+        missing_ids = [
+            product_id for product_id in product_ids if product_id not in products_by_id
+        ]
 
         if missing_ids:
             self._raise_missing_products_error(missing_ids)
@@ -1719,7 +1960,9 @@ class CheckoutWhatsAppView(APIView):
             .order_by("id")
         )
         variants_by_id = {variant.id: variant for variant in variants}
-        missing_ids = [variant_id for variant_id in variant_ids if variant_id not in variants_by_id]
+        missing_ids = [
+            variant_id for variant_id in variant_ids if variant_id not in variants_by_id
+        ]
 
         if missing_ids:
             raise serializers.ValidationError(
@@ -1775,13 +2018,21 @@ class CheckoutWhatsAppView(APIView):
 
         update_fields: list[str] = []
 
-        if not self._profile_has_complete_address(profile) and address and neighborhood and city:
+        if (
+            not self._profile_has_complete_address(profile)
+            and address
+            and neighborhood
+            and city
+        ):
             profile.address = address
             profile.neighborhood = neighborhood
             profile.city = city
             update_fields.extend(["address", "neighborhood", "city"])
 
-        if delivery_region is not None and profile.delivery_region_id != delivery_region.id:
+        if (
+            delivery_region is not None
+            and profile.delivery_region_id != delivery_region.id
+        ):
             profile.delivery_region = delivery_region
             update_fields.append("delivery_region")
 
@@ -1818,7 +2069,11 @@ class CheckoutWhatsAppView(APIView):
             if variant_id is not None:
                 if variant is None or variant.product_id != product.id:
                     raise serializers.ValidationError(
-                        {"items": ["A variante selecionada nao pertence ao produto informado."]}
+                        {
+                            "items": [
+                                "A variante selecionada nao pertence ao produto informado."
+                            ]
+                        }
                     )
 
                 if not variant.is_active:
@@ -1851,7 +2106,7 @@ class CheckoutWhatsAppView(APIView):
                         "items": [
                             (
                                 f'Quantidade solicitada para "{product.name} - {variant.name}" '
-                                f'excede o estoque da variacao ({variant.stock_quantity})'
+                                f"excede o estoque da variacao ({variant.stock_quantity})"
                             )
                         ]
                     }
@@ -1860,6 +2115,11 @@ class CheckoutWhatsAppView(APIView):
             unit_price = Decimal(product.price).quantize(Decimal("0.01"))
             line_total = (unit_price * quantity).quantize(Decimal("0.01"))
             subtotal += line_total
+            previous_stock = (
+                variant.stock_quantity
+                if variant is not None
+                else product.stock_quantity
+            )
 
             normalized_items.append(
                 {
@@ -1868,11 +2128,15 @@ class CheckoutWhatsAppView(APIView):
                     "product_name": product.name,
                     "sku": product.sku or "",
                     "variant_name": variant.name if variant is not None else "",
-                    "variant_color_hex": variant.color_hex if variant is not None else "",
+                    "variant_color_hex": (
+                        variant.color_hex if variant is not None else ""
+                    ),
                     "variant_image_url": self._build_variant_image_url(variant),
                     "quantity": quantity,
                     "unit_price": unit_price,
                     "line_total": line_total,
+                    "previous_stock": previous_stock,
+                    "new_stock": previous_stock - quantity,
                 }
             )
 
@@ -1884,7 +2148,9 @@ class CheckoutWhatsAppView(APIView):
         quantities_by_product_id = self._aggregate_product_quantities(cart_items)
         products_by_id = self._lock_cart_products(quantities_by_product_id, store)
         variants_by_id = self._lock_cart_variants(cart_items, store)
-        products_with_active_variants = self._products_with_active_variants(products_by_id)
+        products_with_active_variants = self._products_with_active_variants(
+            products_by_id
+        )
         normalized_items, subtotal = self._normalize_reserved_items(
             cart_items,
             products_by_id,
@@ -1969,7 +2235,11 @@ class CheckoutWhatsAppView(APIView):
 
                 if delivery_region is None:
                     raise serializers.ValidationError(
-                        {"customer": {"delivery_region_id": "Selected delivery region is unavailable"}}
+                        {
+                            "customer": {
+                                "delivery_region_id": "Selected delivery region is unavailable"
+                            }
+                        }
                     )
             elif (
                 profile is not None
@@ -1999,7 +2269,9 @@ class CheckoutWhatsAppView(APIView):
         notes = customer.get("notes", "").strip()
 
         with transaction.atomic():
-            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(cart_items, store)
+            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(
+                cart_items, store
+            )
 
             delivery_fee = Decimal("0.00")
             if is_delivery:
@@ -2061,7 +2333,9 @@ class CheckoutWhatsAppView(APIView):
             message = "\n".join(message_lines)
             whatsapp_phone = store.get_configured_whatsapp_phone()
             whatsapp_url = (
-                f"https://wa.me/{whatsapp_phone}?text={quote(message)}" if whatsapp_phone else ""
+                f"https://wa.me/{whatsapp_phone}?text={quote(message)}"
+                if whatsapp_phone
+                else ""
             )
 
             sale_order = SaleOrder.objects.create(
@@ -2074,7 +2348,9 @@ class CheckoutWhatsAppView(APIView):
                 delivery_method=customer["delivery_method"],
                 payment_method=customer["payment_method"],
                 delivery_region=delivery_region,
-                delivery_region_name=delivery_region.name if delivery_region is not None else "",
+                delivery_region_name=(
+                    delivery_region.name if delivery_region is not None else ""
+                ),
                 address=order_address,
                 neighborhood=order_neighborhood,
                 city=order_city,
@@ -2115,12 +2391,11 @@ class CheckoutWhatsAppView(APIView):
                     StockMovement(
                         store=store,
                         product=products_by_id[item["product_id"]],
+                        variant_id=item["variant_id"],
                         movement_type=StockMovement.TYPE_SAIDA,
                         quantity=item["quantity"],
-                        previous_stock=(
-                            products_by_id[item["product_id"]].stock_quantity + item["quantity"]
-                        ),
-                        new_stock=products_by_id[item["product_id"]].stock_quantity,
+                        previous_stock=item["previous_stock"],
+                        new_stock=item["new_stock"],
                         reason=StockMovement.REASON_VENDA,
                         source=StockMovement.SOURCE_VENDA,
                         sale_order=sale_order,
@@ -2171,7 +2446,9 @@ class CheckoutWhatsAppView(APIView):
 REFRESH_TOKEN_COOKIE_PATH = "/api/auth/"
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: bool = False) -> None:
+def _set_refresh_cookie(
+    response: Response, refresh_token: str, *, remember_me: bool = False
+) -> None:
     """Store the refresh token as an httpOnly cookie, unreachable from page JS.
 
     Always carries a real Max-Age matching the token's own `exp` (see
@@ -2192,11 +2469,13 @@ def _set_refresh_cookie(response: Response, refresh_token: str, *, remember_me: 
         # also set, regardless of IS_PRODUCTION -- see BIPFLOW_CROSS_ORIGIN_COOKIES.
         "secure": settings.IS_PRODUCTION or settings.BIPFLOW_CROSS_ORIGIN_COOKIES,
         "samesite": settings.REFRESH_COOKIE_SAMESITE,
-        "max_age": int((
-            settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME
-            if remember_me
-            else settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
-        ).total_seconds()),
+        "max_age": int(
+            (
+                settings.REMEMBER_ME_REFRESH_TOKEN_LIFETIME
+                if remember_me
+                else settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+            ).total_seconds()
+        ),
     }
 
     response.set_cookie(REFRESH_TOKEN_COOKIE_NAME, refresh_token, **cookie_kwargs)
@@ -2248,10 +2527,14 @@ def _blacklist_all_outstanding_tokens(user) -> int:
     """
     outstanding = OutstandingToken.objects.filter(user=user)
     already_blacklisted_jtis = set(
-        BlacklistedToken.objects.filter(token__user=user).values_list("token__jti", flat=True)
+        BlacklistedToken.objects.filter(token__user=user).values_list(
+            "token__jti", flat=True
+        )
     )
     newly_blacklisted = [
-        BlacklistedToken(token=token) for token in outstanding if token.jti not in already_blacklisted_jtis
+        BlacklistedToken(token=token)
+        for token in outstanding
+        if token.jti not in already_blacklisted_jtis
     ]
     BlacklistedToken.objects.bulk_create(newly_blacklisted)
     return len(newly_blacklisted)
@@ -2311,12 +2594,27 @@ class LoginTokenObtainPairView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         identifier = _login_identifier(request)
-        remember_me = bool(request.data.get("remember_me")) if hasattr(request.data, "get") else False
+        remember_me = (
+            bool(request.data.get("remember_me"))
+            if hasattr(request.data, "get")
+            else False
+        )
 
-        if LoginAttempt.recent_failure_count(identifier) >= settings.LOGIN_CAPTCHA_FAILURE_THRESHOLD:
-            captcha_token = request.data.get("captcha_token") if hasattr(request.data, "get") else None
+        if (
+            LoginAttempt.recent_failure_count(identifier)
+            >= settings.LOGIN_CAPTCHA_FAILURE_THRESHOLD
+        ):
+            captcha_token = (
+                request.data.get("captcha_token")
+                if hasattr(request.data, "get")
+                else None
+            )
             if not verify_turnstile(captcha_token, _client_ip(request)):
-                self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_CAPTCHA_REQUIRED)
+                self._record(
+                    request,
+                    identifier,
+                    failure_reason=LoginAttempt.FAILURE_CAPTCHA_REQUIRED,
+                )
                 return validation_error(
                     "Confirme que voce nao e um robo para continuar.",
                     details={"requires_captcha": True},
@@ -2325,7 +2623,11 @@ class LoginTokenObtainPairView(TokenObtainPairView):
         try:
             response = super().post(request, *args, **kwargs)
         except AuthenticationFailed:
-            self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_INVALID_CREDENTIALS)
+            self._record(
+                request,
+                identifier,
+                failure_reason=LoginAttempt.FAILURE_INVALID_CREDENTIALS,
+            )
             raise
 
         user = User.objects.filter(username__iexact=identifier).first()
@@ -2336,7 +2638,11 @@ class LoginTokenObtainPairView(TokenObtainPairView):
         )
         store_id = membership.store_id if membership else None
 
-        mfa_device = TOTPDevice.objects.filter(user=user, confirmed=True).first() if user else None
+        mfa_device = (
+            TOTPDevice.objects.filter(user=user, confirmed=True).first()
+            if user
+            else None
+        )
         if mfa_device is not None:
             # Password checked out, but a second factor is still owed --
             # discard the real tokens super().post() already minted and
@@ -2346,9 +2652,18 @@ class LoginTokenObtainPairView(TokenObtainPairView):
             # than masquerading as a single successful password check.
             # remember_me rides along in the challenge so step two can
             # still honor the choice the user made on the login form.
-            self._record(request, identifier, failure_reason=LoginAttempt.FAILURE_MFA_REQUIRED, user=user, store_id=store_id)
+            self._record(
+                request,
+                identifier,
+                failure_reason=LoginAttempt.FAILURE_MFA_REQUIRED,
+                user=user,
+                store_id=store_id,
+            )
             return Response(
-                {"mfa_required": True, "mfa_token": build_mfa_challenge_token(user.id, remember_me)},
+                {
+                    "mfa_required": True,
+                    "mfa_token": build_mfa_challenge_token(user.id, remember_me),
+                },
                 status=status.HTTP_200_OK,
             )
 
@@ -2363,11 +2678,23 @@ class LoginTokenObtainPairView(TokenObtainPairView):
         return response
 
     def throttled(self, request, wait) -> None:
-        self._record(request, _login_identifier(request), failure_reason=LoginAttempt.FAILURE_THROTTLED)
+        self._record(
+            request,
+            _login_identifier(request),
+            failure_reason=LoginAttempt.FAILURE_THROTTLED,
+        )
         super().throttled(request, wait)
 
     @staticmethod
-    def _record(request, identifier: str, *, succeeded: bool = False, failure_reason: str = "", user=None, store_id=None) -> None:
+    def _record(
+        request,
+        identifier: str,
+        *,
+        succeeded: bool = False,
+        failure_reason: str = "",
+        user=None,
+        store_id=None,
+    ) -> None:
         LoginAttempt.record(
             identifier=identifier,
             ip_address=_client_ip(request),
@@ -2439,7 +2766,9 @@ class LogoutView(APIView):
 
         token.blacklist()
 
-        response = Response({"message": "Logout realizado com sucesso."}, status=status.HTTP_200_OK)
+        response = Response(
+            {"message": "Logout realizado com sucesso."}, status=status.HTTP_200_OK
+        )
         _clear_refresh_cookie(response)
         return response
 
@@ -2480,7 +2809,9 @@ class MfaSetupView(APIView):
     def post(self, request, *args, **kwargs):
         existing = TOTPDevice.objects.filter(user=request.user).first()
         if existing is not None and existing.confirmed:
-            return validation_error("MFA ja esta ativado. Desative antes de reconfigurar.")
+            return validation_error(
+                "MFA ja esta ativado. Desative antes de reconfigurar."
+            )
 
         secret = generate_totp_secret()
         device, _created = TOTPDevice.objects.update_or_create(
@@ -2511,11 +2842,15 @@ class MfaSetupConfirmView(APIView):
     def post(self, request, *args, **kwargs):
         device = TOTPDevice.objects.filter(user=request.user, confirmed=False).first()
         if device is None:
-            return validation_error("Nenhuma configuracao de MFA pendente. Inicie o setup novamente.")
+            return validation_error(
+                "Nenhuma configuracao de MFA pendente. Inicie o setup novamente."
+            )
 
         code = request.data.get("code") if hasattr(request.data, "get") else None
         if not verify_totp_code(device.get_secret(), str(code or "")):
-            return validation_error("Codigo invalido. Confira o app autenticador e tente novamente.")
+            return validation_error(
+                "Codigo invalido. Confira o app autenticador e tente novamente."
+            )
 
         device.confirmed = True
         device.confirmed_at = timezone.now()
@@ -2577,11 +2912,19 @@ class MfaVerifyView(APIView):
         challenge = read_mfa_challenge_payload(mfa_token) if mfa_token else None
         user_id = challenge.get("user_id") if challenge else None
         remember_me = bool(challenge.get("remember_me")) if challenge else False
-        user = User.objects.filter(pk=user_id, is_active=True).first() if user_id else None
-        device = TOTPDevice.objects.filter(user=user, confirmed=True).first() if user else None
+        user = (
+            User.objects.filter(pk=user_id, is_active=True).first() if user_id else None
+        )
+        device = (
+            TOTPDevice.objects.filter(user=user, confirmed=True).first()
+            if user
+            else None
+        )
 
         if user is None or device is None:
-            return validation_error("Sessao de verificacao invalida ou expirada. Faca login novamente.")
+            return validation_error(
+                "Sessao de verificacao invalida ou expirada. Faca login novamente."
+            )
 
         verified = verify_totp_code(device.get_secret(), code) if code else False
         if not verified and backup_code:
@@ -2606,8 +2949,12 @@ class MfaVerifyView(APIView):
         # challenge token is valid (5 minutes) and the TOTP code still
         # verifies (~90s window). cache.add() is atomic ("set if absent"),
         # so two concurrent replays of the same token can't both succeed.
-        challenge_cache_key = f"mfa_challenge_used:{_hash_cache_identifier(str(mfa_token))}"
-        if not cache.add(challenge_cache_key, True, timeout=MFA_CHALLENGE_MAX_AGE_SECONDS):
+        challenge_cache_key = (
+            f"mfa_challenge_used:{_hash_cache_identifier(str(mfa_token))}"
+        )
+        if not cache.add(
+            challenge_cache_key, True, timeout=MFA_CHALLENGE_MAX_AGE_SECONDS
+        ):
             LoginAttempt.record(
                 identifier=user.username,
                 ip_address=ip_address,
@@ -2616,9 +2963,13 @@ class MfaVerifyView(APIView):
                 failure_reason=LoginAttempt.FAILURE_MFA_INVALID,
                 user=user,
             )
-            return validation_error("Sessao de verificacao invalida ou expirada. Faca login novamente.")
+            return validation_error(
+                "Sessao de verificacao invalida ou expirada. Faca login novamente."
+            )
 
-        membership = StoreMembership.objects.filter(user=user).select_related("store").first()
+        membership = (
+            StoreMembership.objects.filter(user=user).select_related("store").first()
+        )
         LoginAttempt.record(
             identifier=user.username,
             ip_address=ip_address,
@@ -2631,7 +2982,9 @@ class MfaVerifyView(APIView):
         refresh = StoreScopedTokenObtainPairSerializer.get_token(user)
         _apply_remember_me(refresh, remember_me)
         _sync_outstanding_token_expiry(refresh)
-        response = Response({"access": str(refresh.access_token)}, status=status.HTTP_200_OK)
+        response = Response(
+            {"access": str(refresh.access_token)}, status=status.HTTP_200_OK
+        )
         _set_refresh_cookie(response, str(refresh), remember_me=remember_me)
         return response
 
@@ -2707,7 +3060,9 @@ class CustomerProfileView(APIView):
 
     def get(self, request, *args, **kwargs):
         profile = self._get_profile(request)
-        serializer = CustomerProfileSerializer(profile, context={"store": profile.store})
+        serializer = CustomerProfileSerializer(
+            profile, context={"store": profile.store}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
@@ -2735,7 +3090,11 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"]
-        user = User.objects.filter(email__iexact=email, is_active=True).order_by("id").first()
+        user = (
+            User.objects.filter(email__iexact=email, is_active=True)
+            .order_by("id")
+            .first()
+        )
 
         # Always return the same public response to avoid account enumeration.
         public_response = {

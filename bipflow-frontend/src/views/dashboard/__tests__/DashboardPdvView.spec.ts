@@ -128,8 +128,41 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
     await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
     await flushPromises()
 
-    expect(wrapper.find('[data-cy="pdv-scan-error"]').text()).toContain('indisponível')
+    expect(wrapper.find('[data-cy="pdv-scan-error"]').text()).toContain('indisponivel')
     expect(wrapper.find('[data-cy="pdv-cart-empty"]').exists()).toBe(true)
+  })
+
+  it('opens a variant picker and adds the selected variant to the cart', async () => {
+    vi.mocked(ProductService.getByCode).mockResolvedValue({
+      ...scannedProduct,
+      stock_quantity: 5,
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#111111',
+          stock_quantity: 2,
+          image: null,
+          is_active: true,
+          position: 0,
+        },
+      ],
+    } as any)
+    const wrapper = mountPdvView()
+
+    await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+    await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="pdv-variant-picker"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="pdv-cart-empty"]').exists()).toBe(true)
+
+    await wrapper.find('[data-cy="pdv-variant-option"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="pdv-variant-picker"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="pdv-cart-row"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="pdv-cart-variant-name"]').text()).toContain('Preto')
   })
 
   it('shows a specific error when a scan would exceed the available stock', async () => {
@@ -181,14 +214,60 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
     await wrapper.find('[data-cy="pdv-finalize-sale"]').trigger('click')
     await flushPromises()
 
-    expect(PdvSaleService.create).toHaveBeenCalledWith({
-      items: [{ public_code: 'ABCD2345', quantity: 1 }],
-      payment_method: 'pix',
-      customer_name: undefined,
-      notes: undefined,
-    })
+    expect(PdvSaleService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [{ public_code: 'ABCD2345', quantity: 1 }],
+        payment_method: 'pix',
+        customer_name: undefined,
+        notes: undefined,
+      })
+    )
     // A successful sale clears the cart for the next customer.
     expect(wrapper.find('[data-cy="pdv-cart-empty"]').exists()).toBe(true)
+  })
+
+  it('finalizes a selected variant with variant_id in the PDV sale payload', async () => {
+    vi.mocked(ProductService.getByCode).mockResolvedValue({
+      ...scannedProduct,
+      stock_quantity: 5,
+      variants: [
+        {
+          id: 10,
+          name: 'Preto',
+          color_hex: '#111111',
+          stock_quantity: 2,
+          image: null,
+          is_active: true,
+          position: 0,
+        },
+      ],
+    } as any)
+    vi.mocked(PdvSaleService.create).mockResolvedValue({
+      order_reference: 'PDV-20260702-120000-000000',
+      items: [],
+      subtotal: '18.50',
+      total: '18.50',
+      payment_method: 'pix',
+      created_at: '2026-07-02T12:00:00Z',
+      customer_email: '',
+    })
+
+    const wrapper = mountPdvView()
+    await wrapper.find('[data-cy="pdv-scan-input"]').setValue('ABCD2345')
+    await wrapper.find('[data-cy="pdv-scan-input"]').trigger('keyup.enter')
+    await flushPromises()
+    await wrapper.find('[data-cy="pdv-variant-option"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-cy="pdv-finalize-sale"]').trigger('click')
+    await flushPromises()
+
+    expect(PdvSaleService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [{ public_code: 'ABCD2345', variant_id: 10, quantity: 1 }],
+        payment_method: 'pix',
+      })
+    )
   })
 
   it('passes the optional customer phone through to the sale payload (Etapa R4 of the QR-code stock-exit refinement)', async () => {
@@ -250,7 +329,11 @@ describe('DashboardPdvView (Etapa 3 of the QR-code stock-exit evolution)', () =>
       items: [
         {
           product_id: 7,
+          variant_id: null,
           product_name: 'Coxinha premium',
+          variant_name: '',
+          variant_color_hex: '',
+          variant_image_url: '',
           public_code: 'ABCD2345',
           quantity: 1,
           unit_price: '18.50',

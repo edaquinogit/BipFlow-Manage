@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
 import { ArrowDownTrayIcon, PrinterIcon, XMarkIcon } from '@heroicons/vue/24/outline';
-import type { ProductBulkLabel } from '@/types/productLabel';
+import {
+  DEFAULT_PRODUCT_LABEL_SETTINGS,
+  type ProductBulkLabel,
+  type ProductLabelSettings,
+} from '@/types/productLabel';
 import ProductService from '@/services/product.service';
 import { Logger } from '@/services/logger';
 import { buildErrorContext, type ApplicationError } from '@/types/errors';
@@ -41,8 +45,14 @@ const isLoading = ref(false);
 const loadError = ref<string | null>(null);
 const labels = ref<ProductBulkLabel[]>([]);
 const missingIds = ref<number[]>([]);
+const labelSettings = ref<ProductLabelSettings>({ ...DEFAULT_PRODUCT_LABEL_SETTINGS });
 
 const hasLabels = computed(() => labels.value.length > 0);
+const labelGridStyle = computed(() => ({
+  '--label-print-columns': String(labelSettings.value.columns),
+  '--label-print-margin': `${labelSettings.value.margin_mm}mm`,
+  '--label-print-gap': `${Math.max(labelSettings.value.cell_padding_mm, 2)}mm`,
+}));
 
 const loadLabels = async (): Promise<void> => {
   if (props.productIds.length === 0) {
@@ -53,11 +63,13 @@ const loadLabels = async (): Promise<void> => {
   loadError.value = null;
   labels.value = [];
   missingIds.value = [];
+  labelSettings.value = { ...DEFAULT_PRODUCT_LABEL_SETTINGS };
 
   try {
     const response = await ProductService.getQrCodesBulk(props.productIds);
     labels.value = response.labels;
     missingIds.value = response.missing_ids;
+    labelSettings.value = response.settings;
   } catch (error: unknown) {
     loadError.value = 'Não foi possível gerar as etiquetas dos produtos selecionados.';
     Logger.error(
@@ -87,7 +99,7 @@ const handleDownloadPdf = (): void => {
   if (!hasLabels.value) {
     return;
   }
-  buildProductLabelsPdf(labels.value).save('etiquetas-produtos.pdf');
+  buildProductLabelsPdf(labels.value, labelSettings.value).save('etiquetas-produtos.pdf');
 };
 </script>
 
@@ -142,7 +154,12 @@ const handleDownloadPdf = (): void => {
               Nenhuma etiqueta para exibir.
             </p>
 
-            <div v-else class="qr-bulk-printable-grid" data-cy="qr-bulk-labels-grid">
+            <div
+              v-else
+              class="qr-bulk-printable-grid"
+              data-cy="qr-bulk-labels-grid"
+              :style="labelGridStyle"
+            >
               <div
                 v-for="label in labels"
                 :key="label.id"
@@ -150,10 +167,10 @@ const handleDownloadPdf = (): void => {
                 data-cy="qr-bulk-label-card"
               >
                 <p class="label-name">{{ label.name }}</p>
-                <p class="label-price">{{ formatBRL(label.price) }}</p>
-                <p v-if="label.size" class="label-size" data-cy="qr-bulk-label-size">Tamanho: {{ label.size }}</p>
+                <p v-if="labelSettings.show_price" class="label-price">{{ formatBRL(label.price) }}</p>
+                <p v-if="labelSettings.show_size && label.size" class="label-size" data-cy="qr-bulk-label-size">Tamanho: {{ label.size }}</p>
                 <img :src="label.qr_code" alt="QR Code do produto" class="label-qr" data-cy="qr-bulk-label-image" />
-                <p class="label-code">{{ label.public_code }}</p>
+                <p v-if="labelSettings.show_public_code" class="label-code">{{ label.public_code }}</p>
               </div>
             </div>
           </template>
@@ -369,9 +386,9 @@ const handleDownloadPdf = (): void => {
     left: 0;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5cm;
-    padding: 1cm;
+    grid-template-columns: repeat(var(--label-print-columns, 2), 1fr);
+    gap: var(--label-print-gap, 4mm);
+    padding: var(--label-print-margin, 10mm);
   }
 
   .qr-label-card {

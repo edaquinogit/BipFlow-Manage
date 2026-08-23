@@ -46,6 +46,11 @@ const buildStockAdjustmentPayload = (
   originalProduct: Product,
   nextStockQuantity: number
 ): StockMovementInput | null => {
+  const hasActiveVariants = originalProduct.variants?.some((variant) => variant.is_active) ?? false;
+  if (hasActiveVariants) {
+    return null;
+  }
+
   const currentStockQuantity = Number(originalProduct.stock_quantity ?? 0);
   const stockDifference = nextStockQuantity - currentStockQuantity;
 

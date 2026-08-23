@@ -1,5 +1,11 @@
 import api from './api'
-import type { Store, StoreReceiptSettingsPayload } from '@/types/store'
+import type {
+  Store,
+  StoreAppearanceSettingsPayload,
+  StoreLabelSettings,
+  StoreLabelSettingsPayload,
+  StoreReceiptSettingsPayload,
+} from '@/types/store'
 
 export const storeService = {
   async getCurrent(): Promise<Store> {
@@ -22,6 +28,30 @@ export const storeService = {
   /** Rename a store the authenticated user owns or manages. */
   async rename(slug: string, name: string): Promise<Store> {
     const response = await api.patch<Store>(`v1/store/mine/${slug}/`, { name })
+    return response.data
+  },
+
+  /** Update controlled storefront appearance settings. */
+  async updateAppearance(slug: string, payload: StoreAppearanceSettingsPayload): Promise<Store> {
+    const response = await api.patch<Store>(`v1/store/mine/${slug}/appearance/`, payload)
+    return response.data
+  },
+
+  /** Fetch one store's printable product label settings. */
+  async getLabelSettings(slug: string): Promise<StoreLabelSettings> {
+    const response = await api.get<StoreLabelSettings>(`v1/store/mine/${slug}/label-settings/`)
+    return response.data
+  },
+
+  /** Update one store's printable product label settings. */
+  async updateLabelSettings(
+    slug: string,
+    payload: StoreLabelSettingsPayload
+  ): Promise<StoreLabelSettings> {
+    const response = await api.patch<StoreLabelSettings>(
+      `v1/store/mine/${slug}/label-settings/`,
+      payload
+    )
     return response.data
   },
 
