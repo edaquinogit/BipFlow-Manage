@@ -27,6 +27,7 @@ from .models import (
     SaleOrderItem,
     StockMovement,
     Store,
+    StorefrontAppearance,
     StoreMembership,
     StoreSettings,
     TOTPDevice,
@@ -995,6 +996,85 @@ class StoreAppearanceSettingsSerializer(serializers.Serializer):
 
     def validate_theme(self, value):
         return Store.normalize_theme(value)
+
+
+class StorefrontAppearanceSerializer(serializers.ModelSerializer):
+    """Dashboard-owned read/write for the extended storefront personalization.
+
+    Colors stay on Store.theme/StoreAppearanceSettingsSerializer; this only
+    covers what Store doesn't already model (see StorefrontAppearance's
+    docstring).
+    """
+
+    class Meta:
+        model = StorefrontAppearance
+        fields = [
+            "secondary_color",
+            "hero_enabled",
+            "hero_image_desktop",
+            "hero_image_mobile",
+            "hero_alt_text",
+            "hero_title",
+            "hero_subtitle",
+            "hero_cta_text",
+            "hero_cta_url",
+            "card_style",
+            "radius_style",
+            "density",
+            "motion_enabled",
+            "motion_intensity",
+            "decoration_enabled",
+            "decoration_style",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+    def validate_secondary_color(self, value: str) -> str:
+        return StorefrontAppearance.normalize_secondary_color(value)
+
+
+class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
+    """Safe public storefront appearance -- never memberships/owner/secrets.
+
+    Merged with the store's own public identity (name/logo/theme) by the
+    view, since a storefront visitor needs both to render the vitrine.
+    """
+
+    store_name = serializers.CharField(source="store.name", read_only=True)
+    store_slug = serializers.CharField(source="store.slug", read_only=True)
+    logo_url = serializers.CharField(source="store.logo_url", read_only=True)
+    tagline = serializers.CharField(source="store.tagline", read_only=True)
+    theme = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StorefrontAppearance
+        fields = [
+            "store_name",
+            "store_slug",
+            "logo_url",
+            "tagline",
+            "theme",
+            "secondary_color",
+            "hero_enabled",
+            "hero_image_desktop",
+            "hero_image_mobile",
+            "hero_alt_text",
+            "hero_title",
+            "hero_subtitle",
+            "hero_cta_text",
+            "hero_cta_url",
+            "card_style",
+            "radius_style",
+            "density",
+            "motion_enabled",
+            "motion_intensity",
+            "decoration_enabled",
+            "decoration_style",
+        ]
+        read_only_fields = fields
+
+    def get_theme(self, appearance: StorefrontAppearance) -> dict[str, str]:
+        return Store.normalize_theme(appearance.store.theme)
 
 
 class StoreRenameSerializer(serializers.Serializer):

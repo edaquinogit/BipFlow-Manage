@@ -60,6 +60,7 @@ from .models import (
     SaleOrderItem,
     StockMovement,
     Store,
+    StorefrontAppearance,
     StoreMembership,
     StoreSettings,
     TOTPDevice,
@@ -94,6 +95,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProductSerializer,
+    PublicStorefrontAppearanceSerializer,
     PublicStoreSettingsSerializer,
     RegisterUserSerializer,
     SaleOrderBreakdownSerializer,
@@ -106,6 +108,7 @@ from .serializers import (
     StockMovementCreateSerializer,
     StockMovementSerializer,
     StoreAppearanceSettingsSerializer,
+    StorefrontAppearanceSerializer,
     StoreReceiptSettingsSerializer,
     StoreRenameSerializer,
     StoreScopedTokenObtainPairSerializer,
@@ -1684,6 +1687,92 @@ class StoreAppearanceSettingsView(APIView):
         store.save(update_fields=update_fields)
 
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
+class StorefrontAppearanceView(APIView):
+    """Read/update the extended storefront personalization for one of the
+    user's stores (hero, layout preset, motion, decorations).
+
+    Colors/logo/tagline stay on StoreAppearanceSettingsView -- this only
+    covers the fields StorefrontAppearance adds. Same membership/role
+    permission story as StoreAppearanceSettingsView.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _get_store(slug: str):
+        return Store.objects.filter(slug=slug).first()
+
+    @staticmethod
+    def _is_member(request, store: Store) -> bool:
+        return store.memberships.filter(user=request.user).exists()
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def get(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar a aparencia desta loja."
+            )
+
+        appearance = StorefrontAppearance.get_for_store(store)
+        return Response(
+            StorefrontAppearanceSerializer(appearance).data, status=status.HTTP_200_OK
+        )
+
+    def patch(self, request, *args, **kwargs):
+        store = self._get_store(kwargs["slug"])
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar a aparencia desta loja."
+            )
+
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para editar a aparencia desta loja."
+            )
+
+        appearance = StorefrontAppearance.get_for_store(store)
+        serializer = StorefrontAppearanceSerializer(
+            appearance, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PublicStorefrontAppearanceView(APIView):
+    """Public, unauthenticated storefront appearance for one store's vitrine.
+
+    Looked up by the slug in the URL (not resolve_request_store): any
+    visitor may read any *active* store's public appearance -- there's
+    nothing membership-gated here, unlike the dashboard-authenticated
+    StorefrontAppearanceView above. Never exposes owner/memberships/ids.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        store = Store.objects.filter(slug=kwargs["slug"], is_active=True).first()
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+
+        appearance = StorefrontAppearance.get_for_store(store)
+        serializer = PublicStorefrontAppearanceSerializer(appearance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class StoreReceiptSettingsView(APIView):

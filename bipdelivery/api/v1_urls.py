@@ -1,5 +1,6 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
 from .pdv import PdvReceiptEmailView, PdvSaleView
 from .views import (
     BotConversationViewSet,
@@ -12,10 +13,12 @@ from .views import (
     MyStoreDetailView,
     MyStoresView,
     ProductViewSet,
+    PublicStorefrontAppearanceView,
     PublicStoreSettingsView,
     SaleOrderViewSet,
     StockMovementViewSet,
     StoreAppearanceSettingsView,
+    StorefrontAppearanceView,
     StoreLabelSettingsView,
     StoreReceiptSettingsView,
     StoreSettingsView,
@@ -49,6 +52,16 @@ urlpatterns = [
         "store/mine/<slug:slug>/appearance/",
         StoreAppearanceSettingsView.as_view(),
         name="store-mine-appearance",
+    ),
+    path(
+        "store/mine/<slug:slug>/storefront-appearance/",
+        StorefrontAppearanceView.as_view(),
+        name="store-mine-storefront-appearance",
+    ),
+    path(
+        "public/stores/<slug:slug>/appearance/",
+        PublicStorefrontAppearanceView.as_view(),
+        name="public-store-storefront-appearance",
     ),
     path(
         "store/mine/<slug:slug>/label-settings/",
