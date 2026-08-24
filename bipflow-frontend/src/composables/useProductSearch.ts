@@ -38,7 +38,7 @@ export interface UseProductSearchReturn {
 
 function normalizeFilters(filters: Partial<ProductFilters>): ProductFilters {
   return {
-    search: filters.search?.trim() || '',
+    search: typeof filters.search === 'string' ? filters.search : '',
     categoryId: filters.categoryId,
     priceMin: filters.priceMin,
     priceMax: filters.priceMax,

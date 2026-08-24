@@ -16,6 +16,7 @@ from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed, NotFound, PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -60,6 +61,7 @@ from .models import (
     SaleOrderItem,
     StockMovement,
     Store,
+    StorefrontBanner,
     StorefrontAppearance,
     StoreMembership,
     StoreSettings,
@@ -108,7 +110,11 @@ from .serializers import (
     StockMovementCreateSerializer,
     StockMovementSerializer,
     StoreAppearanceSettingsSerializer,
+    StorefrontBannerReorderSerializer,
+    StorefrontBannerSerializer,
     StorefrontAppearanceSerializer,
+    StorefrontMediaUploadSerializer,
+    PublicStorefrontBannerSerializer,
     StoreReceiptSettingsSerializer,
     StoreRenameSerializer,
     StoreScopedTokenObtainPairSerializer,
@@ -121,7 +127,6 @@ from .store_scope import StoreScopedViewSetMixin, resolve_request_store
 from .throttling import (
     REFRESH_TOKEN_COOKIE_NAME,
     AuthIpThrottle,
-    _hash_cache_identifier,
     BotMessageIpThrottle,
     CheckoutCustomerThrottle,
     CheckoutIpThrottle,
@@ -133,6 +138,7 @@ from .throttling import (
     RegistrationIdentityThrottle,
     TokenRefreshIdentityThrottle,
     TokenRefreshIpThrottle,
+    _hash_cache_identifier,
 )
 
 User = get_user_model()
@@ -190,6 +196,25 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """
         return super().get_object()
 
+    def _resolve_category_filter_ids(self, category_filter: str) -> list[int]:
+        categories = Category.objects.filter(store=self.get_request_store())
+
+        try:
+            category_id = int(category_filter)
+            selected_categories = categories.filter(id=category_id)
+        except ValueError:
+            selected_categories = categories.filter(slug=category_filter)
+
+        selected_ids = list(selected_categories.values_list("id", flat=True))
+        parent_ids = list(
+            selected_categories.filter(parent__isnull=True).values_list("id", flat=True)
+        )
+        child_ids = list(
+            categories.filter(parent_id__in=parent_ids).values_list("id", flat=True)
+        )
+
+        return list(dict.fromkeys([*selected_ids, *child_ids]))
+
     def get_base_queryset(self):
         """
         Apply filtering and optimization before the store scope (Etapa 3) is intersected.
@@ -203,10 +228,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         Returns:
             QuerySet: Optimized queryset with filters and select_related()
         """
-        queryset = Product.objects.select_related("category").prefetch_related(
-            "gallery_images",
-            "variants",
-        )
+        queryset = Product.objects.select_related(
+            "category", "category__parent"
+        ).prefetch_related("gallery_images", "variants")
 
         # 🔍 TEXT SEARCH: Search in name, SKU, and description
         search_term = self.request.query_params.get("search", "").strip()
@@ -220,13 +244,9 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         # 🏷️ CATEGORY FILTER: By ID or slug
         category_filter = self.request.query_params.get("category", "").strip()
         if category_filter:
-            # Try to match by ID first, then by slug
-            try:
-                category_id = int(category_filter)
-                queryset = queryset.filter(category_id=category_id)
-            except ValueError:
-                # If not an integer, try slug
-                queryset = queryset.filter(category__slug=category_filter)
+            queryset = queryset.filter(
+                category_id__in=self._resolve_category_filter_ids(category_filter)
+            )
 
         # 📊 STOCK AVAILABILITY FILTER
         in_stock_param = self.request.query_params.get("in_stock", "").lower()
@@ -441,7 +461,7 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
 
         # Validate category exists within the requester's store
         try:
-            new_category = Category.objects.get(
+            new_category = Category.objects.select_related("parent").get(
                 id=new_category_id, store=self.get_request_store()
             )
         except Category.DoesNotExist:
@@ -481,6 +501,12 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
                         "id": new_category.id,
                         "name": new_category.name,
                         "slug": new_category.slug,
+                        "parent": new_category.parent_id,
+                        "parent_name": (
+                            new_category.parent.name
+                            if new_category.parent_id
+                            else None
+                        ),
                     },
                 },
                 status=status.HTTP_200_OK,
@@ -659,20 +685,28 @@ class CategoryViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
     pagination_class = StandardPagination
 
     def get_base_queryset(self):
-        return Category.objects.all()
+        return Category.objects.select_related("parent").annotate(
+            product_count=Count("products", distinct=True),
+            children_count=Count("children", distinct=True),
+        ).order_by("parent__name", "name", "id")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["store"] = self.get_request_store()
+        return context
 
     def destroy(self, request, *args, **kwargs):
         """
-        Delete category with protection for referenced products.
+        Delete category with protection for referenced products and subcategories.
 
-        Returns standardized error response if category has related products.
+        Returns standardized error response if category has related records.
         """
         instance = self.get_object()
         try:
             instance.delete()
         except ProtectedError:
             return business_logic_error(
-                "Não é possível excluir categoria porque ela possui produtos relacionados."
+                "Não é possível excluir categoria porque ela possui produtos ou subcategorias vinculados."
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1631,13 +1665,26 @@ class StoreLabelSettingsView(APIView):
 
 
 class StoreAppearanceSettingsView(APIView):
-    """Read/update controlled storefront appearance for one of the user's stores."""
+    """Read/update controlled storefront appearance for the active dashboard store.
+
+    The slug route remains for backwards compatibility, while
+    /store/current/appearance/ is the canonical multi-tenant contract used by
+    the dashboard. The canonical path resolves the tenant through
+    resolve_request_store(), which honors the trusted X-Store-Slug header/JWT
+    claim and never trusts an arbitrary client-provided store id.
+    """
 
     permission_classes = [IsAuthenticated]
 
     @staticmethod
-    def _get_store(slug: str):
+    def _get_store_by_slug(slug: str):
         return Store.objects.filter(slug=slug).first()
+
+    def _resolve_store(self, request, slug: str | None = None):
+        if slug:
+            return self._get_store_by_slug(slug)
+
+        return resolve_request_store(request)
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
@@ -1651,7 +1698,7 @@ class StoreAppearanceSettingsView(APIView):
         ).exists()
 
     def get(self, request, *args, **kwargs):
-        store = self._get_store(kwargs["slug"])
+        store = self._resolve_store(request, kwargs.get("slug"))
         if store is None:
             return not_found_error("Loja nao encontrada.")
         if not self._is_member(request, store):
@@ -1662,7 +1709,7 @@ class StoreAppearanceSettingsView(APIView):
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
-        store = self._get_store(kwargs["slug"])
+        store = self._resolve_store(request, kwargs.get("slug"))
         if store is None:
             return not_found_error("Loja nao encontrada.")
         if not self._is_member(request, store):
@@ -1690,19 +1737,24 @@ class StoreAppearanceSettingsView(APIView):
 
 
 class StorefrontAppearanceView(APIView):
-    """Read/update the extended storefront personalization for one of the
-    user's stores (hero, layout preset, motion, decorations).
+    """Read/update extended storefront personalization for the active store.
 
-    Colors/logo/tagline stay on StoreAppearanceSettingsView -- this only
-    covers the fields StorefrontAppearance adds. Same membership/role
-    permission story as StoreAppearanceSettingsView.
+    Colors/logo/tagline stay on StoreAppearanceSettingsView -- this only covers
+    the fields StorefrontAppearance adds. The slug route remains supported, but
+    the current-store route is the canonical dashboard path.
     """
 
     permission_classes = [IsAuthenticated]
 
     @staticmethod
-    def _get_store(slug: str):
+    def _get_store_by_slug(slug: str):
         return Store.objects.filter(slug=slug).first()
+
+    def _resolve_store(self, request, slug: str | None = None):
+        if slug:
+            return self._get_store_by_slug(slug)
+
+        return resolve_request_store(request)
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
@@ -1716,7 +1768,7 @@ class StorefrontAppearanceView(APIView):
         ).exists()
 
     def get(self, request, *args, **kwargs):
-        store = self._get_store(kwargs["slug"])
+        store = self._resolve_store(request, kwargs.get("slug"))
         if store is None:
             return not_found_error("Loja nao encontrada.")
         if not self._is_member(request, store):
@@ -1726,11 +1778,15 @@ class StorefrontAppearanceView(APIView):
 
         appearance = StorefrontAppearance.get_for_store(store)
         return Response(
-            StorefrontAppearanceSerializer(appearance).data, status=status.HTTP_200_OK
+            StorefrontAppearanceSerializer(
+                appearance,
+                context={"store": store},
+            ).data,
+            status=status.HTTP_200_OK,
         )
 
     def patch(self, request, *args, **kwargs):
-        store = self._get_store(kwargs["slug"])
+        store = self._resolve_store(request, kwargs.get("slug"))
         if store is None:
             return not_found_error("Loja nao encontrada.")
         if not self._is_member(request, store):
@@ -1745,12 +1801,229 @@ class StorefrontAppearanceView(APIView):
 
         appearance = StorefrontAppearance.get_for_store(store)
         serializer = StorefrontAppearanceSerializer(
-            appearance, data=request.data, partial=True
+            appearance,
+            data=request.data,
+            partial=True,
+            context={"store": store},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StorefrontMediaUploadView(APIView):
+    """Upload tenant-scoped storefront media without trusting client store ids."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para enviar midias desta loja."
+            )
+
+        serializer = StorefrontMediaUploadSerializer(
+            data=request.data,
+            context={"request": request, "store": store},
+        )
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.save(), status=status.HTTP_201_CREATED)
+
+
+class StorefrontBannerListView(APIView):
+    """List/create promotional banners for the active dashboard store."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _is_member(request, store: Store) -> bool:
+        return store.memberships.filter(user=request.user).exists()
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def get(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar os banners desta loja."
+            )
+
+        banners = StorefrontBanner.objects.filter(store=store).order_by("position", "id")
+        serializer = StorefrontBannerSerializer(
+            banners,
+            many=True,
+            context={"store": store},
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para criar banners desta loja."
+            )
+
+        serializer = StorefrontBannerSerializer(
+            data=request.data,
+            context={"store": store},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class StorefrontBannerDetailView(APIView):
+    """Read/update/delete one promotional banner from the active store."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _is_member(request, store: Store) -> bool:
+        return store.memberships.filter(user=request.user).exists()
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    @staticmethod
+    def _get_banner(store: Store, banner_id: int):
+        return StorefrontBanner.objects.filter(store=store, id=banner_id).first()
+
+    def get(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._is_member(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para acessar os banners desta loja."
+            )
+
+        banner = self._get_banner(store, kwargs["banner_id"])
+        if banner is None:
+            return not_found_error("Banner nao encontrado.")
+
+        serializer = StorefrontBannerSerializer(banner, context={"store": store})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para editar banners desta loja."
+            )
+
+        banner = self._get_banner(store, kwargs["banner_id"])
+        if banner is None:
+            return not_found_error("Banner nao encontrado.")
+
+        serializer = StorefrontBannerSerializer(
+            banner,
+            data=request.data,
+            partial=True,
+            context={"store": store},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para remover banners desta loja."
+            )
+
+        banner = self._get_banner(store, kwargs["banner_id"])
+        if banner is None:
+            return not_found_error("Banner nao encontrado.")
+
+        banner.delete()
+        for index, remaining_banner in enumerate(
+            StorefrontBanner.objects.filter(store=store).order_by("position", "id")
+        ):
+            if remaining_banner.position != index:
+                remaining_banner.position = index
+                remaining_banner.save(update_fields=["position", "updated_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class StorefrontBannerReorderView(APIView):
+    """Persist current-store promotional banner order."""
+
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _can_edit(request, store: Store) -> bool:
+        return store.memberships.filter(
+            user=request.user,
+            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+        ).exists()
+
+    def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+        if not self._can_edit(request, store):
+            return permission_denied_error(
+                "Voce nao possui permissao para ordenar banners desta loja."
+            )
+
+        serializer = StorefrontBannerReorderSerializer(
+            data=request.data,
+            context={"store": store},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            banners_by_id = {
+                banner.id: banner
+                for banner in StorefrontBanner.objects.select_for_update().filter(
+                    store=store,
+                    id__in=serializer.validated_data["ids"],
+                )
+            }
+            for index, banner_id in enumerate(serializer.validated_data["ids"]):
+                banner = banners_by_id[banner_id]
+                banner.position = index
+                banner.save(update_fields=["position", "updated_at"])
+
+        banners = StorefrontBanner.objects.filter(store=store).order_by("position", "id")
+        response_serializer = StorefrontBannerSerializer(
+            banners,
+            many=True,
+            context={"store": store},
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
 class PublicStorefrontAppearanceView(APIView):
@@ -1772,6 +2045,24 @@ class PublicStorefrontAppearanceView(APIView):
 
         appearance = StorefrontAppearance.get_for_store(store)
         serializer = PublicStorefrontAppearanceSerializer(appearance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PublicStorefrontBannerListView(APIView):
+    """Public active promotional banners for one store's vitrine."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        store = Store.objects.filter(slug=kwargs["slug"], is_active=True).first()
+        if store is None:
+            return not_found_error("Loja nao encontrada.")
+
+        serializer = PublicStorefrontBannerSerializer(
+            StorefrontBanner.public_for_store(store),
+            many=True,
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

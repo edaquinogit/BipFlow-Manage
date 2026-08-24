@@ -52,6 +52,8 @@ class ProductService {
     const rawProduct = { ...(data as Record<string, unknown>) };
     const rawCategory = rawProduct.category;
     const rawCategoryName = rawProduct.category_name;
+    const rawCategoryParent = rawProduct.category_parent;
+    const rawCategoryParentName = rawProduct.category_parent_name;
 
     if (
       typeof rawCategory === "number" &&
@@ -62,6 +64,8 @@ class ProductService {
         id: rawCategory,
         name: rawCategoryName,
         slug: null,
+        parent: typeof rawCategoryParent === "number" ? rawCategoryParent : null,
+        parent_name: typeof rawCategoryParentName === "string" ? rawCategoryParentName : null,
       };
     }
 
@@ -457,7 +461,13 @@ class ProductService {
   async bulkUpdateCategory(productIds: number[], categoryId: number): Promise<{
     updated_count: number;
     updated_products: number[];
-    new_category: { id: number; name: string; slug: string | null };
+    new_category: {
+      id: number;
+      name: string;
+      slug: string | null;
+      parent?: number | null;
+      parent_name?: string | null;
+    };
   }> {
     try {
       const payload = {
@@ -478,7 +488,13 @@ class ProductService {
       return data as {
         updated_count: number;
         updated_products: number[];
-        new_category: { id: number; name: string; slug: string | null };
+        new_category: {
+          id: number;
+          name: string;
+          slug: string | null;
+          parent?: number | null;
+          parent_name?: string | null;
+        };
       };
     } catch (error: unknown) {
       this.handleError(error as ApplicationError, "Bulk Update Category");

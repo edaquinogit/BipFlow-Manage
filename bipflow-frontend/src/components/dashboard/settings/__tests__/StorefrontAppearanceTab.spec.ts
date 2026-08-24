@@ -5,21 +5,40 @@ import DashboardSettingsView from '@/views/dashboard/DashboardSettingsView.vue'
 import StorefrontAppearanceTab from '../StorefrontAppearanceTab.vue'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useToast } from '@/composables/useToast'
+import { categoryService } from '@/services/category.service'
+import productService from '@/services/product.service'
 import { storeService } from '@/services/store.service'
 import { storefrontAppearanceService } from '@/services/storefront-appearance.service'
-import type { Store, StorefrontAppearance } from '@/types/store'
+import type { Store, StorefrontAppearance, StorefrontBanner } from '@/types/store'
 
 vi.mock('@/composables/useCurrentStore', () => ({ useCurrentStore: vi.fn() }))
 vi.mock('@/composables/useToast', () => ({ useToast: vi.fn() }))
 vi.mock('@/services/store.service', () => ({
   storeService: {
     updateAppearance: vi.fn(),
+    updateCurrentAppearance: vi.fn(),
   },
 }))
 vi.mock('@/services/storefront-appearance.service', () => ({
   storefrontAppearanceService: {
     get: vi.fn(),
     update: vi.fn(),
+    uploadMedia: vi.fn(),
+    listBanners: vi.fn(),
+    createBanner: vi.fn(),
+    updateBanner: vi.fn(),
+    deleteBanner: vi.fn(),
+    reorderBanners: vi.fn(),
+  },
+}))
+vi.mock('@/services/category.service', () => ({
+  categoryService: {
+    getAll: vi.fn(),
+  },
+}))
+vi.mock('@/services/product.service', () => ({
+  default: {
+    getAll: vi.fn(),
   },
 }))
 vi.mock('@/services/logger', () => ({
@@ -68,7 +87,10 @@ function buildStore(overrides: Partial<Store> = {}): Store {
 
 function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): StorefrontAppearance {
   return {
+    id: 10,
+    store_id: 1,
     secondary_color: '#E91E63',
+    favicon_url: '',
     hero_enabled: false,
     hero_image_desktop: '',
     hero_image_mobile: '',
@@ -76,6 +98,8 @@ function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): Storefr
     hero_title: '',
     hero_subtitle: '',
     hero_cta_text: '',
+    hero_destination_type: 'none',
+    hero_destination_value: '',
     hero_cta_url: '',
     card_style: 'clean',
     radius_style: 'rounded',
@@ -84,6 +108,29 @@ function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): Storefr
     motion_intensity: 'standard',
     decoration_enabled: false,
     decoration_style: 'none',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function buildBanner(overrides: Partial<StorefrontBanner> = {}): StorefrontBanner {
+  return {
+    id: 100,
+    store_id: 1,
+    image_url: 'https://cdn.example.com/promo.png',
+    alt_text: 'Banner promocional',
+    title: 'Promocao',
+    subtitle: 'Itens selecionados',
+    cta_text: 'Ver ofertas',
+    destination_type: 'products',
+    destination_value: '',
+    button_url: '/l/loja-a/produtos',
+    position: 0,
+    is_active: true,
+    status: 'active',
+    starts_at: null,
+    ends_at: null,
+    created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
@@ -120,14 +167,78 @@ describe('StorefrontAppearanceTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:storefront-preview'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    })
     fetchCurrentStore.mockClear()
     mockCurrentStore()
     vi.mocked(useToast).mockReturnValue(toastState as any)
     vi.mocked(storefrontAppearanceService.get).mockResolvedValue(buildAppearance())
-    vi.mocked(storefrontAppearanceService.update).mockImplementation((_slug, payload) => (
+    vi.mocked(storefrontAppearanceService.update).mockImplementation((payload) => (
       Promise.resolve(buildAppearance(payload))
     ))
-    vi.mocked(storeService.updateAppearance).mockImplementation((_slug, payload) => (
+    vi.mocked(storefrontAppearanceService.uploadMedia).mockImplementation((kind, file) => (
+      Promise.resolve({
+        kind,
+        url: `https://cdn.example.com/${file.name}`,
+        path: `stores/1/storefront/${kind}/${file.name}`,
+        size: file.size,
+        content_type: file.type,
+      })
+    ))
+    vi.mocked(storefrontAppearanceService.listBanners).mockResolvedValue([])
+    vi.mocked(storefrontAppearanceService.createBanner).mockImplementation((payload) => (
+      Promise.resolve(buildBanner({
+        ...payload,
+        id: 101,
+        store_id: 1,
+        image_url: payload.image_url ?? 'https://cdn.example.com/promo.png',
+        alt_text: payload.alt_text ?? '',
+        title: payload.title ?? '',
+        subtitle: payload.subtitle ?? '',
+        cta_text: payload.cta_text ?? '',
+        destination_type: payload.destination_type ?? 'none',
+        destination_value: payload.destination_value ?? '',
+        position: payload.position ?? 0,
+        is_active: payload.is_active ?? true,
+        starts_at: payload.starts_at ?? null,
+        ends_at: payload.ends_at ?? null,
+      }))
+    ))
+    vi.mocked(storefrontAppearanceService.updateBanner).mockImplementation((id, payload) => (
+      Promise.resolve(buildBanner({ id, ...payload }))
+    ))
+    vi.mocked(storefrontAppearanceService.deleteBanner).mockResolvedValue(undefined)
+    vi.mocked(storefrontAppearanceService.reorderBanners).mockImplementation((ids) => (
+      Promise.resolve(ids.map((id, index) => buildBanner({ id, position: index })))
+    ))
+    vi.mocked(categoryService.getAll).mockResolvedValue([
+      {
+        id: 7,
+        name: 'Promocoes',
+        slug: 'promocoes',
+        description: null,
+        product_count: 1,
+        children_count: 0,
+      },
+    ])
+    vi.mocked(productService.getAll).mockResolvedValue([
+      {
+        id: 9,
+        name: 'Produto destaque',
+        slug: 'produto-destaque',
+        category: { id: 7, name: 'Promocoes', slug: 'promocoes' },
+        price: 10,
+        stock_quantity: 5,
+        is_available: true,
+      } as any,
+    ])
+    vi.mocked(storeService.updateCurrentAppearance).mockImplementation((payload) => (
       Promise.resolve(buildStore({
         logo_url: payload.logo_url ?? 'https://example.com/logo-a.png',
         tagline: payload.tagline ?? 'Catalogo A',
@@ -136,6 +247,15 @@ describe('StorefrontAppearanceTab', () => {
     ))
   })
 
+  async function selectFile(wrapper: ReturnType<typeof mount>, selector: string, file: File) {
+    const input = wrapper.find(selector)
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    await input.trigger('change')
+  }
+
   it('shows loading while fetching the current store appearance', async () => {
     const deferred = createDeferred<StorefrontAppearance>()
     vi.mocked(storefrontAppearanceService.get).mockReturnValueOnce(deferred.promise)
@@ -143,7 +263,7 @@ describe('StorefrontAppearanceTab', () => {
     const wrapper = mount(StorefrontAppearanceTab)
 
     expect(wrapper.find('[data-cy="storefront-appearance-loading"]').exists()).toBe(true)
-    expect(storefrontAppearanceService.get).toHaveBeenCalledWith('loja-a')
+    expect(storefrontAppearanceService.get).toHaveBeenCalledWith()
 
     deferred.resolve(buildAppearance())
     await flushPromises()
@@ -172,14 +292,51 @@ describe('StorefrontAppearanceTab', () => {
     await wrapper.find('[data-cy="btn-save-storefront-identity"]').trigger('click')
     await flushPromises()
 
-    expect(storeService.updateAppearance).toHaveBeenCalledWith('loja-a', {
+    expect(storeService.updateCurrentAppearance).toHaveBeenCalledWith({
       tagline: 'Nova vitrine',
     })
-    expect(storefrontAppearanceService.update).toHaveBeenCalledWith('loja-a', {
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith({
       secondary_color: '#00AAFF',
     })
     expect(fetchCurrentStore).toHaveBeenCalledWith(true)
     expect(toastState.success).toHaveBeenCalledWith('Aparencia da vitrine atualizada com sucesso.')
+  })
+
+  it('previews and uploads a selected logo before saving the store identity', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    const logoFile = new File(['image'], 'logo.png', { type: 'image/png' })
+    await selectFile(wrapper, '[data-cy="storefront-logo-file"]', logoFile)
+
+    expect(wrapper.find('[data-cy="storefront-logo-preview"]').attributes('src')).toBe('blob:storefront-preview')
+
+    await wrapper.find('[data-cy="btn-save-storefront-identity"]').trigger('click')
+    await flushPromises()
+
+    expect(storefrontAppearanceService.uploadMedia).toHaveBeenCalledWith('logo', logoFile)
+    expect(storeService.updateCurrentAppearance).toHaveBeenCalledWith({
+      logo_url: 'https://cdn.example.com/logo.png',
+    })
+    expect(fetchCurrentStore).toHaveBeenCalledWith(true)
+  })
+
+  it('previews and uploads a selected favicon before saving appearance', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    const faviconFile = new File(['image'], 'favicon.png', { type: 'image/png' })
+    await selectFile(wrapper, '[data-cy="storefront-favicon-file"]', faviconFile)
+
+    expect(wrapper.find('[data-cy="storefront-favicon-preview"]').attributes('src')).toBe('blob:storefront-preview')
+
+    await wrapper.find('[data-cy="btn-save-storefront-identity"]').trigger('click')
+    await flushPromises()
+
+    expect(storefrontAppearanceService.uploadMedia).toHaveBeenCalledWith('favicon', faviconFile)
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith({
+      favicon_url: 'https://cdn.example.com/favicon.png',
+    })
   })
 
   it('keeps banner fields conditional and saves the hero payload', async () => {
@@ -188,21 +345,93 @@ describe('StorefrontAppearanceTab', () => {
 
     await wrapper.find('[data-cy="storefront-appearance-section-banner"]').trigger('click')
 
-    expect(wrapper.find('[data-cy="storefront-banner-desktop-url"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="storefront-banner-file"]').exists()).toBe(false)
 
     await wrapper.find('[data-cy="storefront-banner-enabled"]').setValue(true)
-    await wrapper.find('[data-cy="storefront-banner-desktop-url"]').setValue('https://example.com/banner.jpg')
+    const bannerFile = new File(['image'], 'banner.png', { type: 'image/png' })
+    await selectFile(wrapper, '[data-cy="storefront-banner-file"]', bannerFile)
     await wrapper.find('[data-cy="storefront-banner-alt"]').setValue('Campanha de verao')
     await wrapper.find('[data-cy="btn-save-storefront-banner"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-cy="storefront-banner-preview"]').exists()).toBe(true)
-    expect(storefrontAppearanceService.update).toHaveBeenCalledWith('loja-a', expect.objectContaining({
+    expect(storefrontAppearanceService.uploadMedia).toHaveBeenCalledWith('banner', bannerFile)
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith(expect.objectContaining({
       hero_enabled: true,
-      hero_image_desktop: 'https://example.com/banner.jpg',
+      hero_image_desktop: 'https://cdn.example.com/banner.png',
       hero_alt_text: 'Campanha de verao',
     }))
     expect(toastState.success).toHaveBeenCalledWith('Aparencia da vitrine atualizada com sucesso.')
+  })
+
+  it('saves the hero CTA through a friendly category destination', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-appearance-section-banner"]').trigger('click')
+    await wrapper.find('[data-cy="storefront-banner-enabled"]').setValue(true)
+    await wrapper.find('[data-cy="storefront-banner-cta-text"]').setValue('Ver promocoes')
+    await wrapper.find('[data-cy="storefront-banner-destination-type"]').setValue('category')
+    await nextTick()
+    await wrapper.find('[data-cy="storefront-banner-destination-category"]').setValue('7')
+    await wrapper.find('[data-cy="btn-save-storefront-banner"]').trigger('click')
+    await flushPromises()
+
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith(expect.objectContaining({
+      hero_destination_type: 'category',
+      hero_destination_value: '7',
+      hero_cta_text: 'Ver promocoes',
+    }))
+    expect(storefrontAppearanceService.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      hero_cta_url: expect.any(String),
+    }))
+  })
+
+  it('creates a promotional banner with upload, product destination and schedule', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-appearance-section-promocoes"]').trigger('click')
+    await wrapper.find('[data-cy="btn-add-storefront-promotion"]').trigger('click')
+
+    const promotionFile = new File(['image'], 'promo.png', { type: 'image/png' })
+    await selectFile(wrapper, '[data-cy="storefront-promotion-file"]', promotionFile)
+    expect(wrapper.find('[data-cy="storefront-promotion-preview"]').attributes('src')).toBe('blob:storefront-preview')
+    await wrapper.find('[data-cy="storefront-promotion-title"]').setValue('Oferta relampago')
+    await wrapper.find('[data-cy="storefront-promotion-destination-type"]').setValue('product')
+    await nextTick()
+    await wrapper.find('[data-cy="storefront-promotion-destination-product"]').setValue('9')
+    await wrapper.find('[data-cy="storefront-promotion-starts-at"]').setValue('2026-08-25T09:30')
+    await wrapper.find('[data-cy="storefront-promotion-ends-at"]').setValue('2026-08-31T22:00')
+    await wrapper.find('[data-cy="btn-save-storefront-promotion"]').trigger('click')
+    await flushPromises()
+
+    expect(storefrontAppearanceService.uploadMedia).toHaveBeenCalledWith('promotion', promotionFile)
+    expect(storefrontAppearanceService.createBanner).toHaveBeenCalledWith(expect.objectContaining({
+      image_url: 'https://cdn.example.com/promo.png',
+      title: 'Oferta relampago',
+      destination_type: 'product',
+      destination_value: '9',
+      is_active: true,
+      starts_at: expect.any(String),
+      ends_at: expect.any(String),
+    }))
+  })
+
+  it('reorders persisted promotional banners', async () => {
+    vi.mocked(storefrontAppearanceService.listBanners).mockResolvedValue([
+      buildBanner({ id: 100, title: 'Primeiro', position: 0 }),
+      buildBanner({ id: 101, title: 'Segundo', position: 1 }),
+    ])
+
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-appearance-section-promocoes"]').trigger('click')
+    await wrapper.findAll('[data-cy="btn-move-storefront-promotion-down"]')[0]!.trigger('click')
+    await flushPromises()
+
+    expect(storefrontAppearanceService.reorderBanners).toHaveBeenCalledWith([101, 100])
   })
 
   it('disables the banner save button while the request is in flight', async () => {
@@ -254,7 +483,7 @@ describe('StorefrontAppearanceTab', () => {
     await wrapper.find('[data-cy="btn-save-storefront-layout"]').trigger('click')
     await flushPromises()
 
-    expect(storefrontAppearanceService.update).toHaveBeenCalledWith('loja-a', expect.objectContaining({
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith(expect.objectContaining({
       card_style: 'bordered',
       radius_style: 'soft',
       density: 'compact',
@@ -266,11 +495,9 @@ describe('StorefrontAppearanceTab', () => {
   })
 
   it('reloads appearance when the selected store changes and replaces the previous form state', async () => {
-    vi.mocked(storefrontAppearanceService.get).mockImplementation((slug) => (
-      Promise.resolve(slug === 'loja-a'
-        ? buildAppearance({ secondary_color: '#FF00AA' })
-        : buildAppearance({ secondary_color: '#0044FF' }))
-    ))
+    vi.mocked(storefrontAppearanceService.get)
+      .mockResolvedValueOnce(buildAppearance({ secondary_color: '#FF00AA' }))
+      .mockResolvedValueOnce(buildAppearance({ id: 20, store_id: 2, secondary_color: '#0044FF' }))
 
     const wrapper = mount(StorefrontAppearanceTab)
     await flushPromises()
@@ -287,7 +514,7 @@ describe('StorefrontAppearanceTab', () => {
     await nextTick()
     await flushPromises()
 
-    expect(storefrontAppearanceService.get).toHaveBeenCalledWith('loja-b')
+    expect(storefrontAppearanceService.get).toHaveBeenCalledTimes(2)
     expect((wrapper.find('[data-cy="storefront-secondary-color"]').element as HTMLInputElement).value).toBe('#0044FF')
     expect(wrapper.find('[data-cy="open-current-storefront-link"]').attributes('href')).toBe('/l/loja-b/produtos')
   })
@@ -295,9 +522,9 @@ describe('StorefrontAppearanceTab', () => {
   it('ignores a stale Store A response that resolves after Store B', async () => {
     const storeARequest = createDeferred<StorefrontAppearance>()
     const storeBRequest = createDeferred<StorefrontAppearance>()
-    vi.mocked(storefrontAppearanceService.get).mockImplementation((slug) => (
-      slug === 'loja-a' ? storeARequest.promise : storeBRequest.promise
-    ))
+    vi.mocked(storefrontAppearanceService.get)
+      .mockReturnValueOnce(storeARequest.promise)
+      .mockReturnValueOnce(storeBRequest.promise)
 
     const wrapper = mount(StorefrontAppearanceTab)
 

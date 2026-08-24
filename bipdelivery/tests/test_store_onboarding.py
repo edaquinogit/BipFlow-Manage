@@ -12,12 +12,19 @@ to a store they actually belong to. Trusting the header unconditionally
 for authenticated requests would reopen exactly the leak Etapa 3 closed.
 """
 
+import os
+import shutil
+import tempfile
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.cache import cache
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from django.utils import timezone
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -28,11 +35,37 @@ from bipdelivery.api.models import (
     Product,
     Store,
     StorefrontAppearance,
+    StorefrontBanner,
     StoreMembership,
     product_image_upload_to,
 )
 
 User = get_user_model()
+
+
+def build_storefront_test_image(filename: str = "storefront.png") -> SimpleUploadedFile:
+    image_buffer = BytesIO()
+    Image.new("RGB", (16, 16), color=(216, 27, 96)).save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+    return SimpleUploadedFile(
+        filename,
+        image_buffer.read(),
+        content_type="image/png",
+    )
+
+
+def build_large_storefront_test_image(filename: str = "storefront-large.png") -> SimpleUploadedFile:
+    image_buffer = BytesIO()
+    Image.frombytes("RGB", (900, 900), os.urandom(900 * 900 * 3)).save(
+        image_buffer,
+        format="PNG",
+    )
+    image_buffer.seek(0)
+    return SimpleUploadedFile(
+        filename,
+        image_buffer.read(),
+        content_type="image/png",
+    )
 
 
 class RegistrationCreatesStoreTest(TestCase):
@@ -545,6 +578,9 @@ class StoreAppearanceSettingsEndpointTest(TestCase):
     def _url(self, slug: str) -> str:
         return f"/api/v1/store/mine/{slug}/appearance/"
 
+    def _current_url(self) -> str:
+        return "/api/v1/store/current/appearance/"
+
     def test_owner_can_update_storefront_appearance(self) -> None:
         response = self.client.patch(
             self._url(self.store_a.slug),
@@ -609,6 +645,31 @@ class StoreAppearanceSettingsEndpointTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_current_endpoint_updates_authenticated_store(self) -> None:
+        response = self.client.patch(
+            self._current_url(),
+            {"tagline": "Atual pela loja ativa"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.store_a.refresh_from_db()
+        self.store_b.refresh_from_db()
+        self.assertEqual(self.store_a.tagline, "Atual pela loja ativa")
+        self.assertNotEqual(self.store_b.tagline, "Atual pela loja ativa")
+
+    def test_current_endpoint_viewer_cannot_update_selected_store(self) -> None:
+        response = self.client.patch(
+            self._current_url(),
+            {"tagline": "Indevido"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.store_b.refresh_from_db()
+        self.assertNotEqual(self.store_b.tagline, "Indevido")
+
 
 class StorefrontAppearanceEndpointTest(TestCase):
     """Extended storefront appearance is tenant-scoped and public-safe."""
@@ -637,6 +698,9 @@ class StorefrontAppearanceEndpointTest(TestCase):
     def _dashboard_url(self, slug: str) -> str:
         return f"/api/v1/store/mine/{slug}/storefront-appearance/"
 
+    def _current_dashboard_url(self) -> str:
+        return "/api/v1/store/current/storefront-appearance/"
+
     def _public_url(self, slug: str) -> str:
         return f"/api/v1/public/stores/{slug}/appearance/"
 
@@ -654,6 +718,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
             self._dashboard_url(self.store_a.slug),
             {
                 "secondary_color": "#22aaee",
+                "favicon_url": "https://example.com/favicon.png",
                 "hero_enabled": True,
                 "hero_image_desktop": "https://example.com/banner.jpg",
                 "hero_alt_text": "Banner promocional",
@@ -671,6 +736,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
         self.assertEqual(write_response.status_code, status.HTTP_200_OK)
         appearance = StorefrontAppearance.objects.get(store=self.store_a)
         self.assertEqual(appearance.secondary_color, "#22AAEE")
+        self.assertEqual(appearance.favicon_url, "https://example.com/favicon.png")
         self.assertTrue(appearance.hero_enabled)
         self.assertEqual(appearance.card_style, "elevated")
         self.assertEqual(appearance.radius_style, "soft")
@@ -710,6 +776,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
         self.assertEqual(response.data["logo_url"], "https://example.com/logo.png")
         self.assertEqual(response.data["tagline"], "Catalogo premium")
         self.assertEqual(response.data["theme"]["accent"], "#22AAEE")
+        self.assertEqual(response.data["favicon_url"], "")
         self.assertTrue(response.data["hero_enabled"])
         self.assertEqual(response.data["card_style"], "bordered")
         self.assertNotIn("id", response.data)
@@ -719,6 +786,532 @@ class StorefrontAppearanceEndpointTest(TestCase):
         response = APIClient().get(self._public_url(self.inactive_store.slug))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_current_endpoint_reads_defaults_and_initializes_authenticated_store(self) -> None:
+        response = self.client.get(self._current_dashboard_url())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["store_id"], self.store_a.id)
+        self.assertIsInstance(response.data["id"], int)
+        self.assertFalse(response.data["hero_enabled"])
+        self.assertTrue(
+            StorefrontAppearance.objects.filter(store=self.store_a).exists()
+        )
+
+    def test_current_endpoint_uses_selected_store_header_when_member(self) -> None:
+        response = self.client.get(
+            self._current_dashboard_url(),
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["store_id"], self.store_b.id)
+
+    def test_current_endpoint_patches_only_sent_fields(self) -> None:
+        appearance = StorefrontAppearance.objects.create(
+            store=self.store_a,
+            hero_title="Titulo mantido",
+            hero_enabled=False,
+            card_style="clean",
+        )
+
+        response = self.client.patch(
+            self._current_dashboard_url(),
+            {"hero_enabled": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        appearance.refresh_from_db()
+        self.assertTrue(appearance.hero_enabled)
+        self.assertEqual(appearance.hero_title, "Titulo mantido")
+        self.assertEqual(appearance.card_style, "clean")
+
+    def test_current_endpoint_rejects_invalid_values(self) -> None:
+        enum_response = self.client.patch(
+            self._current_dashboard_url(),
+            {"card_style": "flutuante"},
+            format="json",
+        )
+        color_response = self.client.patch(
+            self._current_dashboard_url(),
+            {"secondary_color": "pink"},
+            format="json",
+        )
+
+        self.assertEqual(enum_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(color_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_current_endpoint_derives_hero_cta_from_friendly_category_destination(self) -> None:
+        category = Category.objects.create(
+            name="Promocoes",
+            slug="promocoes",
+            store=self.store_a,
+        )
+
+        response = self.client.patch(
+            self._current_dashboard_url(),
+            {
+                "hero_cta_text": "Ver promocoes",
+                "hero_destination_type": "category",
+                "hero_destination_value": str(category.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["hero_destination_type"], "category")
+        self.assertEqual(response.data["hero_destination_value"], str(category.id))
+        self.assertEqual(
+            response.data["hero_cta_url"],
+            f"/l/{self.store_a.slug}/produtos?category={category.id}",
+        )
+
+    def test_current_endpoint_rejects_hero_destination_from_other_store(self) -> None:
+        other_category = Category.objects.create(
+            name="Outra loja",
+            slug="outra-loja",
+            store=self.store_b,
+        )
+
+        response = self.client.patch(
+            self._current_dashboard_url(),
+            {
+                "hero_destination_type": "category",
+                "hero_destination_value": str(other_category.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_current_endpoint_does_not_read_or_patch_unowned_store_from_header(self) -> None:
+        other_user = User.objects.create_user(
+            username="other_storefront_owner", password="testpass123"
+        )
+        store_c = Store.objects.create(name="Loja C", slug="loja-c")
+        StoreMembership.objects.create(
+            store=store_c, user=other_user, role=StoreMembership.ROLE_OWNER
+        )
+        StorefrontAppearance.objects.create(
+            store=self.store_a, secondary_color="#AA0000"
+        )
+        StorefrontAppearance.objects.create(
+            store=store_c, secondary_color="#00BB00"
+        )
+
+        read_response = self.client.get(
+            self._current_dashboard_url(),
+            HTTP_X_STORE_SLUG=store_c.slug,
+        )
+        write_response = self.client.patch(
+            self._current_dashboard_url(),
+            {"secondary_color": "#336699"},
+            format="json",
+            HTTP_X_STORE_SLUG=store_c.slug,
+        )
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(read_response.data["store_id"], self.store_a.id)
+        self.assertEqual(read_response.data["secondary_color"], "#AA0000")
+        self.assertEqual(write_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(write_response.data["store_id"], self.store_a.id)
+
+        self.assertEqual(
+            StorefrontAppearance.objects.get(store=self.store_a).secondary_color,
+            "#336699",
+        )
+        self.assertEqual(
+            StorefrontAppearance.objects.get(store=store_c).secondary_color,
+            "#00BB00",
+        )
+
+    def test_current_endpoint_user_without_store_membership_gets_403(self) -> None:
+        client = APIClient()
+        orphan_user = User.objects.create_user(
+            username="storefront_orphan", password="testpass123"
+        )
+        client.force_authenticate(user=orphan_user)
+
+        response = client.get(self._current_dashboard_url())
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_current_endpoint_requires_authentication(self) -> None:
+        response = APIClient().get(self._current_dashboard_url())
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class StorefrontMediaUploadEndpointTest(TestCase):
+    """Storefront media uploads are multipart, validated and tenant-scoped."""
+
+    def setUp(self) -> None:
+        self.media_root = tempfile.mkdtemp()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root)
+        self.settings_override.enable()
+
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(
+            username="storefront_media_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
+
+    def tearDown(self) -> None:
+        self.settings_override.disable()
+        shutil.rmtree(self.media_root, ignore_errors=True)
+
+    def _url(self) -> str:
+        return "/api/v1/store/current/storefront-media/"
+
+    def test_owner_can_upload_logo_to_current_store_path(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "logo", "file": build_storefront_test_image("logo.png")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["kind"], "logo")
+        self.assertEqual(response.data["content_type"], "image/png")
+        self.assertTrue(
+            response.data["path"].startswith(
+                f"stores/{self.store_a.id}/storefront/logo/"
+            )
+        )
+        self.assertIn(f"/media/stores/{self.store_a.id}/storefront/logo/", response.data["url"])
+
+    def test_owner_can_upload_banner_to_current_store_path(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "banner", "file": build_storefront_test_image("banner.png")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["kind"], "banner")
+        self.assertTrue(
+            response.data["path"].startswith(
+                f"stores/{self.store_a.id}/storefront/banners/"
+            )
+        )
+
+    def test_owner_can_upload_favicon_to_current_store_path(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "favicon", "file": build_storefront_test_image("favicon.png")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["kind"], "favicon")
+        self.assertTrue(
+            response.data["path"].startswith(
+                f"stores/{self.store_a.id}/storefront/favicon/"
+            )
+        )
+
+    def test_owner_can_upload_promotion_to_current_store_path(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "promotion", "file": build_storefront_test_image("promo.png")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["kind"], "promotion")
+        self.assertTrue(
+            response.data["path"].startswith(
+                f"stores/{self.store_a.id}/storefront/promotions/"
+            )
+        )
+
+    def test_rejects_invalid_file_type(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {
+                "kind": "logo",
+                "file": SimpleUploadedFile(
+                    "payload.txt",
+                    b"<script>alert(1)</script>",
+                    content_type="text/plain",
+                ),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rejects_oversized_logo(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "logo", "file": build_large_storefront_test_image()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("file", response.data)
+
+    def test_viewer_cannot_upload_to_selected_store(self) -> None:
+        response = self.client.post(
+            self._url(),
+            {"kind": "logo", "file": build_storefront_test_image("logo.png")},
+            format="multipart",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unowned_header_does_not_change_upload_tenant(self) -> None:
+        other_user = User.objects.create_user(
+            username="storefront_media_other", password="testpass123"
+        )
+        store_c = Store.objects.create(name="Loja C", slug="loja-c")
+        StoreMembership.objects.create(
+            store=store_c, user=other_user, role=StoreMembership.ROLE_OWNER
+        )
+
+        response = self.client.post(
+            self._url(),
+            {"kind": "logo", "file": build_storefront_test_image("logo.png")},
+            format="multipart",
+            HTTP_X_STORE_SLUG=store_c.slug,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            response.data["path"].startswith(
+                f"stores/{self.store_a.id}/storefront/logo/"
+            )
+        )
+        self.assertNotIn(f"stores/{store_c.id}/", response.data["path"])
+
+
+class StorefrontBannerEndpointTest(TestCase):
+    """Promotional banners are CRUD-managed, ordered and tenant-scoped."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.user = User.objects.create_user(
+            username="storefront_banner_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
+        self.category = Category.objects.create(
+            name="Promocoes",
+            slug="promocoes",
+            store=self.store_a,
+        )
+        self.product = Product.objects.create(
+            name="Produto destaque",
+            price=Decimal("12.00"),
+            category=self.category,
+            store=self.store_a,
+            slug="produto-destaque",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(
+            user=self.user,
+            token={"store_id": self.store_a.id},
+        )
+
+    def _list_url(self) -> str:
+        return "/api/v1/store/current/storefront-banners/"
+
+    def _detail_url(self, banner: StorefrontBanner) -> str:
+        return f"/api/v1/store/current/storefront-banners/{banner.id}/"
+
+    def _reorder_url(self) -> str:
+        return "/api/v1/store/current/storefront-banners/reorder/"
+
+    def _public_url(self, slug: str) -> str:
+        return f"/api/v1/public/stores/{slug}/banners/"
+
+    def test_owner_can_create_list_update_and_delete_banner(self) -> None:
+        create_response = self.client.post(
+            self._list_url(),
+            {
+                "image_url": "https://cdn.example.com/promo.png",
+                "alt_text": "Promocao da semana",
+                "title": "Semana especial",
+                "subtitle": "Itens selecionados",
+                "cta_text": "Ver categoria",
+                "destination_type": "category",
+                "destination_value": str(self.category.id),
+                "is_active": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["position"], 0)
+        self.assertEqual(create_response.data["status"], "active")
+        self.assertEqual(
+            create_response.data["button_url"],
+            f"/l/{self.store_a.slug}/produtos?category={self.category.id}",
+        )
+
+        banner = StorefrontBanner.objects.get(store=self.store_a)
+        list_response = self.client.get(self._list_url())
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+
+        update_response = self.client.patch(
+            self._detail_url(banner),
+            {
+                "title": "Produto em destaque",
+                "destination_type": "product",
+                "destination_value": str(self.product.id),
+            },
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            update_response.data["button_url"],
+            f"/l/{self.store_a.slug}/produtos/{self.product.slug}",
+        )
+
+        delete_response = self.client.delete(self._detail_url(banner))
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(StorefrontBanner.objects.filter(id=banner.id).exists())
+
+    def test_reorder_persists_positions_for_full_banner_list(self) -> None:
+        first = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/first.png",
+            title="Primeiro",
+            position=0,
+        )
+        second = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/second.png",
+            title="Segundo",
+            position=1,
+        )
+
+        response = self.client.post(
+            self._reorder_url(),
+            {"ids": [second.id, first.id]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(second.position, 0)
+        self.assertEqual(first.position, 1)
+        self.assertEqual([banner["id"] for banner in response.data], [second.id, first.id])
+
+    def test_reorder_rejects_partial_or_cross_tenant_id_list(self) -> None:
+        own_banner = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/own.png",
+        )
+        other_banner = StorefrontBanner.objects.create(
+            store=self.store_b,
+            image_url="https://cdn.example.com/other.png",
+        )
+
+        partial_response = self.client.post(
+            self._reorder_url(),
+            {"ids": [own_banner.id, other_banner.id]},
+            format="json",
+        )
+
+        self.assertEqual(partial_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_schedule_status_and_public_endpoint_only_expose_active_window(self) -> None:
+        active = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/active.png",
+            title="Ativo",
+            position=0,
+        )
+        scheduled = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/scheduled.png",
+            title="Agendado",
+            position=1,
+            starts_at=timezone.now() + timezone.timedelta(days=1),
+        )
+        expired = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/expired.png",
+            title="Expirado",
+            position=2,
+            ends_at=timezone.now() - timezone.timedelta(days=1),
+        )
+        inactive = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/inactive.png",
+            title="Inativo",
+            position=3,
+            is_active=False,
+        )
+
+        list_response = self.client.get(self._list_url())
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        statuses_by_title = {
+            banner["title"]: banner["status"] for banner in list_response.data
+        }
+        self.assertEqual(statuses_by_title[active.title], "active")
+        self.assertEqual(statuses_by_title[scheduled.title], "scheduled")
+        self.assertEqual(statuses_by_title[expired.title], "expired")
+        self.assertEqual(statuses_by_title[inactive.title], "inactive")
+
+        public_response = APIClient().get(self._public_url(self.store_a.slug))
+        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
+        self.assertEqual([banner["title"] for banner in public_response.data], ["Ativo"])
+
+    def test_viewer_and_cross_tenant_destination_cannot_mutate_banner(self) -> None:
+        other_category = Category.objects.create(
+            name="Outra",
+            slug="outra",
+            store=self.store_b,
+        )
+        banner = StorefrontBanner.objects.create(
+            store=self.store_a,
+            image_url="https://cdn.example.com/banner.png",
+        )
+
+        cross_destination_response = self.client.patch(
+            self._detail_url(banner),
+            {
+                "destination_type": "category",
+                "destination_value": str(other_category.id),
+            },
+            format="json",
+        )
+        viewer_response = self.client.patch(
+            self._detail_url(banner),
+            {"title": "Indevido"},
+            format="json",
+            HTTP_X_STORE_SLUG=self.store_b.slug,
+        )
+
+        self.assertEqual(
+            cross_destination_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(viewer_response.status_code, status.HTTP_403_FORBIDDEN)
+        banner.refresh_from_db()
+        self.assertNotEqual(banner.title, "Indevido")
 
 
 class ProductImageUploadPathTest(TestCase):

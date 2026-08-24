@@ -1,5 +1,7 @@
 import re
+import uuid
 from decimal import Decimal
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
@@ -7,9 +9,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.text import slugify
+from PIL import Image, UnidentifiedImageError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -27,6 +32,8 @@ from .models import (
     SaleOrderItem,
     StockMovement,
     Store,
+    StorefrontBanner,
+    StorefrontDestination,
     StorefrontAppearance,
     StoreMembership,
     StoreSettings,
@@ -164,11 +171,132 @@ class StoreScopedTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    """Serializer for Category model with essential fields only."""
+    """Serializer for Category model with optional one-level subcategories."""
+
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.none(), required=False, allow_null=True
+    )
+    parent_name = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
+    children_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "description"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "parent",
+            "parent_name",
+            "product_count",
+            "children_count",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "parent_name",
+            "product_count",
+            "children_count",
+            "created_at",
+        ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        store = self._get_context_store()
+        if store is None:
+            return
+
+        parent_queryset = Category.objects.filter(store=store, parent__isnull=True)
+        instance_id = getattr(self.instance, "pk", None)
+        if instance_id is not None:
+            parent_queryset = parent_queryset.exclude(id=instance_id)
+
+        self.fields["parent"].queryset = parent_queryset
+
+    def _get_context_store(self) -> Store | None:
+        store = self.context.get("store")
+        if store is not None:
+            return store
+
+        if self.instance is not None and hasattr(self.instance, "store"):
+            return self.instance.store
+
+        view = self.context.get("view")
+        if view is not None and hasattr(view, "get_request_store"):
+            return view.get_request_store()
+
+        return None
+
+    def get_parent_name(self, category: Category) -> str | None:
+        return category.parent.name if category.parent_id else None
+
+    def get_product_count(self, category: Category) -> int:
+        product_count = getattr(category, "product_count", None)
+        if product_count is not None:
+            return product_count
+
+        return category.products.count()
+
+    def get_children_count(self, category: Category) -> int:
+        children_count = getattr(category, "children_count", None)
+        if children_count is not None:
+            return children_count
+
+        return category.children.count()
+
+    def validate_parent(self, parent: Category | None) -> Category | None:
+        if parent is None:
+            return None
+
+        store = self._get_context_store()
+        if store is not None and parent.store_id != store.id:
+            raise serializers.ValidationError(
+                "A categoria principal deve pertencer a mesma loja."
+            )
+
+        if self.instance is not None and parent.id == self.instance.id:
+            raise serializers.ValidationError(
+                "Uma categoria nao pode ser subcategoria dela mesma."
+            )
+
+        if parent.parent_id is not None:
+            raise serializers.ValidationError(
+                "Subcategorias nao podem receber outras subcategorias."
+            )
+
+        return parent
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        store = self._get_context_store()
+        if store is None:
+            return attrs
+
+        name = attrs.get("name", getattr(self.instance, "name", ""))
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        raw_slug = attrs.get("slug", getattr(self.instance, "slug", "") or "")
+        normalized_slug = slugify(raw_slug or name)
+
+        if not normalized_slug:
+            return attrs
+
+        duplicate_queryset = Category.objects.filter(
+            store=store, parent=parent, slug=normalized_slug
+        )
+        if self.instance is not None:
+            duplicate_queryset = duplicate_queryset.exclude(id=self.instance.id)
+
+        if duplicate_queryset.exists():
+            raise serializers.ValidationError(
+                {
+                    "name": "Ja existe uma categoria com este nome neste nivel."
+                }
+            )
+
+        return attrs
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -209,6 +337,8 @@ class ProductSerializer(serializers.ModelSerializer):
     """
 
     category_name = serializers.ReadOnlyField(source="category.name")
+    category_parent = serializers.SerializerMethodField()
+    category_parent_name = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
     uploaded_images = serializers.ListField(
         child=serializers.ImageField(),
@@ -247,9 +377,19 @@ class ProductSerializer(serializers.ModelSerializer):
             "variants_payload",
             "category",
             "category_name",
+            "category_parent",
+            "category_parent_name",
             "created_at",
         ]
-        read_only_fields = ["id", "public_code", "slug", "created_at", "category_name"]
+        read_only_fields = [
+            "id",
+            "public_code",
+            "slug",
+            "created_at",
+            "category_name",
+            "category_parent",
+            "category_parent_name",
+        ]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -420,6 +560,12 @@ class ProductSerializer(serializers.ModelSerializer):
 
         base_url = getattr(settings, "BASE_URL", "http://127.0.0.1:8000")
         return [urljoin(base_url, url) for url in image_urls]
+
+    def get_category_parent(self, instance: Product) -> int | None:
+        return instance.category.parent_id
+
+    def get_category_parent_name(self, instance: Product) -> str | None:
+        return instance.category.parent.name if instance.category.parent_id else None
 
     def _replace_gallery(self, instance: Product, ordered_files: list) -> None:
         """Persist gallery images while keeping the first image as product cover."""
@@ -998,7 +1144,115 @@ class StoreAppearanceSettingsSerializer(serializers.Serializer):
         return Store.normalize_theme(value)
 
 
-class StorefrontAppearanceSerializer(serializers.ModelSerializer):
+class StorefrontDestinationSerializerMixin:
+    """Normalize friendly CTA destinations into safe storefront URLs."""
+
+    def _normalize_destination_attrs(
+        self,
+        attrs: dict,
+        *,
+        prefix: str = "",
+        url_field: str = "button_url",
+        required_on_create: bool = False,
+    ) -> dict:
+        type_field = f"{prefix}destination_type"
+        value_field = f"{prefix}destination_value"
+        instance = getattr(self, "instance", None)
+        store: Store = self.context["store"]
+
+        if (
+            instance is not None
+            and type_field not in attrs
+            and value_field not in attrs
+        ):
+            return attrs
+
+        current_type = (
+            getattr(instance, type_field, StorefrontDestination.NONE)
+            if instance is not None
+            else StorefrontDestination.NONE
+        )
+        current_value = (
+            getattr(instance, value_field, "")
+            if instance is not None
+            else ""
+        )
+        destination_type = attrs.get(type_field, current_type) or StorefrontDestination.NONE
+        raw_value = str(attrs.get(value_field, current_value) or "").strip()
+
+        if destination_type in {
+            StorefrontDestination.NONE,
+            StorefrontDestination.PRODUCTS,
+        }:
+            normalized_value = ""
+        elif destination_type == StorefrontDestination.CATEGORY:
+            normalized_value = self._validate_destination_object_id(
+                raw_value,
+                model=Category,
+                store=store,
+                field_name=value_field,
+                message="Selecione uma categoria desta loja.",
+            )
+        elif destination_type == StorefrontDestination.PRODUCT:
+            normalized_value = self._validate_destination_object_id(
+                raw_value,
+                model=Product,
+                store=store,
+                field_name=value_field,
+                message="Selecione um produto desta loja.",
+            )
+        elif destination_type == StorefrontDestination.EXTERNAL_URL:
+            if not raw_value:
+                raise serializers.ValidationError(
+                    {value_field: "Informe o link externo."}
+                )
+            normalized_value = serializers.URLField(max_length=500).run_validation(
+                raw_value
+            )
+        else:
+            raise serializers.ValidationError(
+                {type_field: "Destino do CTA invalido."}
+            )
+
+        if required_on_create and destination_type == StorefrontDestination.NONE:
+            normalized_value = ""
+
+        attrs[type_field] = destination_type
+        attrs[value_field] = normalized_value
+        attrs[url_field] = StorefrontDestination.build_url(
+            store,
+            destination_type,
+            normalized_value,
+        )
+        return attrs
+
+    @staticmethod
+    def _validate_destination_object_id(
+        raw_value: str,
+        *,
+        model,
+        store: Store,
+        field_name: str,
+        message: str,
+    ) -> str:
+        if not raw_value:
+            raise serializers.ValidationError({field_name: message})
+
+        try:
+            object_id = int(raw_value)
+        except (TypeError, ValueError) as error:
+            raise serializers.ValidationError({field_name: message}) from error
+
+        if not model.objects.filter(store=store, id=object_id).exists():
+            raise serializers.ValidationError({field_name: message})
+
+        return str(object_id)
+
+
+class StorefrontAppearanceSerializer(
+    StorefrontDestinationSerializerMixin,
+    serializers.ModelSerializer,
+):
     """Dashboard-owned read/write for the extended storefront personalization.
 
     Colors stay on Store.theme/StoreAppearanceSettingsSerializer; this only
@@ -1006,10 +1260,16 @@ class StorefrontAppearanceSerializer(serializers.ModelSerializer):
     docstring).
     """
 
+    store_id = serializers.IntegerField(read_only=True)
+    hero_cta_url = serializers.CharField(read_only=True)
+
     class Meta:
         model = StorefrontAppearance
         fields = [
+            "id",
+            "store_id",
             "secondary_color",
+            "favicon_url",
             "hero_enabled",
             "hero_image_desktop",
             "hero_image_mobile",
@@ -1017,6 +1277,8 @@ class StorefrontAppearanceSerializer(serializers.ModelSerializer):
             "hero_title",
             "hero_subtitle",
             "hero_cta_text",
+            "hero_destination_type",
+            "hero_destination_value",
             "hero_cta_url",
             "card_style",
             "radius_style",
@@ -1027,10 +1289,258 @@ class StorefrontAppearanceSerializer(serializers.ModelSerializer):
             "decoration_style",
             "updated_at",
         ]
-        read_only_fields = ["updated_at"]
+        read_only_fields = ["id", "store_id", "updated_at"]
 
     def validate_secondary_color(self, value: str) -> str:
-        return StorefrontAppearance.normalize_secondary_color(value)
+        normalized_value = str(value or "").strip()
+        if not normalized_value:
+            return ""
+        if not ProductVariant.COLOR_HEX_VALIDATOR.regex.match(normalized_value):
+            raise serializers.ValidationError(
+                "Informe uma cor hexadecimal no formato #RRGGBB."
+            )
+        return normalized_value.upper()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        return self._normalize_destination_attrs(
+            attrs,
+            prefix="hero_",
+            url_field="hero_cta_url",
+        )
+
+
+class StorefrontMediaUploadSerializer(serializers.Serializer):
+    """Validate and persist tenant-scoped storefront media uploads."""
+
+    KIND_LOGO = "logo"
+    KIND_BANNER = "banner"
+    KIND_FAVICON = "favicon"
+    KIND_PROMOTION = "promotion"
+    KIND_CHOICES = (
+        (KIND_LOGO, "Logo"),
+        (KIND_BANNER, "Banner"),
+        (KIND_FAVICON, "Favicon"),
+        (KIND_PROMOTION, "Promocao"),
+    )
+
+    ALLOWED_IMAGE_TYPES = {
+        "image/jpeg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
+        "image/jpg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
+        "image/png": {"extensions": {"png"}, "format": "PNG"},
+        "image/webp": {"extensions": {"webp"}, "format": "WEBP"},
+    }
+    MAX_BYTES_BY_KIND = {
+        KIND_LOGO: 2 * 1024 * 1024,
+        KIND_BANNER: 5 * 1024 * 1024,
+        KIND_FAVICON: 1 * 1024 * 1024,
+        KIND_PROMOTION: 5 * 1024 * 1024,
+    }
+    FOLDER_BY_KIND = {
+        KIND_LOGO: "logo",
+        KIND_BANNER: "banners",
+        KIND_FAVICON: "favicon",
+        KIND_PROMOTION: "promotions",
+    }
+
+    kind = serializers.ChoiceField(choices=KIND_CHOICES)
+    file = serializers.ImageField(write_only=True, allow_empty_file=False)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        kind = attrs["kind"]
+        uploaded_file = attrs["file"]
+        content_type = str(getattr(uploaded_file, "content_type", "") or "").lower()
+        content_type = content_type.split(";", 1)[0].strip()
+
+        if content_type not in self.ALLOWED_IMAGE_TYPES:
+            raise serializers.ValidationError(
+                {"file": "Envie uma imagem PNG, JPG, JPEG ou WEBP."}
+            )
+
+        extension = Path(uploaded_file.name or "").suffix.lower().lstrip(".")
+        expected_extensions = self.ALLOWED_IMAGE_TYPES[content_type]["extensions"]
+        if extension not in expected_extensions:
+            raise serializers.ValidationError(
+                {"file": "A extensao do arquivo nao corresponde ao tipo da imagem."}
+            )
+
+        max_bytes = self.MAX_BYTES_BY_KIND[kind]
+        if uploaded_file.size > max_bytes:
+            max_mb = max_bytes // (1024 * 1024)
+            raise serializers.ValidationError(
+                {"file": f"A imagem deve ter no maximo {max_mb} MB."}
+            )
+
+        detected_format = self._detect_image_format(uploaded_file)
+        expected_format = self.ALLOWED_IMAGE_TYPES[content_type]["format"]
+        if detected_format != expected_format:
+            raise serializers.ValidationError(
+                {"file": "O conteudo do arquivo nao corresponde ao tipo informado."}
+            )
+
+        attrs["_content_type"] = content_type
+        attrs["_extension"] = "jpg" if extension == "jpeg" else extension
+        return attrs
+
+    @staticmethod
+    def _detect_image_format(uploaded_file) -> str:
+        try:
+            uploaded_file.seek(0)
+            with Image.open(uploaded_file) as image:
+                detected_format = image.format or ""
+                image.verify()
+            return detected_format
+        except (UnidentifiedImageError, OSError) as error:
+            raise serializers.ValidationError(
+                {"file": "Arquivo de imagem invalido."}
+            ) from error
+        finally:
+            uploaded_file.seek(0)
+
+    def save(self, **kwargs):
+        store: Store = self.context["store"]
+        request = self.context.get("request")
+        kind = self.validated_data["kind"]
+        uploaded_file = self.validated_data["file"]
+        extension = self.validated_data["_extension"]
+        content_type = self.validated_data["_content_type"]
+        folder = self.FOLDER_BY_KIND[kind]
+        storage_path = (
+            f"stores/{store.id}/storefront/{folder}/{uuid.uuid4().hex}.{extension}"
+        )
+
+        uploaded_file.seek(0)
+        stored_path = default_storage.save(storage_path, uploaded_file)
+        media_url = default_storage.url(stored_path)
+        if request is not None:
+            media_url = request.build_absolute_uri(media_url)
+        elif not urlparse(media_url).scheme:
+            media_url = urljoin(getattr(settings, "BASE_URL", "http://127.0.0.1:8000"), media_url)
+
+        return {
+            "kind": kind,
+            "url": media_url,
+            "path": stored_path,
+            "size": uploaded_file.size,
+            "content_type": content_type,
+        }
+
+
+class StorefrontBannerSerializer(
+    StorefrontDestinationSerializerMixin,
+    serializers.ModelSerializer,
+):
+    """Dashboard CRUD serializer for tenant-scoped promotional banners."""
+
+    store_id = serializers.IntegerField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    button_url = serializers.CharField(read_only=True)
+    position = serializers.IntegerField(required=False, min_value=0)
+
+    class Meta:
+        model = StorefrontBanner
+        fields = [
+            "id",
+            "store_id",
+            "image_url",
+            "alt_text",
+            "title",
+            "subtitle",
+            "cta_text",
+            "destination_type",
+            "destination_value",
+            "button_url",
+            "position",
+            "is_active",
+            "status",
+            "starts_at",
+            "ends_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "store_id",
+            "button_url",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        attrs = self._normalize_destination_attrs(attrs)
+
+        starts_at = attrs.get(
+            "starts_at",
+            getattr(self.instance, "starts_at", None),
+        )
+        ends_at = attrs.get(
+            "ends_at",
+            getattr(self.instance, "ends_at", None),
+        )
+        if starts_at and ends_at and starts_at > ends_at:
+            raise serializers.ValidationError(
+                {"ends_at": "A data final deve ser posterior ao inicio."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        store: Store = self.context["store"]
+        if "position" not in validated_data:
+            last_position = (
+                StorefrontBanner.objects.filter(store=store)
+                .order_by("-position", "-id")
+                .values_list("position", flat=True)
+                .first()
+            )
+            validated_data["position"] = 0 if last_position is None else last_position + 1
+        return StorefrontBanner.objects.create(store=store, **validated_data)
+
+
+class PublicStorefrontBannerSerializer(serializers.ModelSerializer):
+    """Public, visitor-safe promotional banner payload."""
+
+    status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = StorefrontBanner
+        fields = [
+            "image_url",
+            "alt_text",
+            "title",
+            "subtitle",
+            "cta_text",
+            "button_url",
+            "position",
+            "status",
+        ]
+        read_only_fields = fields
+
+
+class StorefrontBannerReorderSerializer(serializers.Serializer):
+    """Persist merchant-defined promotional banner order."""
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+    )
+
+    def validate_ids(self, value):
+        store: Store = self.context["store"]
+        unique_ids = list(dict.fromkeys(value))
+        if len(unique_ids) != len(value):
+            raise serializers.ValidationError("Nao repita banners na ordenacao.")
+
+        current_ids = set(
+            StorefrontBanner.objects.filter(store=store).values_list("id", flat=True)
+        )
+        if current_ids != set(unique_ids):
+            raise serializers.ValidationError(
+                "Envie todos os banners desta loja para reordenar."
+            )
+        return unique_ids
 
 
 class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
@@ -1055,6 +1565,7 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
             "tagline",
             "theme",
             "secondary_color",
+            "favicon_url",
             "hero_enabled",
             "hero_image_desktop",
             "hero_image_mobile",
@@ -1062,6 +1573,8 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
             "hero_title",
             "hero_subtitle",
             "hero_cta_text",
+            "hero_destination_type",
+            "hero_destination_value",
             "hero_cta_url",
             "card_style",
             "radius_style",

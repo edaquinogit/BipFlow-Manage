@@ -377,6 +377,7 @@ import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
 import { buildPublicProductUrl } from '@/utils/publicStorefrontUrl'
+import { applyStorefrontFavicon } from '@/utils/storefrontFavicon'
 import { isLowStock } from '@/utils/stockAlerts'
 
 const route = useRoute()
@@ -394,6 +395,14 @@ const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
 const { appearance: storefrontAppearance } = usePublicStorefrontAppearance(publicStoreSlug)
 const storeBranding = useStoreTheme(selectedStore, storefrontAppearance)
+
+watch(
+  () => storefrontAppearance.value?.favicon_url,
+  (faviconUrl) => {
+    applyStorefrontFavicon(faviconUrl)
+  },
+  { immediate: true },
+)
 
 const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">

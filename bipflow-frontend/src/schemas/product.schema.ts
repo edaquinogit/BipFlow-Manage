@@ -9,6 +9,8 @@ export const CategorySchema = z.object({
   id: z.number(),
   name: z.string().min(1, "Category name is required"),
   slug: z.string().nullable().optional(),
+  parent: z.number().nullable().optional(),
+  parent_name: z.string().nullable().optional(),
 });
 
 /**

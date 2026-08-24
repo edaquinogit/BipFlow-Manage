@@ -56,7 +56,7 @@
             :key="category.id"
             :value="category.id"
           >
-            {{ category.name }}
+            {{ getCategoryDisplayName(category) }}
           </option>
         </select>
       </div>
@@ -200,6 +200,7 @@
 import { ref, computed, watch } from 'vue'
 import type { ProductFilterCategory, ProductFilters } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { getCategoryDisplayName } from '@/utils/categories'
 
 // Props
 const props = defineProps<{
@@ -217,7 +218,7 @@ const emit = defineEmits<{
 const localFilters = ref<ProductFilters>({ ...props.filters })
 
 const normalizeFilters = (): ProductFilters => ({
-  search: localFilters.value.search?.trim() || '',
+  search: localFilters.value.search ?? '',
   categoryId: typeof localFilters.value.categoryId === 'number'
     ? localFilters.value.categoryId
     : undefined,
@@ -249,7 +250,7 @@ watch(() => props.filters, (newFilters) => {
 // Methods
 const handleSearchInput = () => {
   // Debounced by parent component
-  emit('updateFilters', { search: normalizeFilters().search })
+  emit('updateFilters', { search: localFilters.value.search ?? '' })
 }
 
 const applyFilters = () => {
@@ -291,7 +292,7 @@ const removeStockFilter = () => {
 const getCategoryName = (categoryId: number | undefined): string => {
   if (!categoryId) return ''
   const category = props.categories.find(c => c.id === categoryId)
-  return category?.name || 'Desconhecida'
+  return category ? getCategoryDisplayName(category) : 'Desconhecida'
 }
 
 const formatPriceRange = (): string => {

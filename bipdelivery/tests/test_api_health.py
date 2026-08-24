@@ -181,6 +181,17 @@ class CategoryAPIHealthTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["name"], "Books")
 
+    def test_category_create_subcategory(self) -> None:
+        """Should create a subcategory linked to a parent category."""
+        self.client.force_authenticate(user=self.user)
+        payload = {"name": "Biquíni", "parent": self.category.id}
+        response: Any = self.client.post("/api/v1/categories/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["name"], "Biquíni")
+        self.assertEqual(response.data["parent"], self.category.id)
+        self.assertEqual(response.data["parent_name"], "Electronics")
+
     def test_category_retrieve(self) -> None:
         """Should retrieve category by ID."""
         self.client.force_authenticate(user=self.user)
@@ -204,6 +215,16 @@ class CategoryAPIHealthTest(TestCase):
         response: Any = self.client.delete(f"/api/v1/categories/{self.category.id}/")  # type: ignore
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Category.objects.filter(id=self.category.id).exists())  # type: ignore
+
+    def test_category_delete_with_subcategories_is_protected(self) -> None:
+        """Deleting a parent category with subcategories should fail."""
+        self.client.force_authenticate(user=self.user)
+        Category.objects.create(name="Biquíni", parent=self.category)
+
+        response: Any = self.client.delete(f"/api/v1/categories/{self.category.id}/")  # type: ignore
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Category.objects.filter(id=self.category.id).exists())  # type: ignore
 
 
 class ProductAPIHealthTest(TestCase):

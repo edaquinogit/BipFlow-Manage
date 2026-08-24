@@ -1,6 +1,10 @@
 import { ref, watch, type Ref } from 'vue'
 import { storefrontAppearanceService } from '@/services/storefront-appearance.service'
+import { Logger } from '@/services/logger'
+import { buildErrorContext, type ApplicationError } from '@/types/errors'
 import type { StorefrontAppearance, StorefrontAppearancePayload } from '@/types/store'
+
+const STOREFRONT_APPEARANCE_ENDPOINT = 'v1/store/current/storefront-appearance/'
 
 /**
  * Shared load/save for the dashboard's storefront appearance editor tabs
@@ -29,14 +33,21 @@ export function useStorefrontAppearance(storeSlug: Ref<string | null | undefined
     loadError.value = null
 
     try {
-      const loadedAppearance = await storefrontAppearanceService.get(slug)
+      const loadedAppearance = await storefrontAppearanceService.get()
       if (requestId === loadRequestId && storeSlug.value === slug) {
         appearance.value = loadedAppearance
       }
-    } catch {
+    } catch (error: unknown) {
       if (requestId === loadRequestId && storeSlug.value === slug) {
         appearance.value = null
         loadError.value = 'Nao foi possivel carregar a aparencia da vitrine.'
+        Logger.error(
+          'Storefront appearance load failed',
+          buildErrorContext(error as ApplicationError, {
+            endpoint: STOREFRONT_APPEARANCE_ENDPOINT,
+            selectedStoreSlug: slug,
+          }),
+        )
       }
     } finally {
       if (requestId === loadRequestId && storeSlug.value === slug) {
@@ -51,7 +62,7 @@ export function useStorefrontAppearance(storeSlug: Ref<string | null | undefined
       throw new Error('Nenhuma loja selecionada.')
     }
 
-    const updated = await storefrontAppearanceService.update(slug, payload)
+    const updated = await storefrontAppearanceService.update(payload)
     if (storeSlug.value === slug) {
       appearance.value = updated
     }

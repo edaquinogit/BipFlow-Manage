@@ -10,6 +10,7 @@ import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { storeSettingsService } from '@/services/store-settings.service'
+import { storefrontAppearanceService } from '@/services/storefront-appearance.service'
 import type { Product } from '@/types/product'
 import type { PublicStorefrontAppearance } from '@/types/store'
 import { useRoute, useRouter } from 'vue-router'
@@ -49,6 +50,12 @@ vi.mock('@/services/delivery-region.service', () => ({
 vi.mock('@/services/store-settings.service', () => ({
   storeSettingsService: {
     getPublic: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/storefront-appearance.service', () => ({
+  storefrontAppearanceService: {
+    getPublicBanners: vi.fn(),
   },
 }))
 
@@ -121,6 +128,7 @@ function buildPublicAppearance(overrides: Partial<PublicStorefrontAppearance> = 
       muted: '#6B7280',
     },
     secondary_color: '#E91E63',
+    favicon_url: '',
     hero_enabled: false,
     hero_image_desktop: '',
     hero_image_mobile: '',
@@ -128,6 +136,8 @@ function buildPublicAppearance(overrides: Partial<PublicStorefrontAppearance> = 
     hero_title: '',
     hero_subtitle: '',
     hero_cta_text: '',
+    hero_destination_type: 'none',
+    hero_destination_value: '',
     hero_cta_url: '',
     card_style: 'clean',
     radius_style: 'rounded',
@@ -299,6 +309,7 @@ describe('ProductsView', () => {
       whatsapp_phone_digits: '5579999999999',
       is_whatsapp_configured: true,
     })
+    vi.mocked(storefrontAppearanceService.getPublicBanners).mockResolvedValue([])
     wrapper = mountView()
     await flushPromises()
     await nextTick()
@@ -426,11 +437,49 @@ describe('ProductsView', () => {
     expect(hero.text()).toContain('Ver oferta')
   })
 
+  it('renders public promotional banners from the storefront API', async () => {
+    wrapper.unmount()
+    vi.mocked(storefrontAppearanceService.getPublicBanners).mockResolvedValue([
+      {
+        image_url: 'https://cdn.example.com/promo.png',
+        alt_text: 'Promocao relampago',
+        title: 'Oferta relampago',
+        subtitle: 'Somente hoje',
+        cta_text: 'Ver ofertas',
+        button_url: '/l/default/produtos?category=7',
+        position: 0,
+        status: 'active',
+      },
+    ])
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    const promotions = wrapper.find('[data-cy="storefront-promotional-banners"]')
+    expect(promotions.exists()).toBe(true)
+    expect(promotions.find('img').attributes('src')).toBe('https://cdn.example.com/promo.png')
+    expect(promotions.find('img').attributes('alt')).toBe('Promocao relampago')
+    expect(promotions.text()).toContain('Oferta relampago')
+    expect(promotions.text()).toContain('Ver ofertas')
+    expect(storefrontAppearanceService.getPublicBanners).toHaveBeenCalledWith('default')
+  })
+
   it('renders category shortcuts and cart drawer components', async () => {
     await wrapper.find('[aria-label="Abrir filtros"]').trigger('click')
 
     expect(wrapper.text()).toContain('Todas')
     expect(wrapper.find('.cart-drawer-stub').exists()).toBe(true)
+  })
+
+  it('keeps the typed search space so compound terms can be entered naturally', async () => {
+    await wrapper
+      .find('input[aria-label="Buscar produtos por nome"]')
+      .setValue('camisa ')
+
+    expect(searchState.updateFilters).toHaveBeenCalledWith({
+      search: 'camisa ',
+    })
   })
 
   it('shows the floating cart action after an item is added', async () => {

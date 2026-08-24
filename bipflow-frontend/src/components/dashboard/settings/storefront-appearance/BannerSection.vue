@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
+import { storefrontAppearanceService } from '@/services/storefront-appearance.service';
 import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import type { StorefrontAppearance, StorefrontAppearancePayload } from '@/types/store';
+import {
+  STOREFRONT_MEDIA_RULES,
+  validateStorefrontMediaFile,
+} from '@/utils/storefrontMedia';
 
 /**
  * Banner opcional do hero. O lojista faz a arte pronta (Canva/Figma) --
@@ -28,8 +33,13 @@ type BannerDraft = Pick<
 >;
 
 const { success, error: toastError } = useToast();
+const BANNER_MEDIA_RULES = STOREFRONT_MEDIA_RULES.banner;
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);
+const bannerInput = ref<HTMLInputElement | null>(null);
+const pendingBannerFile = ref<File | null>(null);
+const pendingBannerPreviewUrl = ref<string | null>(null);
+const bannerError = ref<string | null>(null);
 
 function buildDraft(appearance: StorefrontAppearance | null): BannerDraft {
   return {
@@ -50,13 +60,66 @@ function areDraftsEqual(left: BannerDraft, right: BannerDraft): boolean {
 
 const draft = ref<BannerDraft>(buildDraft(props.appearance));
 const savedDraft = ref<BannerDraft>(buildDraft(props.appearance));
-const hasChanges = computed(() => !areDraftsEqual(draft.value, savedDraft.value));
+const bannerPreviewUrl = computed(() => (
+  pendingBannerPreviewUrl.value || draft.value.hero_image_desktop
+));
+const hasChanges = computed(() => (
+  Boolean(pendingBannerFile.value) || !areDraftsEqual(draft.value, savedDraft.value)
+));
 
 watch(() => props.appearance, (appearance) => {
+  clearPendingBannerFile();
   const nextDraft = buildDraft(appearance);
   draft.value = nextDraft;
   savedDraft.value = buildDraft(appearance);
 });
+
+onBeforeUnmount(() => {
+  clearPendingBannerFile();
+});
+
+function clearPendingBannerFile(): void {
+  if (pendingBannerPreviewUrl.value) {
+    URL.revokeObjectURL(pendingBannerPreviewUrl.value);
+  }
+  pendingBannerFile.value = null;
+  pendingBannerPreviewUrl.value = null;
+  bannerError.value = null;
+  if (bannerInput.value) {
+    bannerInput.value.value = '';
+  }
+}
+
+function openBannerPicker(): void {
+  bannerInput.value?.click();
+}
+
+function handleBannerFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  if (!file) {
+    return;
+  }
+
+  const validationError = validateStorefrontMediaFile('banner', file);
+  if (validationError) {
+    clearPendingBannerFile();
+    bannerError.value = validationError;
+    return;
+  }
+
+  clearPendingBannerFile();
+  pendingBannerFile.value = file;
+  pendingBannerPreviewUrl.value = URL.createObjectURL(file);
+  draft.value.hero_enabled = true;
+}
+
+function removeBannerImage(): void {
+  clearPendingBannerFile();
+  draft.value.hero_image_desktop = '';
+  draft.value.hero_image_mobile = '';
+  draft.value.hero_enabled = false;
+}
 
 async function handleSave(): Promise<void> {
   if (isSaving.value || !hasChanges.value) {
@@ -67,10 +130,22 @@ async function handleSave(): Promise<void> {
   saveError.value = null;
 
   try {
-    const updatedAppearance = await props.save({ ...draft.value });
+    const draftToPersist: BannerDraft = { ...draft.value };
+
+    if (pendingBannerFile.value) {
+      const uploadedBanner = await storefrontAppearanceService.uploadMedia(
+        'banner',
+        pendingBannerFile.value,
+      );
+      draftToPersist.hero_enabled = true;
+      draftToPersist.hero_image_desktop = uploadedBanner.url;
+    }
+
+    const updatedAppearance = await props.save({ ...draftToPersist });
     const nextDraft = buildDraft(updatedAppearance);
     draft.value = nextDraft;
     savedDraft.value = buildDraft(updatedAppearance);
+    clearPendingBannerFile();
     success('Aparencia da vitrine atualizada com sucesso.');
   } catch (error: unknown) {
     Logger.error('Storefront banner save failed', buildErrorContext(error as ApplicationError, {}));
@@ -90,15 +165,44 @@ async function handleSave(): Promise<void> {
     </label>
 
     <div v-if="draft.hero_enabled" class="grid gap-4 sm:grid-cols-2">
-      <label class="block">
-        <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Imagem (desktop)</span>
-        <input v-model="draft.hero_image_desktop" data-cy="storefront-banner-desktop-url" type="url" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="https://.../banner-desktop.jpg" />
-      </label>
+      <div class="block sm:col-span-2">
+        <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Imagem do banner</span>
+        <input
+          ref="bannerInput"
+          data-cy="storefront-banner-file"
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
+          class="sr-only"
+          @change="handleBannerFileChange"
+        />
 
-      <label class="block">
-        <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Imagem (mobile)</span>
-        <input v-model="draft.hero_image_mobile" data-cy="storefront-banner-mobile-url" type="url" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="https://.../banner-mobile.jpg" />
-      </label>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-cy="btn-select-storefront-banner"
+            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+            @click="openBannerPicker"
+          >
+            Alterar imagem
+          </button>
+          <button
+            type="button"
+            data-cy="btn-remove-storefront-banner"
+            :disabled="!bannerPreviewUrl"
+            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#D81B60] hover:text-[#D81B60] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+            @click="removeBannerImage"
+          >
+            Remover
+          </button>
+        </div>
+
+        <p class="mt-2 text-[11px] leading-5 text-bip-muted">
+          PNG, JPG, JPEG ou WEBP ate 5 MB. Recomendado: {{ BANNER_MEDIA_RULES.recommendedSize }}.
+        </p>
+        <p v-if="bannerError" data-cy="storefront-banner-file-error" class="mt-1 text-xs font-semibold text-[#D81B60]">
+          {{ bannerError }}
+        </p>
+      </div>
 
       <label class="block sm:col-span-2">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Texto alternativo (acessibilidade)</span>
@@ -125,10 +229,10 @@ async function handleSave(): Promise<void> {
         <input v-model="draft.hero_cta_url" data-cy="storefront-banner-cta-url" type="url" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" />
       </label>
 
-      <div v-if="draft.hero_image_desktop" class="overflow-hidden rounded-lg border border-[#E5E7EB] bg-zinc-50 sm:col-span-2">
+      <div v-if="bannerPreviewUrl" class="overflow-hidden rounded-lg border border-[#E5E7EB] bg-zinc-50 sm:col-span-2">
         <img
           data-cy="storefront-banner-preview"
-          :src="draft.hero_image_desktop"
+          :src="bannerPreviewUrl"
           :alt="draft.hero_alt_text || 'Preview do banner desktop'"
           class="aspect-[16/7] w-full object-cover"
         />

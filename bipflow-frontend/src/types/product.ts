@@ -17,6 +17,8 @@ export interface ProductCategory {
   id: number
   name: string
   slug: string | null
+  parent?: number | null
+  parent_name?: string | null
 }
 
 export interface ProductVariant {
@@ -167,7 +169,8 @@ export interface CheckoutResponse {
   whatsapp_url: string
 }
 
-export type ProductFilterCategory = Pick<Category, 'id' | 'name'>
+export type ProductFilterCategory = Pick<Category, 'id' | 'name'> &
+  Partial<Pick<Category, 'parent' | 'parent_name'>>
 
 /**
  * Paginated API response
@@ -188,6 +191,8 @@ export const ProductCategorySchema = z.object({
   id: z.number(),
   name: z.string(),
   slug: z.string().nullable(),
+  parent: z.number().nullable().optional(),
+  parent_name: z.string().nullable().optional(),
 })
 
 export const ProductVariantSchema = z.object({

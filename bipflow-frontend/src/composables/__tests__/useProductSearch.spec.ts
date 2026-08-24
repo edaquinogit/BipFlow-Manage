@@ -108,4 +108,16 @@ describe('useProductSearch pagination', () => {
     expect(page.value).toBe(1)
     expect(productService.list).not.toHaveBeenCalled()
   })
+
+  it('preserves a trailing search space while the customer is typing a compound term', async () => {
+    const { filters, updateFilters } = useProductSearch({
+      pageSize: PAGE_SIZE,
+      debounceDelay: 1_000,
+    })
+    await flushPromises()
+
+    updateFilters({ search: 'camisa ' })
+
+    expect(filters.value.search).toBe('camisa ')
+  })
 })

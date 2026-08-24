@@ -68,6 +68,27 @@ describe('StoreService', () => {
     expect(response.theme?.primary).toBe('#111111')
   })
 
+  it('updates controlled storefront appearance for the active store', async () => {
+    vi.mocked(api.patch).mockResolvedValue({
+      data: {
+        id: 1,
+        name: 'Loja Principal',
+        slug: 'default',
+        whatsapp_phone: '',
+        theme: { primary: '#111111' },
+        is_active: true,
+        receipt_exchange_policy: '',
+        receipt_paper_format: '80mm',
+      },
+    } as never)
+
+    const payload = { tagline: 'Nova vitrine', theme: { primary: '#111111' } }
+    const response = await storeService.updateCurrentAppearance(payload)
+
+    expect(api.patch).toHaveBeenCalledWith('v1/store/current/appearance/', payload)
+    expect(response.theme?.primary).toBe('#111111')
+  })
+
   it('fetches and updates label settings', async () => {
     const settings = {
       page_format: 'a4' as const,

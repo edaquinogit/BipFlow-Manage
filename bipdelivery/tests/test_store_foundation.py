@@ -41,6 +41,8 @@ class CurrentStoreEndpointTest(TestCase):
 class StoreModelTest(TestCase):
     def test_get_default_creates_lazily_when_missing(self) -> None:
         """Store.get_default() must not require the data migration to have run."""
+        Store.objects.all().delete()
+
         self.assertEqual(Store.objects.count(), 0)
 
         store = Store.get_default()

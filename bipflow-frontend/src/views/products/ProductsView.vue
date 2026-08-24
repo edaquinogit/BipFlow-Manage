@@ -252,6 +252,46 @@
         </div>
       </section>
 
+      <section
+        v-if="storefrontBanners.length"
+        data-cy="storefront-promotional-banners"
+        class="mb-5 grid gap-3 min-[390px]:mb-6 md:grid-cols-2"
+      >
+        <component
+          :is="banner.button_url ? 'a' : 'div'"
+          v-for="banner in storefrontBanners"
+          :key="`${banner.position}-${banner.image_url}`"
+          :href="banner.button_url || undefined"
+          class="group overflow-hidden rounded-[var(--store-radius-lg)] border border-[var(--store-border)] bg-[var(--store-surface)] shadow-[var(--store-card-shadow)] transition hover:border-[var(--store-primary)]/45"
+        >
+          <img
+            :src="banner.image_url"
+            :alt="banner.alt_text || banner.title || storeBranding.name"
+            class="aspect-[5/2] w-full object-cover"
+            loading="lazy"
+          />
+          <div
+            v-if="banner.title || banner.subtitle || (banner.cta_text && banner.button_url)"
+            class="flex flex-col gap-3 border-t border-[var(--store-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="min-w-0">
+              <h2 v-if="banner.title" class="text-sm font-semibold leading-tight text-[var(--store-text)]">
+                {{ banner.title }}
+              </h2>
+              <p v-if="banner.subtitle" class="mt-1 text-xs leading-5 text-[var(--store-text-muted)]">
+                {{ banner.subtitle }}
+              </p>
+            </div>
+            <span
+              v-if="banner.cta_text && banner.button_url"
+              class="storefront-primary-button inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--store-radius-md)] px-3 text-[10px] font-bold uppercase tracking-[0.14em]"
+            >
+              {{ banner.cta_text }}
+            </span>
+          </div>
+        </component>
+      </section>
+
       <div class="mb-5 flex flex-col gap-2 text-sm text-[#6B7280] min-[390px]:mb-6 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between min-[390px]:gap-4">
         <p>{{ showingRange }}</p>
         <button
@@ -428,6 +468,7 @@ import { Logger } from '@/services/logger'
 import { extractCheckoutErrorMessage, orderService } from '@/services/order.service'
 import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
+import { storefrontAppearanceService } from '@/services/storefront-appearance.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type {
   Product,
@@ -435,7 +476,9 @@ import type {
   ProductSortOption,
   ProductVariant,
 } from '@/types/product'
+import type { PublicStorefrontBanner } from '@/types/store'
 import { formatBRL } from '@/utils/formatters'
+import { applyStorefrontFavicon } from '@/utils/storefrontFavicon'
 
 function parseNumberParam(
   value: LocationQueryValue | LocationQueryValue[] | undefined
@@ -488,6 +531,7 @@ const isCoreDataReady = ref(false)
 const isProductsReady = ref(false)
 const isBackendReady = computed(() => isCoreDataReady.value && isProductsReady.value)
 const categories = ref<Category[]>([])
+const storefrontBanners = ref<PublicStorefrontBanner[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const isCartOpen = ref(false)
@@ -669,6 +713,24 @@ async function loadStoreSettings(): Promise<void> {
   }
 }
 
+async function loadStorefrontBanners(): Promise<void> {
+  const slug = publicStoreSlug.value
+  if (!slug) {
+    storefrontBanners.value = []
+    return
+  }
+
+  try {
+    storefrontBanners.value = await storefrontAppearanceService.getPublicBanners(slug)
+  } catch (err) {
+    storefrontBanners.value = []
+    Logger.warn('Failed to load public storefront banners', {
+      error: err instanceof Error ? err.message : 'unknown_error',
+      slug,
+    })
+  }
+}
+
 async function loadDeliveryRegions(): Promise<void> {
   isDeliveryRegionsLoading.value = true
 
@@ -763,12 +825,28 @@ watch(
         loadCategories(),
         loadDeliveryRegions(),
         loadStoreSettings(),
+        loadStorefrontBanners(),
         fetchProducts(),
       ])
       isCoreDataReady.value = true
       isProductsReady.value = true
     }
   }
+)
+
+watch(
+  publicStoreSlug,
+  () => {
+    void loadStorefrontBanners()
+  },
+)
+
+watch(
+  () => storefrontAppearance.value?.favicon_url,
+  (faviconUrl) => {
+    applyStorefrontFavicon(faviconUrl)
+  },
+  { immediate: true },
 )
 
 watch(isInitialLoading, (loading, wasLoading) => {
@@ -783,6 +861,7 @@ onMounted(async () => {
     loadCategories(),
     loadDeliveryRegions(),
     loadStoreSettings(),
+    loadStorefrontBanners(),
   ])
   isCoreDataReady.value = true
 })

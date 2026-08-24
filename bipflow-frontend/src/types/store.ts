@@ -41,9 +41,23 @@ export type RadiusStyle = 'minimal' | 'rounded' | 'soft'
 export type LayoutDensity = 'compact' | 'comfortable'
 export type MotionIntensity = 'subtle' | 'standard'
 export type DecorationStyle = 'none' | 'circles' | 'soft-shapes' | 'geometric'
+export type StorefrontMediaKind = 'logo' | 'banner' | 'favicon' | 'promotion'
+export type StorefrontDestinationType = 'none' | 'products' | 'category' | 'product' | 'external_url'
+export type StorefrontBannerStatus = 'active' | 'inactive' | 'scheduled' | 'expired'
+
+export interface StorefrontMediaUploadResponse {
+  kind: StorefrontMediaKind
+  url: string
+  path: string
+  size: number
+  content_type: string
+}
 
 export interface StorefrontAppearance {
+  id: number
+  store_id: number
   secondary_color: string
+  favicon_url: string
   hero_enabled: boolean
   hero_image_desktop: string
   hero_image_mobile: string
@@ -51,6 +65,8 @@ export interface StorefrontAppearance {
   hero_title: string
   hero_subtitle: string
   hero_cta_text: string
+  hero_destination_type: StorefrontDestinationType
+  hero_destination_value: string
   hero_cta_url: string
   card_style: CardStyle
   radius_style: RadiusStyle
@@ -62,15 +78,51 @@ export interface StorefrontAppearance {
   updated_at: string
 }
 
-export type StorefrontAppearancePayload = Partial<Omit<StorefrontAppearance, 'updated_at'>>
+export type StorefrontAppearancePayload = Partial<Omit<StorefrontAppearance, 'id' | 'store_id' | 'updated_at'>>
 
-export type PublicStorefrontAppearance = Omit<StorefrontAppearance, 'updated_at'> & {
+export type PublicStorefrontAppearance = Omit<StorefrontAppearance, 'id' | 'store_id' | 'updated_at'> & {
   store_name: string
   store_slug: string
   logo_url: string
   tagline: string
   theme: StoreTheme
 }
+
+export interface StorefrontBanner {
+  id: number
+  store_id: number
+  image_url: string
+  alt_text: string
+  title: string
+  subtitle: string
+  cta_text: string
+  destination_type: StorefrontDestinationType
+  destination_value: string
+  button_url: string
+  position: number
+  is_active: boolean
+  status: StorefrontBannerStatus
+  starts_at: string | null
+  ends_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type StorefrontBannerPayload = Partial<
+  Omit<StorefrontBanner, 'id' | 'store_id' | 'button_url' | 'status' | 'created_at' | 'updated_at'>
+>
+
+export type PublicStorefrontBanner = Pick<
+  StorefrontBanner,
+  | 'image_url'
+  | 'alt_text'
+  | 'title'
+  | 'subtitle'
+  | 'cta_text'
+  | 'button_url'
+  | 'position'
+  | 'status'
+>
 
 export interface StoreLabelSettings {
   page_format: 'a4'

@@ -15,7 +15,7 @@ vi.mock('@/composables/useToast', () => ({ useToast: vi.fn() }))
 describe('CategoriesTab', () => {
   const toastState = { success: vi.fn(), error: vi.fn() }
   const categoriesState = {
-    categories: ref([{ id: 1, name: 'Bebidas', description: '', slug: 'bebidas', product_count: 0 }]),
+    categories: ref([{ id: 1, name: 'Bebidas', description: '', slug: 'bebidas', parent: null, parent_name: null, product_count: 0, children_count: 0 }]),
     loading: ref(false),
     error: ref<string | null>(null),
     fetchCategories: vi.fn(),
@@ -25,7 +25,7 @@ describe('CategoriesTab', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    categoriesState.categories.value = [{ id: 1, name: 'Bebidas', description: '', slug: 'bebidas', product_count: 0 }]
+    categoriesState.categories.value = [{ id: 1, name: 'Bebidas', description: '', slug: 'bebidas', parent: null, parent_name: null, product_count: 0, children_count: 0 }]
     categoriesState.loading.value = false
     categoriesState.error.value = null
 
@@ -59,9 +59,22 @@ describe('CategoriesTab', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(categoriesState.addCategory).toHaveBeenCalledWith({ name: 'Combos', description: '' })
+    expect(categoriesState.addCategory).toHaveBeenCalledWith({ name: 'Combos', description: '', parent: null })
     expect(toastState.success).toHaveBeenCalledWith('Categoria criada com sucesso.')
     expect((wrapper.find('input[type="text"]').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('creates a subcategory when a parent category is selected', async () => {
+    categoriesState.addCategory.mockResolvedValue({ id: 2, name: 'Biquíni', parent: 1 })
+    const wrapper = mount(CategoriesTab)
+
+    await wrapper.find('select').setValue('1')
+    await wrapper.find('input[type="text"]').setValue('Biquíni')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(categoriesState.addCategory).toHaveBeenCalledWith({ name: 'Biquíni', description: '', parent: 1 })
+    expect(toastState.success).toHaveBeenCalledWith('Subcategoria criada com sucesso.')
   })
 
   it('shows an error toast when category creation fails', async () => {
@@ -79,8 +92,8 @@ describe('CategoriesTab', () => {
     categoriesState.deleteCategory.mockResolvedValue(undefined)
     const wrapper = mount(CategoriesTab)
 
-    const removeButton = wrapper.findAll('button').find((button) => button.text().includes('Remover'))
-    await removeButton!.trigger('click')
+    const removeButton = wrapper.find('button[title="Remover categoria"]')
+    await removeButton.trigger('click')
     await flushPromises()
 
     expect(categoriesState.deleteCategory).toHaveBeenCalledWith(1)

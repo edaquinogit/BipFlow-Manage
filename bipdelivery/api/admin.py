@@ -16,6 +16,7 @@ from .models import (
     SaleOrderItem,
     Store,
     StorefrontAppearance,
+    StorefrontBanner,
     StoreMembership,
     StoreSettings,
     TOTPDevice,
@@ -49,10 +50,38 @@ class StoreScopedAdminMixin:
         super().save_model(request, obj, form, change)
 
 
+class StoreScopedCategoryParentFilter(admin.SimpleListFilter):
+    title = "parent"
+    parameter_name = "parent"
+
+    def lookups(self, request, model_admin):
+        queryset = Category.objects.filter(parent__isnull=True)
+        if not request.user.is_superuser:
+            queryset = queryset.filter(store__memberships__user=request.user)
+
+        lookups = [("__none__", "-")]
+        lookups.extend(
+            (str(category.id), category.name)
+            for category in queryset.distinct().order_by("name", "id")
+        )
+        return lookups
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == "__none__":
+            return queryset.filter(parent__isnull=True)
+
+        if value:
+            return queryset.filter(parent_id=value)
+
+        return queryset
+
+
 @admin.register(Category)
 class CategoryAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
-    list_display = ("id", "name", "store")
-    list_filter = ("store",)
+    list_display = ("id", "name", "parent", "store")
+    list_filter = ("store", StoreScopedCategoryParentFilter)
+    search_fields = ("name", "description", "parent__name")
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -125,6 +154,24 @@ class StorefrontAppearanceAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
     )
     list_filter = ("card_style", "radius_style", "hero_enabled", "decoration_style")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(StorefrontBanner)
+class StorefrontBannerAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "store",
+        "title",
+        "position",
+        "is_active",
+        "status",
+        "starts_at",
+        "ends_at",
+        "updated_at",
+    )
+    list_filter = ("is_active", "store", "destination_type")
+    search_fields = ("title", "subtitle", "alt_text")
+    readonly_fields = ("button_url", "created_at", "updated_at")
 
 
 @admin.register(CustomerProfile)

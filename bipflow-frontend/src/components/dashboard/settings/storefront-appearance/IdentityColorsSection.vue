@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useToast } from '@/composables/useToast';
 import { Logger } from '@/services/logger';
 import { storeService } from '@/services/store.service';
+import { storefrontAppearanceService } from '@/services/storefront-appearance.service';
 import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import type {
   Store,
@@ -11,6 +12,10 @@ import type {
   StorefrontAppearance,
   StoreTheme,
 } from '@/types/store';
+import {
+  STOREFRONT_MEDIA_RULES,
+  validateStorefrontMediaFile,
+} from '@/utils/storefrontMedia';
 
 /**
  * Identidade + Cores: logo, tagline e a paleta editavel pelo lojista.
@@ -37,6 +42,7 @@ interface IdentityColorsDraft {
 }
 
 const SECONDARY_COLOR_FALLBACK = '#D81B60';
+const LOGO_MEDIA_RULES = STOREFRONT_MEDIA_RULES.logo;
 
 const THEME_COLOR_FIELDS: { key: ThemeColorKey; label: string }[] = [
   { key: 'primary', label: 'Principal' },
@@ -94,15 +100,67 @@ function buildStorePayload(
 
 const draft = ref<IdentityColorsDraft>(buildDraft(selectedStore.value, props.appearance));
 const savedDraft = ref<IdentityColorsDraft>(buildDraft(selectedStore.value, props.appearance));
-const hasChanges = computed(() => !areDraftsEqual(draft.value, savedDraft.value));
+const logoInput = ref<HTMLInputElement | null>(null);
+const pendingLogoFile = ref<File | null>(null);
+const pendingLogoPreviewUrl = ref<string | null>(null);
+const logoError = ref<string | null>(null);
+const logoPreviewUrl = computed(() => pendingLogoPreviewUrl.value || draft.value.logo_url);
+const hasChanges = computed(() => (
+  Boolean(pendingLogoFile.value) || !areDraftsEqual(draft.value, savedDraft.value)
+));
 const isSaving = ref(false);
 const saveError = ref<string | null>(null);
 
 watch([selectedStore, () => props.appearance], ([store, appearance]) => {
+  clearPendingLogoFile();
   const nextDraft = buildDraft(store, appearance);
   draft.value = nextDraft;
   savedDraft.value = buildDraft(store, appearance);
 });
+
+onBeforeUnmount(() => {
+  clearPendingLogoFile();
+});
+
+function clearPendingLogoFile(): void {
+  if (pendingLogoPreviewUrl.value) {
+    URL.revokeObjectURL(pendingLogoPreviewUrl.value);
+  }
+  pendingLogoFile.value = null;
+  pendingLogoPreviewUrl.value = null;
+  logoError.value = null;
+  if (logoInput.value) {
+    logoInput.value.value = '';
+  }
+}
+
+function openLogoPicker(): void {
+  logoInput.value?.click();
+}
+
+function handleLogoFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  if (!file) {
+    return;
+  }
+
+  const validationError = validateStorefrontMediaFile('logo', file);
+  if (validationError) {
+    clearPendingLogoFile();
+    logoError.value = validationError;
+    return;
+  }
+
+  clearPendingLogoFile();
+  pendingLogoFile.value = file;
+  pendingLogoPreviewUrl.value = URL.createObjectURL(file);
+}
+
+function removeLogo(): void {
+  clearPendingLogoFile();
+  draft.value.logo_url = '';
+}
 
 async function handleSave(): Promise<void> {
   const store = selectedStore.value;
@@ -114,18 +172,35 @@ async function handleSave(): Promise<void> {
   saveError.value = null;
 
   try {
-    const storePayload = buildStorePayload(draft.value, savedDraft.value);
+    const draftToPersist: IdentityColorsDraft = {
+      ...draft.value,
+      theme: { ...draft.value.theme },
+    };
+
+    if (pendingLogoFile.value) {
+      const uploadedLogo = await storefrontAppearanceService.uploadMedia(
+        'logo',
+        pendingLogoFile.value,
+      );
+      draftToPersist.logo_url = uploadedLogo.url;
+    }
+
+    const storePayload = buildStorePayload(draftToPersist, savedDraft.value);
     const shouldUpdateStore = Object.keys(storePayload).length > 0;
-    const shouldUpdateSecondaryColor = draft.value.secondary_color !== savedDraft.value.secondary_color;
+    const shouldUpdateSecondaryColor = (
+      draftToPersist.secondary_color !== savedDraft.value.secondary_color
+    );
     let updatedStore: Store | null = null;
     let updatedAppearance: StorefrontAppearance | null = null;
 
     if (shouldUpdateStore) {
-      updatedStore = await storeService.updateAppearance(store.slug, storePayload);
+      updatedStore = await storeService.updateCurrentAppearance(storePayload);
     }
 
     if (shouldUpdateSecondaryColor) {
-      updatedAppearance = await props.save({ secondary_color: draft.value.secondary_color });
+      updatedAppearance = await props.save({
+        secondary_color: draftToPersist.secondary_color,
+      });
     }
 
     if (shouldUpdateStore) {
@@ -136,6 +211,7 @@ async function handleSave(): Promise<void> {
       const nextDraft = buildDraft(updatedStore ?? selectedStore.value ?? store, updatedAppearance ?? props.appearance);
       draft.value = nextDraft;
       savedDraft.value = buildDraft(updatedStore ?? selectedStore.value ?? store, updatedAppearance ?? props.appearance);
+      clearPendingLogoFile();
       success('Aparencia da vitrine atualizada com sucesso.');
     }
   } catch (error: unknown) {
@@ -154,18 +230,64 @@ async function handleSave(): Promise<void> {
       <h3 class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Identidade</h3>
 
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <label class="block sm:col-span-2">
-          <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
-            URL do logo
+        <div class="sm:col-span-2">
+          <span class="mb-2 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
+            Logo da loja
           </span>
-          <input
-            v-model="draft.logo_url"
-            data-cy="storefront-logo-url"
-            type="url"
-            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-            placeholder="https://.../logo.png"
-          />
-        </label>
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E5E7EB] bg-zinc-50">
+              <img
+                v-if="logoPreviewUrl"
+                data-cy="storefront-logo-preview"
+                :src="logoPreviewUrl"
+                alt="Preview do logo"
+                class="h-full w-full object-contain"
+              />
+              <span v-else class="text-[10px] font-black uppercase tracking-widest text-bip-muted">
+                Logo
+              </span>
+            </div>
+
+            <div class="flex flex-1 flex-col gap-2">
+              <input
+                ref="logoInput"
+                data-cy="storefront-logo-file"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                class="sr-only"
+                @change="handleLogoFileChange"
+              />
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-cy="btn-select-storefront-logo"
+                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+                  @click="openLogoPicker"
+                >
+                  Alterar logo
+                </button>
+                <button
+                  type="button"
+                  data-cy="btn-remove-storefront-logo"
+                  :disabled="!logoPreviewUrl"
+                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#D81B60] hover:text-[#D81B60] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+                  @click="removeLogo"
+                >
+                  Remover
+                </button>
+              </div>
+
+              <p class="text-[11px] leading-5 text-bip-muted">
+                PNG, JPG, JPEG ou WEBP ate 2 MB. Recomendado: {{ LOGO_MEDIA_RULES.recommendedSize }}.
+              </p>
+              <p v-if="logoError" data-cy="storefront-logo-error" class="text-xs font-semibold text-[#D81B60]">
+                {{ logoError }}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <label class="block sm:col-span-2">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">

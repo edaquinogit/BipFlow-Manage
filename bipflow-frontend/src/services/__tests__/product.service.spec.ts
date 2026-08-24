@@ -88,6 +88,8 @@ describe("ProductService", () => {
       id: 3,
       name: "Photo",
       slug: null,
+      parent: null,
+      parent_name: null,
     });
   });
 
@@ -107,6 +109,8 @@ describe("ProductService", () => {
             price: "199.90",
             category: 5,
             category_name: "Audio",
+            category_parent: 4,
+            category_parent_name: "Electronics",
             image: "http://localhost:8000/media/products/2026/headphones.png",
             images: [
               "http://localhost:8000/media/products/2026/headphones.png",
@@ -126,6 +130,8 @@ describe("ProductService", () => {
       id: 5,
       name: "Audio",
       slug: null,
+      parent: 4,
+      parent_name: "Electronics",
     });
     expect(response.results[0]?.image).toContain("/media/products/");
   });
@@ -160,6 +166,8 @@ describe("ProductService", () => {
       id: 2,
       name: "Lanches",
       slug: null,
+      parent: null,
+      parent_name: null,
     });
     expect(product.description).toBe("Burger com blend especial");
     expect(product.size).toBe("Grande");
@@ -194,6 +202,8 @@ describe("ProductService", () => {
       id: 2,
       name: "Lanches",
       slug: null,
+      parent: null,
+      parent_name: null,
     });
   });
 

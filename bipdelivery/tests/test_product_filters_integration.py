@@ -137,6 +137,29 @@ class ProductFilterIntegrationTest(TestCase):
         self.assertIn("Medium Product", product_names)
         self.assertIn("Expensive Product", product_names)
 
+    def test_filter_by_parent_category_includes_subcategory_products(self) -> None:
+        """Selecting a parent category should include products in its subcategories."""
+        parent_category = Category.objects.create(name="Moda Praia", slug="moda-praia")
+        child_category = Category.objects.create(
+            name="Biquíni",
+            slug="biquini",
+            parent=parent_category,
+        )
+        Product.objects.create(
+            name="Biquíni Azul",
+            price=Decimal("89.90"),
+            category=child_category,
+            stock_quantity=2,
+        )
+
+        response: Any = self.client.get(
+            "/api/v1/products/", {"category": str(parent_category.id)}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        product_names = [p["name"] for p in response.data["results"]]
+        self.assertEqual(product_names, ["Biquíni Azul"])
+
     def test_filter_out_of_stock(self) -> None:
         """Frontend can explicitly filter for out-of-stock products."""
         response: Any = self.client.get("/api/v1/products/", {"in_stock": "false"})

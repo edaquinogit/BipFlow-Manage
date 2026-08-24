@@ -11,7 +11,7 @@ import { useDialogA11y } from '@/composables/useDialogA11y';
 interface Props {
   isOpen: boolean;
   initialData?: Product | null;
-  categories: Array<{ id: number; name: string }>;
+  categories: Array<{ id: number; name: string; parent?: number | null; parent_name?: string | null }>;
   isSaving?: boolean;
 }
 

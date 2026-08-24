@@ -1,6 +1,7 @@
 import { ref, computed } from "vue";
 import type { Category } from "../schemas/category.schema";
 import { categoryService } from "../services/category.service";
+import { buildCategoryTree, flattenCategoryTree } from "../utils/categories";
 
 // Mantemos o estado FORA da função para que ele funcione como um "Store" (Singleton)
 // Isso garante que se você mudar de página e voltar, as categorias ainda estarão lá.
@@ -74,12 +75,14 @@ export function useCategories() {
 
   // Helper para select/dropdowns (Ordenado alfabeticamente)
   const sortedCategories = computed(() =>
-    [...categories.value].sort((a, b) => a.name.localeCompare(b.name)),
+    flattenCategoryTree(categories.value),
   );
+  const categoryTree = computed(() => buildCategoryTree(categories.value));
 
   return {
     categories: sortedCategories,
     rawCategories: categories,
+    categoryTree,
     loading,
     error,
     fetchCategories,

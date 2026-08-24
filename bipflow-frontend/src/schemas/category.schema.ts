@@ -10,14 +10,17 @@ export const CategorySchema = z.object({
   name: z
     .string()
     .min(2, "Category name must have at least 2 characters")
-    .max(50, "Category name is too long"),
+    .max(100, "Category name is too long"),
   description: z.string().nullable().optional().default(""), // Ensure empty string to prevent rendering errors in Vue
   slug: z
     .string()
     .nullable()
     .optional()
     .transform((val) => val ?? ""),
+  parent: z.number().nullable().optional(),
+  parent_name: z.string().nullable().optional(),
   product_count: z.number().int().nonnegative().optional().default(0),
+  children_count: z.number().int().nonnegative().optional().default(0),
   created_at: z.string().optional(), // Removed .datetime() in case Django sends ISO formatted with timezone
 });
 
@@ -29,6 +32,8 @@ export const CategoryCreateSchema = CategorySchema.omit({
   id: true,
   slug: true,
   product_count: true,
+  parent_name: true,
+  children_count: true,
   created_at: true,
 });
 
@@ -45,7 +50,15 @@ export type CategoryCreatePayload = z.infer<typeof CategoryCreateSchema>;
 export const createEmptyCategory = (): CategoryCreatePayload => ({
   name: "",
   description: "", // Mantendo consistência com o default do schema
+  parent: null,
 });
 
-export const CategoryPayloadSchema = CategorySchema.omit({ id: true, slug: true, product_count: true, created_at: true });
+export const CategoryPayloadSchema = CategorySchema.omit({
+  id: true,
+  slug: true,
+  product_count: true,
+  parent_name: true,
+  children_count: true,
+  created_at: true,
+});
 export type CategoryPayload = z.infer<typeof CategoryPayloadSchema>;

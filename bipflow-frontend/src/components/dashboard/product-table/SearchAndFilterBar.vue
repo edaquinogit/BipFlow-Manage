@@ -13,11 +13,12 @@ import type { FilterState } from '@/types/filters';
 import { createDefaultFilterState, hasActiveFilters } from '@/types/filters';
 import { Logger } from '@/services/logger';
 import { buildErrorContext, type ApplicationError } from '@/types/errors';
+import { buildCategoryTree, getCategoryDisplayName } from '@/utils/categories';
 
 interface Props {
   filters: FilterState;
   isSearching?: boolean;
-  categories?: Array<{ id: number | string; name: string }>;
+  categories?: Array<{ id: number | string; name: string; parent?: number | string | null; parent_name?: string | null }>;
   showPriceControls?: boolean;
 }
 
@@ -42,6 +43,7 @@ const newCategoryName = ref('');
 const isCreatingCategory = ref(false);
 
 const hasAnyActiveFilters = computed(() => hasActiveFilters(localFilters.value));
+const categoryTree = computed(() => buildCategoryTree(props.categories));
 
 const activeFilterSummary = computed(() => {
   const parts: string[] = [];
@@ -85,8 +87,12 @@ function emitFilters(patch: Partial<FilterState>): void {
 
 function getCategoryName(id: string | number | null): string {
   if (!id) return 'Todas as categorias';
-  const category = props.categories.find((item) => item.id === id);
-  return category?.name || 'Categoria desconhecida';
+  const category = props.categories.find((item) => String(item.id) === String(id));
+  return category ? getCategoryDisplayName(category) : 'Categoria desconhecida';
+}
+
+function isSelectedCategory(categoryId: string | number): boolean {
+  return String(localFilters.value.categoryId ?? '') === String(categoryId);
 }
 
 function getAvailabilityText(inStock: boolean | null): string {
@@ -318,18 +324,31 @@ function cancelNewCategory(): void {
                   <CheckIcon v-if="!localFilters.categoryId" class="h-4 w-4 shrink-0" />
                 </button>
 
-                <button
-                  v-for="category in categories"
-                  :key="category.id"
-                  type="button"
-                  class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
-                  :class="localFilters.categoryId === category.id ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
-                  :aria-selected="localFilters.categoryId === category.id"
-                  @click="selectCategory(category.id)"
-                >
-                  <span class="truncate">{{ category.name }}</span>
-                  <CheckIcon v-if="localFilters.categoryId === category.id" class="h-4 w-4 shrink-0" />
-                </button>
+                <template v-for="category in categoryTree" :key="category.id">
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
+                    :class="isSelectedCategory(category.id) ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                    :aria-selected="isSelectedCategory(category.id)"
+                    @click="selectCategory(category.id)"
+                  >
+                    <span class="truncate">{{ category.name }}</span>
+                    <CheckIcon v-if="isSelectedCategory(category.id)" class="h-4 w-4 shrink-0" />
+                  </button>
+
+                  <button
+                    v-for="child in category.children"
+                    :key="child.id"
+                    type="button"
+                    class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 pl-6 text-left text-sm transition"
+                    :class="isSelectedCategory(child.id) ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                    :aria-selected="isSelectedCategory(child.id)"
+                    @click="selectCategory(child.id)"
+                  >
+                    <span class="truncate">{{ child.name }}</span>
+                    <CheckIcon v-if="isSelectedCategory(child.id)" class="h-4 w-4 shrink-0" />
+                  </button>
+                </template>
               </div>
             </div>
 

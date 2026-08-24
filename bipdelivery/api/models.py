@@ -3,6 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
@@ -75,6 +76,59 @@ def get_default_store_id() -> int:
     return Store.get_default().id
 
 
+class StorefrontDestination:
+    """Closed set of safe storefront CTA destinations."""
+
+    NONE = "none"
+    PRODUCTS = "products"
+    CATEGORY = "category"
+    PRODUCT = "product"
+    EXTERNAL_URL = "external_url"
+
+    CHOICES = [
+        (NONE, "Nenhuma acao"),
+        (PRODUCTS, "Abrir vitrine"),
+        (CATEGORY, "Abrir categoria"),
+        (PRODUCT, "Abrir produto"),
+        (EXTERNAL_URL, "Abrir link externo"),
+    ]
+
+    @classmethod
+    def build_url(cls, store: "Store", destination_type: str, destination_value: str) -> str:
+        normalized_type = destination_type or cls.NONE
+        normalized_value = str(destination_value or "").strip()
+
+        if normalized_type == cls.NONE:
+            return ""
+
+        if normalized_type == cls.PRODUCTS:
+            return f"/l/{store.slug}/produtos"
+
+        if normalized_type == cls.CATEGORY:
+            category = Category.objects.filter(
+                store=store,
+                id=normalized_value,
+            ).first()
+            if category is None:
+                return ""
+            return f"/l/{store.slug}/produtos?category={category.id}"
+
+        if normalized_type == cls.PRODUCT:
+            product = Product.objects.filter(store=store, id=normalized_value).first()
+            if product is None:
+                return ""
+            if product.slug:
+                return f"/l/{store.slug}/produtos/{product.slug}"
+            if product.public_code:
+                return f"/l/{store.slug}/p/{product.public_code}"
+            return ""
+
+        if normalized_type == cls.EXTERNAL_URL:
+            return normalized_value
+
+        return ""
+
+
 class Category(models.Model):
     """Product category model for organizational purposes."""
 
@@ -84,6 +138,14 @@ class Category(models.Model):
         related_name="categories",
         default=get_default_store_id,
         help_text="Tenant that owns this category (Etapa 2 of the multi-tenant evolution).",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="children",
+        null=True,
+        blank=True,
+        help_text="Optional parent category for one-level subcategory organization.",
     )
     name = models.CharField(max_length=100)
     slug = models.SlugField(blank=True, null=True)
@@ -97,9 +159,39 @@ class Category(models.Model):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["store", "slug"], name="unique_category_slug_per_store"
+                fields=["store", "slug"],
+                condition=models.Q(parent__isnull=True),
+                name="unique_top_level_category_slug_per_store",
+            ),
+            models.UniqueConstraint(
+                fields=["store", "parent", "slug"],
+                condition=models.Q(parent__isnull=False),
+                name="unique_subcategory_slug_per_parent",
             ),
         ]
+
+    def _validate_parent_relationship(self) -> None:
+        if not self.parent_id:
+            return
+
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError(
+                {"parent": "Uma categoria nao pode ser subcategoria dela mesma."}
+            )
+
+        if self.parent.parent_id is not None:
+            raise ValidationError(
+                {"parent": "Subcategorias nao podem receber outras subcategorias."}
+            )
+
+        if self.store_id and self.parent.store_id != self.store_id:
+            raise ValidationError(
+                {"parent": "A categoria principal deve pertencer a mesma loja."}
+            )
+
+    def clean(self) -> None:
+        super().clean()
+        self._validate_parent_relationship()
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -109,12 +201,17 @@ class Category(models.Model):
             *args: Variable length argument list for parent save().
             **kwargs: Arbitrary keyword arguments for parent save().
         """
+        self._validate_parent_relationship()
+
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         """Return the category name as string representation."""
+        if self.parent_id:
+            return f"{self.parent.name} / {self.name}"
+
         return self.name
 
 
@@ -708,7 +805,14 @@ class StorefrontAppearance(models.Model):
     hero_title = models.CharField(max_length=120, blank=True)
     hero_subtitle = models.CharField(max_length=200, blank=True)
     hero_cta_text = models.CharField(max_length=40, blank=True)
-    hero_cta_url = models.URLField(max_length=500, blank=True)
+    hero_destination_type = models.CharField(
+        max_length=16,
+        choices=StorefrontDestination.CHOICES,
+        default=StorefrontDestination.NONE,
+    )
+    hero_destination_value = models.CharField(max_length=500, blank=True)
+    hero_cta_url = models.CharField(max_length=500, blank=True)
+    favicon_url = models.URLField(max_length=500, blank=True)
 
     card_style = models.CharField(
         max_length=16, choices=CARD_STYLE_CHOICES, default=CARD_STYLE_CLEAN
@@ -756,6 +860,87 @@ class StorefrontAppearance(models.Model):
 
     def __str__(self) -> str:
         return f"Storefront appearance for {self.store_id}"
+
+
+class StorefrontBanner(models.Model):
+    """Promotional storefront banner scoped to one store."""
+
+    store = models.ForeignKey(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="storefront_banners",
+    )
+    image_url = models.URLField(max_length=500)
+    alt_text = models.CharField(max_length=160, blank=True)
+    title = models.CharField(max_length=120, blank=True)
+    subtitle = models.CharField(max_length=200, blank=True)
+    cta_text = models.CharField(max_length=40, blank=True)
+    destination_type = models.CharField(
+        max_length=16,
+        choices=StorefrontDestination.CHOICES,
+        default=StorefrontDestination.NONE,
+    )
+    destination_value = models.CharField(max_length=500, blank=True)
+    button_url = models.CharField(max_length=500, blank=True)
+    position = models.PositiveIntegerField(default=0, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        indexes = [
+            models.Index(fields=["store", "position"]),
+            models.Index(fields=["store", "is_active", "starts_at", "ends_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(starts_at__isnull=True)
+                    | models.Q(ends_at__isnull=True)
+                    | models.Q(starts_at__lte=models.F("ends_at"))
+                ),
+                name="storefront_banner_valid_schedule",
+            ),
+        ]
+
+    @property
+    def status(self) -> str:
+        now = timezone.now()
+        if not self.is_active:
+            return "inactive"
+        if self.starts_at and self.starts_at > now:
+            return "scheduled"
+        if self.ends_at and self.ends_at < now:
+            return "expired"
+        return "active"
+
+    @classmethod
+    def public_for_store(cls, store: Store):
+        now = timezone.now()
+        return (
+            cls.objects.filter(store=store, is_active=True)
+            .filter(models.Q(starts_at__isnull=True) | models.Q(starts_at__lte=now))
+            .filter(models.Q(ends_at__isnull=True) | models.Q(ends_at__gte=now))
+            .order_by("position", "id")
+        )
+
+    def refresh_button_url(self) -> None:
+        self.button_url = StorefrontDestination.build_url(
+            self.store,
+            self.destination_type,
+            self.destination_value,
+        )
+
+    def save(self, *args, **kwargs):
+        self.refresh_button_url()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        label = self.title or self.alt_text or f"Banner {self.id or ''}".strip()
+        return f"{label} @ {self.store_id}"
 
 
 class CustomerProfile(models.Model):

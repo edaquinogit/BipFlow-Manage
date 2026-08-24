@@ -37,6 +37,12 @@ export const storeService = {
     return response.data
   },
 
+  /** Update controlled storefront appearance settings for the active store. */
+  async updateCurrentAppearance(payload: StoreAppearanceSettingsPayload): Promise<Store> {
+    const response = await api.patch<Store>('v1/store/current/appearance/', payload)
+    return response.data
+  },
+
   /** Fetch one store's printable product label settings. */
   async getLabelSettings(slug: string): Promise<StoreLabelSettings> {
     const response = await api.get<StoreLabelSettings>(`v1/store/mine/${slug}/label-settings/`)

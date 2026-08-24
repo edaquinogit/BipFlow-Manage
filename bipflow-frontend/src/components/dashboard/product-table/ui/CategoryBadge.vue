@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Category as ProductCategory } from '@/schemas/product.schema';
 import type { Category as CategorySchema } from '@/schemas/category.schema';
+import { getCategoryDisplayName } from '@/utils/categories';
 
 defineProps<{
   category: CategorySchema | ProductCategory | null;
@@ -12,7 +13,7 @@ defineProps<{
     v-if="category"
     class="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-zinc-50 px-3 py-1 text-[9px] font-black uppercase tracking-tighter text-bip-muted"
   >
-    <span class="truncate max-w-24">{{ category.name }}</span>
+    <span class="max-w-36 truncate">{{ getCategoryDisplayName(category) }}</span>
   </span>
 
   <span

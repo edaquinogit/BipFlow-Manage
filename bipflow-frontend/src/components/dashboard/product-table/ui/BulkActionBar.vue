@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { XMarkIcon, TagIcon, CheckIcon, QrCodeIcon } from '@heroicons/vue/24/outline';
 import type { Category } from '@/schemas/category.schema';
+import { getCategoryDisplayName } from '@/utils/categories';
 
 /**
  * 🛰️ COMPONENT CONTRACT
@@ -104,7 +105,7 @@ const handleConfirm = () => {
                 :key="category.id"
                 :value="category.id"
               >
-                {{ category.name }}
+                {{ getCategoryDisplayName(category) }}
               </option>
             </select>
           </div>
