@@ -21,6 +21,9 @@ describe('Store foundation: public contract has no private leakage', () => {
       expect(response.status).to.eq(200)
       expect(Object.keys(response.body).sort()).to.deep.equal(
         [
+          // Visual storefront display name only; it does not expose legal
+          // ownership, memberships or tenant-private metadata.
+          'display_name',
           'id',
           'is_active',
           'logo_url',
