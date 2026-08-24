@@ -24,6 +24,7 @@ describe('StoreService', () => {
       data: {
         id: 1,
         name: 'Loja Principal',
+        display_name: 'Boutique Principal',
         slug: 'default',
         logo_url: 'https://example.com/logo.png',
         tagline: 'Catalogo online',
@@ -41,6 +42,7 @@ describe('StoreService', () => {
 
     expect(api.get).toHaveBeenCalledWith('v1/store/current/')
     expect(response.slug).toBe('default')
+    expect(response.display_name).toBe('Boutique Principal')
     expect(response.logo_url).toBe('https://example.com/logo.png')
     expect(response.tagline).toBe('Catalogo online')
     expect(response.status).toBe('active')
@@ -61,7 +63,7 @@ describe('StoreService', () => {
       },
     } as never)
 
-    const payload = { tagline: 'Nova vitrine', theme: { primary: '#111111' } }
+    const payload = { display_name: 'Boutique', tagline: 'Nova vitrine', theme: { primary: '#111111' } }
     const response = await storeService.updateAppearance('default', payload)
 
     expect(api.patch).toHaveBeenCalledWith('v1/store/mine/default/appearance/', payload)
@@ -82,7 +84,7 @@ describe('StoreService', () => {
       },
     } as never)
 
-    const payload = { tagline: 'Nova vitrine', theme: { primary: '#111111' } }
+    const payload = { display_name: 'Boutique', tagline: 'Nova vitrine', theme: { primary: '#111111' } }
     const response = await storeService.updateCurrentAppearance(payload)
 
     expect(api.patch).toHaveBeenCalledWith('v1/store/current/appearance/', payload)

@@ -531,6 +531,7 @@ class Store(models.Model):
     )
 
     name = models.CharField(max_length=120)
+    display_name = models.CharField(max_length=120, blank=True)
     slug = models.SlugField(unique=True)
     logo_url = models.URLField(max_length=500, blank=True)
     tagline = models.CharField(max_length=160, blank=True)
@@ -739,7 +740,7 @@ class StorefrontAppearance(models.Model):
     Deliberately separate from Store.theme (primary/accent/background/
     surface/text/muted, already wired end to end through the theme engine):
     this model only adds what Store doesn't already cover -- an optional
-    secondary color plus hero, layout preset and motion/decoration choices.
+    secondary color plus hero, typography, layout preset and motion/decoration choices.
     Every non-color field is a closed choice set, never a free CSS/JS value,
     so a merchant can't inject unsafe styling into every other tenant's
     shared frontend build.
@@ -768,6 +769,15 @@ class StorefrontAppearance(models.Model):
     DENSITY_CHOICES = [
         (DENSITY_COMPACT, "Compact"),
         (DENSITY_COMFORTABLE, "Comfortable"),
+    ]
+
+    FONT_PRESET_MODERN = "modern"
+    FONT_PRESET_EDITORIAL = "editorial"
+    FONT_PRESET_CLASSIC = "classic"
+    FONT_PRESET_CHOICES = [
+        (FONT_PRESET_MODERN, "Modern"),
+        (FONT_PRESET_EDITORIAL, "Editorial"),
+        (FONT_PRESET_CLASSIC, "Classic"),
     ]
 
     MOTION_INTENSITY_SUBTLE = "subtle"
@@ -822,6 +832,9 @@ class StorefrontAppearance(models.Model):
     )
     density = models.CharField(
         max_length=16, choices=DENSITY_CHOICES, default=DENSITY_COMFORTABLE
+    )
+    font_preset = models.CharField(
+        max_length=16, choices=FONT_PRESET_CHOICES, default=FONT_PRESET_MODERN
     )
 
     motion_enabled = models.BooleanField(default=True)

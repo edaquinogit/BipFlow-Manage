@@ -14,6 +14,7 @@ import { buildErrorContext, type ApplicationError } from '@/types/errors';
 import type {
   CardStyle,
   DecorationStyle,
+  FontPreset,
   LayoutDensity,
   MotionIntensity,
   RadiusStyle,
@@ -31,12 +32,14 @@ import {
   STOREFRONT_MEDIA_RULES,
   validateStorefrontMediaFile,
 } from '@/utils/storefrontMedia';
+import { STOREFRONT_PALETTE_PRESETS } from '@/utils/storefrontPalettePresets';
 
 type AppearanceSection = 'identidade' | 'banner' | 'promocoes' | 'estilo' | 'preview';
 type ThemeColorKey = keyof StoreTheme;
 type ThemeDraft = Record<ThemeColorKey, string>;
 
 interface AppearanceDraft {
+  display_name: string;
   logo_url: string;
   favicon_url: string;
   tagline: string;
@@ -54,6 +57,7 @@ interface AppearanceDraft {
   card_style: CardStyle;
   radius_style: RadiusStyle;
   density: LayoutDensity;
+  font_preset: FontPreset;
   motion_enabled: boolean;
   motion_intensity: MotionIntensity;
   decoration_enabled: boolean;
@@ -106,6 +110,12 @@ const THEME_COLOR_FIELDS: { key: ThemeColorKey; label: string }[] = [
   { key: 'surface', label: 'Superficie' },
   { key: 'text', label: 'Texto' },
   { key: 'muted', label: 'Texto auxiliar' },
+];
+
+const FONT_PRESET_OPTIONS: { value: FontPreset; label: string }[] = [
+  { value: 'modern', label: 'Moderna' },
+  { value: 'editorial', label: 'Editorial' },
+  { value: 'classic', label: 'Classica' },
 ];
 
 const DEFAULT_THEME: ThemeDraft = {
@@ -179,6 +189,7 @@ function buildDraft(
   const heroDestinationType = inferHeroDestinationType(appearanceValue);
 
   return {
+    display_name: store?.display_name ?? '',
     logo_url: store?.logo_url ?? '',
     favicon_url: appearanceValue?.favicon_url ?? '',
     tagline: store?.tagline ?? '',
@@ -198,6 +209,7 @@ function buildDraft(
     card_style: appearanceValue?.card_style ?? 'clean',
     radius_style: appearanceValue?.radius_style ?? 'rounded',
     density: appearanceValue?.density ?? 'comfortable',
+    font_preset: appearanceValue?.font_preset ?? 'modern',
     motion_enabled: appearanceValue?.motion_enabled ?? true,
     motion_intensity: appearanceValue?.motion_intensity ?? 'standard',
     decoration_enabled: appearanceValue?.decoration_enabled ?? false,
@@ -225,7 +237,9 @@ const hasAppearanceChanges = computed(() => (
   Boolean(pendingLogoFile.value || pendingFaviconFile.value || pendingHeroBannerFile.value)
   || !areDraftsEqual(draft.value, savedDraft.value)
 ));
-const previewStoreName = computed(() => selectedStore.value?.name || 'Loja Principal');
+const previewStoreName = computed(() => (
+  draft.value.display_name.trim() || selectedStore.value?.name || 'Loja Principal'
+));
 const heroPreviewUrl = computed(() => buildDestinationUrl(
   draft.value.hero_destination_type,
   draft.value.hero_destination_value,
@@ -244,6 +258,15 @@ const previewStyle = computed(() => ({
     : draft.value.radius_style === 'soft'
       ? '1rem'
       : '0.65rem',
+  '--preview-font-body': draft.value.font_preset === 'classic'
+    ? 'Georgia, "Times New Roman", serif'
+    : 'var(--font-sans)',
+  '--preview-font-heading': draft.value.font_preset === 'editorial'
+    ? 'var(--font-display)'
+    : draft.value.font_preset === 'classic'
+      ? 'Georgia, "Times New Roman", serif'
+      : 'var(--font-sans)',
+  fontFamily: 'var(--preview-font-body)',
 }));
 
 const visiblePreviewBanners = computed(() => (
@@ -433,6 +456,10 @@ function buildStorePayload(
 ): StoreAppearanceSettingsPayload {
   const payload: StoreAppearanceSettingsPayload = {};
 
+  if (nextDraft.display_name !== previousDraft.display_name) {
+    payload.display_name = nextDraft.display_name;
+  }
+
   if (nextDraft.logo_url !== previousDraft.logo_url) {
     payload.logo_url = nextDraft.logo_url;
   }
@@ -468,6 +495,7 @@ function buildAppearancePayload(
   if (nextDraft.card_style !== previousDraft.card_style) payload.card_style = nextDraft.card_style;
   if (nextDraft.radius_style !== previousDraft.radius_style) payload.radius_style = nextDraft.radius_style;
   if (nextDraft.density !== previousDraft.density) payload.density = nextDraft.density;
+  if (nextDraft.font_preset !== previousDraft.font_preset) payload.font_preset = nextDraft.font_preset;
   if (nextDraft.motion_enabled !== previousDraft.motion_enabled) payload.motion_enabled = nextDraft.motion_enabled;
   if (nextDraft.motion_intensity !== previousDraft.motion_intensity) {
     payload.motion_enabled = nextDraft.motion_enabled;
@@ -477,6 +505,14 @@ function buildAppearancePayload(
   if (nextDraft.decoration_style !== previousDraft.decoration_style) payload.decoration_style = nextDraft.decoration_style;
 
   return payload;
+}
+
+function applyPalettePreset(presetId: string): void {
+  const preset = STOREFRONT_PALETTE_PRESETS.find((item) => item.id === presetId);
+  if (!preset) return;
+
+  draft.value.theme = { ...preset.theme };
+  draft.value.secondary_color = preset.secondaryColor;
 }
 
 function sourceFailureMessage(source: 'identity' | 'banner' | 'layout' | 'all'): string {
@@ -938,6 +974,11 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
               </div>
 
               <label class="block md:col-span-2">
+                <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Nome exibido na vitrine</span>
+                <input v-model="draft.display_name" data-cy="storefront-display-name" type="text" maxlength="120" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" :placeholder="selectedStore?.name || 'Nome da loja'" />
+              </label>
+
+              <label class="block md:col-span-2">
                 <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Slogan</span>
                 <input v-model="draft.tagline" data-cy="storefront-tagline" type="text" maxlength="160" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="Ex.: Catalogo online" />
               </label>
@@ -946,6 +987,27 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
 
           <div class="rounded-lg border border-[#E5E7EB] bg-white p-4">
             <h3 class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Cores</h3>
+            <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <button
+                v-for="preset in STOREFRONT_PALETTE_PRESETS"
+                :key="preset.id"
+                type="button"
+                data-cy="storefront-palette-preset"
+                :data-palette-id="preset.id"
+                class="rounded-lg border border-[#E5E7EB] bg-white p-3 text-left transition hover:border-[#D81B60]/50 hover:bg-[#FDF2F8]"
+                @click="applyPalettePreset(preset.id)"
+              >
+                <span class="block text-[10px] font-black uppercase tracking-widest text-[#05050A]">{{ preset.label }}</span>
+                <span class="mt-2 flex gap-1.5" aria-hidden="true">
+                  <span
+                    v-for="color in [preset.theme.primary, preset.theme.accent, preset.secondaryColor, preset.theme.background]"
+                    :key="`${preset.id}-${color}`"
+                    class="h-5 w-5 rounded-full border border-black/10"
+                    :style="{ backgroundColor: color }"
+                  />
+                </span>
+              </button>
+            </div>
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
               <label v-for="field in THEME_COLOR_FIELDS" :key="field.key" class="block">
                 <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">{{ field.label }}</span>
@@ -1176,6 +1238,15 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
           <h3 class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Estilo da vitrine</h3>
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <label class="block">
+              <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Fonte</span>
+              <select v-model="draft.font_preset" data-cy="storefront-font-preset-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
+                <option v-for="option in FONT_PRESET_OPTIONS" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <label class="block">
               <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Cards</span>
               <select v-model="draft.card_style" data-cy="storefront-card-style-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
                 <option value="clean">Limpo</option>
@@ -1270,7 +1341,7 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
                     <span v-else class="text-xs font-black">BF</span>
                   </div>
                   <div class="min-w-0">
-                    <p class="truncate text-sm font-black">{{ previewStoreName }}</p>
+                    <p class="truncate text-sm font-black" style="font-family: var(--preview-font-heading)">{{ previewStoreName }}</p>
                     <p class="truncate text-xs text-[var(--preview-muted)]">{{ draft.tagline || 'Catalogo online' }}</p>
                   </div>
                   <div v-if="faviconPreviewUrl" class="ml-auto flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-black/10 bg-white">
@@ -1281,7 +1352,7 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
                 <div v-if="draft.hero_enabled && heroPreviewImageUrl" class="mt-4 overflow-hidden rounded-[var(--preview-radius)] border border-black/10 bg-[var(--preview-surface)]">
                   <img :src="heroPreviewImageUrl" :alt="draft.hero_alt_text" class="aspect-[16/7] w-full object-cover" />
                   <div v-if="draft.hero_title || draft.hero_subtitle || (draft.hero_cta_text && heroPreviewUrl)" class="space-y-2 p-3">
-                    <p v-if="draft.hero_title" class="text-sm font-black leading-tight">{{ draft.hero_title }}</p>
+                    <p v-if="draft.hero_title" class="text-sm font-black leading-tight" style="font-family: var(--preview-font-heading)">{{ draft.hero_title }}</p>
                     <p v-if="draft.hero_subtitle" class="text-xs leading-5 text-[var(--preview-muted)]">{{ draft.hero_subtitle }}</p>
                     <span v-if="draft.hero_cta_text && heroPreviewUrl" class="inline-flex h-9 items-center rounded-[var(--preview-radius)] bg-[var(--preview-accent)] px-3 text-[10px] font-black uppercase tracking-widest text-white">
                       {{ draft.hero_cta_text }}
@@ -1293,7 +1364,7 @@ function statusLabel(statusValue: StorefrontBannerStatus | 'draft'): string {
                   <div v-for="banner in visiblePreviewBanners" :key="banner.clientId" class="overflow-hidden rounded-[var(--preview-radius)] border border-black/10 bg-[var(--preview-surface)]">
                     <img :src="banner.pendingPreviewUrl || banner.image_url" :alt="banner.alt_text" class="aspect-[5/2] w-full object-cover" />
                     <div v-if="banner.title || banner.subtitle" class="p-2">
-                      <p v-if="banner.title" class="text-xs font-black">{{ banner.title }}</p>
+                      <p v-if="banner.title" class="text-xs font-black" style="font-family: var(--preview-font-heading)">{{ banner.title }}</p>
                       <p v-if="banner.subtitle" class="text-[11px] text-[var(--preview-muted)]">{{ banner.subtitle }}</p>
                     </div>
                   </div>

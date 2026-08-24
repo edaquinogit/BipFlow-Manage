@@ -67,6 +67,7 @@ function buildStore(overrides: Partial<Store> = {}): Store {
     name: 'Loja A',
     slug: 'loja-a',
     logo_url: 'https://example.com/logo-a.png',
+    display_name: '',
     tagline: 'Catalogo A',
     whatsapp_phone: '5571999990000',
     theme: {
@@ -104,6 +105,7 @@ function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): Storefr
     card_style: 'clean',
     radius_style: 'rounded',
     density: 'comfortable',
+    font_preset: 'modern',
     motion_enabled: true,
     motion_intensity: 'standard',
     decoration_enabled: false,
@@ -240,6 +242,7 @@ describe('StorefrontAppearanceTab', () => {
     ])
     vi.mocked(storeService.updateCurrentAppearance).mockImplementation((payload) => (
       Promise.resolve(buildStore({
+        display_name: payload.display_name ?? '',
         logo_url: payload.logo_url ?? 'https://example.com/logo-a.png',
         tagline: payload.tagline ?? 'Catalogo A',
         theme: payload.theme ?? buildStore().theme,
@@ -288,11 +291,13 @@ describe('StorefrontAppearanceTab', () => {
     await flushPromises()
 
     await wrapper.find('[data-cy="storefront-tagline"]').setValue('Nova vitrine')
+    await wrapper.find('[data-cy="storefront-display-name"]').setValue('Boutique A')
     await wrapper.find('[data-cy="storefront-secondary-color"]').setValue('#00AAFF')
     await wrapper.find('[data-cy="btn-save-storefront-identity"]').trigger('click')
     await flushPromises()
 
     expect(storeService.updateCurrentAppearance).toHaveBeenCalledWith({
+      display_name: 'Boutique A',
       tagline: 'Nova vitrine',
     })
     expect(storefrontAppearanceService.update).toHaveBeenCalledWith({
@@ -300,6 +305,31 @@ describe('StorefrontAppearanceTab', () => {
     })
     expect(fetchCurrentStore).toHaveBeenCalledWith(true)
     expect(toastState.success).toHaveBeenCalledWith('Aparencia da vitrine atualizada com sucesso.')
+  })
+
+  it('applies a centralized palette preset and persists its colors', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper
+      .find('[data-cy="storefront-palette-preset"][data-palette-id="azul-profissional"]')
+      .trigger('click')
+    await wrapper.find('[data-cy="btn-save-storefront-identity"]').trigger('click')
+    await flushPromises()
+
+    expect(storeService.updateCurrentAppearance).toHaveBeenCalledWith({
+      theme: {
+        primary: '#0F172A',
+        accent: '#2563EB',
+        background: '#F8FAFC',
+        surface: '#FFFFFF',
+        text: '#0F172A',
+        muted: '#64748B',
+      },
+    })
+    expect(storefrontAppearanceService.update).toHaveBeenCalledWith({
+      secondary_color: '#38BDF8',
+    })
   })
 
   it('previews and uploads a selected logo before saving the store identity', async () => {
@@ -477,6 +507,7 @@ describe('StorefrontAppearanceTab', () => {
     await wrapper.find('[data-cy="storefront-card-style-select"]').setValue('bordered')
     await wrapper.find('[data-cy="storefront-radius-style-select"]').setValue('soft')
     await wrapper.find('[data-cy="storefront-density-select"]').setValue('compact')
+    await wrapper.find('[data-cy="storefront-font-preset-select"]').setValue('editorial')
     await wrapper.find('[data-cy="storefront-motion-intensity-select"]').setValue('subtle')
     await wrapper.find('[data-cy="storefront-decoration-enabled"]').setValue(true)
     await wrapper.find('[data-cy="storefront-decoration-style-select"]').setValue('geometric')
@@ -487,6 +518,7 @@ describe('StorefrontAppearanceTab', () => {
       card_style: 'bordered',
       radius_style: 'soft',
       density: 'compact',
+      font_preset: 'editorial',
       motion_enabled: true,
       motion_intensity: 'subtle',
       decoration_enabled: true,

@@ -14,6 +14,7 @@ export interface StoreTheme {
 export interface Store {
   id: number
   name: string
+  display_name?: string | null
   slug: string
   logo_url?: string | null
   tagline?: string | null
@@ -31,6 +32,7 @@ export interface StoreReceiptSettingsPayload {
 }
 
 export interface StoreAppearanceSettingsPayload {
+  display_name?: string
   logo_url?: string
   tagline?: string
   theme?: StoreTheme
@@ -39,6 +41,7 @@ export interface StoreAppearanceSettingsPayload {
 export type CardStyle = 'clean' | 'bordered' | 'elevated'
 export type RadiusStyle = 'minimal' | 'rounded' | 'soft'
 export type LayoutDensity = 'compact' | 'comfortable'
+export type FontPreset = 'modern' | 'editorial' | 'classic'
 export type MotionIntensity = 'subtle' | 'standard'
 export type DecorationStyle = 'none' | 'circles' | 'soft-shapes' | 'geometric'
 export type StorefrontMediaKind = 'logo' | 'banner' | 'favicon' | 'promotion'
@@ -71,6 +74,7 @@ export interface StorefrontAppearance {
   card_style: CardStyle
   radius_style: RadiusStyle
   density: LayoutDensity
+  font_preset: FontPreset
   motion_enabled: boolean
   motion_intensity: MotionIntensity
   decoration_enabled: boolean

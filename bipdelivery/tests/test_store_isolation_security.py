@@ -19,6 +19,8 @@ from bipdelivery.api.models import Store, StoreMembership
 PUBLIC_STORE_FIELDS = {
     "id",
     "name",
+    # Visual storefront name only; separate from owner/membership/legal data.
+    "display_name",
     "slug",
     "logo_url",
     "tagline",

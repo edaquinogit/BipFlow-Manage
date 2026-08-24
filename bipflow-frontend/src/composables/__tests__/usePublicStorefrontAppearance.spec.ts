@@ -49,6 +49,7 @@ function buildAppearance(overrides: Partial<PublicStorefrontAppearance> = {}): P
     card_style: 'clean',
     radius_style: 'rounded',
     density: 'comfortable',
+    font_preset: 'modern',
     motion_enabled: true,
     motion_intensity: 'standard',
     decoration_enabled: false,

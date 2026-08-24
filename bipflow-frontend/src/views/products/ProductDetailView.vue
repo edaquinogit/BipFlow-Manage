@@ -3,6 +3,7 @@
     class="storefront-shell min-h-screen"
     :data-card-style="storefrontAppearance?.card_style ?? 'clean'"
     :data-density="storefrontAppearance?.density ?? 'comfortable'"
+    :data-font-preset="storefrontAppearance?.font_preset ?? 'modern'"
     :data-motion="storefrontAppearance?.motion_enabled === false ? 'off' : 'on'"
     :data-motion-intensity="storefrontAppearance?.motion_intensity ?? 'standard'"
     :data-decoration="storefrontAppearance?.decoration_enabled ? storefrontAppearance.decoration_style : 'none'"

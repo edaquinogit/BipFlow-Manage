@@ -585,6 +585,7 @@ class StoreAppearanceSettingsEndpointTest(TestCase):
         response = self.client.patch(
             self._url(self.store_a.slug),
             {
+                "display_name": "Boutique Principal",
                 "logo_url": "https://example.com/logo.png",
                 "tagline": "Nova vitrine",
                 "theme": {
@@ -598,6 +599,8 @@ class StoreAppearanceSettingsEndpointTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.store_a.refresh_from_db()
+        self.assertEqual(self.store_a.display_name, "Boutique Principal")
+        self.assertEqual(response.data["display_name"], "Boutique Principal")
         self.assertEqual(self.store_a.logo_url, "https://example.com/logo.png")
         self.assertEqual(self.store_a.tagline, "Nova vitrine")
         self.assertEqual(self.store_a.theme["primary"], "#111111")
@@ -725,6 +728,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
                 "card_style": "elevated",
                 "radius_style": "soft",
                 "density": "compact",
+                "font_preset": "editorial",
                 "motion_enabled": False,
                 "motion_intensity": "subtle",
                 "decoration_enabled": True,
@@ -741,6 +745,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
         self.assertEqual(appearance.card_style, "elevated")
         self.assertEqual(appearance.radius_style, "soft")
         self.assertEqual(appearance.density, "compact")
+        self.assertEqual(appearance.font_preset, "editorial")
         self.assertFalse(appearance.motion_enabled)
         self.assertEqual(appearance.decoration_style, "geometric")
 
@@ -757,21 +762,25 @@ class StorefrontAppearanceEndpointTest(TestCase):
 
     def test_public_active_store_appearance_includes_identity_without_private_ids(self) -> None:
         self.store_a.logo_url = "https://example.com/logo.png"
+        self.store_a.display_name = "Boutique Publica"
         self.store_a.tagline = "Catalogo premium"
         self.store_a.theme = {"primary": "#111111", "accent": "#22aaee"}
-        self.store_a.save(update_fields=["logo_url", "tagline", "theme", "updated_at"])
+        self.store_a.save(
+            update_fields=["logo_url", "display_name", "tagline", "theme", "updated_at"]
+        )
         StorefrontAppearance.objects.create(
             store=self.store_a,
             hero_enabled=True,
             hero_image_desktop="https://example.com/banner.jpg",
             hero_alt_text="Banner principal",
             card_style="bordered",
+            font_preset="classic",
         )
 
         response = APIClient().get(self._public_url(self.store_a.slug))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["store_name"], self.store_a.name)
+        self.assertEqual(response.data["store_name"], "Boutique Publica")
         self.assertEqual(response.data["store_slug"], self.store_a.slug)
         self.assertEqual(response.data["logo_url"], "https://example.com/logo.png")
         self.assertEqual(response.data["tagline"], "Catalogo premium")
@@ -779,8 +788,17 @@ class StorefrontAppearanceEndpointTest(TestCase):
         self.assertEqual(response.data["favicon_url"], "")
         self.assertTrue(response.data["hero_enabled"])
         self.assertEqual(response.data["card_style"], "bordered")
+        self.assertEqual(response.data["font_preset"], "classic")
         self.assertNotIn("id", response.data)
         self.assertNotIn("store", response.data)
+
+    def test_public_appearance_falls_back_to_registered_store_name(self) -> None:
+        StorefrontAppearance.objects.create(store=self.store_a)
+
+        response = APIClient().get(self._public_url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["store_name"], self.store_a.name)
 
     def test_public_inactive_store_appearance_returns_404(self) -> None:
         response = APIClient().get(self._public_url(self.inactive_store.slug))
@@ -833,6 +851,11 @@ class StorefrontAppearanceEndpointTest(TestCase):
             {"card_style": "flutuante"},
             format="json",
         )
+        font_response = self.client.patch(
+            self._current_dashboard_url(),
+            {"font_preset": "script-livre"},
+            format="json",
+        )
         color_response = self.client.patch(
             self._current_dashboard_url(),
             {"secondary_color": "pink"},
@@ -840,6 +863,7 @@ class StorefrontAppearanceEndpointTest(TestCase):
         )
 
         self.assertEqual(enum_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(font_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(color_response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_current_endpoint_derives_hero_cta_from_friendly_category_destination(self) -> None:

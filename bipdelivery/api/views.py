@@ -1727,7 +1727,7 @@ class StoreAppearanceSettingsView(APIView):
         validated = serializer.validated_data
 
         update_fields = ["updated_at"]
-        for field in ("logo_url", "tagline", "theme"):
+        for field in ("display_name", "logo_url", "tagline", "theme"):
             if field in validated:
                 setattr(store, field, validated[field])
                 update_fields.append(field)

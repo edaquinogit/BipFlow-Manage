@@ -142,6 +142,7 @@ function buildPublicAppearance(overrides: Partial<PublicStorefrontAppearance> = 
     card_style: 'clean',
     radius_style: 'rounded',
     density: 'comfortable',
+    font_preset: 'modern',
     motion_enabled: true,
     motion_intensity: 'standard',
     decoration_enabled: false,
@@ -411,6 +412,7 @@ describe('ProductsView', () => {
       card_style: 'elevated',
       radius_style: 'soft',
       density: 'compact',
+      font_preset: 'editorial',
       motion_enabled: false,
       decoration_enabled: true,
       decoration_style: 'geometric',
@@ -423,6 +425,7 @@ describe('ProductsView', () => {
     const shell = wrapper.find('.storefront-shell')
     expect(shell.attributes('data-card-style')).toBe('elevated')
     expect(shell.attributes('data-density')).toBe('compact')
+    expect(shell.attributes('data-font-preset')).toBe('editorial')
     expect(shell.attributes('data-motion')).toBe('off')
     expect(shell.attributes('data-decoration')).toBe('geometric')
     expect(shell.attributes('style')).toContain('--store-secondary-base: #E91E63')

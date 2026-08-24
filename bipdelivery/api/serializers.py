@@ -1083,6 +1083,7 @@ class StoreSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "display_name",
             "slug",
             "logo_url",
             "tagline",
@@ -1127,6 +1128,12 @@ class LabelSettingsSerializer(serializers.ModelSerializer):
 class StoreAppearanceSettingsSerializer(serializers.Serializer):
     """Validate storefront appearance updates controlled by the theme engine."""
 
+    display_name = serializers.CharField(
+        max_length=120,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
     logo_url = serializers.URLField(
         max_length=500,
         required=False,
@@ -1283,6 +1290,7 @@ class StorefrontAppearanceSerializer(
             "card_style",
             "radius_style",
             "density",
+            "font_preset",
             "motion_enabled",
             "motion_intensity",
             "decoration_enabled",
@@ -1550,7 +1558,7 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
     view, since a storefront visitor needs both to render the vitrine.
     """
 
-    store_name = serializers.CharField(source="store.name", read_only=True)
+    store_name = serializers.SerializerMethodField()
     store_slug = serializers.CharField(source="store.slug", read_only=True)
     logo_url = serializers.CharField(source="store.logo_url", read_only=True)
     tagline = serializers.CharField(source="store.tagline", read_only=True)
@@ -1579,6 +1587,7 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
             "card_style",
             "radius_style",
             "density",
+            "font_preset",
             "motion_enabled",
             "motion_intensity",
             "decoration_enabled",
@@ -1588,6 +1597,9 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
 
     def get_theme(self, appearance: StorefrontAppearance) -> dict[str, str]:
         return Store.normalize_theme(appearance.store.theme)
+
+    def get_store_name(self, appearance: StorefrontAppearance) -> str:
+        return appearance.store.display_name.strip() or appearance.store.name
 
 
 class StoreRenameSerializer(serializers.Serializer):

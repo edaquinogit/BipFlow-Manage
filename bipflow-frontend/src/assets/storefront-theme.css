@@ -24,9 +24,25 @@
   --motion-fast: 150ms;
   --motion-base: 250ms;
   --motion-slow: 350ms;
+  --store-font-body: var(--font-sans);
+  --store-font-heading: var(--font-sans);
 
   background: var(--store-background);
   color: var(--store-text);
+  font-family: var(--store-font-body);
+}
+
+.storefront-shell[data-font-preset="editorial"] {
+  --store-font-heading: var(--font-display);
+}
+
+.storefront-shell[data-font-preset="classic"] {
+  --store-font-body: Georgia, "Times New Roman", serif;
+  --store-font-heading: Georgia, "Times New Roman", serif;
+}
+
+.storefront-shell :where(h1, h2, h3, .brand-wordmark, .hero-display-title) {
+  font-family: var(--store-font-heading);
 }
 
 .storefront-shell[data-card-style="bordered"] {
