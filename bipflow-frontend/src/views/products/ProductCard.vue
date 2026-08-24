@@ -1,6 +1,6 @@
 <template>
   <article
-    class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-[var(--store-border)] bg-[var(--store-surface)] shadow-[0_18px_40px_-30px_rgba(5,5,10,0.6)] transition duration-300 hover:-translate-y-1 hover:border-[var(--store-primary)]/45 hover:shadow-[0_24px_60px_-34px_var(--store-primary-soft)] min-[390px]:rounded-2xl"
+    class="storefront-product-card group relative flex h-full min-w-0 flex-col overflow-hidden border border-[var(--store-border)] bg-[var(--store-surface)] transition hover:-translate-y-1 hover:border-[var(--store-primary)]/45 hover:shadow-[0_24px_60px_-34px_var(--store-primary-soft)]"
     :class="{ 'opacity-75': !canOrderProduct }"
   >
     <button

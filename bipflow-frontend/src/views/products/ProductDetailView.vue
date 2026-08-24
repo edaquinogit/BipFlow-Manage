@@ -1,5 +1,13 @@
 <template>
-  <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
+  <div
+    class="storefront-shell min-h-screen"
+    :data-card-style="storefrontAppearance?.card_style ?? 'clean'"
+    :data-density="storefrontAppearance?.density ?? 'comfortable'"
+    :data-motion="storefrontAppearance?.motion_enabled === false ? 'off' : 'on'"
+    :data-motion-intensity="storefrontAppearance?.motion_intensity ?? 'standard'"
+    :data-decoration="storefrontAppearance?.decoration_enabled ? storefrontAppearance.decoration_style : 'none'"
+    :style="storeBranding.cssVars"
+  >
     <header class="storefront-header border-b">
       <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
@@ -354,6 +362,7 @@ import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
+import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
 import { useStoreTheme } from '@/composables/useStoreTheme'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
@@ -377,10 +386,15 @@ const routeStoreSlug = typeof route.params?.storeSlug === 'string' ? route.param
 if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
+const currentRouteStoreSlug = computed(() => (
+  typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+))
 const toast = useToast()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
-const storeBranding = useStoreTheme(selectedStore)
+const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
+const { appearance: storefrontAppearance } = usePublicStorefrontAppearance(publicStoreSlug)
+const storeBranding = useStoreTheme(selectedStore, storefrontAppearance)
 
 const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">

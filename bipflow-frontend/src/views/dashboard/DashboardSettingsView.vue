@@ -2,6 +2,7 @@
 import { computed, ref, type Component } from 'vue';
 import {
   BuildingStorefrontIcon,
+  PaintBrushIcon,
   PhoneIcon,
   PrinterIcon,
   ShieldCheckIcon,
@@ -12,13 +13,15 @@ import CategoriesTab from '@/components/dashboard/settings/CategoriesTab.vue';
 import DeliveryRegionsTab from '@/components/dashboard/settings/DeliveryRegionsTab.vue';
 import ReceiptSettingsTab from '@/components/dashboard/settings/ReceiptSettingsTab.vue';
 import SecurityTab from '@/components/dashboard/settings/SecurityTab.vue';
+import StorefrontAppearanceTab from '@/components/dashboard/settings/StorefrontAppearanceTab.vue';
 import StoresTab from '@/components/dashboard/settings/StoresTab.vue';
 import WhatsappTab from '@/components/dashboard/settings/WhatsappTab.vue';
 
-type SettingsTab = 'categorias' | 'frete' | 'whatsapp' | 'lojas' | 'recibo' | 'seguranca';
+type SettingsTab = 'categorias' | 'frete' | 'whatsapp' | 'lojas' | 'recibo' | 'seguranca' | 'aparencia';
 
 const TABS: { value: SettingsTab; label: string; icon: typeof TagIcon; component: Component }[] = [
   { value: 'categorias', label: 'Categorias', icon: TagIcon, component: CategoriesTab },
+  { value: 'aparencia', label: 'Aparencia da vitrine', icon: PaintBrushIcon, component: StorefrontAppearanceTab },
   { value: 'frete', label: 'Frete', icon: TruckIcon, component: DeliveryRegionsTab },
   { value: 'whatsapp', label: 'WhatsApp', icon: PhoneIcon, component: WhatsappTab },
   { value: 'lojas', label: 'Lojas', icon: BuildingStorefrontIcon, component: StoresTab },
@@ -44,6 +47,7 @@ const activeTabComponent = computed(() => (
         v-for="tab in TABS"
         :key="tab.value"
         type="button"
+        :data-cy="`settings-tab-${tab.value}`"
         role="tab"
         :aria-selected="activeTab === tab.value"
         class="flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all duration-300"

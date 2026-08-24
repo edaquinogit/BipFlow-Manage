@@ -27,6 +27,7 @@ from bipdelivery.api.models import (
     LabelSettings,
     Product,
     Store,
+    StorefrontAppearance,
     StoreMembership,
     product_image_upload_to,
 )
@@ -607,6 +608,117 @@ class StoreAppearanceSettingsEndpointTest(TestCase):
         response = APIClient().get(self._url(self.store_a.slug))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class StorefrontAppearanceEndpointTest(TestCase):
+    """Extended storefront appearance is tenant-scoped and public-safe."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.inactive_store = Store.objects.create(
+            name="Loja Inativa", slug="loja-inativa", is_active=False
+        )
+        self.user = User.objects.create_user(
+            username="storefront_appearance_owner", password="testpass123"
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.user, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(
+            user=self.user, token={"store_id": self.store_a.id}
+        )
+
+    def _dashboard_url(self, slug: str) -> str:
+        return f"/api/v1/store/mine/{slug}/storefront-appearance/"
+
+    def _public_url(self, slug: str) -> str:
+        return f"/api/v1/public/stores/{slug}/appearance/"
+
+    def test_owner_can_read_defaults_and_update_extended_appearance(self) -> None:
+        read_response = self.client.get(self._dashboard_url(self.store_a.slug))
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(read_response.data["hero_enabled"])
+        self.assertEqual(read_response.data["card_style"], "clean")
+        self.assertTrue(
+            StorefrontAppearance.objects.filter(store=self.store_a).exists()
+        )
+
+        write_response = self.client.patch(
+            self._dashboard_url(self.store_a.slug),
+            {
+                "secondary_color": "#22aaee",
+                "hero_enabled": True,
+                "hero_image_desktop": "https://example.com/banner.jpg",
+                "hero_alt_text": "Banner promocional",
+                "card_style": "elevated",
+                "radius_style": "soft",
+                "density": "compact",
+                "motion_enabled": False,
+                "motion_intensity": "subtle",
+                "decoration_enabled": True,
+                "decoration_style": "geometric",
+            },
+            format="json",
+        )
+
+        self.assertEqual(write_response.status_code, status.HTTP_200_OK)
+        appearance = StorefrontAppearance.objects.get(store=self.store_a)
+        self.assertEqual(appearance.secondary_color, "#22AAEE")
+        self.assertTrue(appearance.hero_enabled)
+        self.assertEqual(appearance.card_style, "elevated")
+        self.assertEqual(appearance.radius_style, "soft")
+        self.assertEqual(appearance.density, "compact")
+        self.assertFalse(appearance.motion_enabled)
+        self.assertEqual(appearance.decoration_style, "geometric")
+
+    def test_viewer_can_read_but_not_update_extended_appearance(self) -> None:
+        read_response = self.client.get(self._dashboard_url(self.store_b.slug))
+        write_response = self.client.patch(
+            self._dashboard_url(self.store_b.slug),
+            {"hero_enabled": True},
+            format="json",
+        )
+
+        self.assertEqual(read_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(write_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_public_active_store_appearance_includes_identity_without_private_ids(self) -> None:
+        self.store_a.logo_url = "https://example.com/logo.png"
+        self.store_a.tagline = "Catalogo premium"
+        self.store_a.theme = {"primary": "#111111", "accent": "#22aaee"}
+        self.store_a.save(update_fields=["logo_url", "tagline", "theme", "updated_at"])
+        StorefrontAppearance.objects.create(
+            store=self.store_a,
+            hero_enabled=True,
+            hero_image_desktop="https://example.com/banner.jpg",
+            hero_alt_text="Banner principal",
+            card_style="bordered",
+        )
+
+        response = APIClient().get(self._public_url(self.store_a.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["store_name"], self.store_a.name)
+        self.assertEqual(response.data["store_slug"], self.store_a.slug)
+        self.assertEqual(response.data["logo_url"], "https://example.com/logo.png")
+        self.assertEqual(response.data["tagline"], "Catalogo premium")
+        self.assertEqual(response.data["theme"]["accent"], "#22AAEE")
+        self.assertTrue(response.data["hero_enabled"])
+        self.assertEqual(response.data["card_style"], "bordered")
+        self.assertNotIn("id", response.data)
+        self.assertNotIn("store", response.data)
+
+    def test_public_inactive_store_appearance_returns_404(self) -> None:
+        response = APIClient().get(self._public_url(self.inactive_store.slug))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class ProductImageUploadPathTest(TestCase):
