@@ -84,6 +84,12 @@ npm run dev:docker  # proxy para http://localhost:8080
 npm run dev:smoke   # proxy para http://localhost:18088
 ```
 
+Abra sempre `http://127.0.0.1:5173/` quando quiser ver alteracoes locais com
+hot reload. As portas Docker/Compose (`8080` e stacks smoke como `18088`)
+servem um build estatico via Nginx; elas so mudam depois de
+`docker compose up -d --build ...`. Para confirmar qual build esta ativo,
+consulte `/revision.json` na porta do container.
+
 Tambem e possivel apontar manualmente:
 
 ```powershell

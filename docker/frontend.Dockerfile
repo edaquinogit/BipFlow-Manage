@@ -13,7 +13,7 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
-ARG BIPFLOW_COMMIT_SHA
+ARG BIPFLOW_COMMIT_SHA=local
 
 LABEL org.opencontainers.image.source="https://github.com/edaquinogit/BipFlow-Manage" \
       org.opencontainers.image.revision="${BIPFLOW_COMMIT_SHA}" \
@@ -24,5 +24,6 @@ COPY docker/nginx-proxy-headers.conf /etc/nginx/snippets/proxy-headers.conf
 COPY docker/nginx-http-maps.conf /etc/nginx/conf.d/00-maps.conf
 COPY docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
+RUN printf '{"revision":"%s"}\n' "${BIPFLOW_COMMIT_SHA}" > /usr/share/nginx/html/revision.json
 
 EXPOSE 80

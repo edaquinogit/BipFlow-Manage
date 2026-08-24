@@ -243,16 +243,22 @@ jobs:
           docker network create smoke-net
           docker run -d --name backend --network smoke-net alpine:3.20 sleep 3600
           docker run -d --name frontend-smoke --network smoke-net -p 8080:80 bipflow-frontend:ci
+          healthy=false
           for i in $(seq 1 10); do
             if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
               echo "frontend container is healthy"
-              exit 0
+              healthy=true
+              break
             fi
             sleep 2
           done
-          echo "frontend container never became healthy" >&2
-          docker logs frontend-smoke
-          exit 1
+          if [ "$healthy" != "true" ]; then
+            echo "frontend container never became healthy" >&2
+            docker logs frontend-smoke
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8080/revision.json | tee frontend-revision.json
+          grep -F "\"revision\":\"${GITHUB_SHA}\"" frontend-revision.json
 
       - name: Stop smoke containers
         if: always()

@@ -94,6 +94,21 @@ Esse modo e separado do desenvolvimento com Vite. Para dev local sem Docker,
 rode o frontend em `http://127.0.0.1:5173/` e o Django em
 `http://127.0.0.1:8000/`.
 
+O frontend do Docker Compose e um build estatico servido pelo Nginx. Ele nao
+tem hot reload e nao reflete alteracoes locais ate a imagem ser rebuildada.
+Para conferir qual commit o container esta servindo:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/revision.json
+```
+
+Para atualizar o container estatico depois de uma mudanca local:
+
+```powershell
+$env:BIPFLOW_COMMIT_SHA=(git rev-parse --short HEAD)
+docker compose up -d --build --remove-orphans frontend backend
+```
+
 ## Setup Do Backend Django
 
 Na raiz do repositorio:

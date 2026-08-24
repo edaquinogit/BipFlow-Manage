@@ -221,6 +221,7 @@ docker compose up --build
 Aplicação local: `http://localhost:8080/`
 API pelo proxy do frontend: `http://localhost:8080/api/`
 Admin Django pelo proxy: `http://localhost:8080/admin/`
+Revisão servida pelo container: `http://localhost:8080/revision.json`
 
 Serviços:
 
@@ -251,6 +252,16 @@ docker compose logs frontend backend
 No modo de desenvolvimento sem Docker, use o frontend em
 `http://127.0.0.1:5173/` e suba o Django separadamente em
 `http://127.0.0.1:8000/`.
+
+Importante: `localhost:8080` e stacks smoke como `localhost:18088` servem um
+build estatico do Vue pelo Nginx. Eles nao acompanham alteracoes salvas em
+arquivos `.vue` ou `.ts`. Para atualizar esse modo, rebuild/recreate a stack:
+
+```powershell
+$env:BIPFLOW_COMMIT_SHA=(git rev-parse --short HEAD)
+docker compose up -d --build --remove-orphans frontend backend
+Invoke-RestMethod http://localhost:8080/revision.json
+```
 
 ### Backend Django
 
@@ -287,8 +298,10 @@ npm run dev:smoke   # proxy para http://localhost:18088
 ```
 
 Quando o catalogo em `5173` retorna 502 em `/api/v1/products/`, normalmente o
-backend direto em `8000` nao esta rodando. Nesse caso, abra o Docker em
-`18088` ou reinicie o frontend com `dev:smoke`.
+backend direto em `8000` nao esta rodando. Nesse caso, mantenha o Docker ativo
+e reinicie o frontend com `dev:docker` ou `dev:smoke`, mas continue abrindo a
+aplicacao de desenvolvimento em `5173`. Abra `8080` ou `18088` apenas quando
+quiser validar o build estatico do container.
 
 Aplicação local: `http://127.0.0.1:5173/`
 
