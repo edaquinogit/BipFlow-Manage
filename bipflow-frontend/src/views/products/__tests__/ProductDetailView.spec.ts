@@ -4,6 +4,7 @@ import { defineComponent, nextTick, ref } from 'vue'
 import ProductDetailView from '../ProductDetailView.vue'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
 import { useToast } from '@/composables/useToast'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { Logger } from '@/services/logger'
@@ -18,6 +19,10 @@ vi.mock('@/composables/useCart', () => ({
 
 vi.mock('@/composables/useCurrentStore', () => ({
   useCurrentStore: vi.fn(),
+}))
+
+vi.mock('@/composables/usePublicStorefrontAppearance', () => ({
+  usePublicStorefrontAppearance: vi.fn(),
 }))
 
 vi.mock('@/composables/useToast', () => ({
@@ -167,6 +172,12 @@ describe('ProductDetailView', () => {
     vi.mocked(useToast).mockReturnValue(toastMock as any)
     vi.mocked(useCart).mockReturnValue(cartState as any)
     vi.mocked(useCurrentStore).mockReturnValue(currentStoreState as any)
+    vi.mocked(usePublicStorefrontAppearance).mockReturnValue({
+      appearance: ref(null),
+      isLoading: ref(false),
+      loadError: ref(null),
+      load: vi.fn(),
+    } as any)
     vi.mocked(useRoute).mockReturnValue({
       params: {
         storeSlug: 'default',

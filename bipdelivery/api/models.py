@@ -636,6 +636,128 @@ class LabelSettings(models.Model):
         return f"Label settings for {self.store_id}"
 
 
+class StorefrontAppearance(models.Model):
+    """Controlled storefront personalization scoped to one store.
+
+    Deliberately separate from Store.theme (primary/accent/background/
+    surface/text/muted, already wired end to end through the theme engine):
+    this model only adds what Store doesn't already cover -- an optional
+    secondary color plus hero, layout preset and motion/decoration choices.
+    Every non-color field is a closed choice set, never a free CSS/JS value,
+    so a merchant can't inject unsafe styling into every other tenant's
+    shared frontend build.
+    """
+
+    CARD_STYLE_CLEAN = "clean"
+    CARD_STYLE_BORDERED = "bordered"
+    CARD_STYLE_ELEVATED = "elevated"
+    CARD_STYLE_CHOICES = [
+        (CARD_STYLE_CLEAN, "Clean"),
+        (CARD_STYLE_BORDERED, "Bordered"),
+        (CARD_STYLE_ELEVATED, "Elevated"),
+    ]
+
+    RADIUS_STYLE_MINIMAL = "minimal"
+    RADIUS_STYLE_ROUNDED = "rounded"
+    RADIUS_STYLE_SOFT = "soft"
+    RADIUS_STYLE_CHOICES = [
+        (RADIUS_STYLE_MINIMAL, "Minimal"),
+        (RADIUS_STYLE_ROUNDED, "Rounded"),
+        (RADIUS_STYLE_SOFT, "Soft"),
+    ]
+
+    DENSITY_COMPACT = "compact"
+    DENSITY_COMFORTABLE = "comfortable"
+    DENSITY_CHOICES = [
+        (DENSITY_COMPACT, "Compact"),
+        (DENSITY_COMFORTABLE, "Comfortable"),
+    ]
+
+    MOTION_INTENSITY_SUBTLE = "subtle"
+    MOTION_INTENSITY_STANDARD = "standard"
+    MOTION_INTENSITY_CHOICES = [
+        (MOTION_INTENSITY_SUBTLE, "Subtle"),
+        (MOTION_INTENSITY_STANDARD, "Standard"),
+    ]
+
+    DECORATION_STYLE_NONE = "none"
+    DECORATION_STYLE_CIRCLES = "circles"
+    DECORATION_STYLE_SOFT_SHAPES = "soft-shapes"
+    DECORATION_STYLE_GEOMETRIC = "geometric"
+    DECORATION_STYLE_CHOICES = [
+        (DECORATION_STYLE_NONE, "None"),
+        (DECORATION_STYLE_CIRCLES, "Circles"),
+        (DECORATION_STYLE_SOFT_SHAPES, "Soft shapes"),
+        (DECORATION_STYLE_GEOMETRIC, "Geometric"),
+    ]
+
+    store = models.OneToOneField(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="storefront_appearance",
+    )
+
+    # Optional -- the theme engine falls back to Store.theme's accent color
+    # when blank (see useStoreTheme.ts's --store-secondary-base).
+    secondary_color = models.CharField(max_length=7, blank=True)
+
+    hero_enabled = models.BooleanField(default=False)
+    hero_image_desktop = models.URLField(max_length=500, blank=True)
+    hero_image_mobile = models.URLField(max_length=500, blank=True)
+    hero_alt_text = models.CharField(max_length=160, blank=True)
+    hero_title = models.CharField(max_length=120, blank=True)
+    hero_subtitle = models.CharField(max_length=200, blank=True)
+    hero_cta_text = models.CharField(max_length=40, blank=True)
+    hero_cta_url = models.URLField(max_length=500, blank=True)
+
+    card_style = models.CharField(
+        max_length=16, choices=CARD_STYLE_CHOICES, default=CARD_STYLE_CLEAN
+    )
+    radius_style = models.CharField(
+        max_length=16, choices=RADIUS_STYLE_CHOICES, default=RADIUS_STYLE_ROUNDED
+    )
+    density = models.CharField(
+        max_length=16, choices=DENSITY_CHOICES, default=DENSITY_COMFORTABLE
+    )
+
+    motion_enabled = models.BooleanField(default=True)
+    motion_intensity = models.CharField(
+        max_length=16,
+        choices=MOTION_INTENSITY_CHOICES,
+        default=MOTION_INTENSITY_STANDARD,
+    )
+
+    decoration_enabled = models.BooleanField(default=False)
+    decoration_style = models.CharField(
+        max_length=16,
+        choices=DECORATION_STYLE_CHOICES,
+        default=DECORATION_STYLE_NONE,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Storefront appearance"
+        verbose_name_plural = "Storefront appearance"
+
+    @classmethod
+    def normalize_secondary_color(cls, value: str | None) -> str:
+        """Return `value` if it's a valid hex color, else '' (falls back to accent)."""
+        normalized_value = str(value or "").strip()
+        if not ProductVariant.COLOR_HEX_VALIDATOR.regex.match(normalized_value):
+            return ""
+        return normalized_value.upper() if len(normalized_value) == 7 else normalized_value
+
+    @classmethod
+    def get_for_store(cls, store: Store) -> "StorefrontAppearance":
+        appearance, _created = cls.objects.get_or_create(store=store)
+        return appearance
+
+    def __str__(self) -> str:
+        return f"Storefront appearance for {self.store_id}"
+
+
 class CustomerProfile(models.Model):
     """Storefront customer identity scoped to a single store.
 

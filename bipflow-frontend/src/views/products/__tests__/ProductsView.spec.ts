@@ -5,11 +5,13 @@ import ProductsView from '../ProductsView.vue'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
 import { useToast } from '@/composables/useToast'
 import { categoryService } from '@/services/category.service'
 import { deliveryRegionService } from '@/services/delivery-region.service'
 import { storeSettingsService } from '@/services/store-settings.service'
 import type { Product } from '@/types/product'
+import type { PublicStorefrontAppearance } from '@/types/store'
 import { useRoute, useRouter } from 'vue-router'
 
 vi.mock('@/composables/useProductSearch', () => ({
@@ -22,6 +24,10 @@ vi.mock('@/composables/useCart', () => ({
 
 vi.mock('@/composables/useCurrentStore', () => ({
   useCurrentStore: vi.fn(),
+}))
+
+vi.mock('@/composables/usePublicStorefrontAppearance', () => ({
+  usePublicStorefrontAppearance: vi.fn(),
 }))
 
 vi.mock('@/composables/useToast', () => ({
@@ -99,6 +105,40 @@ const CartDrawerStub = defineComponent({
   ],
   template: '<div class="cart-drawer-stub"></div>',
 })
+
+function buildPublicAppearance(overrides: Partial<PublicStorefrontAppearance> = {}): PublicStorefrontAppearance {
+  return {
+    store_name: 'Loja Principal',
+    store_slug: 'default',
+    logo_url: 'https://example.com/logo.png',
+    tagline: 'Catalogo premium',
+    theme: {
+      primary: '#111111',
+      accent: '#D81B60',
+      background: '#FAFAFA',
+      surface: '#FFFFFF',
+      text: '#05050A',
+      muted: '#6B7280',
+    },
+    secondary_color: '#E91E63',
+    hero_enabled: false,
+    hero_image_desktop: '',
+    hero_image_mobile: '',
+    hero_alt_text: '',
+    hero_title: '',
+    hero_subtitle: '',
+    hero_cta_text: '',
+    hero_cta_url: '',
+    card_style: 'clean',
+    radius_style: 'rounded',
+    density: 'comfortable',
+    motion_enabled: true,
+    motion_intensity: 'standard',
+    decoration_enabled: false,
+    decoration_style: 'none',
+    ...overrides,
+  }
+}
 
 describe('ProductsView', () => {
   let wrapper: ReturnType<typeof mount>
@@ -203,6 +243,13 @@ describe('ProductsView', () => {
     fetchCurrentStore: vi.fn(),
   }
 
+  const storefrontAppearanceState = {
+    appearance: ref<PublicStorefrontAppearance | null>(null),
+    isLoading: ref(false),
+    loadError: ref<string | null>(null),
+    load: vi.fn(),
+  }
+
   const mountView = () =>
     mount(ProductsView, {
       global: {
@@ -224,6 +271,8 @@ describe('ProductsView', () => {
     vi.mocked(useProductSearch).mockReturnValue(searchState as any)
     vi.mocked(useCart).mockReturnValue(cartState as any)
     vi.mocked(useCurrentStore).mockReturnValue(currentStoreState as any)
+    storefrontAppearanceState.appearance.value = null
+    vi.mocked(usePublicStorefrontAppearance).mockReturnValue(storefrontAppearanceState as any)
     vi.mocked(useToast).mockReturnValue(toastMock as any)
     vi.mocked(useRoute).mockReturnValue({
       params: {},
@@ -334,6 +383,47 @@ describe('ProductsView', () => {
     expect(wrapper.text()).toContain('Loja Principal')
     expect(wrapper.find('.product-card-stub').exists()).toBe(true)
     expect(wrapper.text()).toContain('Exibindo 1-1 de 1 produtos')
+  })
+
+  it('applies public appearance presets and renders the hero banner', async () => {
+    wrapper.unmount()
+
+    storefrontAppearanceState.appearance.value = buildPublicAppearance({
+      hero_enabled: true,
+      hero_image_desktop: 'https://example.com/banner-desktop.jpg',
+      hero_image_mobile: 'https://example.com/banner-mobile.jpg',
+      hero_alt_text: 'Colecao nova',
+      hero_title: 'Nova colecao',
+      hero_subtitle: 'Pecas selecionadas para hoje.',
+      hero_cta_text: 'Ver oferta',
+      hero_cta_url: 'https://example.com/oferta',
+      card_style: 'elevated',
+      radius_style: 'soft',
+      density: 'compact',
+      motion_enabled: false,
+      decoration_enabled: true,
+      decoration_style: 'geometric',
+    })
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    const shell = wrapper.find('.storefront-shell')
+    expect(shell.attributes('data-card-style')).toBe('elevated')
+    expect(shell.attributes('data-density')).toBe('compact')
+    expect(shell.attributes('data-motion')).toBe('off')
+    expect(shell.attributes('data-decoration')).toBe('geometric')
+    expect(shell.attributes('style')).toContain('--store-secondary-base: #E91E63')
+    expect(shell.attributes('style')).toContain('--store-radius-lg: 2rem')
+    expect(shell.attributes('style')).toContain('--motion-base: 0ms')
+
+    const hero = wrapper.find('[data-cy="storefront-hero-banner"]')
+    expect(hero.exists()).toBe(true)
+    expect(hero.find('img').attributes('src')).toBe('https://example.com/banner-desktop.jpg')
+    expect(hero.find('img').attributes('alt')).toBe('Colecao nova')
+    expect(hero.text()).toContain('Nova colecao')
+    expect(hero.text()).toContain('Ver oferta')
   })
 
   it('renders category shortcuts and cart drawer components', async () => {

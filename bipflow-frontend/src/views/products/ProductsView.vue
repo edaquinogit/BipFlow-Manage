@@ -1,5 +1,13 @@
 <template>
-  <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
+  <div
+    class="storefront-shell min-h-screen"
+    :data-card-style="storefrontAppearance?.card_style ?? 'clean'"
+    :data-density="storefrontAppearance?.density ?? 'comfortable'"
+    :data-motion="storefrontAppearance?.motion_enabled === false ? 'off' : 'on'"
+    :data-motion-intensity="storefrontAppearance?.motion_intensity ?? 'standard'"
+    :data-decoration="storefrontAppearance?.decoration_enabled ? storefrontAppearance.decoration_style : 'none'"
+    :style="storeBranding.cssVars"
+  >
     <header class="storefront-header border-b">
       <div class="mx-auto max-w-7xl px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:px-8">
         <div class="flex flex-col gap-3 min-[390px]:gap-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -194,6 +202,56 @@
     >
       <p class="sr-only" aria-live="polite">{{ liveRegionMessage }}</p>
 
+      <section
+        v-if="heroAppearance"
+        data-cy="storefront-hero-banner"
+        class="mb-5 overflow-hidden rounded-[var(--store-radius-lg)] border border-[var(--store-border)] bg-[var(--store-surface)] shadow-[var(--store-card-shadow)] min-[390px]:mb-6"
+      >
+        <picture>
+          <source
+            v-if="heroAppearance.hero_image_mobile"
+            :srcset="heroAppearance.hero_image_mobile"
+            media="(max-width: 640px)"
+          />
+          <img
+            :src="heroAppearance.hero_image_desktop"
+            :alt="heroAppearance.hero_alt_text || storeBranding.name"
+            class="aspect-[16/7] w-full object-cover"
+            loading="eager"
+          />
+        </picture>
+
+        <div
+          v-if="heroAppearance.hero_title || heroAppearance.hero_subtitle || (heroAppearance.hero_cta_text && heroAppearance.hero_cta_url)"
+          class="flex flex-col gap-3 border-t border-[var(--store-border)] px-4 py-4 min-[390px]:px-5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="min-w-0">
+            <h2
+              v-if="heroAppearance.hero_title"
+              class="text-lg font-semibold leading-tight text-[var(--store-text)] min-[390px]:text-xl"
+            >
+              {{ heroAppearance.hero_title }}
+            </h2>
+            <p
+              v-if="heroAppearance.hero_subtitle"
+              class="mt-1 text-sm leading-5 text-[var(--store-text-muted)]"
+            >
+              {{ heroAppearance.hero_subtitle }}
+            </p>
+          </div>
+
+          <a
+            v-if="heroAppearance.hero_cta_text && heroAppearance.hero_cta_url"
+            :href="heroAppearance.hero_cta_url"
+            target="_blank"
+            rel="noopener"
+            class="storefront-primary-button inline-flex h-11 shrink-0 items-center justify-center rounded-[var(--store-radius-md)] px-4 text-[11px] font-bold uppercase tracking-[0.14em] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)]"
+          >
+            {{ heroAppearance.hero_cta_text }}
+          </a>
+        </div>
+      </section>
+
       <div class="mb-5 flex flex-col gap-2 text-sm text-[#6B7280] min-[390px]:mb-6 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between min-[390px]:gap-4">
         <p>{{ showingRange }}</p>
         <button
@@ -249,7 +307,10 @@
 
       <div
         v-else-if="displayedProducts.length > 0"
-        class="grid grid-cols-2 gap-x-2.5 gap-y-5 min-[390px]:gap-x-3 min-[390px]:gap-y-6 sm:grid-cols-3 lg:gap-x-5 lg:gap-y-8 xl:grid-cols-4"
+        class="storefront-product-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
+        :class="isCompactDensity
+          ? 'gap-x-2 gap-y-4 min-[390px]:gap-x-2.5 min-[390px]:gap-y-5 lg:gap-x-4 lg:gap-y-6'
+          : 'gap-x-2.5 gap-y-5 min-[390px]:gap-x-3 min-[390px]:gap-y-6 lg:gap-x-5 lg:gap-y-8'"
       >
         <ProductCard
           v-for="product in displayedProducts"
@@ -356,7 +417,8 @@ import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
 import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
-import { useStoreBranding } from '@/composables/useStoreBranding'
+import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
+import { useStoreTheme } from '@/composables/useStoreTheme'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
 import { authService } from '@/services/auth.service'
@@ -409,10 +471,15 @@ const routeStoreSlug = typeof route.params?.storeSlug === 'string' ? route.param
 if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
+const currentRouteStoreSlug = computed(() => (
+  typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+))
 const toast = useToast()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
-const storeBranding = useStoreBranding(selectedStore)
+const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
+const { appearance: storefrontAppearance } = usePublicStorefrontAppearance(publicStoreSlug)
+const storeBranding = useStoreTheme(selectedStore, storefrontAppearance)
 const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
 // Two independent fetches gate the intro's loading state: store/categories/etc
 // (awaited directly below) and the product list, which useProductSearch kicks
@@ -507,6 +574,17 @@ const displayedProducts = computed(() => {
 })
 
 const isWhatsAppConfigured = computed(() => storeWhatsAppPhone.value.length > 0)
+const isCompactDensity = computed(() => storefrontAppearance.value?.density === 'compact')
+
+const heroAppearance = computed(() => {
+  const appearance = storefrontAppearance.value
+
+  if (!appearance?.hero_enabled || !appearance.hero_image_desktop) {
+    return null
+  }
+
+  return appearance
+})
 
 const liveRegionMessage = computed(() => {
   if (isInitialLoading.value) {
@@ -843,53 +921,3 @@ async function handleSubmitOrder(): Promise<void> {
   }
 }
 </script>
-
-<style scoped>
-.storefront-shell {
-  background: var(--store-background);
-  color: var(--store-text);
-}
-
-.storefront-header {
-  background: var(--store-background);
-  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
-}
-
-.storefront-panel {
-  background: var(--store-surface);
-  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
-}
-
-.storefront-muted {
-  color: var(--store-muted);
-}
-
-.storefront-brand-line {
-  background: var(--store-accent);
-}
-
-.storefront-primary-button {
-  border-color: var(--store-primary);
-  background: var(--store-primary);
-  color: #fff;
-}
-
-.storefront-primary-button:hover {
-  border-color: var(--store-accent);
-  background: var(--store-accent);
-}
-
-.storefront-outline-button {
-  border-color: color-mix(in srgb, var(--store-muted) 42%, transparent);
-  color: var(--store-text);
-}
-
-.storefront-outline-button:hover {
-  border-color: var(--store-accent);
-  color: var(--store-accent);
-}
-
-.storefront-shell .hero-display-title {
-  color: var(--store-text);
-}
-</style>

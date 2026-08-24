@@ -36,6 +36,42 @@ export interface StoreAppearanceSettingsPayload {
   theme?: StoreTheme
 }
 
+export type CardStyle = 'clean' | 'bordered' | 'elevated'
+export type RadiusStyle = 'minimal' | 'rounded' | 'soft'
+export type LayoutDensity = 'compact' | 'comfortable'
+export type MotionIntensity = 'subtle' | 'standard'
+export type DecorationStyle = 'none' | 'circles' | 'soft-shapes' | 'geometric'
+
+export interface StorefrontAppearance {
+  secondary_color: string
+  hero_enabled: boolean
+  hero_image_desktop: string
+  hero_image_mobile: string
+  hero_alt_text: string
+  hero_title: string
+  hero_subtitle: string
+  hero_cta_text: string
+  hero_cta_url: string
+  card_style: CardStyle
+  radius_style: RadiusStyle
+  density: LayoutDensity
+  motion_enabled: boolean
+  motion_intensity: MotionIntensity
+  decoration_enabled: boolean
+  decoration_style: DecorationStyle
+  updated_at: string
+}
+
+export type StorefrontAppearancePayload = Partial<Omit<StorefrontAppearance, 'updated_at'>>
+
+export type PublicStorefrontAppearance = Omit<StorefrontAppearance, 'updated_at'> & {
+  store_name: string
+  store_slug: string
+  logo_url: string
+  tagline: string
+  theme: StoreTheme
+}
+
 export interface StoreLabelSettings {
   page_format: 'a4'
   columns: number

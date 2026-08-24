@@ -1,5 +1,13 @@
 <template>
-  <div class="storefront-shell min-h-screen" :style="storeBranding.cssVars">
+  <div
+    class="storefront-shell min-h-screen"
+    :data-card-style="storefrontAppearance?.card_style ?? 'clean'"
+    :data-density="storefrontAppearance?.density ?? 'comfortable'"
+    :data-motion="storefrontAppearance?.motion_enabled === false ? 'off' : 'on'"
+    :data-motion-intensity="storefrontAppearance?.motion_intensity ?? 'standard'"
+    :data-decoration="storefrontAppearance?.decoration_enabled ? storefrontAppearance.decoration_style : 'none'"
+    :style="storeBranding.cssVars"
+  >
     <header class="storefront-header border-b">
       <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 min-[390px]:py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <button
@@ -55,21 +63,21 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zm8.25-.75a8.25 8.25 0 10-16.5 0 8.25 8.25 0 0016.5 0z" />
           </svg>
         </div>
-        <h2 class="mt-5 text-2xl font-semibold text-[#05050A]">Nao foi possivel abrir este produto</h2>
-        <p class="mt-3 text-base text-[#6B7280]">
+        <h2 class="mt-5 text-2xl font-semibold text-[var(--store-text)]">Nao foi possivel abrir este produto</h2>
+        <p class="mt-3 text-base text-[var(--store-text-muted)]">
           {{ errorMessage || 'O produto pode ter sido removido ou esta temporariamente indisponivel.' }}
         </p>
         <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
+            class="inline-flex items-center justify-center rounded-lg bg-[var(--store-text)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--store-primary)]"
             @click="loadProduct"
           >
             Tentar novamente
           </button>
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-semibold text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+            class="inline-flex items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-semibold text-[var(--store-text)] transition hover:border-[var(--store-primary)] hover:text-[var(--store-primary)]"
             @click="goBackToCatalog"
           >
             Voltar ao catalogo
@@ -125,8 +133,8 @@
               type="button"
                 class="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-[1rem] border bg-white transition min-[390px]:h-20 min-[390px]:w-20 min-[390px]:rounded-lg sm:h-24 sm:w-24"
               :class="imageUrl === activeImageSource
-                ? 'border-[#D81B60]'
-                : 'border-[#E5E7EB] hover:border-[#D81B60]'"
+                ? 'border-[var(--store-primary)]'
+                : 'border-[#E5E7EB] hover:border-[var(--store-primary)]'"
               :aria-label="`Selecionar imagem do produto ${product.name}`"
               @click="handleSelectImage(imageUrl)"
             >
@@ -145,16 +153,16 @@
         <aside class="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <section class="w-full max-w-full">
             <div class="flex flex-wrap items-center justify-between gap-2.5 min-[390px]:gap-3">
-              <p class="text-xs font-bold uppercase tracking-[0.16em] text-[#D81B60] min-[390px]:text-sm min-[390px]:normal-case min-[390px]:tracking-normal">
+              <p class="text-xs font-bold uppercase tracking-[0.16em] text-[var(--store-primary)] min-[390px]:text-sm min-[390px]:normal-case min-[390px]:tracking-normal">
                 {{ product.category.name }}
               </p>
               <div class="flex items-center gap-2">
                 <button
                   type="button"
-                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-10 min-[390px]:w-10"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-white transition focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:h-10 min-[390px]:w-10"
                   :class="isShareCopied
-                    ? 'border-[#D81B60] bg-[#D81B60] text-white shadow-[0_12px_24px_-18px_rgba(216,27,96,0.6)]'
-                    : 'storefront-outline-button hover:border-[#D81B60] hover:text-[#D81B60]'"
+                    ? 'border-[var(--store-primary)] bg-[var(--store-primary)] text-white shadow-[0_12px_24px_-18px_rgba(216,27,96,0.6)]'
+                    : 'storefront-outline-button hover:border-[var(--store-primary)] hover:text-[var(--store-primary)]'"
                   :aria-label="isShareCopied ? 'Link do produto copiado' : 'Compartilhar produto'"
                   :title="isShareCopied ? 'Link copiado' : 'Compartilhar produto'"
                   @click="void handleShareProduct()"
@@ -173,18 +181,18 @@
 
                 <span
                   class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] min-[390px]:text-xs"
-                  :class="canAddSelectedItem ? 'bg-[#FCE7F3] text-[#D81B60]' : 'bg-slate-100 text-slate-600'"
+                  :class="canAddSelectedItem ? 'bg-[var(--store-primary-soft)] text-[var(--store-primary)]' : 'bg-slate-100 text-slate-600'"
                 >
                   {{ availabilityLabel }}
                 </span>
               </div>
             </div>
 
-            <h1 class="mt-2.5 text-[1.8rem] font-semibold leading-[1.05] text-[#05050A] min-[390px]:mt-3 min-[390px]:text-3xl sm:text-4xl">
+            <h1 class="mt-2.5 text-[1.8rem] font-semibold leading-[1.05] text-[var(--store-text)] min-[390px]:mt-3 min-[390px]:text-3xl sm:text-4xl">
               {{ product.name }}
             </h1>
 
-            <p class="mt-4 text-[1.9rem] font-semibold tracking-[-0.03em] text-[#05050A] min-[390px]:mt-5 min-[390px]:text-3xl">
+            <p class="mt-4 text-[1.9rem] font-semibold tracking-[-0.03em] text-[var(--store-text)] min-[390px]:mt-5 min-[390px]:text-3xl">
               {{ formatBRL(product.price) }}
             </p>
 
@@ -192,14 +200,14 @@
               {{ productDescription }}
             </p>
 
-            <dl class="mt-5 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-[13px] text-[#6B7280] min-[390px]:mt-6 min-[390px]:text-sm">
+            <dl class="mt-5 divide-y divide-[#E5E7EB] border-y border-[#E5E7EB] text-[13px] text-[var(--store-text-muted)] min-[390px]:mt-6 min-[390px]:text-sm">
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Tamanho</dt>
-                <dd class="text-right font-semibold text-[#05050A]">{{ product.size || 'Sob consulta' }}</dd>
+                <dd class="text-right font-semibold text-[var(--store-text)]">{{ product.size || 'Sob consulta' }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>SKU</dt>
-                <dd class="text-right font-semibold text-[#05050A]">{{ product.sku || 'Nao informado' }}</dd>
+                <dd class="text-right font-semibold text-[var(--store-text)]">{{ product.sku || 'Nao informado' }}</dd>
               </div>
               <div class="flex items-center justify-between gap-4 py-3">
                 <dt>Estoque</dt>
@@ -217,14 +225,14 @@
                 >
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold text-[#05050A]">Cor</p>
+                      <p class="text-sm font-semibold text-[var(--store-text)]">Cor</p>
                       <p class="mt-1 truncate text-[13px] text-slate-600 min-[390px]:text-sm">
                         {{ selectedVariant?.name || 'Selecione uma cor' }}
                       </p>
                       <p
                         v-if="selectedVariant"
                         class="mt-1 text-[12px] font-semibold min-[390px]:text-[13px]"
-                        :class="selectedVariantAvailableStock > 0 ? 'text-[#D81B60]' : 'text-slate-500'"
+                        :class="selectedVariantAvailableStock > 0 ? 'text-[var(--store-primary)]' : 'text-slate-500'"
                       >
                         {{ selectedVariantAvailableStock > 0 ? `${selectedVariantAvailableStock} disponiveis` : 'Cor esgotada' }}
                       </p>
@@ -236,10 +244,10 @@
                       v-for="variant in activeVariants"
                       :key="variant.id"
                       type="button"
-                      class="inline-flex h-11 min-w-11 items-center justify-center rounded-full border bg-white p-1 transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="inline-flex h-11 min-w-11 items-center justify-center rounded-full border bg-white p-1 transition focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                       :class="selectedVariant?.id === variant.id
-                        ? 'border-[#D81B60] shadow-[0_12px_24px_-18px_rgba(216,27,96,0.65)]'
-                        : 'border-[#D8DDE5] hover:border-[#D81B60]'"
+                        ? 'border-[var(--store-primary)] shadow-[0_12px_24px_-18px_rgba(216,27,96,0.65)]'
+                        : 'border-[#D8DDE5] hover:border-[var(--store-primary)]'"
                       :disabled="variantAvailableStock(variant) <= 0"
                       :aria-label="`Selecionar cor ${variant.name}`"
                       :title="variant.name"
@@ -257,7 +265,7 @@
 
                 <div class="flex items-center justify-between gap-3 min-[390px]:gap-4">
                   <div>
-                    <p class="text-sm font-semibold text-[#05050A]">
+                    <p class="text-sm font-semibold text-[var(--store-text)]">
                       Quantidade
                     </p>
                     <p class="mt-1 text-[13px] text-slate-600 min-[390px]:text-sm">
@@ -268,19 +276,19 @@
                   <div class="inline-flex h-11 items-center rounded-[0.95rem] border border-[#D8DDE5] bg-white shadow-[0_12px_28px_-24px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl">
                     <button
                       type="button"
-                      class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
+                      class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
                       :disabled="!canAddSelectedItem || quantity <= 1"
                       aria-label="Diminuir quantidade"
                       @click="decrementQuantity"
                     >
                       <MinusIcon class="h-4 w-4" aria-hidden="true" />
                     </button>
-                    <span class="min-w-8 text-center text-[15px] font-semibold text-[#05050A] min-[390px]:min-w-11 min-[390px]:text-base">
+                    <span class="min-w-8 text-center text-[15px] font-semibold text-[var(--store-text)] min-[390px]:min-w-11 min-[390px]:text-base">
                       {{ quantity }}
                     </span>
                     <button
                       type="button"
-                      class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
+                      class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
                       :disabled="!canAddSelectedItem || quantity >= currentAvailableStock"
                       aria-label="Aumentar quantidade"
                       @click="incrementQuantity"
@@ -292,9 +300,9 @@
 
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm"
+                  class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[12px] font-bold uppercase tracking-[0.12em] shadow-[0_16px_34px_-24px_rgba(5,5,10,0.65)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:px-6 min-[390px]:py-3.5 min-[390px]:text-[13px] min-[390px]:tracking-[0.14em] sm:text-sm"
                   :class="canAddSelectedItem
-                    ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]'
+                    ? 'bg-[var(--store-text)] text-white hover:-translate-y-0.5 hover:bg-[var(--store-primary)] hover:shadow-[0_18px_40px_-24px_rgba(216,27,96,0.55)]'
                     : 'cursor-not-allowed bg-slate-200 text-slate-500'"
                   :disabled="!canAddSelectedItem"
                   @click="handleAddToCart"
@@ -354,7 +362,8 @@ import FloatingCartButton from './FloatingCartButton.vue'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
-import { useStoreBranding } from '@/composables/useStoreBranding'
+import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
+import { useStoreTheme } from '@/composables/useStoreTheme'
 import { useToast } from '@/composables/useToast'
 import { PublicRoutes } from '@/router/public.routes'
 import { authService } from '@/services/auth.service'
@@ -376,10 +385,15 @@ const routeStoreSlug = typeof route.params?.storeSlug === 'string' ? route.param
 if (routeStoreSlug) {
   setSelectedStoreSlug(routeStoreSlug)
 }
+const currentRouteStoreSlug = computed(() => (
+  typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
+))
 const toast = useToast()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
-const storeBranding = useStoreBranding(selectedStore)
+const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
+const { appearance: storefrontAppearance } = usePublicStorefrontAppearance(publicStoreSlug)
+const storeBranding = useStoreTheme(selectedStore, storefrontAppearance)
 
 const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
@@ -673,7 +687,7 @@ const availabilityLabel = computed(() => {
 })
 
 const availabilityToneClass = computed(() => (
-  canAddSelectedItem.value ? 'text-[#D81B60]' : 'text-slate-600'
+  canAddSelectedItem.value ? 'text-[var(--store-primary)]' : 'text-slate-600'
 ))
 
 const addToCartLabel = computed(() => {
@@ -1031,30 +1045,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.storefront-shell {
-  background: var(--store-background);
-  color: var(--store-text);
-}
-
-.storefront-header {
-  background: var(--store-background);
-  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
-}
-
-.storefront-muted {
-  color: var(--store-muted);
-}
-
-.storefront-outline-button {
-  border-color: color-mix(in srgb, var(--store-muted) 42%, transparent);
-  color: var(--store-text);
-}
-
-.storefront-outline-button:hover {
-  border-color: var(--store-accent);
-  color: var(--store-accent);
-}
-
 .carousel-slide-next-enter-active,
 .carousel-slide-next-leave-active,
 .carousel-slide-prev-enter-active,

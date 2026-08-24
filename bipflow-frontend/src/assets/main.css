@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./storefront-theme.css";
 
 /* Tailwind v4 scans the Vue and TypeScript source files from here. */
 @source "../**/*.{vue,ts}";

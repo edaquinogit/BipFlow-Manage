@@ -15,6 +15,7 @@ from .models import (
     SaleOrder,
     SaleOrderItem,
     Store,
+    StorefrontAppearance,
     StoreMembership,
     StoreSettings,
     TOTPDevice,
@@ -107,6 +108,22 @@ class LabelSettingsAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("page_format", "store")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(StorefrontAppearance)
+class StorefrontAppearanceAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "store",
+        "card_style",
+        "radius_style",
+        "hero_enabled",
+        "motion_enabled",
+        "decoration_style",
+        "updated_at",
+    )
+    list_filter = ("card_style", "radius_style", "hero_enabled", "decoration_style")
     readonly_fields = ("created_at", "updated_at")
 
 

@@ -2,7 +2,7 @@
   <Transition name="cart-sheet">
     <div v-if="isOpen" class="fixed inset-0 z-50">
       <div
-        class="absolute inset-0 bg-[#05050A]/55 backdrop-blur-sm"
+        class="absolute inset-0 bg-[var(--store-text)]/55 backdrop-blur-sm"
         @click="$emit('close')"
       />
 
@@ -16,11 +16,11 @@
         <header class="border-b border-[#E5E7EB] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
-              <p class="text-xs font-bold uppercase tracking-[0.12em] text-[#D81B60]">Pedido</p>
-              <h2 class="mt-1.5 text-lg font-bold tracking-tight text-[#05050A] sm:mt-2 sm:text-xl">
+              <p class="text-xs font-bold uppercase tracking-[0.12em] text-[var(--store-primary)]">Pedido</p>
+              <h2 class="mt-1.5 text-lg font-bold tracking-tight text-[var(--store-text)] sm:mt-2 sm:text-xl">
                 {{ itemCount }} item<span v-if="itemCount !== 1">s</span> no pedido
               </h2>
-              <p class="mt-1 max-w-[34rem] text-xs leading-5 text-[#6B7280] sm:text-sm">
+              <p class="mt-1 max-w-[34rem] text-xs leading-5 text-[var(--store-text-muted)] sm:text-sm">
                 Revise os itens e envie o pedido pelo WhatsApp.
               </p>
             </div>
@@ -28,7 +28,7 @@
             <button
               ref="closeButtonRef"
               type="button"
-              class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] active:bg-[#FAFAFA]"
+              class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[var(--store-text-muted)] transition hover:border-[var(--store-primary)] hover:text-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] active:bg-[#FAFAFA]"
               aria-label="Fechar carrinho"
               @click="$emit('close')"
             >
@@ -39,19 +39,19 @@
 
         <div class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
           <div v-if="items.length === 0" class="border-y border-dashed border-[#D1D5DB] py-10 text-center">
-            <ShoppingBagIcon class="mx-auto h-10 w-10 text-[#D81B60]" aria-hidden="true" />
-            <p class="mt-4 text-base font-semibold text-[#05050A]">Seu pedido esta vazio</p>
-            <p class="mt-2 text-sm leading-6 text-[#6B7280]">
+            <ShoppingBagIcon class="mx-auto h-10 w-10 text-[var(--store-primary)]" aria-hidden="true" />
+            <p class="mt-4 text-base font-semibold text-[var(--store-text)]">Seu pedido esta vazio</p>
+            <p class="mt-2 text-sm leading-6 text-[var(--store-text-muted)]">
               Escolha uma peca na vitrine para iniciar o pedido.
             </p>
           </div>
 
           <div v-else>
             <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-sm font-bold text-[#05050A]">Itens selecionados</h3>
+              <h3 class="text-sm font-bold text-[var(--store-text)]">Itens selecionados</h3>
               <button
                 type="button"
-                class="min-h-11 rounded-lg px-2 text-sm font-semibold text-[#6B7280] transition hover:bg-white hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+                class="min-h-11 rounded-lg px-2 text-sm font-semibold text-[var(--store-text-muted)] transition hover:bg-white hover:text-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                 @click="$emit('clearCart')"
               >
                 Limpar
@@ -75,10 +75,10 @@
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-[#D81B60]">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--store-primary)]">
                           {{ item.product.category.name }}
                         </p>
-                        <h4 class="mt-1 line-clamp-2 text-[15px] font-bold leading-5 text-[#05050A] sm:text-base sm:leading-6">
+                        <h4 class="mt-1 line-clamp-2 text-[15px] font-bold leading-5 text-[var(--store-text)] sm:text-base sm:leading-6">
                           {{ item.product.name }}
                         </h4>
                         <p
@@ -92,12 +92,12 @@
                           />
                           <span class="truncate">{{ item.variant.name }}</span>
                         </p>
-                        <p class="mt-1 text-[13px] text-[#6B7280] sm:text-sm">
+                        <p class="mt-1 text-[13px] text-[var(--store-text-muted)] sm:text-sm">
                           {{ formatBRL(item.product.price) }} / unidade
                         </p>
                         <p
                           v-if="item.variant"
-                          class="mt-1 text-[12px] font-semibold text-[#6B7280] sm:text-[13px]"
+                          class="mt-1 text-[12px] font-semibold text-[var(--store-text-muted)] sm:text-[13px]"
                         >
                           {{ cartItemAvailableStock(item) }} disponiveis nesta cor
                         </p>
@@ -117,18 +117,18 @@
                       <div class="inline-flex h-11 items-center rounded-xl border border-[#D1D5DB] bg-white shadow-sm">
                         <button
                           type="button"
-                          class="inline-flex h-11 w-11 items-center justify-center rounded-l-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
+                          class="inline-flex h-11 w-11 items-center justify-center rounded-l-xl text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--store-primary-soft)]"
                           :aria-label="`Diminuir quantidade de ${cartItemLabel(item)}`"
                           @click="$emit('updateQuantity', item.product.id, item.quantity - 1, item.variant?.id ?? null)"
                         >
                           <MinusIcon class="h-4 w-4" aria-hidden="true" />
                         </button>
-                        <span class="min-w-9 text-center text-sm font-semibold text-[#05050A]">
+                        <span class="min-w-9 text-center text-sm font-semibold text-[var(--store-text)]">
                           {{ item.quantity }}
                         </span>
                         <button
                           type="button"
-                          class="inline-flex h-11 w-11 items-center justify-center rounded-r-xl text-[#6B7280] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#FCE7F3]"
+                          class="inline-flex h-11 w-11 items-center justify-center rounded-r-xl text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--store-primary-soft)]"
                           :aria-label="`Aumentar quantidade de ${cartItemLabel(item)}`"
                           :disabled="item.quantity >= cartItemAvailableStock(item)"
                           @click="$emit('updateQuantity', item.product.id, item.quantity + 1, item.variant?.id ?? null)"
@@ -137,7 +137,7 @@
                         </button>
                       </div>
 
-                      <p class="text-base font-bold text-[#05050A]">
+                      <p class="text-base font-bold text-[var(--store-text)]">
                         {{ formatBRL(Number(item.product.price) * item.quantity) }}
                       </p>
                     </div>
@@ -149,35 +149,35 @@
 
           <section v-if="items.length > 0" class="mt-5 border-t border-[#D9DADD] pt-5 sm:mt-6 sm:pt-6">
             <div class="mb-4">
-              <h3 class="text-sm font-bold text-[#05050A]">Dados para finalizar</h3>
+              <h3 class="text-sm font-bold text-[var(--store-text)]">Dados para finalizar</h3>
             </div>
 
             <div class="grid gap-3.5">
               <template v-if="!hasProfileIdentity">
                 <div class="grid gap-4 sm:grid-cols-2">
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                       Nome
                     </span>
                     <input
                       :value="customer.fullName"
                       type="text"
                       autocomplete="name"
-                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                       placeholder="Seu nome"
                       @input="handleFullNameInput"
                     />
                   </label>
 
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                       Telefone
                     </span>
                     <input
                       :value="customer.phone"
                       type="tel"
                       autocomplete="tel"
-                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                       placeholder="(11) 99999-0000"
                       @input="handlePhoneInput"
                     />
@@ -185,14 +185,14 @@
                 </div>
 
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                     E-mail (opcional)
                   </span>
                   <input
                     :value="customer.email"
                     type="email"
                     autocomplete="email"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                     placeholder="voce@exemplo.com"
                     @input="handleEmailInput"
                   />
@@ -201,12 +201,12 @@
 
               <div class="grid gap-4 sm:grid-cols-2">
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                     Entrega
                   </span>
                   <select
                     :value="customer.deliveryMethod"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                     @change="handleDeliveryMethodChange"
                   >
                     <option value="delivery">Receber em casa</option>
@@ -215,12 +215,12 @@
                 </label>
 
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                     Pagamento
                   </span>
                   <select
                     :value="customer.paymentMethod"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                     @change="handlePaymentMethodChange"
                   >
                     <option value="pix">Pix</option>
@@ -232,12 +232,12 @@
 
               <template v-if="customer.deliveryMethod === 'delivery'">
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                     Regiao de entrega
                   </span>
                   <select
                     :value="customer.deliveryRegionId ?? ''"
-                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                     :disabled="isDeliveryRegionsLoading || deliveryRegions.length === 0"
                     @change="handleDeliveryRegionChange"
                   >
@@ -263,7 +263,7 @@
                       <p class="font-bold">Endereço salvo</p>
                       <p class="mt-1 text-emerald-800">{{ profileAddressSummary }}</p>
                     </div>
-                    <RouterLink :to="accountRoute" class="shrink-0 font-semibold text-[#D81B60] hover:underline">
+                    <RouterLink :to="accountRoute" class="shrink-0 font-semibold text-[var(--store-primary)] hover:underline">
                       Editar
                     </RouterLink>
                   </div>
@@ -278,14 +278,14 @@
                   </p>
 
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                       Endereço
                     </span>
                     <input
                       :value="customer.address"
                       type="text"
                       autocomplete="street-address"
-                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                       placeholder="Rua, numero e complemento"
                       @input="handleAddressInput"
                     />
@@ -293,28 +293,28 @@
 
                   <div class="grid gap-4 sm:grid-cols-2">
                     <label class="block">
-                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                         Bairro
                       </span>
                       <input
                         :value="customer.neighborhood"
                         type="text"
                         autocomplete="address-level3"
-                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                         placeholder="Bairro"
                         @input="handleNeighborhoodInput"
                       />
                     </label>
 
                     <label class="block">
-                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                      <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                         Cidade
                       </span>
                       <input
                         :value="customer.city"
                         type="text"
                         autocomplete="address-level2"
-                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[var(--store-text)] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                         placeholder="Cidade"
                         @input="handleCityInput"
                       />
@@ -324,13 +324,13 @@
               </template>
 
               <label class="block">
-                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--store-text-muted)]">
                   Observacoes
                 </span>
                 <textarea
                   :value="customer.notes"
                   rows="3"
-                  class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                  class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[var(--store-text)] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                   placeholder="Tamanho, referencia ou combinados do pedido"
                   @input="handleNotesInput"
                 />
@@ -341,28 +341,28 @@
 
         <footer class="z-10 border-t border-[#E5E7EB] bg-white px-4 py-4 shadow-[0_-8px_24px_-22px_rgba(5,5,10,0.6)] sm:px-6 sm:py-5">
           <div class="space-y-2.5 text-sm">
-            <div class="flex items-center justify-between text-[#6B7280]">
+            <div class="flex items-center justify-between text-[var(--store-text-muted)]">
               <span>Produtos</span>
-              <span class="font-semibold text-[#05050A]">{{ formatBRL(subtotal) }}</span>
+              <span class="font-semibold text-[var(--store-text)]">{{ formatBRL(subtotal) }}</span>
             </div>
             <div
               v-if="customer.deliveryMethod === 'delivery' && deliveryFee > 0"
-              class="flex items-center justify-between text-[#6B7280]"
+              class="flex items-center justify-between text-[var(--store-text-muted)]"
             >
               <span>Frete</span>
-              <span class="font-semibold text-[#05050A]">{{ formatBRL(deliveryFee) }}</span>
+              <span class="font-semibold text-[var(--store-text)]">{{ formatBRL(deliveryFee) }}</span>
             </div>
-            <div class="flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[#05050A]">
+            <div class="flex items-center justify-between border-t border-[#E5E7EB] pt-3 text-[var(--store-text)]">
               <span class="font-bold">Total estimado</span>
               <span class="text-xl font-bold tracking-tight">{{ formatBRL(total) }}</span>
             </div>
-            <p class="text-[11px] leading-4 text-[#6B7280]">Valor final confirmado no WhatsApp.</p>
+            <p class="text-[11px] leading-4 text-[var(--store-text-muted)]">Valor final confirmado no WhatsApp.</p>
             <p v-if="!isWhatsAppConfigured" class="rounded-r-lg border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
               WhatsApp da loja ainda nao configurado.
             </p>
             <p
               v-if="checkoutValidationMessage"
-              class="rounded-r-lg border-l-4 border-[#D81B60] bg-[#FFF4F8] px-3 py-2 text-sm font-semibold text-[#7A143D]"
+              class="rounded-r-lg border-l-4 border-[var(--store-primary)] bg-[var(--store-primary-soft)] px-3 py-2 text-sm font-semibold text-[var(--store-primary-hover)]"
             >
               {{ checkoutValidationMessage }}
             </p>
@@ -371,7 +371,7 @@
           <button
             type="button"
             data-cy="checkout-submit-button"
-            class="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#05050A] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D81B60] focus:outline-none focus:ring-4 focus:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] sm:mt-5"
+            class="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--store-text)] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--store-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--store-primary-soft)] disabled:cursor-not-allowed disabled:bg-[#D1D5DB] sm:mt-5"
             :disabled="!canSubmitCheckout"
             @click="$emit('submitOrder')"
           >
@@ -409,7 +409,7 @@ const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
     <rect x="28" y="28" width="184" height="184" rx="22" fill="#FFFFFF" stroke="#E5E7EB" />
     <rect x="64" y="68" width="112" height="76" rx="14" fill="#F4F1F3" />
     <path d="M76 132l26-27c5-5 13-5 18 0l17 18 9-10c5-5 14-5 19 0l29 30v14H76z" fill="#E9A8C0" />
-    <text x="120" y="184" text-anchor="middle" fill="#6B7280" font-family="Arial, sans-serif" font-size="15" font-weight="700">Imagem em breve</text>
+    <text x="120" y="184" text-anchor="middle" fill="var(--store-text-muted)" font-family="Arial, sans-serif" font-size="15" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`
 
