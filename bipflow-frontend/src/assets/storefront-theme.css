@@ -1,0 +1,74 @@
+/*
+ * Centralized storefront theme layer (Theme Engine).
+ * Per-store editable colors arrive as inline `:style` vars from
+ * useStoreTheme(); every derived/static token below is computed once here
+ * so no storefront component ever hardcodes a brand color, radius or
+ * transition duration.
+ */
+.storefront-shell {
+  /* Derived brand shades -- computed from the editable base colors so a
+     merchant only ever picks one primary/accent color, never a hover state. */
+  --store-primary-hover: color-mix(in srgb, var(--store-primary) 85%, black);
+  --store-primary-soft: color-mix(in srgb, var(--store-primary) 12%, white);
+  --store-secondary: var(--store-secondary-base, var(--store-accent));
+  --store-text-muted: var(--store-muted);
+  --store-border: color-mix(in srgb, var(--store-muted) 28%, transparent);
+
+  /* Controlled radius scale -- presets only, never a free pixel value. */
+  --store-radius-sm: 0.5rem;
+  --store-radius-md: 0.95rem;
+  --store-radius-lg: 1.5rem;
+
+  /* Controlled motion scale -- honors prefers-reduced-motion globally (see main.css). */
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 350ms;
+
+  background: var(--store-background);
+  color: var(--store-text);
+}
+
+.storefront-header {
+  background: var(--store-background);
+  border-color: var(--store-border);
+}
+
+.storefront-panel {
+  background: var(--store-surface);
+  border-color: var(--store-border);
+}
+
+.storefront-muted {
+  color: var(--store-text-muted);
+}
+
+.storefront-brand-line {
+  background: var(--store-accent);
+}
+
+.storefront-primary-button {
+  border-color: var(--store-primary);
+  background: var(--store-primary);
+  color: #fff;
+  transition-duration: var(--motion-base);
+}
+
+.storefront-primary-button:hover {
+  border-color: var(--store-primary-hover);
+  background: var(--store-primary-hover);
+}
+
+.storefront-outline-button {
+  border-color: var(--store-border);
+  color: var(--store-text);
+  transition-duration: var(--motion-base);
+}
+
+.storefront-outline-button:hover {
+  border-color: var(--store-accent);
+  color: var(--store-accent);
+}
+
+.storefront-shell .hero-display-title {
+  color: var(--store-text);
+}

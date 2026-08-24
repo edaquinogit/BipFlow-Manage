@@ -137,18 +137,31 @@
                       Todas
                     </button>
 
-                    <button
-                      v-for="category in categories"
-                      :key="category.id"
-                      type="button"
-                      class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
-                      :class="draftCategoryId === category.id
-                        ? 'bg-[#D81B60] text-white shadow-md'
-                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
-                      @click="handleQuickCategory(category.id)"
-                    >
-                      {{ category.name }}
-                    </button>
+                    <template v-for="category in categoryTree" :key="category.id">
+                      <button
+                        type="button"
+                        class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
+                        :class="draftCategoryId === category.id
+                          ? 'bg-[#D81B60] text-white shadow-md'
+                          : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                        @click="handleQuickCategory(category.id)"
+                      >
+                        {{ category.name }}
+                      </button>
+
+                      <button
+                        v-for="child in category.children"
+                        :key="child.id"
+                        type="button"
+                        class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
+                        :class="draftCategoryId === child.id
+                          ? 'bg-[#D81B60] text-white shadow-md'
+                          : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                        @click="handleQuickCategory(child.id)"
+                      >
+                        {{ child.name }}
+                      </button>
+                    </template>
                   </div>
                 </div>
 
@@ -356,7 +369,7 @@ import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
 import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
-import { useStoreBranding } from '@/composables/useStoreBranding'
+import { useStoreTheme } from '@/composables/useStoreTheme'
 import { useToast } from '@/composables/useToast'
 import type { Category } from '@/schemas/category.schema'
 import { authService } from '@/services/auth.service'
@@ -373,6 +386,7 @@ import type {
   ProductSortOption,
   ProductVariant,
 } from '@/types/product'
+import { buildCategoryTree } from '@/utils/categories'
 import { formatBRL } from '@/utils/formatters'
 
 function parseNumberParam(
@@ -412,7 +426,7 @@ if (routeStoreSlug) {
 const toast = useToast()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
-const storeBranding = useStoreBranding(selectedStore)
+const storeBranding = useStoreTheme(selectedStore)
 const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
 // Two independent fetches gate the intro's loading state: store/categories/etc
 // (awaited directly below) and the product list, which useProductSearch kicks
@@ -421,6 +435,7 @@ const isCoreDataReady = ref(false)
 const isProductsReady = ref(false)
 const isBackendReady = computed(() => isCoreDataReady.value && isProductsReady.value)
 const categories = ref<Category[]>([])
+const categoryTree = computed(() => buildCategoryTree(categories.value))
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const isCartOpen = ref(false)
@@ -843,53 +858,3 @@ async function handleSubmitOrder(): Promise<void> {
   }
 }
 </script>
-
-<style scoped>
-.storefront-shell {
-  background: var(--store-background);
-  color: var(--store-text);
-}
-
-.storefront-header {
-  background: var(--store-background);
-  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
-}
-
-.storefront-panel {
-  background: var(--store-surface);
-  border-color: color-mix(in srgb, var(--store-muted) 22%, transparent);
-}
-
-.storefront-muted {
-  color: var(--store-muted);
-}
-
-.storefront-brand-line {
-  background: var(--store-accent);
-}
-
-.storefront-primary-button {
-  border-color: var(--store-primary);
-  background: var(--store-primary);
-  color: #fff;
-}
-
-.storefront-primary-button:hover {
-  border-color: var(--store-accent);
-  background: var(--store-accent);
-}
-
-.storefront-outline-button {
-  border-color: color-mix(in srgb, var(--store-muted) 42%, transparent);
-  color: var(--store-text);
-}
-
-.storefront-outline-button:hover {
-  border-color: var(--store-accent);
-  color: var(--store-accent);
-}
-
-.storefront-shell .hero-display-title {
-  color: var(--store-text);
-}
-</style>

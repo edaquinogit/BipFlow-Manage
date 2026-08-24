@@ -1,6 +1,6 @@
 <template>
   <article
-    class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-[#E9D7DF] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFF9FB_100%)] shadow-[0_18px_40px_-30px_rgba(5,5,10,0.6)] transition duration-300 hover:-translate-y-1 hover:border-[#D81B60]/45 hover:shadow-[0_24px_60px_-34px_rgba(216,27,96,0.32)] min-[390px]:rounded-2xl"
+    class="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-[var(--store-border)] bg-[var(--store-surface)] shadow-[0_18px_40px_-30px_rgba(5,5,10,0.6)] transition duration-300 hover:-translate-y-1 hover:border-[var(--store-primary)]/45 hover:shadow-[0_24px_60px_-34px_var(--store-primary-soft)] min-[390px]:rounded-2xl"
     :class="{ 'opacity-75': !canOrderProduct }"
   >
     <button
@@ -15,13 +15,13 @@
         >
           <span
             v-if="product.category?.name"
-            class="max-w-[70%] truncate rounded-full bg-white/[0.92] px-3 py-1 text-[11px] font-semibold text-[#05050A] backdrop-blur"
+            class="max-w-[70%] truncate rounded-full bg-white/[0.92] px-3 py-1 text-[11px] font-semibold text-[var(--store-text)] backdrop-blur"
           >
-            {{ product.category.name }}
+            {{ getCategoryDisplayName(product.category) }}
           </span>
           <span
             v-if="cartQuantity > 0"
-            class="ml-auto inline-flex min-h-7 shrink-0 items-center justify-center rounded-full bg-[#D81B60] px-3 text-[11px] font-semibold text-white"
+            class="ml-auto inline-flex min-h-7 shrink-0 items-center justify-center rounded-full bg-[var(--store-primary)] px-3 text-[11px] font-semibold text-white"
           >
             {{ cartQuantity }} no pedido
           </span>
@@ -57,7 +57,7 @@
         @click="handleOpenDetails"
       >
         <h3
-          class="line-clamp-2 min-h-[2.85rem] text-[13px] font-semibold leading-[1.32] text-[#05050A] transition-colors group-hover:text-[#D81B60] min-[390px]:min-h-[3.05rem] min-[390px]:text-[14px] min-[390px]:leading-[1.35] sm:min-h-[2.9rem] sm:text-[15px] sm:leading-[1.45] lg:min-h-[3rem] lg:text-base lg:leading-[1.5]"
+          class="line-clamp-2 min-h-[2.85rem] text-[13px] font-semibold leading-[1.32] text-[var(--store-text)] transition-colors group-hover:text-[var(--store-primary)] min-[390px]:min-h-[3.05rem] min-[390px]:text-[14px] min-[390px]:leading-[1.35] sm:min-h-[2.9rem] sm:text-[15px] sm:leading-[1.45] lg:min-h-[3rem] lg:text-base lg:leading-[1.5]"
         >
           {{ product.name }}
         </h3>
@@ -68,7 +68,7 @@
       >
         <div>
           <span
-            class="block text-[1.12rem] font-semibold tracking-[-0.015em] text-[#05050A] min-[390px]:text-[1.22rem] sm:text-[1.36rem] lg:text-[1.28rem] xl:text-[1.34rem]"
+            class="block text-[1.12rem] font-semibold tracking-[-0.015em] text-[var(--store-text)] min-[390px]:text-[1.22rem] sm:text-[1.36rem] lg:text-[1.28rem] xl:text-[1.34rem]"
           >
             {{ formatBRL(product.price) }}
           </span>
@@ -92,7 +92,7 @@
 
         <button
           type="button"
-          class="inline-flex min-w-0 max-w-[42%] shrink items-center justify-end gap-0.5 text-[9px] font-semibold leading-[1.2] tracking-[0.03em] text-[#6B7280] transition hover:text-[#D81B60] min-[390px]:max-w-none min-[390px]:gap-1 min-[390px]:text-[10px]"
+          class="inline-flex min-w-0 max-w-[42%] shrink items-center justify-end gap-0.5 text-[9px] font-semibold leading-[1.2] tracking-[0.03em] text-[var(--store-text-muted)] transition hover:text-[var(--store-primary)] min-[390px]:max-w-none min-[390px]:gap-1 min-[390px]:text-[10px]"
           :aria-label="`Ver descricao e detalhes de ${product.name}`"
           title="Ver detalhes"
           @click="handleOpenDetails"
@@ -111,11 +111,11 @@
         >
           <div class="min-w-0">
             <div
-              class="inline-flex h-11 items-center rounded-[0.95rem] border border-[#D8DDE5] bg-white/95 shadow-[0_10px_24px_-22px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl"
+              class="inline-flex h-11 items-center rounded-[0.95rem] border border-[var(--store-border)] bg-white/95 shadow-[0_10px_24px_-22px_rgba(5,5,10,0.55)] min-[390px]:h-12 min-[390px]:rounded-xl"
             >
               <button
                 type="button"
-                class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
+                class="inline-flex h-11 w-10 items-center justify-center rounded-l-[0.95rem] text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-l-xl"
                 :disabled="!canOrderProduct || quantity <= 1"
                 aria-label="Diminuir quantidade"
                 @click.stop="decrementQuantity"
@@ -123,13 +123,13 @@
                 <MinusIcon class="h-4 w-4" aria-hidden="true" />
               </button>
               <span
-                class="min-w-8 text-center text-[15px] font-semibold text-[#05050A] min-[390px]:min-w-10 min-[390px]:text-base"
+                class="min-w-8 text-center text-[15px] font-semibold text-[var(--store-text)] min-[390px]:min-w-10 min-[390px]:text-base"
               >
                 {{ quantity }}
               </span>
               <button
                 type="button"
-                class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[#6B7280] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
+                class="inline-flex h-11 w-10 items-center justify-center rounded-r-[0.95rem] text-[var(--store-text-muted)] transition hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40 min-[390px]:h-12 min-[390px]:w-11 min-[390px]:rounded-r-xl"
                 :disabled="!canOrderProduct || quantity >= currentAvailableStock"
                 aria-label="Aumentar quantidade"
                 @click.stop="incrementQuantity"
@@ -142,10 +142,10 @@
           <button
             type="button"
             data-cy="add-to-cart-button"
-            class="inline-flex h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[0.95rem] px-2 text-[8px] font-bold uppercase leading-none tracking-[0.04em] shadow-[0_14px_30px_-22px_rgba(5,5,10,0.7)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-12 min-[390px]:gap-1.5 min-[390px]:rounded-xl min-[390px]:px-2.5 min-[390px]:text-[8px] min-[390px]:tracking-[0.05em] min-[480px]:gap-2 min-[480px]:px-3 min-[480px]:text-[9px] min-[480px]:tracking-[0.08em] sm:px-4 sm:text-[11px] sm:tracking-[0.1em]"
+            class="inline-flex h-11 min-w-0 max-w-full shrink-0 items-center justify-center gap-1 overflow-hidden rounded-[0.95rem] px-2 text-[8px] font-bold uppercase leading-none tracking-[0.04em] shadow-[0_14px_30px_-22px_rgba(5,5,10,0.7)] transition duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:h-12 min-[390px]:gap-1.5 min-[390px]:rounded-xl min-[390px]:px-2.5 min-[390px]:text-[8px] min-[390px]:tracking-[0.05em] min-[480px]:gap-2 min-[480px]:px-3 min-[480px]:text-[9px] min-[480px]:tracking-[0.08em] sm:px-4 sm:text-[11px] sm:tracking-[0.1em]"
             :class="
               canOrderProduct
-                ? 'bg-[#05050A] text-white hover:-translate-y-0.5 hover:bg-[#D81B60] hover:shadow-[0_18px_36px_-24px_rgba(216,27,96,0.65)]'
+                ? 'bg-[var(--store-text)] text-white hover:-translate-y-0.5 hover:bg-[var(--store-primary)] hover:shadow-[0_18px_36px_-24px_var(--store-primary-soft)]'
                 : 'cursor-not-allowed bg-slate-200 text-slate-500'
             "
             :disabled="!canOrderProduct"
@@ -182,6 +182,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { Product, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { getCategoryDisplayName } from '@/utils/categories'
 import { isLowStock } from '@/utils/stockAlerts'
 
 const props = withDefaults(
