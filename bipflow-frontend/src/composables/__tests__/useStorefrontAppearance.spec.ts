@@ -23,7 +23,7 @@ function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): Storefr
   return {
     id: 10,
     store_id: 1,
-    secondary_color: '#E91E63',
+    secondary_color: '#374151',
     favicon_url: '',
     hero_enabled: false,
     hero_image_desktop: '',

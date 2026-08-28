@@ -31,7 +31,7 @@ describe('StoreService', () => {
         whatsapp_phone: '5571999999999',
         theme: {
           primary: '#05050A',
-          accent: '#D81B60',
+          accent: '#111827',
         },
         is_active: true,
         status: 'active',

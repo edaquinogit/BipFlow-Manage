@@ -5,7 +5,7 @@ const FALLBACK_LOGO_URL = '/brand-logo.png'
 
 const DEFAULT_THEME: Required<Record<keyof StoreTheme, string>> = {
   primary: '#05050A',
-  accent: '#D81B60',
+  accent: '#111827',
   background: '#FAFAFA',
   surface: '#FFFFFF',
   text: '#05050A',
@@ -50,10 +50,10 @@ export function buildStoreBranding(store: Store | null | undefined): StoreBrandi
   const status = store?.status ?? (isActive ? 'active' : 'inactive')
 
   return {
-    name: sanitizeText(store?.display_name, sanitizeText(store?.name, 'Boutique Fitness')),
+    name: sanitizeText(store?.display_name, sanitizeText(store?.name, 'Sua loja')),
     slug: sanitizeText(store?.slug, ''),
     logoUrl: sanitizeText(store?.logo_url, FALLBACK_LOGO_URL),
-    tagline: sanitizeText(store?.tagline, 'Catalogo online'),
+    tagline: sanitizeText(store?.tagline, ''),
     whatsappPhone: sanitizeText(store?.whatsapp_phone, ''),
     isActive,
     status,

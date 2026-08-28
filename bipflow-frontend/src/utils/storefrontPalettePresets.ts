@@ -9,17 +9,17 @@ export interface StorefrontPalettePreset {
 
 export const STOREFRONT_PALETTE_PRESETS: StorefrontPalettePreset[] = [
   {
-    id: 'rosa-moderno',
-    label: 'Rosa moderno',
+    id: 'neutro-premium',
+    label: 'Neutro premium',
     theme: {
       primary: '#05050A',
-      accent: '#D81B60',
+      accent: '#111827',
       background: '#FAFAFA',
       surface: '#FFFFFF',
       text: '#05050A',
       muted: '#6B7280',
     },
-    secondaryColor: '#E91E63',
+    secondaryColor: '#374151',
   },
   {
     id: 'azul-profissional',

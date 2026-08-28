@@ -72,7 +72,7 @@ function buildStore(overrides: Partial<Store> = {}): Store {
     whatsapp_phone: '5571999990000',
     theme: {
       primary: '#05050A',
-      accent: '#D81B60',
+      accent: '#111827',
       background: '#FAFAFA',
       surface: '#FFFFFF',
       text: '#05050A',
@@ -90,7 +90,7 @@ function buildAppearance(overrides: Partial<StorefrontAppearance> = {}): Storefr
   return {
     id: 10,
     store_id: 1,
-    secondary_color: '#E91E63',
+    secondary_color: '#374151',
     favicon_url: '',
     hero_enabled: false,
     hero_image_desktop: '',
@@ -152,7 +152,7 @@ describe('DashboardSettingsView storefront appearance tab', () => {
 })
 
 describe('StorefrontAppearanceTab', () => {
-  const toastState = { success: vi.fn(), error: vi.fn() }
+  const toastState = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }
   const fetchCurrentStore = vi.fn().mockResolvedValue(undefined)
   let selectedStore: Ref<Store | null>
 
@@ -286,6 +286,33 @@ describe('StorefrontAppearanceTab', () => {
     expect(wrapper.find('[data-cy="open-current-storefront-link"]').attributes('href')).toBe('/l/loja-a/produtos')
   })
 
+  it('shows first setup progress when the store still uses defaults', async () => {
+    mockCurrentStore(buildStore({
+      logo_url: '',
+      display_name: '',
+      tagline: '',
+      theme: {
+        primary: '#05050A',
+        accent: '#111827',
+        background: '#FAFAFA',
+        surface: '#FFFFFF',
+        text: '#05050A',
+        muted: '#6B7280',
+      },
+    }))
+    vi.mocked(storefrontAppearanceService.get).mockResolvedValue(buildAppearance({
+      secondary_color: '#111827',
+    }))
+
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="storefront-first-setup-progress"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('0 de 4 concluidos')
+    expect(wrapper.text()).toContain('Adicionar logo')
+    expect(wrapper.text()).toContain('Escolher cores')
+  })
+
   it('saves identity colors through the allowed store and appearance payloads', async () => {
     const wrapper = mount(StorefrontAppearanceTab)
     await flushPromises()
@@ -330,6 +357,23 @@ describe('StorefrontAppearanceTab', () => {
     expect(storefrontAppearanceService.update).toHaveBeenCalledWith({
       secondary_color: '#38BDF8',
     })
+  })
+
+  it('warns about low contrast and can fix the palette locally', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-theme-background"]').setValue('#000000')
+    await wrapper.find('[data-cy="storefront-theme-text"]').setValue('#111111')
+    await nextTick()
+
+    expect(wrapper.find('[data-cy="storefront-contrast-panel"]').text()).toContain('Baixo contraste')
+
+    await wrapper.find('[data-cy="btn-fix-storefront-contrast"]').trigger('click')
+    await nextTick()
+
+    expect((wrapper.find('[data-cy="storefront-theme-text"]').element as HTMLInputElement).value).toBe('#FFFFFF')
+    expect(toastState.info).toHaveBeenCalledWith('Cores ajustadas para melhorar o contraste.')
   })
 
   it('previews and uploads a selected logo before saving the store identity', async () => {
@@ -446,6 +490,34 @@ describe('StorefrontAppearanceTab', () => {
       starts_at: expect.any(String),
       ends_at: expect.any(String),
     }))
+  })
+
+  it('duplicates an existing promotional banner as a new draft', async () => {
+    vi.mocked(storefrontAppearanceService.listBanners).mockResolvedValue([
+      buildBanner({ id: 100, title: 'Promocao', position: 0 }),
+    ])
+
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-appearance-section-promocoes"]').trigger('click')
+    await wrapper.find('[data-cy="btn-duplicate-storefront-promotion"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.findAll('[data-cy="storefront-promotion-card"]')).toHaveLength(2)
+    expect(wrapper.find('[data-cy="storefront-promotion-drawer"]').exists()).toBe(true)
+    expect((wrapper.find('[data-cy="storefront-promotion-title"]').element as HTMLInputElement).value).toBe('Promocao copia')
+    expect(toastState.info).toHaveBeenCalledWith('Promocao duplicada como rascunho.')
+  })
+
+  it('switches the live preview between desktop and mobile modes', async () => {
+    const wrapper = mount(StorefrontAppearanceTab)
+    await flushPromises()
+
+    await wrapper.find('[data-cy="storefront-preview-mobile"]').trigger('click')
+
+    expect(wrapper.find('[data-cy="storefront-preview-mobile"]').classes()).toContain('bg-white')
+    expect(wrapper.find('[data-cy="storefront-preview-desktop"]').classes()).not.toContain('bg-white')
   })
 
   it('reorders persisted promotional banners', async () => {
