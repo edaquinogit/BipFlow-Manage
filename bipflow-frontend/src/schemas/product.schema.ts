@@ -48,6 +48,17 @@ const ProductVariantImageSchema = z
   ])
   .optional();
 
+// Null means "inherit the product's base price" -- an empty/untouched input
+// resolves to null, never to 0 (0.00 is a legitimate explicit price). Same
+// shape as LowStockThresholdSchema above.
+const VariantPriceSchema = z.preprocess(
+  (value) => (value === "" || value === undefined || value === null ? null : value),
+  z.coerce
+    .number()
+    .min(0, "Preço da variação não pode ser negativo")
+    .nullable(),
+);
+
 const ProductVariantSchema = z.object({
   id: z.number().optional(),
   name: z
@@ -59,6 +70,7 @@ const ProductVariantSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color, like #111827")
     .transform((value) => value.toUpperCase()),
+  price: VariantPriceSchema,
   stock_quantity: z.coerce
     .number()
     .int("Variant stock must be an integer")
