@@ -5,6 +5,7 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerFeedback,
     CustomerProfile,
     DeliveryRegion,
     LabelSettings,
@@ -265,6 +266,30 @@ class BotConversationAdmin(admin.ModelAdmin):
     search_fields = ("session_id", "customer_phone", "messages__content")
     readonly_fields = ("session_id", "created_at", "updated_at")
     inlines = [BotMessageInline]
+
+
+@admin.register(CustomerFeedback)
+class CustomerFeedbackAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    """Operational fallback for triaging storefront feedback before/without
+    the dashboard's own Feedbacks page."""
+
+    list_display = ("store", "feedback_type", "status", "created_at")
+    list_filter = ("store", "feedback_type", "status", "created_at")
+    search_fields = ("message", "contact", "correlation_id")
+    readonly_fields = (
+        "store",
+        "customer_profile",
+        "feedback_type",
+        "message",
+        "contact",
+        "page_path",
+        "product",
+        "order",
+        "correlation_id",
+        "user_agent",
+        "created_at",
+        "updated_at",
+    )
 
 
 class SaleOrderItemInline(admin.TabularInline):

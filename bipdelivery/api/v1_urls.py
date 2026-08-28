@@ -8,6 +8,8 @@ from .views import (
     CategoryViewSet,
     CheckoutWhatsAppView,
     CurrentStoreView,
+    CustomerFeedbackCreateView,
+    CustomerFeedbackViewSet,
     CustomerProfileView,
     DeliveryRegionViewSet,
     MyStoreDetailView,
@@ -38,11 +40,13 @@ router.register(r"delivery-regions", DeliveryRegionViewSet, basename="delivery-r
 router.register(r"sales-orders", SaleOrderViewSet, basename="sales-order")
 router.register(r"bot-conversations", BotConversationViewSet, basename="bot-conversation")
 router.register(r"stock-movements", StockMovementViewSet, basename="stock-movement")
+router.register(r"feedback-reports", CustomerFeedbackViewSet, basename="feedback-report")
 
 urlpatterns = [
     # Injeta todas as rotas geradas pelo roteador
     path("bot/messages/", BotMessageView.as_view(), name="bot-message"),
     path("checkout/whatsapp/", CheckoutWhatsAppView.as_view(), name="checkout-whatsapp"),
+    path("feedback/", CustomerFeedbackCreateView.as_view(), name="customer-feedback-create"),
     path("customers/me/", CustomerProfileView.as_view(), name="customer-profile-me"),
     path("pdv/sales/", PdvSaleView.as_view(), name="pdv-sale"),
     path(

@@ -127,6 +127,24 @@ class BotMessageIpThrottle(AnonRateThrottle):
     scope = "bot_message_ip"
 
 
+class FeedbackIpThrottle(SimpleRateThrottle):
+    """
+    Limit public feedback submissions by client IP, regardless of auth
+    status -- same reasoning as CheckoutIpThrottle: a plain AnonRateThrottle
+    stops throttling the instant a customer is logged in, which would
+    silently disable this limit for the exact case (an authenticated
+    customer reporting a problem) the feature exists for.
+    """
+
+    scope = "feedback_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
+
+
 class PdvReceiptEmailThrottle(UserRateThrottle):
     """
     Limit how often a dashboard user can trigger a PDV receipt email send --
