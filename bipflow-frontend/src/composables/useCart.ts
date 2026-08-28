@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import type { CartCustomer, CartItem, Product, ProductVariant } from '@/types/product'
-import { getSelectedStoreSlug } from '@/services/store-scope'
+import { getSelectedStoreSlug, subscribeStoreScopeChange } from '@/services/store-scope'
 
 // Etapa 3 of the multi-tenant evolution: the cart key is scoped per store so
 // a delivery region or item picked while browsing one storefront never
@@ -17,8 +17,14 @@ const LEGACY_CUSTOMER_STORAGE_KEY = 'bipflow_public_cart_customer'
 const CART_CUSTOMER_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const CART_CUSTOMER_KEY_PATTERN = /^bipflow_cart_.*_customer(_savedAt)?$/
 
-function storeScopedStorageKey(suffix: 'items' | 'customer'): string {
-  const slug = getSelectedStoreSlug() || 'default'
+function normalizedStorageSlug(slug: string | null = getSelectedStoreSlug()): string {
+  return slug || 'default'
+}
+
+function storeScopedStorageKey(
+  suffix: 'items' | 'customer',
+  slug = normalizedStorageSlug()
+): string {
   return `bipflow_cart_${slug}_${suffix}`
 }
 
@@ -67,6 +73,10 @@ const defaultCustomer: CartCustomer = {
 const items = ref<CartItem[]>([])
 const customer = ref<CartCustomer>({ ...defaultCustomer })
 const hasHydrated = ref(false)
+let hydratedStorageSlug: string | null = null
+let isHydratingPersistedState = false
+let skipNextItemsPersistence = false
+let skipNextCustomerPersistence = false
 
 function canUseBrowserStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -145,16 +155,49 @@ function migrateLegacyCartOnce(itemsKey: string, customerKey: string): void {
   window.localStorage.removeItem(LEGACY_CUSTOMER_STORAGE_KEY)
 }
 
-function loadPersistedState(): void {
-  if (!canUseBrowserStorage() || hasHydrated.value) {
+function persistState(slug = hydratedStorageSlug ?? normalizedStorageSlug()): void {
+  if (!canUseBrowserStorage()) {
     return
   }
 
-  const itemsKey = storeScopedStorageKey('items')
-  const customerKey = storeScopedStorageKey('customer')
+  const customerKey = storeScopedStorageKey('customer', slug)
+  const nextCustomerJson = JSON.stringify(customer.value)
+  const hasCustomerChanged = window.localStorage.getItem(customerKey) !== nextCustomerJson
+
+  window.localStorage.setItem(storeScopedStorageKey('items', slug), JSON.stringify(items.value))
+  window.localStorage.setItem(customerKey, nextCustomerJson)
+
+  // Only refresh the TTL timestamp when the customer data actually changed.
+  // This is called on every store-scope switch to flush pending reactive
+  // writes; bumping the timestamp unconditionally here would keep resetting
+  // the TTL clock for a customer's untouched PII forever, as long as they
+  // keep switching stores -- defeating CART_CUSTOMER_STORAGE_TTL_MS.
+  if (hasCustomerChanged) {
+    window.localStorage.setItem(customerSavedAtKey(customerKey), String(Date.now()))
+  }
+}
+
+function loadPersistedState({ force = false }: { force?: boolean } = {}): void {
+  const nextStorageSlug = normalizedStorageSlug()
+
+  if (!canUseBrowserStorage()) {
+    hydratedStorageSlug = nextStorageSlug
+    hasHydrated.value = true
+    return
+  }
+
+  if (hasHydrated.value && hydratedStorageSlug === nextStorageSlug && !force) {
+    return
+  }
+
+  const itemsKey = storeScopedStorageKey('items', nextStorageSlug)
+  const customerKey = storeScopedStorageKey('customer', nextStorageSlug)
 
   migrateLegacyCartOnce(itemsKey, customerKey)
 
+  isHydratingPersistedState = true
+  skipNextItemsPersistence = true
+  skipNextCustomerPersistence = true
   try {
     const storedItems = window.localStorage.getItem(itemsKey)
     const storedCustomer = window.localStorage.getItem(customerKey)
@@ -162,6 +205,9 @@ function loadPersistedState(): void {
     const savedAt = Number(window.localStorage.getItem(savedAtKey))
     const isCustomerExpired =
       !savedAt || Number.isNaN(savedAt) || Date.now() - savedAt > CART_CUSTOMER_STORAGE_TTL_MS
+
+    items.value = []
+    customer.value = { ...defaultCustomer }
 
     if (storedItems) {
       const parsedItems = JSON.parse(storedItems) as CartItem[]
@@ -184,18 +230,37 @@ function loadPersistedState(): void {
     items.value = []
     customer.value = { ...defaultCustomer }
   } finally {
+    hydratedStorageSlug = nextStorageSlug
     hasHydrated.value = true
+    isHydratingPersistedState = false
   }
 }
+
+subscribeStoreScopeChange(() => {
+  if (!hasHydrated.value) {
+    return
+  }
+
+  persistState()
+  loadPersistedState({ force: true })
+})
 
 watch(
   items,
   (nextItems) => {
-    if (!canUseBrowserStorage() || !hasHydrated.value) {
+    if (skipNextItemsPersistence) {
+      skipNextItemsPersistence = false
       return
     }
 
-    window.localStorage.setItem(storeScopedStorageKey('items'), JSON.stringify(nextItems))
+    if (!canUseBrowserStorage() || !hasHydrated.value || isHydratingPersistedState) {
+      return
+    }
+
+    window.localStorage.setItem(
+      storeScopedStorageKey('items', hydratedStorageSlug ?? normalizedStorageSlug()),
+      JSON.stringify(nextItems)
+    )
   },
   { deep: true }
 )
@@ -203,11 +268,19 @@ watch(
 watch(
   customer,
   (nextCustomer) => {
-    if (!canUseBrowserStorage() || !hasHydrated.value) {
+    if (skipNextCustomerPersistence) {
+      skipNextCustomerPersistence = false
       return
     }
 
-    const customerKey = storeScopedStorageKey('customer')
+    if (!canUseBrowserStorage() || !hasHydrated.value || isHydratingPersistedState) {
+      return
+    }
+
+    const customerKey = storeScopedStorageKey(
+      'customer',
+      hydratedStorageSlug ?? normalizedStorageSlug()
+    )
     window.localStorage.setItem(customerKey, JSON.stringify(nextCustomer))
     window.localStorage.setItem(customerSavedAtKey(customerKey), String(Date.now()))
   },

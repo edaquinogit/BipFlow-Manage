@@ -1,5 +1,6 @@
 import api from './api'
 import { getStoredBotSessionId } from './bot.service'
+import { getSelectedStoreSlug } from './store-scope'
 import type {
   CartCustomer,
   CartItem,
@@ -8,6 +9,13 @@ import type {
 } from '@/types/product'
 import { isAxiosError } from '@/types/errors'
 import { formatBRL } from '@/utils/formatters'
+
+const CHECKOUT_IDEMPOTENCY_STORAGE_PREFIX = 'bipflow_checkout_idempotency'
+
+interface StoredCheckoutIdempotency {
+  fingerprint: string
+  key: string
+}
 
 /**
  * CheckoutWhatsAppView returns a distinct `code` for the two guest-data
@@ -25,6 +33,14 @@ export function extractCheckoutErrorMessage(error: unknown): string {
 
     if (data?.code === 'guest_address_incomplete') {
       return 'Informe endereco, bairro e cidade para receber em casa.'
+    }
+
+    if (data?.code === 'whatsapp_not_configured') {
+      return 'WhatsApp da loja ainda nao configurado.'
+    }
+
+    if (data?.code === 'idempotency_key_conflict') {
+      return 'Este checkout mudou desde a ultima tentativa. Revise o pedido e tente novamente.'
     }
 
     if (typeof data?.detail === 'string') {
@@ -64,6 +80,86 @@ function buildCheckoutPayload(items: CartItem[], customer: CartCustomer): Checko
   return payload
 }
 
+function canUseBrowserStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+}
+
+function checkoutIdempotencyStorageKey(): string {
+  const slug = getSelectedStoreSlug() || 'default'
+  return `${CHECKOUT_IDEMPOTENCY_STORAGE_PREFIX}_${slug}`
+}
+
+function checkoutPayloadFingerprint(payload: CheckoutPayload): string {
+  const fingerprintPayload = {
+    items: payload.items,
+    customer: payload.customer,
+    bot_session_id: payload.bot_session_id ?? '',
+  }
+  const serialized = JSON.stringify(fingerprintPayload)
+  let hash = 2166136261
+
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
+function newCheckoutIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function getCheckoutIdempotencyKey(payload: CheckoutPayload): string {
+  const fingerprint = checkoutPayloadFingerprint(payload)
+
+  if (!canUseBrowserStorage()) {
+    return newCheckoutIdempotencyKey()
+  }
+
+  const storageKey = checkoutIdempotencyStorageKey()
+  const storedValue = window.localStorage.getItem(storageKey)
+  if (storedValue) {
+    try {
+      const stored = JSON.parse(storedValue) as StoredCheckoutIdempotency
+      if (stored.fingerprint === fingerprint && stored.key) {
+        return stored.key
+      }
+    } catch {
+      window.localStorage.removeItem(storageKey)
+    }
+  }
+
+  const key = newCheckoutIdempotencyKey()
+  window.localStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }))
+  return key
+}
+
+function clearCheckoutIdempotencyKey(payload: CheckoutPayload): void {
+  if (!canUseBrowserStorage()) {
+    return
+  }
+
+  const storageKey = checkoutIdempotencyStorageKey()
+  const storedValue = window.localStorage.getItem(storageKey)
+  if (!storedValue) {
+    return
+  }
+
+  try {
+    const stored = JSON.parse(storedValue) as StoredCheckoutIdempotency
+    if (stored.fingerprint === checkoutPayloadFingerprint(payload)) {
+      window.localStorage.removeItem(storageKey)
+    }
+  } catch {
+    window.localStorage.removeItem(storageKey)
+  }
+}
+
 function buildWhatsAppHandoffMessage(items: CartItem[], subtotal: number): string {
   const itemLines = items.map((item, index) => {
     const lineTotal = Number(item.product.price) * item.quantity
@@ -94,7 +190,9 @@ function buildWhatsAppHandoffUrl(phoneDigits: string, items: CartItem[], subtota
 export const orderService = {
   async checkoutViaWhatsApp(items: CartItem[], customer: CartCustomer): Promise<CheckoutResponse> {
     const payload = buildCheckoutPayload(items, customer)
+    payload.idempotency_key = getCheckoutIdempotencyKey(payload)
     const response = await api.post<CheckoutResponse>('v1/checkout/whatsapp/', payload)
+    clearCheckoutIdempotencyKey(payload)
     return response.data
   },
 

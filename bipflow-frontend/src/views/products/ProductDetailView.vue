@@ -316,6 +316,10 @@
           </section>
         </aside>
       </div>
+
+      <footer class="mt-10 border-t border-[#E5E7EB] py-6 text-center">
+        <FeedbackTrigger :product-id="feedbackProductId" type="product" />
+      </footer>
     </main>
 
     <FloatingCartButton
@@ -360,6 +364,7 @@ import { useRoute, useRouter } from 'vue-router'
 import CartDrawer from './CartDrawer.vue'
 import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
+import FeedbackTrigger from '@/components/feedback/FeedbackTrigger.vue'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
@@ -416,6 +421,7 @@ const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   </svg>
 `)}`
 const product = ref<ProductDetail | null>(null)
+const feedbackProductId = computed(() => product.value?.id ?? null)
 const deliveryRegions = ref<DeliveryRegion[]>([])
 const storeWhatsAppPhone = ref('')
 const activeImage = ref<string | null>(null)
@@ -1011,6 +1017,11 @@ function canOpenWhatsAppCheckout(): boolean {
     return false
   }
 
+  if (!isWhatsAppConfigured.value) {
+    toast.info('WhatsApp da loja ainda nao configurado.')
+    return false
+  }
+
   return true
 }
 
@@ -1024,15 +1035,16 @@ async function handleSubmitOrder(): Promise<void> {
   try {
     const checkout = await orderService.checkoutViaWhatsApp(items.value, customer.value)
 
-    if (checkout.whatsapp_url) {
-      const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
-      if (!openedWindow) {
-        window.location.href = checkout.whatsapp_url
-      }
-      toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
-    } else {
-      toast.error('Pedido registrado, mas o WhatsApp da loja nao esta configurado.')
+    if (!checkout.whatsapp_url) {
+      toast.error('Nao foi possivel abrir o WhatsApp da loja. Seu carrinho foi mantido.')
+      return
     }
+
+    const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
+    if (!openedWindow) {
+      window.location.href = checkout.whatsapp_url
+    }
+    toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
 
     clearCart()
     resetCustomer()

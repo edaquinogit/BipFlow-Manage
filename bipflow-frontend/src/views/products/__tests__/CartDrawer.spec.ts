@@ -184,6 +184,15 @@ describe('CartDrawer', () => {
     expect(wrapper.emitted('submitOrder')).toHaveLength(1)
   })
 
+  it('blocks checkout submission when the store has no WhatsApp configured', async () => {
+    const wrapper = mountDrawer({ isWhatsAppConfigured: false })
+
+    await wrapper.find('footer button').trigger('click')
+
+    expect(wrapper.find('footer button').attributes('disabled')).toBeDefined()
+    expect(wrapper.emitted('submitOrder')).toBeUndefined()
+  })
+
   it('emits updateCustomer with the notes text on input', async () => {
     const wrapper = mountDrawer()
 

@@ -336,14 +336,24 @@
         </div>
         <h2 class="mb-2 text-lg font-medium text-[#05050A]">Erro ao carregar produtos</h2>
         <p class="mb-6 text-[#6B7280]">{{ error }}</p>
-        <button
-          type="button"
-          aria-label="Tentar novamente"
-          class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] focus:ring-offset-2"
-          @click="retryFetch"
-        >
-          Tentar novamente
-        </button>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label="Tentar novamente"
+            class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] focus:ring-offset-2"
+            @click="retryFetch"
+          >
+            Tentar novamente
+          </button>
+          <button
+            type="button"
+            aria-label="Relatar problema"
+            class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#374151] transition-colors hover:border-[var(--store-primary)] hover:text-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] focus:ring-offset-2"
+            @click="handleReportCatalogProblem"
+          >
+            Relatar problema
+          </button>
+        </div>
       </div>
 
       <div
@@ -403,6 +413,10 @@
           @previous-page="previousPage"
         />
       </div>
+
+      <footer class="mt-10 border-t border-[#E5E7EB] py-6 text-center">
+        <FeedbackTrigger />
+      </footer>
     </main>
 
     <FloatingCartButton
@@ -441,6 +455,7 @@ import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
 import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
+import FeedbackTrigger from '@/components/feedback/FeedbackTrigger.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import {
@@ -449,6 +464,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { useCustomerFeedback } from '@/composables/useCustomerFeedback'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
@@ -464,6 +480,7 @@ import { setSelectedStoreSlug } from '@/services/store-scope'
 import { storeSettingsService } from '@/services/store-settings.service'
 import { storefrontAppearanceService } from '@/services/storefront-appearance.service'
 import type { DeliveryRegion } from '@/types/delivery'
+import { getErrorRequestId } from '@/types/errors'
 import type {
   Product,
   ProductFilters as ProductFilterState,
@@ -512,6 +529,7 @@ const currentRouteStoreSlug = computed(() => (
   typeof route.params?.storeSlug === 'string' ? route.params.storeSlug : ''
 ))
 const toast = useToast()
+const { open: openFeedback } = useCustomerFeedback()
 const { profile: customerProfile, fetchCustomerProfile } = useCustomerProfile()
 const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
@@ -550,6 +568,7 @@ const {
   isLoading,
   isInitialLoading,
   error,
+  errorCorrelationId,
   page,
   totalPages,
   filters,
@@ -895,6 +914,14 @@ function retryFetch(): void {
   void fetchProducts()
 }
 
+function handleReportCatalogProblem(): void {
+  openFeedback({
+    type: 'problem',
+    pagePath: route.fullPath,
+    correlationId: errorCorrelationId.value,
+  })
+}
+
 function handleAddToCart(
   product: Product,
   quantity: number,
@@ -939,6 +966,11 @@ function canOpenWhatsAppCheckout(): boolean {
     return false
   }
 
+  if (!isWhatsAppConfigured.value) {
+    toast.info('WhatsApp da loja ainda nao configurado.')
+    return false
+  }
+
   return true
 }
 
@@ -952,25 +984,35 @@ async function handleSubmitOrder(): Promise<void> {
   try {
     const checkout = await orderService.checkoutViaWhatsApp(items.value, customer.value)
 
-    if (checkout.whatsapp_url) {
-      const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
-      if (!openedWindow) {
-        window.location.href = checkout.whatsapp_url
-      }
-      toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
-    } else {
-      toast.error('Pedido registrado, mas o WhatsApp da loja nao esta configurado.')
+    if (!checkout.whatsapp_url) {
+      toast.error('Nao foi possivel abrir o WhatsApp da loja. Seu carrinho foi mantido.')
+      return
     }
+
+    const openedWindow = window.open(checkout.whatsapp_url, '_blank', 'noopener,noreferrer')
+    if (!openedWindow) {
+      window.location.href = checkout.whatsapp_url
+    }
+    toast.success(`Pedido ${checkout.order_reference} registrado. Abrimos o WhatsApp para atendimento.`)
 
     clearCart()
     resetCustomer()
     isCartOpen.value = false
     await fetchProducts()
-  } catch (error) {
+  } catch (checkoutError) {
     Logger.warn('Failed to register WhatsApp checkout', {
-      error: error instanceof Error ? error.message : 'unknown_error',
+      error: checkoutError instanceof Error ? checkoutError.message : 'unknown_error',
     })
-    toast.error(extractCheckoutErrorMessage(error))
+    const correlationId = getErrorRequestId(checkoutError)
+    toast.error(extractCheckoutErrorMessage(checkoutError), undefined, {
+      label: 'Relatar problema',
+      onClick: () =>
+        openFeedback({
+          type: 'checkout',
+          pagePath: route.fullPath,
+          correlationId,
+        }),
+    })
   } finally {
     isSubmittingOrder.value = false
   }

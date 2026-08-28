@@ -126,6 +126,7 @@ export interface CheckoutPayload {
   items: CheckoutPayloadItem[]
   customer: CheckoutPayloadCustomer
   bot_session_id?: string
+  idempotency_key?: string
 }
 
 export interface CheckoutResponseItem {

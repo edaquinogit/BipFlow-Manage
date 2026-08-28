@@ -1,6 +1,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import productService from '@/services/product.service'
 import { Logger } from '@/services/logger'
+import { getSelectedStoreSlug } from '@/services/store-scope'
+import { getErrorRequestId } from '@/types/errors'
 import type { PaginatedProductsResponse, Product, ProductFilters } from '@/types/product'
 import { debounce } from '@/utils/debounce'
 
@@ -17,6 +19,9 @@ export interface UseProductSearchReturn {
   isLoading: Ref<boolean>
   isInitialLoading: Ref<boolean>
   error: Ref<string | null>
+  /** X-Request-ID of the failed request, when `error` is set -- lets a
+   * "Relatar problema" action attach the exact server log line. */
+  errorCorrelationId: Ref<string>
   page: Ref<number>
   pageSize: Ref<number>
   totalCount: Ref<number>
@@ -61,6 +66,7 @@ export const useProductSearch = (
   const isLoading = ref(false)
   const isInitialLoading = ref(false)
   const error = ref<string | null>(null)
+  const errorCorrelationId = ref('')
   const page = ref(Math.max(1, initialPage))
   const pageSize = ref(initialPageSize)
   const totalCount = ref(0)
@@ -88,6 +94,7 @@ export const useProductSearch = (
 
   const getCacheKey = (): string =>
     JSON.stringify({
+      storeSlug: getSelectedStoreSlug() || 'default',
       ...filters.value,
       page: page.value,
       pageSize: pageSize.value,
@@ -103,13 +110,10 @@ export const useProductSearch = (
   }
 
   const fetchProductsInternal = async (): Promise<void> => {
-    if (isInitialLoading.value) {
-      return
-    }
-
     isLoading.value = true
     isInitialLoading.value = true
     error.value = null
+    errorCorrelationId.value = ''
 
     const requestId = ++lastIssuedRequest
     const cacheKey = getCacheKey()
@@ -121,8 +125,10 @@ export const useProductSearch = (
         page: page.value,
       })
       updateStateFromResponse(cached.data)
-      isLoading.value = false
-      isInitialLoading.value = false
+      if (requestId === lastIssuedRequest) {
+        isLoading.value = false
+        isInitialLoading.value = false
+      }
       return
     }
 
@@ -146,13 +152,16 @@ export const useProductSearch = (
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Erro ao carregar produtos'
+      errorCorrelationId.value = getErrorRequestId(err)
       Logger.error('Public product fetch failed', {
         page: page.value,
         error: error.value,
       })
     } finally {
-      isLoading.value = false
-      isInitialLoading.value = false
+      if (requestId === lastIssuedRequest) {
+        isLoading.value = false
+        isInitialLoading.value = false
+      }
     }
   }
 
@@ -243,6 +252,7 @@ export const useProductSearch = (
     isLoading,
     isInitialLoading,
     error,
+    errorCorrelationId,
     page,
     pageSize,
     totalCount,

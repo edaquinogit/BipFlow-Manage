@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { useProductSearch } from '../useProductSearch'
 import productService from '@/services/product.service'
+import { setSelectedStoreSlug } from '@/services/store-scope'
 import type { PaginatedProductsResponse } from '@/types/product'
 
 vi.mock('@/services/product.service', () => ({
@@ -30,6 +31,8 @@ function pageResponse(page: number): PaginatedProductsResponse {
 describe('useProductSearch pagination', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setSelectedStoreSlug(null)
+    window.localStorage.clear()
     vi.mocked(productService.list).mockImplementation(async (_filters, page = 1) =>
       pageResponse(page)
     )
@@ -119,5 +122,67 @@ describe('useProductSearch pagination', () => {
     updateFilters({ search: 'camisa ' })
 
     expect(filters.value.search).toBe('camisa ')
+  })
+
+  it('does not reuse cached products after the storefront slug changes', async () => {
+    vi.mocked(productService.list)
+      .mockReset()
+      .mockResolvedValueOnce({
+        ...pageResponse(1),
+        results: [{ id: 101, name: 'Produto Loja A' } as any],
+      })
+      .mockResolvedValueOnce({
+        ...pageResponse(1),
+        results: [{ id: 202, name: 'Produto Loja B' } as any],
+      })
+
+    setSelectedStoreSlug('loja-a')
+    const search = useProductSearch({ pageSize: PAGE_SIZE })
+    await flushPromises()
+
+    expect(search.products.value.map((product) => product.id)).toEqual([101])
+
+    setSelectedStoreSlug('loja-b')
+    await search.fetchProducts()
+    await flushPromises()
+
+    expect(productService.list).toHaveBeenCalledTimes(2)
+    expect(search.products.value.map((product) => product.id)).toEqual([202])
+  })
+
+  // isAxiosError() requires `instanceof Error` -- a plain object literal
+  // (as real axios errors never are) would silently fall through and pass
+  // this test for the wrong reason.
+  const axiosError = (requestId: string) => Object.assign(new Error('Request failed'), {
+    response: { headers: { 'x-request-id': requestId } },
+    config: {},
+    isAxiosError: true,
+  })
+
+  it('captures the failed request X-Request-ID for contextual error reporting', async () => {
+    vi.mocked(productService.list).mockReset().mockRejectedValueOnce(axiosError('req-abc-123'))
+
+    const { error, errorCorrelationId } = useProductSearch({ pageSize: PAGE_SIZE })
+    await flushPromises()
+
+    expect(error.value).toBeTruthy()
+    expect(errorCorrelationId.value).toBe('req-abc-123')
+  })
+
+  it('clears the previous correlation id once a retry succeeds', async () => {
+    vi.mocked(productService.list)
+      .mockReset()
+      .mockRejectedValueOnce(axiosError('req-abc-123'))
+      .mockResolvedValueOnce(pageResponse(1))
+
+    const { error, errorCorrelationId, fetchProducts } = useProductSearch({ pageSize: PAGE_SIZE })
+    await flushPromises()
+    expect(errorCorrelationId.value).toBe('req-abc-123')
+
+    await fetchProducts()
+    await flushPromises()
+
+    expect(error.value).toBeNull()
+    expect(errorCorrelationId.value).toBe('')
   })
 })

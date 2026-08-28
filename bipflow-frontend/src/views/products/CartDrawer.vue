@@ -530,6 +530,7 @@ const checkoutValidationMessage = computed(() => {
 const canSubmitCheckout = computed(() => (
   props.itemCount > 0
   && !props.isSubmitting
+  && props.isWhatsAppConfigured
   && !checkoutValidationMessage.value
 ))
 
@@ -538,7 +539,7 @@ const submitButtonLabel = computed(() => {
     return 'Registrando pedido...'
   }
 
-  return props.isWhatsAppConfigured ? 'Registrar e abrir WhatsApp' : 'Registrar pedido'
+  return props.isWhatsAppConfigured ? 'Registrar e abrir WhatsApp' : 'WhatsApp indisponivel'
 })
 
 function cartItemImage(item: CartItem): string {

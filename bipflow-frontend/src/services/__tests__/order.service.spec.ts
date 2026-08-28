@@ -46,6 +46,7 @@ const buildCustomer = (overrides: Partial<CartCustomer> = {}): CartCustomer => (
 describe('orderService.checkoutViaWhatsApp', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     sessionStorage.clear()
     vi.mocked(api.post).mockResolvedValue({ data: { order_reference: 'BPF-1' } } as never)
   })
@@ -119,6 +120,45 @@ describe('orderService.checkoutViaWhatsApp', () => {
       quantity: 1,
     })
   })
+
+  it('includes an idempotency key in the checkout payload', async () => {
+    const items: CartItem[] = [{ product: buildProduct(), quantity: 1 }]
+
+    await orderService.checkoutViaWhatsApp(items, buildCustomer())
+
+    const payload = vi.mocked(api.post).mock.calls[0]?.[1] as Record<string, unknown>
+    expect(payload.idempotency_key).toEqual(expect.any(String))
+  })
+
+  it('reuses the same idempotency key after an unconfirmed network failure', async () => {
+    const items: CartItem[] = [{ product: buildProduct(), quantity: 1 }]
+    vi.mocked(api.post)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ data: { order_reference: 'BPF-1' } } as never)
+
+    await expect(orderService.checkoutViaWhatsApp(items, buildCustomer())).rejects.toThrow('network')
+    await orderService.checkoutViaWhatsApp(items, buildCustomer())
+
+    const firstPayload = vi.mocked(api.post).mock.calls[0]?.[1] as Record<string, unknown>
+    const secondPayload = vi.mocked(api.post).mock.calls[1]?.[1] as Record<string, unknown>
+    expect(secondPayload.idempotency_key).toBe(firstPayload.idempotency_key)
+  })
+
+  it('creates a new idempotency key when the checkout payload changes', async () => {
+    const product = buildProduct()
+    const firstItems: CartItem[] = [{ product, quantity: 1 }]
+    const secondItems: CartItem[] = [{ product, quantity: 2 }]
+    vi.mocked(api.post)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ data: { order_reference: 'BPF-1' } } as never)
+
+    await expect(orderService.checkoutViaWhatsApp(firstItems, buildCustomer())).rejects.toThrow('network')
+    await orderService.checkoutViaWhatsApp(secondItems, buildCustomer())
+
+    const firstPayload = vi.mocked(api.post).mock.calls[0]?.[1] as Record<string, unknown>
+    const secondPayload = vi.mocked(api.post).mock.calls[1]?.[1] as Record<string, unknown>
+    expect(secondPayload.idempotency_key).not.toBe(firstPayload.idempotency_key)
+  })
 })
 
 describe('orderService.buildWhatsAppHandoffMessage', () => {
@@ -161,6 +201,11 @@ describe('extractCheckoutErrorMessage', () => {
   it('maps guest_address_incomplete to a specific message', () => {
     expect(extractCheckoutErrorMessage(axiosError('guest_address_incomplete')))
       .toBe('Informe endereco, bairro e cidade para receber em casa.')
+  })
+
+  it('maps whatsapp_not_configured to a specific message', () => {
+    expect(extractCheckoutErrorMessage(axiosError('whatsapp_not_configured')))
+      .toBe('WhatsApp da loja ainda nao configurado.')
   })
 
   it('falls back to a generic message for unknown errors', () => {
