@@ -315,3 +315,142 @@ class CheckoutIsolationTest(TwoStoreFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class CatalogSearchIsolationTest(TwoStoreFixtureMixin, TestCase):
+    """`?search=` runs on top of the store-scoped queryset -- a term that matches
+    products in both tenants must still only ever return the caller's own.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.search_hit_a = Product.objects.create(
+            name="Camisa Performance A",
+            price=Decimal("99.00"),
+            category=self.category_a,
+            store=self.store_a,
+        )
+        self.search_hit_b = Product.objects.create(
+            name="Camisa Performance B",
+            price=Decimal("99.00"),
+            category=self.category_b,
+            store=self.store_b,
+        )
+
+    def test_dashboard_search_only_returns_the_authenticated_users_store(self) -> None:
+        response = self.client.get("/api/v1/products/", {"search": "Camisa Performance"})
+
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertEqual(ids, {self.search_hit_b.id})
+        self.assertNotIn(self.search_hit_a.id, ids)
+
+    def test_public_search_with_store_slug_header_only_returns_that_store(self) -> None:
+        client = APIClient()
+        response = client.get(
+            "/api/v1/products/",
+            {"search": "Camisa Performance"},
+            HTTP_X_STORE_SLUG=self.store_a.slug,
+        )
+
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertEqual(ids, {self.search_hit_a.id})
+        self.assertNotIn(self.search_hit_b.id, ids)
+
+    def test_public_search_without_header_only_returns_the_default_store(self) -> None:
+        client = APIClient()
+        response = client.get(
+            "/api/v1/products/", {"search": "Camisa Performance"}
+        )
+
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertEqual(ids, {self.search_hit_a.id})
+
+
+class CheckoutIdempotencyCrossTenantTest(TwoStoreFixtureMixin, TestCase):
+    """The idempotency key is unique per `(store, key)` -- the same key string
+    submitted to two different tenants must produce two independent orders,
+    never a cross-tenant 409 or a reused order.
+    """
+
+    SHARED_KEY = "shared-idempotency-key-1"
+
+    def setUp(self) -> None:
+        super().setUp()
+        for store in (self.store_a, self.store_b):
+            store.whatsapp_phone = "5571999999999"
+            store.save(update_fields=["whatsapp_phone"])
+
+        self.stocked_a = Product.objects.create(
+            name="Item Loja A",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+            category=self.category_a,
+            store=self.store_a,
+        )
+        self.stocked_b = Product.objects.create(
+            name="Item Loja B",
+            price=Decimal("20.00"),
+            stock_quantity=5,
+            category=self.category_b,
+            store=self.store_b,
+        )
+
+        self.customer_a = User.objects.create_user(
+            username="cliente_a", password="testpass123"
+        )
+        CustomerProfile.objects.create(
+            user=self.customer_a, store=self.store_a, full_name="Cliente A", phone="71999990000"
+        )
+        self.customer_b = User.objects.create_user(
+            username="cliente_b", password="testpass123"
+        )
+        CustomerProfile.objects.create(
+            user=self.customer_b, store=self.store_b, full_name="Cliente B", phone="71988880000"
+        )
+
+    def _checkout(self, user, product, store_slug):
+        client = APIClient()
+        client.force_authenticate(user=user)
+        payload = {
+            "idempotency_key": self.SHARED_KEY,
+            "items": [{"product_id": product.id, "quantity": 1}],
+            "customer": {"delivery_method": "pickup", "payment_method": "pix"},
+        }
+        return client.post(
+            "/api/v1/checkout/whatsapp/",
+            payload,
+            format="json",
+            HTTP_X_STORE_SLUG=store_slug,
+        )
+
+    def test_same_key_in_two_stores_creates_two_independent_orders(self) -> None:
+        response_a = self._checkout(self.customer_a, self.stocked_a, self.store_a.slug)
+        response_b = self._checkout(self.customer_b, self.stocked_b, self.store_b.slug)
+
+        self.assertEqual(response_a.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_b.status_code, status.HTTP_200_OK)
+
+        order_a = SaleOrder.objects.get(store=self.store_a, idempotency_key=self.SHARED_KEY)
+        order_b = SaleOrder.objects.get(store=self.store_b, idempotency_key=self.SHARED_KEY)
+        self.assertNotEqual(order_a.id, order_b.id)
+        self.assertEqual(SaleOrder.objects.filter(idempotency_key=self.SHARED_KEY).count(), 2)
+        self.assertEqual(order_a.items.first().product_id, self.stocked_a.id)
+        self.assertEqual(order_b.items.first().product_id, self.stocked_b.id)
+
+    def test_retrying_the_key_stays_scoped_to_its_own_store(self) -> None:
+        first_a = self._checkout(self.customer_a, self.stocked_a, self.store_a.slug)
+        self._checkout(self.customer_b, self.stocked_b, self.store_b.slug)
+        retry_a = self._checkout(self.customer_a, self.stocked_a, self.store_a.slug)
+
+        self.assertEqual(retry_a.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            retry_a.data["order_reference"], first_a.data["order_reference"]
+        )
+        self.assertEqual(
+            SaleOrder.objects.filter(
+                store=self.store_a, idempotency_key=self.SHARED_KEY
+            ).count(),
+            1,
+        )
+        self.stocked_a.refresh_from_db()
+        self.assertEqual(self.stocked_a.stock_quantity, 4)
