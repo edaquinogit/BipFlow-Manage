@@ -93,7 +93,7 @@
                           <span class="truncate">{{ item.variant.name }}</span>
                         </p>
                         <p class="mt-1 text-[13px] text-[var(--store-text-muted)] sm:text-sm">
-                          {{ formatBRL(item.product.price) }} / unidade
+                          {{ formatBRL(cartItemUnitPrice(item)) }} / unidade
                         </p>
                         <p
                           v-if="item.variant"
@@ -138,7 +138,7 @@
                       </div>
 
                       <p class="text-base font-bold text-[var(--store-text)]">
-                        {{ formatBRL(Number(item.product.price) * item.quantity) }}
+                        {{ formatBRL(Number(cartItemUnitPrice(item)) * item.quantity) }}
                       </p>
                     </div>
                   </div>
@@ -400,6 +400,7 @@ import type { CustomerProfile } from '@/types/customer'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { CartCustomer, CartItem } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { effectiveUnitPrice } from '@/utils/pricing'
 import { useDialogA11y } from '@/composables/useDialogA11y'
 import { getCartItemKey } from '@/composables/useCart'
 
@@ -550,6 +551,12 @@ function cartItemLabel(item: CartItem): string {
   return item.variant?.name
     ? `${item.product.name} - ${item.variant.name}`
     : item.product.name
+}
+
+// Display only -- the backend recomputes every line from product_id /
+// variant_id / quantity at checkout (see product-variant-pricing.md).
+function cartItemUnitPrice(item: CartItem): string {
+  return effectiveUnitPrice(item.product, item.variant)
 }
 
 function cartItemAvailableStock(item: CartItem): number {

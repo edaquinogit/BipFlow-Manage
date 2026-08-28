@@ -355,6 +355,38 @@ describe('ProductDetailView', () => {
     )
   })
 
+  it('reflects the selected variant price in the header and updates on selection', async () => {
+    wrapper.unmount()
+    vi.mocked(productService.getPublicBySlug).mockResolvedValue({
+      ...productDetail,
+      price: '42.50',
+      variants: [
+        {
+          id: 10, name: 'Padrao', color_hex: '#000000', price: null,
+          effective_price: '42.50', stock_quantity: 4, image: null,
+          is_active: true, position: 0,
+        },
+        {
+          id: 11, name: 'Premium', color_hex: '#3366FF', price: '59.90',
+          effective_price: '59.90', stock_quantity: 3, image: null,
+          is_active: true, position: 1,
+        },
+      ],
+    } as any)
+
+    wrapper = mountView()
+    await flushPromises()
+    await nextTick()
+
+    // "Padrao" is auto-selected (first orderable) -> its effective price.
+    expect(wrapper.text()).toContain('42,50')
+
+    await wrapper.find('[aria-label="Selecionar cor Premium"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('59,90')
+  })
+
   it('falls back to copying the public product link when native share fails', async () => {
     const share = vi.fn().mockRejectedValue(new Error('share_failed'))
     const writeText = vi.fn().mockResolvedValue(undefined)

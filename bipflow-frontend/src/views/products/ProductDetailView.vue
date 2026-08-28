@@ -194,7 +194,7 @@
             </h1>
 
             <p class="mt-4 text-[1.9rem] font-semibold tracking-[-0.03em] text-[var(--store-text)] min-[390px]:mt-5 min-[390px]:text-3xl">
-              {{ formatBRL(product.price) }}
+              <span v-if="headerPrice.from" class="text-[0.6em] font-medium text-[var(--store-text-muted)]">A partir de </span>{{ formatBRL(headerPrice.amount) }}
             </p>
 
             <p class="mt-3 text-[13px] leading-6 text-slate-600 min-[390px]:text-sm">
@@ -382,6 +382,7 @@ import { storeSettingsService } from '@/services/store-settings.service'
 import type { DeliveryRegion } from '@/types/delivery'
 import type { ProductDetail, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { displayPrice, effectiveUnitPrice } from '@/utils/pricing'
 import { buildPublicProductUrl } from '@/utils/publicStorefrontUrl'
 import { applyStorefrontFavicon } from '@/utils/storefrontFavicon'
 import { isLowStock } from '@/utils/stockAlerts'
@@ -489,6 +490,26 @@ const selectedVariant = computed<ProductVariant | null>(() => {
   }
 
   return activeVariants.value.find((variant) => variant.id === selectedVariantId.value) ?? null
+})
+
+// The detail view always has a variant auto-selected once variants load
+// (selectInitialVariant), so the header shows that variant's effective price
+// and updates the instant another colour is picked. `from` covers the brief
+// pre-selection frame / a product with no active variants. Checkout still
+// recomputes the real total server-side.
+const headerPrice = computed<{ amount: string; from: boolean }>(() => {
+  if (!product.value) {
+    return { amount: '0', from: false }
+  }
+
+  if (selectedVariant.value) {
+    return {
+      amount: effectiveUnitPrice(product.value, selectedVariant.value),
+      from: false,
+    }
+  }
+
+  return displayPrice(product.value)
 })
 
 function variantAvailableStock(variant: ProductVariant): number {
@@ -793,7 +814,7 @@ async function handleShareProduct(): Promise<void> {
 
   const sharePayload = {
     title: product.value.name,
-    text: `${product.value.name} • ${formatBRL(product.value.price)}`,
+    text: `${product.value.name} • ${formatBRL(headerPrice.value.amount)}`,
     url: shareUrl,
   }
 
