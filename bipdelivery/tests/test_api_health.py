@@ -56,6 +56,7 @@ from bipdelivery.api.models import (  # noqa: E402
     Store,
     StoreSettings,
 )
+from bipdelivery.api.views import CheckoutWhatsAppView  # noqa: E402
 
 pytestmark = pytest.mark.django_db
 
@@ -2037,6 +2038,124 @@ class CheckoutWhatsAppAPITest(TestCase):
             response.data["customer"]["delivery_region_name"], "Centro expandido"
         )
         self.assertIn("Regiao: Centro expandido", response.data["message"])
+
+    def test_checkout_rejects_a_delivery_region_from_another_store(self) -> None:
+        """A delivery_region_id that belongs to a different tenant must never
+        resolve -- the storefront customer here is scoped to the default store,
+        so store B's region is as good as non-existent and its fee is unusable.
+        """
+        client = self._checkout_client(
+            address="Rua A, 123", neighborhood="Centro", city="Salvador"
+        )
+        store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        foreign_region = DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("999.00"),
+            store=store_b,
+        )
+        payload = {
+            "items": [{"product_id": self.product.id, "quantity": 1}],
+            "customer": {
+                "delivery_method": "delivery",
+                "payment_method": "pix",
+                "delivery_region_id": foreign_region.id,
+                "notes": "",
+            },
+        }
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivery_region_id", response.data["customer"])
+        self.assertFalse(SaleOrder.objects.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+
+    def test_checkout_rejects_an_inactive_delivery_region(self) -> None:
+        """An inactive region for the right store is still unusable at checkout,
+        and the request fails loudly instead of silently charging another fee.
+        """
+        client = self._checkout_client(
+            address="Rua A, 123", neighborhood="Centro", city="Salvador"
+        )
+        inactive_region = DeliveryRegion.objects.create(
+            name="Centro desativado",
+            city="Salvador",
+            delivery_fee=Decimal("18.50"),
+            is_active=False,
+        )
+        payload = {
+            "items": [{"product_id": self.product.id, "quantity": 1}],
+            "customer": {
+                "delivery_method": "delivery",
+                "payment_method": "pix",
+                "delivery_region_id": inactive_region.id,
+                "notes": "",
+            },
+        }
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivery_region_id", response.data["customer"])
+        self.assertFalse(SaleOrder.objects.exists())
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+
+    def test_checkout_idempotency_recovers_from_a_concurrent_insert_race(
+        self,
+    ) -> None:
+        """Losing side of a true race: the pre-flight idempotency lookup runs
+        before the winner's row is visible, so the request proceeds into the
+        transaction and trips the per-store unique constraint. It must recover
+        by returning the winner's order -- one SaleOrder, stock decremented once
+        -- not surface a 500 or double-reserve stock.
+        """
+        client = self._checkout_client()
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 2}]
+        )
+        payload["idempotency_key"] = "checkout-race-1"
+
+        first_response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+
+        real_check = CheckoutWhatsAppView._idempotent_response_or_conflict
+        calls = {"count": 0}
+
+        def blind_first_lookup(view_self, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return None  # winner's committed row not visible yet
+            return real_check(view_self, **kwargs)
+
+        with patch.object(
+            CheckoutWhatsAppView,
+            "_idempotent_response_or_conflict",
+            blind_first_lookup,
+        ):
+            second_response: Any = client.post(
+                "/api/v1/checkout/whatsapp/", payload, format="json"
+            )
+
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.data["order_reference"],
+            first_response.data["order_reference"],
+        )
+        self.assertEqual(SaleOrder.objects.count(), 1)
+        self.assertEqual(
+            StockMovement.objects.filter(product=self.product).count(), 1
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 6)
 
     def test_checkout_falls_back_to_default_delivery_fee_without_a_region(
         self,
