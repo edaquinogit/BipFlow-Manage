@@ -1688,14 +1688,11 @@ class StoreAppearanceSettingsView(APIView):
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
-        return store.memberships.filter(user=request.user).exists()
+        return can_read_storefront_dashboard_store(request, store)
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     def get(self, request, *args, **kwargs):
         store = self._resolve_store(request, kwargs.get("slug"))
@@ -1722,7 +1719,11 @@ class StoreAppearanceSettingsView(APIView):
                 "Voce nao possui permissao para editar a aparencia desta loja."
             )
 
-        serializer = StoreAppearanceSettingsSerializer(data=request.data, partial=True)
+        serializer = StoreAppearanceSettingsSerializer(
+            data=request.data,
+            partial=True,
+            context={"store": store},
+        )
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
@@ -1734,6 +1735,25 @@ class StoreAppearanceSettingsView(APIView):
         store.save(update_fields=update_fields)
 
         return Response(StoreSerializer(store).data, status=status.HTTP_200_OK)
+
+
+def can_read_storefront_dashboard_store(request, store: Store) -> bool:
+    user = request.user
+    if user.is_staff or user.is_superuser:
+        return True
+
+    return store.memberships.filter(user=user).exists()
+
+
+def can_edit_storefront_dashboard_store(request, store: Store) -> bool:
+    user = request.user
+    if user.is_staff or user.is_superuser:
+        return True
+
+    return store.memberships.filter(
+        user=user,
+        role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
+    ).exists()
 
 
 class StorefrontAppearanceView(APIView):
@@ -1758,14 +1778,11 @@ class StorefrontAppearanceView(APIView):
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
-        return store.memberships.filter(user=request.user).exists()
+        return can_read_storefront_dashboard_store(request, store)
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     def get(self, request, *args, **kwargs):
         store = self._resolve_store(request, kwargs.get("slug"))
@@ -1820,10 +1837,7 @@ class StorefrontMediaUploadView(APIView):
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     def post(self, request, *args, **kwargs):
         store = resolve_request_store(request)
@@ -1850,14 +1864,11 @@ class StorefrontBannerListView(APIView):
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
-        return store.memberships.filter(user=request.user).exists()
+        return can_read_storefront_dashboard_store(request, store)
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     def get(self, request, *args, **kwargs):
         store = resolve_request_store(request)
@@ -1901,14 +1912,11 @@ class StorefrontBannerDetailView(APIView):
 
     @staticmethod
     def _is_member(request, store: Store) -> bool:
-        return store.memberships.filter(user=request.user).exists()
+        return can_read_storefront_dashboard_store(request, store)
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     @staticmethod
     def _get_banner(store: Store, banner_id: int):
@@ -1984,10 +1992,7 @@ class StorefrontBannerReorderView(APIView):
 
     @staticmethod
     def _can_edit(request, store: Store) -> bool:
-        return store.memberships.filter(
-            user=request.user,
-            role__in=(StoreMembership.ROLE_OWNER, StoreMembership.ROLE_MANAGER),
-        ).exists()
+        return can_edit_storefront_dashboard_store(request, store)
 
     def post(self, request, *args, **kwargs):
         store = resolve_request_store(request)

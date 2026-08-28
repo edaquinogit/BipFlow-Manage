@@ -48,6 +48,8 @@ class StoreModelTest(TestCase):
         store = Store.get_default()
 
         self.assertEqual(store.slug, Store.DEFAULT_SLUG)
+        self.assertEqual(store.tagline, "")
+        self.assertEqual(Store.normalize_theme(store.theme)["accent"], "#111827")
         self.assertEqual(Store.objects.count(), 1)
 
     def test_get_default_does_not_duplicate_on_repeated_calls(self) -> None:

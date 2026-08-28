@@ -2,7 +2,7 @@ import re
 import uuid
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -47,6 +47,30 @@ from .permissions import (
 from .stock import sync_product_stock_from_variants
 
 User = get_user_model()
+
+STOREFRONT_MEDIA_PATH_RE = re.compile(
+    r"(?:^|/)stores/(?P<store_id>\d+)/storefront(?:/|$)"
+)
+
+
+def validate_storefront_media_url_ownership(
+    value: str,
+    *,
+    store: Store | None,
+    field_name: str,
+) -> str:
+    """Reject reusing uploaded storefront media that belongs to another store."""
+
+    normalized_value = str(value or "").strip()
+    if not normalized_value or store is None:
+        return normalized_value
+
+    parsed_path = unquote(urlparse(normalized_value).path or normalized_value)
+    match = STOREFRONT_MEDIA_PATH_RE.search(parsed_path)
+    if match and int(match.group("store_id")) != store.id:
+        raise serializers.ValidationError("Esta midia nao pertence a loja atual.")
+
+    return normalized_value
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
@@ -1150,6 +1174,13 @@ class StoreAppearanceSettingsSerializer(serializers.Serializer):
     def validate_theme(self, value):
         return Store.normalize_theme(value)
 
+    def validate_logo_url(self, value):
+        return validate_storefront_media_url_ownership(
+            value,
+            store=self.context.get("store"),
+            field_name="logo_url",
+        )
+
 
 class StorefrontDestinationSerializerMixin:
     """Normalize friendly CTA destinations into safe storefront URLs."""
@@ -1308,6 +1339,27 @@ class StorefrontAppearanceSerializer(
                 "Informe uma cor hexadecimal no formato #RRGGBB."
             )
         return normalized_value.upper()
+
+    def validate_favicon_url(self, value: str) -> str:
+        return validate_storefront_media_url_ownership(
+            value,
+            store=self.context.get("store"),
+            field_name="favicon_url",
+        )
+
+    def validate_hero_image_desktop(self, value: str) -> str:
+        return validate_storefront_media_url_ownership(
+            value,
+            store=self.context.get("store"),
+            field_name="hero_image_desktop",
+        )
+
+    def validate_hero_image_mobile(self, value: str) -> str:
+        return validate_storefront_media_url_ownership(
+            value,
+            store=self.context.get("store"),
+            field_name="hero_image_mobile",
+        )
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -1493,6 +1545,13 @@ class StorefrontBannerSerializer(
                 {"ends_at": "A data final deve ser posterior ao inicio."}
             )
         return attrs
+
+    def validate_image_url(self, value: str) -> str:
+        return validate_storefront_media_url_ownership(
+            value,
+            store=self.context.get("store"),
+            field_name="image_url",
+        )
 
     def create(self, validated_data):
         store: Store = self.context["store"]

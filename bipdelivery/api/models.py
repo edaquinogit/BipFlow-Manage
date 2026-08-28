@@ -507,7 +507,7 @@ class Store(models.Model):
     THEME_KEYS = ("primary", "accent", "background", "surface", "text", "muted")
     DEFAULT_THEME = {
         "primary": "#05050A",
-        "accent": "#D81B60",
+        "accent": "#111827",
         "background": "#FAFAFA",
         "surface": "#FFFFFF",
         "text": "#05050A",
@@ -611,7 +611,7 @@ class Store(models.Model):
             slug=cls.DEFAULT_SLUG,
             defaults={
                 "name": "Loja Principal",
-                "tagline": "Catalogo online",
+                "tagline": "",
             },
         )
         return store
