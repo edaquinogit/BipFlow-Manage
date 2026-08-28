@@ -261,6 +261,45 @@ Se estiver com um banco limpo, rode antes:
 python bipdelivery\manage.py seed_dashboard_roles --email admin@example.com --password admin123 --staff --role admin
 ```
 
+### Rodando a suite Cypress completa localmente
+
+Rodar varios specs Cypress em sequencia contra um `manage.py runserver` local
+esgota rapido os throttles reais de autenticacao (`auth_ip`: 10/minuto,
+`auth_login_identity`: 5/minuto) -- toda spec que faz login usa a mesma
+identidade/IP, entao a suite inteira compartilha o mesmo orcamento. O
+resultado e `429 Too Many Requests` (ou o gate de CAPTCHA condicional
+disparando) em specs que nao tem nada a ver com o que estava sendo testado.
+`.github/workflows/ci.yml`'s `frontend-e2e` job ja evita isso sobrescrevendo
+esses dois throttles via env vars; reproduza o mesmo localmente com o perfil
+`bipdelivery/.env.e2e.example` (mantido em sincronia com o job de CI --
+copie para `.env.e2e`, mesmo padrao de `.env.example` -> `.env`; o hook de
+pre-commit recusa qualquer `.env*` versionado que nao termine em
+`.example`):
+
+```powershell
+cd bipdelivery
+Copy-Item .env.e2e.example .env.e2e
+$env:DJANGO_ENV_FILE = ".env.e2e"
+python manage.py runserver 127.0.0.1:8000
+```
+
+```bash
+cd bipdelivery
+cp .env.e2e.example .env.e2e
+DJANGO_ENV_FILE=.env.e2e python manage.py runserver 127.0.0.1:8000
+```
+
+`LocMemCache` (o cache default sem `CACHE_URL` configurado) e por processo --
+`cache.clear()` via `manage.py shell` roda num processo separado e nunca
+afeta o `runserver` ja rodando. Se a suite ficar contaminada mesmo com o
+perfil `.env.e2e` (por exemplo, apos rodar a suite inteira varias vezes sem
+reiniciar o processo), reinicie o `runserver` para zerar o cache -- nao ha
+como resetar o throttle de fora do processo sem um cache backend
+compartilhado (Redis) configurado.
+
+Nunca defina `DJANGO_ENV_FILE` em producao: o Render injeta env vars reais
+diretamente (ver `render.yaml`), esse arquivo nunca e lido la.
+
 Motor Node arquivado (`legacy/node-engine/`): opcional, fora do runtime.
 
 `api-order-validation/` possui pacote proprio. Rode comandos dentro da pasta
