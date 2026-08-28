@@ -14,12 +14,18 @@ import { ref, computed } from 'vue';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface Toast {
   id: string;
   type: ToastType;
   message: string;
   duration?: number;
   autoClose?: boolean;
+  action?: ToastAction;
 }
 
 const toasts = ref<Toast[]>([]);
@@ -39,8 +45,11 @@ function generateId(): string {
  * @param type - Type of notification (success, error, warning, info)
  * @param message - Message to display
  * @param duration - Auto-close duration in milliseconds. Use 0 to keep it visible.
+ * @param action - Optional secondary action (e.g. "Relatar problema"). A
+ *   toast carrying one never auto-closes, regardless of `duration` -- it
+ *   would be unfair to race the customer against a countdown to click it.
  */
-function notify(type: ToastType, message: string, duration?: number): void {
+function notify(type: ToastType, message: string, duration?: number, action?: ToastAction): void {
   const defaultDurations: Record<ToastType, number> = {
     success: 2600,
     info: 3000,
@@ -58,7 +67,8 @@ function notify(type: ToastType, message: string, duration?: number): void {
     type,
     message,
     duration: resolvedDuration,
-    autoClose: resolvedDuration > 0,
+    autoClose: resolvedDuration > 0 && !action,
+    action,
   };
 
   toasts.value = [...toasts.value, toast].slice(-MAX_VISIBLE_TOASTS);
@@ -81,8 +91,8 @@ function success(message: string, duration?: number): void {
 /**
  * Notify error
  */
-function error(message: string, duration?: number): void {
-  notify('error', message, duration);
+function error(message: string, duration?: number, action?: ToastAction): void {
+  notify('error', message, duration, action);
 }
 
 /**

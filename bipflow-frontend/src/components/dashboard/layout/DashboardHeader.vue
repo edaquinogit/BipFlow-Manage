@@ -4,6 +4,7 @@ import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   ChartBarIcon,
+  ChatBubbleBottomCenterTextIcon,
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   QrCodeIcon,
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { label: 'PDV', to: { name: DashboardRoutes.Pdv }, icon: QrCodeIcon },
   { label: 'Pedidos', to: { name: DashboardRoutes.Orders }, icon: ReceiptPercentIcon },
   { label: 'Atendimento', to: { name: DashboardRoutes.Support }, icon: ChatBubbleLeftRightIcon },
+  { label: 'Feedbacks', to: { name: DashboardRoutes.Feedback }, icon: ChatBubbleBottomCenterTextIcon },
   { label: 'Configuracoes', to: { name: DashboardRoutes.Settings }, icon: Cog6ToothIcon },
 ];
 

@@ -13,6 +13,7 @@ export const DashboardRoutes = {
   Orders: 'dashboard.orders',
   Support: 'dashboard.support',
   SupportConversation: 'dashboard.support.conversation',
+  Feedback: 'dashboard.feedback',
   Settings: 'dashboard.settings',
 } as const
 
@@ -81,6 +82,12 @@ export const dashboardRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/DashboardSupportView.vue'),
         props: true,
         meta: { title: 'Atendimento' },
+      },
+      {
+        path: 'feedbacks',
+        name: DashboardRoutes.Feedback,
+        component: () => import('@/views/dashboard/DashboardFeedbackView.vue'),
+        meta: { title: 'Feedbacks' },
       },
       {
         path: 'configuracoes',

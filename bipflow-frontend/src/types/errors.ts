@@ -123,6 +123,30 @@ export function getErrorStatusCode(error: unknown): number | undefined {
 }
 
 /**
+ * Correlation id for a failed request, read from the `X-Request-ID`
+ * response header GlobalExceptionMiddleware stamps on *every* response
+ * (see bipdelivery/core/middleware.py) -- including manually-built error
+ * Response()s that never carry `request_id` in their JSON body, unlike a
+ * raised/handled exception. The header is checked first for that reason;
+ * the body field is a fallback for completeness, not the primary source.
+ * Ties a customer's "Relatar problema" click back to the exact server log
+ * line for that request.
+ */
+export function getErrorRequestId(error: unknown): string {
+  if (!isAxiosError(error)) {
+    return '';
+  }
+
+  const headerValue = error.response?.headers?.['x-request-id'];
+  if (typeof headerValue === 'string' && headerValue) {
+    return headerValue;
+  }
+
+  const bodyValue = (error.response?.data as { request_id?: string } | undefined)?.request_id;
+  return typeof bodyValue === 'string' ? bodyValue : '';
+}
+
+/**
  * Build error context for structured logging
  */
 export function buildErrorContext(

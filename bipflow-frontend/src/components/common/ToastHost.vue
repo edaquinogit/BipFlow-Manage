@@ -76,6 +76,14 @@ const toastConfig = {
           <p class="mt-0.5 text-sm leading-5 text-slate-600">
             {{ toast.message }}
           </p>
+          <button
+            v-if="toast.action"
+            type="button"
+            class="mt-2 text-xs font-bold text-slate-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-300"
+            @click="toast.action.onClick(); removeToast(toast.id)"
+          >
+            {{ toast.action.label }}
+          </button>
         </div>
 
         <button
