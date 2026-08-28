@@ -41,7 +41,7 @@ interface IdentityColorsDraft {
   secondary_color: string;
 }
 
-const SECONDARY_COLOR_FALLBACK = '#D81B60';
+const SECONDARY_COLOR_FALLBACK = '#111827';
 const LOGO_MEDIA_RULES = STOREFRONT_MEDIA_RULES.logo;
 
 const THEME_COLOR_FIELDS: { key: ThemeColorKey; label: string }[] = [
@@ -56,7 +56,7 @@ const THEME_COLOR_FIELDS: { key: ThemeColorKey; label: string }[] = [
 function buildThemeDraft(theme: StoreTheme | null | undefined): ThemeDraft {
   return {
     primary: theme?.primary || '#05050A',
-    accent: theme?.accent || '#D81B60',
+    accent: theme?.accent || '#111827',
     background: theme?.background || '#FAFAFA',
     surface: theme?.surface || '#FFFFFF',
     text: theme?.text || '#05050A',
@@ -263,7 +263,7 @@ async function handleSave(): Promise<void> {
                 <button
                   type="button"
                   data-cy="btn-select-storefront-logo"
-                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#111827] hover:text-[#111827]"
                   @click="openLogoPicker"
                 >
                   Alterar logo
@@ -272,7 +272,7 @@ async function handleSave(): Promise<void> {
                   type="button"
                   data-cy="btn-remove-storefront-logo"
                   :disabled="!logoPreviewUrl"
-                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#D81B60] hover:text-[#D81B60] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+                  class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#111827] hover:text-[#111827] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
                   @click="removeLogo"
                 >
                   Remover
@@ -282,7 +282,7 @@ async function handleSave(): Promise<void> {
               <p class="text-[11px] leading-5 text-bip-muted">
                 PNG, JPG, JPEG ou WEBP ate 2 MB. Recomendado: {{ LOGO_MEDIA_RULES.recommendedSize }}.
               </p>
-              <p v-if="logoError" data-cy="storefront-logo-error" class="text-xs font-semibold text-[#D81B60]">
+              <p v-if="logoError" data-cy="storefront-logo-error" class="text-xs font-semibold text-[#111827]">
                 {{ logoError }}
               </p>
             </div>
@@ -298,7 +298,7 @@ async function handleSave(): Promise<void> {
             data-cy="storefront-tagline"
             type="text"
             maxlength="160"
-            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="Ex.: Catalogo online"
           />
         </label>
@@ -330,7 +330,7 @@ async function handleSave(): Promise<void> {
               type="text"
               maxlength="9"
               pattern="^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$"
-              class="h-11 min-w-0 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 font-mono text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 min-w-0 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 font-mono text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               :aria-label="`${field.label} em HEX`"
             />
           </span>
@@ -351,7 +351,7 @@ async function handleSave(): Promise<void> {
               type="text"
               maxlength="9"
               pattern="^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$"
-              class="h-11 min-w-0 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 font-mono text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 min-w-0 flex-1 rounded-lg border border-[#D1D5DB] bg-white px-3 font-mono text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               aria-label="Secundaria em HEX"
             />
           </span>
@@ -359,13 +359,13 @@ async function handleSave(): Promise<void> {
       </div>
     </div>
 
-    <p v-if="saveError" class="text-xs font-semibold text-[#D81B60]">{{ saveError }}</p>
+    <p v-if="saveError" class="text-xs font-semibold text-[#111827]">{{ saveError }}</p>
 
     <button
       type="button"
       data-cy="btn-save-storefront-identity"
       :disabled="isSaving || !selectedStore || !hasChanges"
-      class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
+      class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
       @click="handleSave"
     >
       {{ isSaving ? 'Salvando...' : 'Salvar alteracoes' }}

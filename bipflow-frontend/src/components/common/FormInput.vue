@@ -25,7 +25,7 @@ defineEmits(['update:modelValue']);
 
 <template>
   <div class="space-y-2 group">
-    <label class="block text-[10px] font-black text-bip-muted uppercase tracking-[0.2em] group-focus-within:text-[#D81B60] transition-colors">
+    <label class="block text-[10px] font-black text-bip-muted uppercase tracking-[0.2em] group-focus-within:text-[#111827] transition-colors">
       {{ label }}
     </label>
 
@@ -36,14 +36,14 @@ defineEmits(['update:modelValue']);
         :value="modelValue"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         :placeholder="placeholder"
-        class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-[16px] leading-6 text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] active:translate-y-0"
+        class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-[16px] leading-6 text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6] active:translate-y-0"
         style="font-size: 16px;"
-        :class="{ 'border-[#D81B60]/50 bg-[#FCE7F3]': error }"
+        :class="{ 'border-[#111827]/50 bg-[#F3F4F6]': error }"
       />
     </div>
 
     <Transition name="error-slide">
-      <p v-if="error" class="text-[9px] text-[#D81B60] font-black uppercase tracking-widest animate-pulse">
+      <p v-if="error" class="text-[9px] text-[#111827] font-black uppercase tracking-widest animate-pulse">
         {{ error }}
       </p>
     </Transition>

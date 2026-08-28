@@ -51,7 +51,7 @@ const activeTabComponent = computed(() => (
         role="tab"
         :aria-selected="activeTab === tab.value"
         class="flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-widest transition-all duration-300"
-        :class="activeTab === tab.value ? 'bg-[#D81B60] text-white shadow-lg shadow-[#D81B60]/30' : 'text-bip-muted hover:text-[#05050A]'"
+        :class="activeTab === tab.value ? 'bg-[#111827] text-white shadow-lg shadow-[#111827]/30' : 'text-bip-muted hover:text-[#05050A]'"
         @click="activeTab = tab.value"
       >
         <component :is="tab.icon" class="h-4 w-4" />

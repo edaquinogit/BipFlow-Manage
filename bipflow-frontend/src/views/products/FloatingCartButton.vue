@@ -3,7 +3,7 @@
     <button
       v-if="itemCount > 0"
       type="button"
-      class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-[var(--store-text)] px-4 pr-5 text-white shadow-[0_18px_35px_-18px_rgba(5,5,10,0.8)] ring-2 ring-white transition duration-200 hover:-translate-y-0.5 hover:bg-[var(--store-primary)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#FCE7F3] active:translate-y-0 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] sm:right-6"
+      class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-[var(--store-text)] px-4 pr-5 text-white shadow-[0_18px_35px_-18px_rgba(5,5,10,0.8)] ring-2 ring-white transition duration-200 hover:-translate-y-0.5 hover:bg-[var(--store-primary)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--store-primary-soft)] active:translate-y-0 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] sm:right-6"
       :aria-label="cartAriaLabel"
       @click="$emit('openCart')"
     >

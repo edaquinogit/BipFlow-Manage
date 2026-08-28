@@ -88,7 +88,7 @@ useStoreSwitchEffect(() => {
       <div class="mt-3 h-3 w-64 animate-pulse rounded bg-zinc-100" />
     </div>
 
-    <div v-else-if="storeSettingsError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]">
+    <div v-else-if="storeSettingsError" class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151]">
       {{ storeSettingsError }}
     </div>
 
@@ -119,7 +119,7 @@ useStoreSwitchEffect(() => {
           type="tel"
           inputmode="tel"
           autocomplete="tel"
-          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           placeholder="+55 71 99999-9999"
         />
       </label>
@@ -131,7 +131,7 @@ useStoreSwitchEffect(() => {
       <button
         type="submit"
         :disabled="!canSaveStoreSettings"
-        class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+        class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
       >
         {{ isSavingStoreSettings ? 'Salvando...' : 'Salvar WhatsApp' }}
       </button>

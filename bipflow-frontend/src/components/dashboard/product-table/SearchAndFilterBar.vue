@@ -228,7 +228,7 @@ function cancelNewCategory(): void {
           type="text"
           placeholder="Buscar por nome, SKU ou descrição"
           data-cy="search-input"
-          class="h-11 w-full rounded-full border border-transparent bg-[#F4F1F3] py-3 pl-11 pr-10 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full rounded-full border border-transparent bg-[#F4F1F3] py-3 pl-11 pr-10 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:bg-white focus:ring-2 focus:ring-[#F3F4F6]"
           @input="handleSearchInput"
         />
 
@@ -247,7 +247,7 @@ function cancelNewCategory(): void {
         v-if="isSearching"
         class="hidden shrink-0 items-center gap-2 rounded-full bg-[#F4F1F3] px-3 py-2 text-xs text-bip-muted sm:inline-flex"
       >
-        <span class="h-2 w-2 animate-pulse rounded-full bg-[#D81B60]" />
+        <span class="h-2 w-2 animate-pulse rounded-full bg-[#111827]" />
         Buscando
       </span>
 
@@ -255,7 +255,7 @@ function cancelNewCategory(): void {
         v-if="hasAnyActiveFilters"
         type="button"
         data-cy="btn-clear-filters"
-        class="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-bip-muted transition hover:text-[#D81B60] sm:inline-flex"
+        class="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-bip-muted transition hover:text-[#111827] sm:inline-flex"
         @click="handleClearFilters"
       >
         <XMarkIcon class="h-3.5 w-3.5" />
@@ -266,13 +266,13 @@ function cancelNewCategory(): void {
         type="button"
         :aria-expanded="isFiltersOpen"
         aria-label="Abrir filtros"
-        class="group relative shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+        class="group relative shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-bip-muted transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F3F4F6] hover:text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#F3F4F6]"
         @click="toggleFiltersDrawer"
       >
         <FunnelIcon class="h-5 w-5" />
         <span
           v-if="hasAnyActiveFilters"
-          class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#D81B60] ring-2 ring-white"
+          class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#111827] ring-2 ring-white"
         />
       </button>
     </div>
@@ -291,7 +291,7 @@ function cancelNewCategory(): void {
         <div class="relative ml-auto w-full max-w-2xl rounded-2xl border border-white/40 bg-white/80 p-4 shadow-2xl shadow-black/10 backdrop-blur-xl sm:p-6">
           <button
             type="button"
-            class="absolute right-3 top-3 text-bip-muted transition hover:text-[#D81B60]"
+            class="absolute right-3 top-3 text-bip-muted transition hover:text-[#111827]"
             aria-label="Fechar filtros"
             @click="isFiltersOpen = false"
           >
@@ -304,7 +304,7 @@ function cancelNewCategory(): void {
                 <span class="text-xs font-black uppercase tracking-[0.16em] text-bip-muted">Categorias</span>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 text-xs font-semibold text-[#D81B60] hover:underline"
+                  class="inline-flex items-center gap-1 text-xs font-semibold text-[#111827] hover:underline"
                   @click="showNewCategoryModal = true"
                 >
                   <PlusIcon class="h-3.5 w-3.5" />
@@ -316,7 +316,7 @@ function cancelNewCategory(): void {
                 <button
                   type="button"
                   class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
-                  :class="!localFilters.categoryId ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                  :class="!localFilters.categoryId ? 'bg-[#111827] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
                   :aria-selected="!localFilters.categoryId"
                   @click="selectCategory(null)"
                 >
@@ -328,7 +328,7 @@ function cancelNewCategory(): void {
                   <button
                     type="button"
                     class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition"
-                    :class="isSelectedCategory(category.id) ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                    :class="isSelectedCategory(category.id) ? 'bg-[#111827] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
                     :aria-selected="isSelectedCategory(category.id)"
                     @click="selectCategory(category.id)"
                   >
@@ -341,7 +341,7 @@ function cancelNewCategory(): void {
                     :key="child.id"
                     type="button"
                     class="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 pl-6 text-left text-sm transition"
-                    :class="isSelectedCategory(child.id) ? 'bg-[#D81B60] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
+                    :class="isSelectedCategory(child.id) ? 'bg-[#111827] text-white shadow-sm' : 'text-[#05050A] hover:bg-zinc-100'"
                     :aria-selected="isSelectedCategory(child.id)"
                     @click="selectCategory(child.id)"
                   >
@@ -359,8 +359,8 @@ function cancelNewCategory(): void {
                   type="button"
                   class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
                   :class="localFilters.inStock === null
-                    ? 'bg-[#D81B60] text-white shadow-md'
-                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                    ? 'bg-[#111827] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#111827]'"
                   @click="selectAvailability(null)"
                 >
                   Todos os itens
@@ -369,8 +369,8 @@ function cancelNewCategory(): void {
                   type="button"
                   class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
                   :class="localFilters.inStock === true
-                    ? 'bg-[#D81B60] text-white shadow-md'
-                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                    ? 'bg-[#111827] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#111827]'"
                   @click="selectAvailability(true)"
                 >
                   Em estoque
@@ -379,8 +379,8 @@ function cancelNewCategory(): void {
                   type="button"
                   class="rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
                   :class="localFilters.inStock === false
-                    ? 'bg-[#D81B60] text-white shadow-md'
-                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                    ? 'bg-[#111827] text-white shadow-md'
+                    : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#111827]'"
                   @click="selectAvailability(false)"
                 >
                   Sem estoque
@@ -397,7 +397,7 @@ function cancelNewCategory(): void {
                       type="number"
                       min="0"
                       step="0.01"
-                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                       placeholder="Min."
                       @input="handleMinPriceInput"
                     />
@@ -409,7 +409,7 @@ function cancelNewCategory(): void {
                       type="number"
                       min="0"
                       step="0.01"
-                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="h-10 w-full rounded-lg border border-[#D1D5DB] bg-white/50 px-3 text-sm text-[#05050A] outline-none backdrop-blur transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                       placeholder="Max."
                       @input="handleMaxPriceInput"
                     />
@@ -423,7 +423,7 @@ function cancelNewCategory(): void {
             <button
               v-if="hasAnyActiveFilters"
               type="button"
-              class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#05050A]"
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-bip-muted transition hover:border-[#111827]/40 hover:text-[#05050A]"
               @click="handleClearFilters"
             >
               <XMarkIcon class="h-4 w-4" />
@@ -431,7 +431,7 @@ function cancelNewCategory(): void {
             </button>
             <button
               type="button"
-              class="inline-flex h-10 items-center justify-center rounded-lg bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-[0_12px_28px_-18px_rgba(216,27,96,0.8)] transition hover:bg-[#D81B60]/90"
+              class="inline-flex h-10 items-center justify-center rounded-lg bg-[#111827] px-5 text-sm font-semibold text-white shadow-[0_12px_28px_-18px_rgba(17,24,39,0.8)] transition hover:bg-[#111827]/90"
               @click="isFiltersOpen = false"
             >
               Aplicar
@@ -520,7 +520,7 @@ function cancelNewCategory(): void {
               required
               minlength="2"
               maxlength="50"
-              class="h-12 w-full rounded-xl border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-12 w-full rounded-xl border border-[#D1D5DB] bg-white px-4 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Ex.: Bebidas"
             />
           </label>
@@ -528,7 +528,7 @@ function cancelNewCategory(): void {
           <div class="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              class="rounded-xl border border-[#E5E7EB] px-4 py-3 text-sm font-medium text-bip-muted transition hover:border-[#D81B60]/30 hover:text-[#05050A]"
+              class="rounded-xl border border-[#E5E7EB] px-4 py-3 text-sm font-medium text-bip-muted transition hover:border-[#111827]/30 hover:text-[#05050A]"
               :disabled="isCreatingCategory"
               @click="cancelNewCategory"
             >
@@ -537,7 +537,7 @@ function cancelNewCategory(): void {
 
             <button
               type="submit"
-              class="rounded-xl bg-[#D81B60] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="isCreatingCategory || !newCategoryName.trim()"
             >
               <span v-if="isCreatingCategory">Criando...</span>

@@ -60,7 +60,7 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
   class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm transition-all"
 >
         <div class="flex flex-col items-center gap-4">
-          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-[#D81B60] border-t-transparent"></div>
+          <div class="h-10 w-10 animate-spin rounded-full border-[3px] border-[#111827] border-t-transparent"></div>
           <span class="text-[10px] font-black uppercase tracking-[0.3em] text-[#05050A] italic">Atualizando vitrine...</span>
         </div>
       </div>
@@ -90,10 +90,10 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
           type="button"
           data-cy="select-all-checkbox-mobile"
           @click="emit('select-all')"
-          class="w-5 h-5 shrink-0 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-5 h-5 shrink-0 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#F3F4F6]"
           :class="[
             props.isAllSelected || props.isIndeterminate
-              ? 'bg-[#D81B60] border-[#D81B60]'
+              ? 'bg-[#111827] border-[#111827]'
               : 'border-[#D1D5DB] bg-white'
           ]"
           title="Selecionar todos os produtos"
@@ -146,10 +146,10 @@ const onPrintLabel = (product: Product) => emit('print-label', product);
                 v-if="props.canManageCatalog"
                 data-cy="select-all-checkbox"
                 @click="emit('select-all')"
-                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] hover:border-[#D81B60]/50"
+                class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#F3F4F6] hover:border-[#111827]/50"
                 :class="[
                   props.isAllSelected || props.isIndeterminate
-                    ? 'bg-[#D81B60] border-[#D81B60]'
+                    ? 'bg-[#111827] border-[#111827]'
                     : 'border-[#D1D5DB] bg-white'
                 ]"
                 title="Selecionar todos os produtos"

@@ -59,7 +59,7 @@ const chartOptions = computed(() => ({
     fontFamily: 'inherit',
   },
   theme: { mode: 'light' as const },
-  colors: ['#D81B60'],
+  colors: ['#111827'],
   dataLabels: { enabled: false },
   stroke: { curve: 'smooth' as const, width: 3 },
   fill: {
@@ -120,7 +120,7 @@ const chartOptions = computed(() => ({
             <p class="text-[10px] font-black uppercase tracking-widest text-bip-muted">Vs ano anterior</p>
             <p
               class="text-xl font-black"
-              :class="isPositiveYoyComparison ? 'text-emerald-600' : 'text-[#D81B60]'"
+              :class="isPositiveYoyComparison ? 'text-emerald-600' : 'text-[#111827]'"
             >
               {{ isPositiveYoyComparison ? '▲' : '▼' }} {{ Math.abs(Number(comparisonSamePeriodLastYear ?? 0)).toFixed(1) }}%
             </p>
@@ -144,6 +144,6 @@ const chartOptions = computed(() => ({
       </div>
     </div>
 
-    <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-[#D81B60]/5" />
+    <ArrowTrendingUpIcon class="absolute -right-6 -bottom-6 h-32 w-32 text-[#111827]/5" />
   </Card>
 </template>

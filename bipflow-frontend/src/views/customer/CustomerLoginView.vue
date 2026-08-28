@@ -99,7 +99,7 @@ async function handleSubmit(): Promise<void> {
   <div class="storefront-shell min-h-screen">
     <div class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10 sm:px-6">
       <div class="mb-6 text-center">
-        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#D81B60]">Minha conta</p>
+        <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#111827]">Minha conta</p>
         <h1 class="mt-2 text-2xl font-semibold text-[#05050A]">Entrar</h1>
         <p class="mt-2 text-sm leading-6 text-[#6B7280]">
           Acesse seu perfil para finalizar pedidos mais rápido.
@@ -117,7 +117,7 @@ async function handleSubmit(): Promise<void> {
       <div
         v-if="errorMessage"
         data-cy="login-error"
-        class="mb-5 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+        class="mb-5 rounded-xl border border-[#F3F4F6] bg-[#F3F4F6] p-3 text-sm text-[#374151]"
       >
         {{ errorMessage }}
       </div>
@@ -130,7 +130,7 @@ async function handleSubmit(): Promise<void> {
             type="email"
             autocomplete="email"
             required
-            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="voce@email.com"
           />
         </label>
@@ -142,7 +142,7 @@ async function handleSubmit(): Promise<void> {
             type="password"
             autocomplete="current-password"
             required
-            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="Sua senha"
           />
         </label>
@@ -150,7 +150,7 @@ async function handleSubmit(): Promise<void> {
         <button
           type="submit"
           :disabled="isSubmitting"
-          class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
+          class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#111827] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
         >
           {{ isSubmitting ? 'Entrando...' : 'Entrar' }}
         </button>
@@ -159,7 +159,7 @@ async function handleSubmit(): Promise<void> {
       <div class="mt-6 flex flex-col items-center gap-2 text-sm">
         <RouterLink
           :to="{ path: createCustomerProfilePath(routeStoreSlug), query: route.query.redirect ? { redirect: route.query.redirect } : {} }"
-          class="font-semibold text-[#D81B60] hover:underline"
+          class="font-semibold text-[#111827] hover:underline"
         >
           Ainda não tem perfil? Criar agora
         </RouterLink>

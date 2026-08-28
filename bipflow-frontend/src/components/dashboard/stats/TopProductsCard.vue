@@ -68,11 +68,11 @@ const progressFor = (revenue: string): number => {
           <div class="min-w-0 flex-1">
             <div class="flex items-baseline justify-between gap-2">
               <p class="truncate text-sm font-bold text-[#05050A]">{{ product.product_name }}</p>
-              <p class="shrink-0 text-sm font-black text-[#D81B60]">{{ formatBRL(product.revenue_total) }}</p>
+              <p class="shrink-0 text-sm font-black text-[#111827]">{{ formatBRL(product.revenue_total) }}</p>
             </div>
             <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-[#D81B60] to-[#D81B60]/60"
+                class="h-full rounded-full bg-gradient-to-r from-[#111827] to-[#111827]/60"
                 :style="{ width: progressFor(product.revenue_total) + '%' }"
               />
             </div>

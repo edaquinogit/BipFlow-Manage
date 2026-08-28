@@ -108,7 +108,7 @@ useStoreSwitchEffect(() => {
         <span class="mb-2 block text-[10px] font-black uppercase tracking-widest text-bip-muted">Categoria principal</span>
         <select
           :value="categoryDraft.parent ?? ''"
-          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="handleParentChange"
         >
           <option value="">Nenhuma, criar categoria principal</option>
@@ -130,7 +130,7 @@ useStoreSwitchEffect(() => {
           v-model="categoryDraft.name"
           type="text"
           maxlength="100"
-          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           :placeholder="isSubcategoryDraft ? 'Biquíni, Macacão, Saída de praia...' : 'Moda Praia, Acessórios, Combos...'"
         />
       </label>
@@ -140,7 +140,7 @@ useStoreSwitchEffect(() => {
         <textarea
           v-model="categoryDraft.description"
           rows="2"
-          class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           :placeholder="isSubcategoryDraft && selectedParentName ? `Dentro de ${selectedParentName}` : 'Contexto rápido para a equipe'"
         />
       </label>
@@ -148,7 +148,7 @@ useStoreSwitchEffect(() => {
       <button
         type="submit"
         :disabled="isSavingCategory || categoryDraft.name.trim().length < 2"
-        class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+        class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
       >
         {{ submitButtonLabel }}
       </button>
@@ -160,7 +160,7 @@ useStoreSwitchEffect(() => {
         <div class="mt-3 h-3 w-56 animate-pulse rounded bg-zinc-100" />
       </div>
 
-      <div v-else-if="categoriesError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]">
+      <div v-else-if="categoriesError" class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151]">
         {{ categoriesError }}
       </div>
 
@@ -183,7 +183,7 @@ useStoreSwitchEffect(() => {
           <div v-if="canManageCatalog" class="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-bip-muted transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-bip-muted transition hover:border-[#111827]/40 hover:bg-[#F3F4F6] hover:text-[#111827]"
               title="Adicionar subcategoria"
               @click="startSubcategory(category.id)"
             >
@@ -191,7 +191,7 @@ useStoreSwitchEffect(() => {
             </button>
             <button
               type="button"
-              class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] text-[#D81B60] transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#111827]/20 bg-[#F3F4F6] text-[#111827] transition hover:border-[#111827]/40 hover:bg-[#F3F4F6]/70 disabled:cursor-not-allowed disabled:opacity-50"
               title="Remover categoria"
               :disabled="deletingCategoryId === category.id"
               @click="handleDeleteCategory(category.id)"
@@ -218,7 +218,7 @@ useStoreSwitchEffect(() => {
             <button
               v-if="canManageCatalog"
               type="button"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] text-[#D81B60] transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#111827]/20 bg-[#F3F4F6] text-[#111827] transition hover:border-[#111827]/40 hover:bg-[#F3F4F6]/70 disabled:cursor-not-allowed disabled:opacity-50"
               title="Remover subcategoria"
               :disabled="deletingCategoryId === child.id"
               @click="handleDeleteCategory(child.id)"

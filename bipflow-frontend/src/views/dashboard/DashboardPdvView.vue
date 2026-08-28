@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
             autofocus
             data-cy="pdv-scan-input"
             placeholder="Aponte o leitor ou digite o código e pressione Enter"
-            class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 font-mono text-sm uppercase text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 font-mono text-sm uppercase text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             :disabled="isLookingUp"
             @keyup.enter="handleScanSubmit"
           />
@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
             type="button"
             data-cy="pdv-open-camera-scanner"
             aria-label="Escanear com a câmera"
-            class="flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-[#D1D5DB] text-sm font-bold uppercase tracking-wide text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] active:scale-[0.98] sm:h-[3.125rem] sm:w-[3.125rem]"
+            class="flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-[#D1D5DB] text-sm font-bold uppercase tracking-wide text-bip-muted transition hover:border-[#111827]/40 hover:text-[#111827] active:scale-[0.98] sm:h-[3.125rem] sm:w-[3.125rem]"
             @click="openCameraScanner"
           >
             <CameraIcon class="h-5 w-5 shrink-0" />
@@ -508,7 +508,7 @@ onBeforeUnmount(() => {
           data-cy="pdv-scan-error"
           role="alert"
           aria-live="polite"
-          class="mt-2 text-xs font-bold text-[#D81B60]"
+          class="mt-2 text-xs font-bold text-[#111827]"
         >
           {{ scanError }}
         </p>
@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
                       data-cy="pdv-cart-decrement"
                       aria-label="Diminuir quantidade"
                       :disabled="line.quantity <= 1"
-                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#111827]/40 hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-40"
                       @click="adjustQuantity(line.lineKey, -1)"
                     >
                       <MinusIcon class="h-4 w-4" />
@@ -600,7 +600,7 @@ onBeforeUnmount(() => {
                       data-cy="pdv-cart-increment"
                       aria-label="Aumentar quantidade"
                       :disabled="line.quantity >= line.availableStock"
-                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+                      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#D1D5DB] text-bip-muted transition hover:border-[#111827]/40 hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-40"
                       @click="adjustQuantity(line.lineKey, 1)"
                     >
                       <PlusIcon class="h-4 w-4" />
@@ -616,7 +616,7 @@ onBeforeUnmount(() => {
                     type="button"
                     data-cy="pdv-cart-remove"
                     aria-label="Remover item"
-                    class="flex h-9 w-9 items-center justify-center text-bip-muted hover:text-[#D81B60]"
+                    class="flex h-9 w-9 items-center justify-center text-bip-muted hover:text-[#111827]"
                     @click="handleRemoveLine(line.lineKey)"
                   >
                     <TrashIcon class="h-4 w-4" />
@@ -644,7 +644,7 @@ onBeforeUnmount(() => {
           type="button"
           data-cy="pdv-finalize-sale"
           :disabled="cart.isEmpty.value || isSubmitting"
-          class="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#D81B60] text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:opacity-50"
+          class="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#111827] text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-[#111827]/20 transition-all hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:opacity-50"
           @click="handleFinalizeSale"
         >
           {{ isSubmitting ? 'Registrando...' : 'Finalizar venda' }}
@@ -724,12 +724,12 @@ onBeforeUnmount(() => {
             class="flex items-center justify-between gap-3 rounded-lg border border-[#E5E7EB] bg-zinc-50 px-3 py-2 text-xs"
           >
             <span class="min-w-0 truncate font-bold text-[#05050A]">{{ order.order_reference }}</span>
-            <span class="shrink-0 font-mono font-black text-[#D81B60]">{{ formatBRL(order.total) }}</span>
+            <span class="shrink-0 font-mono font-black text-[#111827]">{{ formatBRL(order.total) }}</span>
             <button
               type="button"
               data-cy="pdv-recent-sale-view-receipt"
               aria-label="Ver recibo"
-              class="shrink-0 rounded-lg p-1.5 text-bip-muted transition hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+              class="shrink-0 rounded-lg p-1.5 text-bip-muted transition hover:bg-[#F3F4F6] hover:text-[#111827]"
               @click="handleViewReceipt(order)"
             >
               <EyeIcon class="h-4 w-4" />
@@ -785,7 +785,7 @@ onBeforeUnmount(() => {
             data-cy="pdv-variant-option"
             :data-variant-id="variant.id ?? ''"
             :disabled="variantAvailableStock(variant) <= 0"
-            class="flex min-h-24 w-full items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white p-3 text-left transition hover:border-[#D81B60]/50 hover:bg-[#FDF2F8] disabled:cursor-not-allowed disabled:opacity-45"
+            class="flex min-h-24 w-full items-center gap-3 rounded-lg border border-[#E5E7EB] bg-white p-3 text-left transition hover:border-[#111827]/50 hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-45"
             @click="handleSelectVariant(variant)"
           >
             <img

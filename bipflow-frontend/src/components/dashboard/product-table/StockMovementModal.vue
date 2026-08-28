@@ -177,7 +177,7 @@ const handleSubmit = (): void => {
             <div class="preview-box">
               <span>Estoque atual: {{ currentStock }}</span>
               <span class="preview-arrow">→</span>
-              <span :class="projectedStock < 0 ? 'text-[#D81B60]' : 'text-emerald-700'">
+              <span :class="projectedStock < 0 ? 'text-[#111827]' : 'text-emerald-700'">
                 Novo estoque: {{ projectedStock }}
               </span>
             </div>
@@ -238,7 +238,7 @@ const handleSubmit = (): void => {
   left: 0;
   width: 100%;
   height: 2px;
-  background: linear-gradient(to right, transparent, #d81b60, transparent);
+  background: linear-gradient(to right, transparent, #111827, transparent);
   opacity: 0.5;
 }
 
@@ -279,9 +279,9 @@ const handleSubmit = (): void => {
 }
 
 .type-toggle-active {
-  background-color: #fce7f3;
-  border-color: #d81b60;
-  color: #d81b60;
+  background-color: #F3F4F6;
+  border-color: #111827;
+  color: #111827;
 }
 
 .field-label {
@@ -305,8 +305,8 @@ const handleSubmit = (): void => {
 }
 
 .field-input:focus {
-  border-color: #d81b60;
-  box-shadow: 0 0 0 2px #fce7f3;
+  border-color: #111827;
+  box-shadow: 0 0 0 2px #F3F4F6;
 }
 
 .field-error {
@@ -314,7 +314,7 @@ const handleSubmit = (): void => {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #d81b60;
+  color: #111827;
 }
 
 .preview-box {
@@ -356,7 +356,7 @@ const handleSubmit = (): void => {
   flex: 1;
   padding: 1rem 1.5rem;
   border-radius: 0.75rem;
-  background-color: #d81b60;
+  background-color: #111827;
   color: white;
   font-size: 10px;
   font-weight: 900;
@@ -366,8 +366,8 @@ const handleSubmit = (): void => {
 }
 
 .confirm-button:hover:not(:disabled) {
-  background-color: #ad1457;
-  box-shadow: 0 0 20px rgba(216, 27, 96, 0.25);
+  background-color: #374151;
+  box-shadow: 0 0 20px rgba(17, 24, 39, 0.25);
 }
 
 .confirm-button:disabled {

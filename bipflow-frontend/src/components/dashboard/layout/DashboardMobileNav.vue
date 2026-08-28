@@ -9,9 +9,9 @@
         v-for="item in items"
         :key="item.label"
         :to="item.to"
-        class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[#05050A] transition hover:bg-[#FCE7F3]/60"
-        active-class="bg-[#FCE7F3] text-[#D81B60]"
-        exact-active-class="bg-[#FCE7F3] text-[#D81B60]"
+        class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-[#05050A] transition hover:bg-[#F3F4F6]/60"
+        active-class="bg-[#F3F4F6] text-[#111827]"
+        exact-active-class="bg-[#F3F4F6] text-[#111827]"
         @click="closeMenu"
       >
         <component :is="item.icon" class="h-5 w-5" />
@@ -20,7 +20,7 @@
 
       <button
         type="button"
-        class="mt-2 flex w-full items-center gap-3 rounded-xl border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-3 text-sm font-bold text-[#D81B60] transition hover:bg-[#FCE7F3]/70"
+        class="mt-2 flex w-full items-center gap-3 rounded-xl border border-[#111827]/20 bg-[#F3F4F6] px-3 py-3 text-sm font-bold text-[#111827] transition hover:bg-[#F3F4F6]/70"
         @click="logout"
       >
         <ArrowLeftOnRectangleIcon class="h-5 w-5" />

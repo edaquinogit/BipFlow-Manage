@@ -160,7 +160,7 @@ async function handleSave(): Promise<void> {
 <template>
   <section data-cy="storefront-banner-section" class="max-w-2xl space-y-4 rounded-lg border border-[#E5E7EB] bg-white p-4">
     <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563]">
-      <input v-model="draft.hero_enabled" data-cy="storefront-banner-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-[#FCE7F3]" />
+      <input v-model="draft.hero_enabled" data-cy="storefront-banner-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#111827] focus:ring-[#F3F4F6]" />
       Ativar banner principal
     </label>
 
@@ -180,7 +180,7 @@ async function handleSave(): Promise<void> {
           <button
             type="button"
             data-cy="btn-select-storefront-banner"
-            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#111827] hover:text-[#111827]"
             @click="openBannerPicker"
           >
             Alterar imagem
@@ -189,7 +189,7 @@ async function handleSave(): Promise<void> {
             type="button"
             data-cy="btn-remove-storefront-banner"
             :disabled="!bannerPreviewUrl"
-            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#D81B60] hover:text-[#D81B60] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+            class="inline-flex h-10 items-center justify-center rounded-lg border border-[#D1D5DB] bg-white px-4 text-[10px] font-black uppercase tracking-widest text-[#4B5563] transition hover:border-[#111827] hover:text-[#111827] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
             @click="removeBannerImage"
           >
             Remover
@@ -199,34 +199,34 @@ async function handleSave(): Promise<void> {
         <p class="mt-2 text-[11px] leading-5 text-bip-muted">
           PNG, JPG, JPEG ou WEBP ate 5 MB. Recomendado: {{ BANNER_MEDIA_RULES.recommendedSize }}.
         </p>
-        <p v-if="bannerError" data-cy="storefront-banner-file-error" class="mt-1 text-xs font-semibold text-[#D81B60]">
+        <p v-if="bannerError" data-cy="storefront-banner-file-error" class="mt-1 text-xs font-semibold text-[#111827]">
           {{ bannerError }}
         </p>
       </div>
 
       <label class="block sm:col-span-2">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Texto alternativo (acessibilidade)</span>
-        <input v-model="draft.hero_alt_text" data-cy="storefront-banner-alt" type="text" maxlength="160" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="Descreva a imagem do banner" />
+        <input v-model="draft.hero_alt_text" data-cy="storefront-banner-alt" type="text" maxlength="160" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]" placeholder="Descreva a imagem do banner" />
       </label>
 
       <label class="block">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Titulo (opcional)</span>
-        <input v-model="draft.hero_title" data-cy="storefront-banner-title" type="text" maxlength="120" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" />
+        <input v-model="draft.hero_title" data-cy="storefront-banner-title" type="text" maxlength="120" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]" />
       </label>
 
       <label class="block">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Subtitulo (opcional)</span>
-        <input v-model="draft.hero_subtitle" data-cy="storefront-banner-subtitle" type="text" maxlength="200" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" />
+        <input v-model="draft.hero_subtitle" data-cy="storefront-banner-subtitle" type="text" maxlength="200" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]" />
       </label>
 
       <label class="block">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Texto do CTA (opcional)</span>
-        <input v-model="draft.hero_cta_text" data-cy="storefront-banner-cta-text" type="text" maxlength="40" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" placeholder="Ex.: Ver colecao" />
+        <input v-model="draft.hero_cta_text" data-cy="storefront-banner-cta-text" type="text" maxlength="40" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]" placeholder="Ex.: Ver colecao" />
       </label>
 
       <label class="block">
         <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Link do CTA (opcional)</span>
-        <input v-model="draft.hero_cta_url" data-cy="storefront-banner-cta-url" type="url" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]" />
+        <input v-model="draft.hero_cta_url" data-cy="storefront-banner-cta-url" type="url" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]" />
       </label>
 
       <div v-if="bannerPreviewUrl" class="overflow-hidden rounded-lg border border-[#E5E7EB] bg-zinc-50 sm:col-span-2">
@@ -239,13 +239,13 @@ async function handleSave(): Promise<void> {
       </div>
     </div>
 
-    <p v-if="saveError" class="text-xs font-semibold text-[#D81B60]">{{ saveError }}</p>
+    <p v-if="saveError" class="text-xs font-semibold text-[#111827]">{{ saveError }}</p>
 
     <button
       type="button"
       data-cy="btn-save-storefront-banner"
       :disabled="isSaving || !hasChanges"
-      class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
+      class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
       @click="handleSave"
     >
       {{ isSaving ? 'Salvando...' : 'Salvar alteracoes' }}

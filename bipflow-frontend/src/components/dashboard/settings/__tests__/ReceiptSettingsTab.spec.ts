@@ -18,7 +18,7 @@ vi.mock('@/services/store.service', () => ({
 function buildStore(overrides: Partial<Store> = {}): Store {
   return {
     id: 1,
-    name: 'Boutique Fitness',
+    name: 'Loja Modelo',
     slug: 'boutique-fitness',
     whatsapp_phone: '5571999990000',
     is_active: true,

@@ -58,7 +58,7 @@ const year = new Date().getFullYear()
 <style scoped>
 .auth-brand-panel {
   background:
-    radial-gradient(circle at 50% 0%, rgba(216, 27, 96, 0.16), transparent 32rem),
+    radial-gradient(circle at 50% 0%, rgba(17, 24, 39, 0.16), transparent 32rem),
     radial-gradient(circle at 15% 85%, rgba(39, 39, 42, 0.8), transparent 28rem),
     #05050a;
 }
@@ -67,7 +67,7 @@ const year = new Date().getFullYear()
   position: absolute;
   inset: auto -30% -30% -30%;
   height: 18rem;
-  background: radial-gradient(circle, rgba(216, 27, 96, 0.2), transparent 66%);
+  background: radial-gradient(circle, rgba(17, 24, 39, 0.2), transparent 66%);
   animation: auth-glow-float 8s ease-in-out infinite alternate;
 }
 

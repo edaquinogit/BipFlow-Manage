@@ -188,7 +188,7 @@ watch(
 .camera-reticle {
   position: absolute;
   inset: 15%;
-  border: 3px solid rgba(216, 27, 96, 0.85);
+  border: 3px solid rgba(17, 24, 39, 0.85);
   border-radius: 1.25rem;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
 }
@@ -207,7 +207,7 @@ watch(
 }
 
 .camera-message--error {
-  background-color: rgba(216, 27, 96, 0.15);
+  background-color: rgba(17, 24, 39, 0.15);
   color: #f472b6;
 }
 

@@ -154,7 +154,7 @@ function getStatusLabel(status: BotConversationStatus): string {
 
 function getStatusClass(status: BotConversationStatus): string {
   const classes: Record<BotConversationStatus, string> = {
-    open: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
+    open: 'border-[#111827]/20 bg-[#F3F4F6] text-[#374151]',
     waiting_customer: 'border-emerald-200 bg-emerald-50 text-emerald-800',
     waiting_human: 'border-amber-200 bg-amber-50 text-amber-800',
     closed: 'border-[#E5E7EB] bg-zinc-50 text-bip-muted',
@@ -231,7 +231,7 @@ onBeforeUnmount(() => {
 
       <button
         type="button"
-        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#D81B60] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FCE7F3] disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition hover:border-[#111827]/40 hover:text-[#111827] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="isLoadingList"
         aria-label="Atualizar conversas do bot"
         @click="refreshConversations"
@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
               <input
                 v-model="searchTerm"
                 type="search"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                 placeholder="Buscar sessão, telefone ou mensagem"
               />
             </label>
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
               <FunnelIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bip-muted" />
               <select
                 v-model="statusFilter"
-                class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               >
                 <option v-for="option in STATUS_OPTIONS" :key="option.value" :value="option.value">
                   {{ option.label }}
@@ -294,7 +294,7 @@ onBeforeUnmount(() => {
 
           <div
             v-else-if="listError"
-            class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm font-medium text-[#7A143D]"
+            class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm font-medium text-[#374151]"
           >
             <ExclamationTriangleIcon class="mb-3 h-5 w-5" />
             {{ listError }}
@@ -312,10 +312,10 @@ onBeforeUnmount(() => {
               v-for="conversation in conversations"
               :key="conversation.id"
               type="button"
-              class="w-full rounded-lg border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FCE7F3]"
+              class="w-full rounded-lg border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F3F4F6]"
               :class="selectedConversationId === conversation.id
-                ? 'border-[#D81B60]/30 bg-[#FCE7F3]'
-                : 'border-[#E5E7EB] bg-white hover:border-[#D81B60]/20 hover:bg-zinc-50'"
+                ? 'border-[#111827]/30 bg-[#F3F4F6]'
+                : 'border-[#E5E7EB] bg-white hover:border-[#111827]/20 hover:bg-zinc-50'"
               :aria-label="`Abrir conversa ${conversation.session_id}`"
               @click="openConversation(conversation.id)"
             >
@@ -366,7 +366,7 @@ onBeforeUnmount(() => {
 
         <div
           v-else-if="detailError"
-          class="m-5 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-5 text-sm font-medium text-[#7A143D]"
+          class="m-5 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-5 text-sm font-medium text-[#374151]"
         >
           <ExclamationTriangleIcon class="mb-3 h-5 w-5" />
           {{ detailError }}
@@ -422,7 +422,7 @@ onBeforeUnmount(() => {
               class="max-w-[88%] rounded-lg border p-4"
               :class="message.role === 'bot'
                 ? 'border-[#E5E7EB] bg-zinc-50 text-[#05050A]'
-                : 'ml-auto border-[#D81B60]/20 bg-[#FCE7F3] text-[#05050A]'"
+                : 'ml-auto border-[#111827]/20 bg-[#F3F4F6] text-[#05050A]'"
             >
               <div class="mb-2 flex items-center justify-between gap-3">
                 <span class="inline-flex items-center gap-2 text-xs font-medium text-bip-muted">

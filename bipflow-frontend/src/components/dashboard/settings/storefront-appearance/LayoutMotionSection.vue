@@ -125,21 +125,21 @@ async function handleSave(): Promise<void> {
       <div class="mt-4 grid gap-4 sm:grid-cols-3">
         <label class="block">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Cards</span>
-          <select v-model="draft.card_style" data-cy="storefront-card-style-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
+          <select v-model="draft.card_style" data-cy="storefront-card-style-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]">
             <option v-for="option in CARD_STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
 
         <label class="block">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Bordas</span>
-          <select v-model="draft.radius_style" data-cy="storefront-radius-style-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
+          <select v-model="draft.radius_style" data-cy="storefront-radius-style-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]">
             <option v-for="option in RADIUS_STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
 
         <label class="block">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Densidade</span>
-          <select v-model="draft.density" data-cy="storefront-density-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]">
+          <select v-model="draft.density" data-cy="storefront-density-select" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]">
             <option v-for="option in DENSITY_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
@@ -151,13 +151,13 @@ async function handleSave(): Promise<void> {
 
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
         <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563]">
-          <input v-model="draft.motion_enabled" data-cy="storefront-motion-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-[#FCE7F3]" />
+          <input v-model="draft.motion_enabled" data-cy="storefront-motion-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#111827] focus:ring-[#F3F4F6]" />
           Ativar animacoes
         </label>
 
         <label class="block">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Intensidade</span>
-          <select v-model="draft.motion_intensity" data-cy="storefront-motion-intensity-select" :disabled="!draft.motion_enabled" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:bg-zinc-100">
+          <select v-model="draft.motion_intensity" data-cy="storefront-motion-intensity-select" :disabled="!draft.motion_enabled" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6] disabled:bg-zinc-100">
             <option v-for="option in MOTION_INTENSITY_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
@@ -173,26 +173,26 @@ async function handleSave(): Promise<void> {
 
       <div class="mt-4 grid gap-4 sm:grid-cols-2">
         <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563]">
-          <input v-model="draft.decoration_enabled" data-cy="storefront-decoration-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-[#FCE7F3]" />
+          <input v-model="draft.decoration_enabled" data-cy="storefront-decoration-enabled" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] text-[#111827] focus:ring-[#F3F4F6]" />
           Ativar decoracoes
         </label>
 
         <label class="block">
           <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">Estilo</span>
-          <select v-model="draft.decoration_style" data-cy="storefront-decoration-style-select" :disabled="!draft.decoration_enabled" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3] disabled:bg-zinc-100">
+          <select v-model="draft.decoration_style" data-cy="storefront-decoration-style-select" :disabled="!draft.decoration_enabled" class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6] disabled:bg-zinc-100">
             <option v-for="option in DECORATION_STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
       </div>
     </div>
 
-    <p v-if="saveError" class="text-xs font-semibold text-[#D81B60]">{{ saveError }}</p>
+    <p v-if="saveError" class="text-xs font-semibold text-[#111827]">{{ saveError }}</p>
 
     <button
       type="button"
       data-cy="btn-save-storefront-layout"
       :disabled="isSaving || !hasChanges"
-      class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
+      class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted sm:w-auto"
       @click="handleSave"
     >
       {{ isSaving ? 'Salvando...' : 'Salvar alteracoes' }}

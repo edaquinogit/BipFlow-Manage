@@ -65,7 +65,7 @@ useStoreSwitchEffect(refresh);
 
 <template>
   <div class="space-y-8">
-    <div class="flex flex-col gap-4 border-l-2 border-[#D81B60] pl-6 md:flex-row md:items-end md:justify-between">
+    <div class="flex flex-col gap-4 border-l-2 border-[#111827] pl-6 md:flex-row md:items-end md:justify-between">
       <div>
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Inventário</p>
         <h1 class="mt-1 text-3xl font-black italic uppercase tracking-tighter text-[#05050A]">
@@ -80,7 +80,7 @@ useStoreSwitchEffect(refresh);
         type="button"
         data-cy="btn-export-csv"
         :disabled="movements.length === 0"
-        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60] disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-xs font-black uppercase tracking-widest text-bip-muted transition hover:border-[#111827]/40 hover:bg-[#F3F4F6] hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-50"
         @click="handleExportCsv"
       >
         <ArrowDownTrayIcon class="h-4 w-4" />
@@ -94,7 +94,7 @@ useStoreSwitchEffect(refresh);
         <select
           :value="filters.product ?? ''"
           data-cy="filter-product"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ product: ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : undefined })"
         >
           <option value="">Todos os produtos</option>
@@ -109,7 +109,7 @@ useStoreSwitchEffect(refresh);
         <select
           :value="filters.movement_type ?? ''"
           data-cy="filter-movement-type"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ movement_type: (($event.target as HTMLSelectElement).value || undefined) as 'entrada' | 'saida' | undefined })"
         >
           <option value="">Todos os tipos</option>
@@ -123,7 +123,7 @@ useStoreSwitchEffect(refresh);
         <select
           :value="filters.source ?? ''"
           data-cy="filter-source"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ source: (($event.target as HTMLSelectElement).value || undefined) as 'manual' | 'venda' | 'pdv' | undefined })"
         >
           <option value="">Todas as origens</option>
@@ -138,7 +138,7 @@ useStoreSwitchEffect(refresh);
         <select
           :value="filters.reason ?? ''"
           data-cy="filter-reason"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ reason: ($event.target as HTMLSelectElement).value || undefined })"
         >
           <option value="">Todos os motivos</option>
@@ -154,7 +154,7 @@ useStoreSwitchEffect(refresh);
           type="date"
           data-cy="filter-start-date"
           :value="filters.start ?? ''"
-          class="mt-1 h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="mt-1 h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ start: ($event.target as HTMLInputElement).value || undefined })"
         />
       </label>
@@ -165,7 +165,7 @@ useStoreSwitchEffect(refresh);
           type="date"
           data-cy="filter-end-date"
           :value="filters.end ?? ''"
-          class="mt-1 h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="mt-1 h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ end: ($event.target as HTMLInputElement).value || undefined })"
         />
       </label>
@@ -177,7 +177,7 @@ useStoreSwitchEffect(refresh);
           type="search"
           data-cy="filter-search"
           placeholder="Buscar por produto ou SKU"
-          class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           @change="updateFilters({ search: ($event.target as HTMLInputElement).value || undefined })"
         />
       </label>
@@ -197,9 +197,9 @@ useStoreSwitchEffect(refresh);
       <div v-for="i in 5" :key="i" class="h-14 animate-pulse rounded-xl border border-[#E5E7EB] bg-zinc-100"></div>
     </div>
 
-    <div v-else-if="error" data-cy="error-state" class="rounded-2xl border border-[#D81B60]/20 bg-[#FCE7F3] p-10 text-center">
-      <ExclamationTriangleIcon class="mx-auto mb-3 h-10 w-10 text-[#D81B60] opacity-70" />
-      <p class="text-xs font-black uppercase tracking-widest text-[#7A143D]">{{ error }}</p>
+    <div v-else-if="error" data-cy="error-state" class="rounded-2xl border border-[#111827]/20 bg-[#F3F4F6] p-10 text-center">
+      <ExclamationTriangleIcon class="mx-auto mb-3 h-10 w-10 text-[#111827] opacity-70" />
+      <p class="text-xs font-black uppercase tracking-widest text-[#374151]">{{ error }}</p>
       <button
         type="button"
         data-cy="btn-retry"
@@ -241,7 +241,7 @@ useStoreSwitchEffect(refresh);
               <td class="px-6 py-4 text-center">
                 <span
                   class="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest"
-                  :class="movement.movement_type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-[#FCE7F3] text-[#D81B60]'"
+                  :class="movement.movement_type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F3F4F6] text-[#111827]'"
                 >
                   {{ movementTypeLabel(movement.movement_type) }}
                 </span>

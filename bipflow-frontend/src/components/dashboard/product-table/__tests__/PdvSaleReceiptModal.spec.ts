@@ -15,7 +15,7 @@ vi.mock('@/utils/receiptPdf', () => ({
 function buildStore(overrides: Partial<Store> = {}): Store {
   return {
     id: 1,
-    name: 'Boutique Fitness',
+    name: 'Loja Modelo',
     slug: 'boutique-fitness',
     whatsapp_phone: '5571999990000',
     is_active: true,
@@ -82,7 +82,7 @@ describe('PdvSaleReceiptModal (PDV receipt refinement: store info, exchange poli
   it('shows the current store name in the printed receipt', () => {
     const wrapper = mountModal()
 
-    expect(wrapper.find('[data-cy="pdv-receipt"]').text()).toContain('Boutique Fitness')
+    expect(wrapper.find('[data-cy="pdv-receipt"]').text()).toContain('Loja Modelo')
   })
 
   it('shows the exchange policy when the store has one configured', () => {
@@ -119,7 +119,7 @@ describe('PdvSaleReceiptModal (PDV receipt refinement: store info, exchange poli
     const wrapper = mountModal()
 
     expect(wrapper.find('[data-cy="pdv-receipt"]').classes()).toContain('format-80mm')
-    expect(wrapper.find('[data-cy="pdv-receipt"]').text()).not.toContain('Boutique Fitness')
+    expect(wrapper.find('[data-cy="pdv-receipt"]').text()).not.toContain('Loja Modelo')
   })
 
   it('calls window.print() when the print button is clicked', async () => {

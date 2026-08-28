@@ -57,7 +57,7 @@ const ProductVariantSchema = z.object({
     .max(80, "Variant name is too long"),
   color_hex: z
     .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color, like #D81B60")
+    .regex(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color, like #111827")
     .transform((value) => value.toUpperCase()),
   stock_quantity: z.coerce
     .number()

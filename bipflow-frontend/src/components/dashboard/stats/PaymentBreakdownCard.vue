@@ -31,7 +31,7 @@ const chartOptions = computed(() => ({
   chart: { background: 'transparent', fontFamily: 'inherit' },
   theme: { mode: 'light' as const },
   labels: labels.value,
-  colors: ['#D81B60', '#f59e0b', '#34d399', '#818cf8'],
+  colors: ['#111827', '#f59e0b', '#34d399', '#818cf8'],
   legend: {
     position: 'bottom' as const,
     labels: { colors: '#6B7280' },
@@ -74,7 +74,7 @@ const chartOptions = computed(() => ({
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Formas de pagamento</p>
         <h3 class="mt-2 text-lg font-black italic tracking-tighter text-[#05050A]">Como vendem</h3>
       </div>
-      <CreditCardIcon class="h-6 w-6 text-[#D81B60]" />
+      <CreditCardIcon class="h-6 w-6 text-[#111827]" />
     </div>
 
     <div class="mt-6">

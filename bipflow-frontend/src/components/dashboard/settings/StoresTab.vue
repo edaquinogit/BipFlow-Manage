@@ -80,17 +80,17 @@ async function handleCreateStore(): Promise<void> {
           <input
             v-model="renameValue"
             type="text"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
-            placeholder="Ex.: Boutique Fitness"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
+            placeholder="Ex.: Loja Modelo"
           />
         </label>
 
-        <p v-if="renameError" class="text-xs font-semibold text-[#D81B60]">{{ renameError }}</p>
+        <p v-if="renameError" class="text-xs font-semibold text-[#111827]">{{ renameError }}</p>
 
         <button
           type="submit"
           :disabled="isRenamingStore || renameValue.trim().length < 2 || renameValue.trim() === selectedStore?.name"
-          class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+          class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
         >
           {{ isRenamingStore ? 'Salvando...' : 'Salvar nome' }}
         </button>
@@ -108,17 +108,17 @@ async function handleCreateStore(): Promise<void> {
           <input
             v-model="newStoreName"
             type="text"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="Ex.: Filial Centro"
           />
         </label>
 
-        <p v-if="createStoreError" class="text-xs font-semibold text-[#D81B60]">{{ createStoreError }}</p>
+        <p v-if="createStoreError" class="text-xs font-semibold text-[#111827]">{{ createStoreError }}</p>
 
         <button
           type="submit"
           :disabled="isCreatingStore || newStoreName.trim().length < 2"
-          class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+          class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
         >
           {{ isCreatingStore ? 'Criando...' : 'Criar loja' }}
         </button>

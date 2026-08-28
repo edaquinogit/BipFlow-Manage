@@ -303,7 +303,7 @@ onMounted(() => {
         <input
           v-model="salesSearchTerm"
           type="search"
-          class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white pl-10 pr-3 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           placeholder="Cliente, telefone ou referência"
         />
       </label>
@@ -312,7 +312,7 @@ onMounted(() => {
         <span class="sr-only">Filtrar por status</span>
         <select
           v-model="salesStatusFilter"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
         >
           <option value="all">Todos status</option>
           <option v-for="option in saleStatusOptions" :key="option.value" :value="option.value">
@@ -326,7 +326,7 @@ onMounted(() => {
         <select
           v-model="salesChannelFilter"
           data-cy="sales-channel-filter"
-          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="h-11 w-full appearance-none rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
         >
           <option value="all">Todos canais</option>
           <option v-for="option in saleChannelOptions" :key="option.value" :value="option.value">
@@ -342,7 +342,7 @@ onMounted(() => {
         <div class="mt-3 h-3 w-48 animate-pulse rounded bg-zinc-100" />
       </div>
 
-      <div v-else-if="salesError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D] sm:col-span-2 xl:col-span-3">
+      <div v-else-if="salesError" class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151] sm:col-span-2 xl:col-span-3">
         {{ salesError }}
       </div>
 
@@ -373,7 +373,7 @@ onMounted(() => {
                 {{ formatSaleDate(sale.created_at) }} - {{ getPaymentLabel(sale.payment_method) }}
               </p>
             </div>
-            <p class="shrink-0 text-sm font-black text-[#D81B60]">
+            <p class="shrink-0 text-sm font-black text-[#111827]">
               {{ formatBRL(sale.total) }}
             </p>
           </div>
@@ -385,7 +385,7 @@ onMounted(() => {
             <button
               type="button"
               data-cy="sale-detail-button"
-              class="flex shrink-0 items-center gap-1 rounded-full border border-[#E5E7EB] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60] hover:text-[#D81B60]"
+              class="flex shrink-0 items-center gap-1 rounded-full border border-[#E5E7EB] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-[#111827] hover:text-[#111827]"
               @click="openOrderDetail(sale)"
             >
               <EyeIcon class="h-3.5 w-3.5" />
@@ -423,9 +423,9 @@ onMounted(() => {
           <div class="mt-4 rounded-lg border border-[#E5E7EB] bg-zinc-50 p-3">
             <div
               v-if="sale.status === 'cancelled'"
-              class="flex items-center gap-2 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D]"
+              class="flex items-center gap-2 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#374151]"
             >
-              <span class="h-2 w-2 rounded-full bg-[#D81B60]" />
+              <span class="h-2 w-2 rounded-full bg-[#111827]" />
               Pedido cancelado
             </div>
 
@@ -468,7 +468,7 @@ onMounted(() => {
       <button
         type="button"
         data-cy="sales-pagination-prev"
-        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!hasPreviousPage"
         @click="goToPage(salesPage - 1)"
       >
@@ -480,7 +480,7 @@ onMounted(() => {
       <button
         type="button"
         data-cy="sales-pagination-next"
-        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-40"
+        class="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-xs font-bold text-[#05050A] transition hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!hasNextPage"
         @click="goToPage(salesPage + 1)"
       >

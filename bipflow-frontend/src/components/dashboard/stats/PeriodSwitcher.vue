@@ -27,7 +27,7 @@ const emit = defineEmits<{
       :aria-pressed="modelValue === option.value"
       class="shrink-0 snap-start rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-widest transition-all duration-300"
       :class="modelValue === option.value
-        ? 'bg-[#D81B60] text-white shadow-lg shadow-[#D81B60]/30'
+        ? 'bg-[#111827] text-white shadow-lg shadow-[#111827]/30'
         : 'text-bip-muted hover:text-[#05050A]'"
       @click="emit('update:modelValue', option.value)"
     >

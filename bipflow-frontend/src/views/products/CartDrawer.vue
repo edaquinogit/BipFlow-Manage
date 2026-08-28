@@ -68,7 +68,7 @@
                   <img
                     :src="cartItemImage(item)"
                     :alt="`Imagem do produto ${cartItemLabel(item)}`"
-                    class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-[#F4F1F3] object-cover sm:h-20 sm:w-20"
+                    class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl bg-[#F3F4F6] object-cover sm:h-20 sm:w-20"
                     loading="lazy"
                   />
 
@@ -407,8 +407,8 @@ const fallbackImageUrl = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
     <rect width="240" height="240" fill="#FAFAFA" />
     <rect x="28" y="28" width="184" height="184" rx="22" fill="#FFFFFF" stroke="#E5E7EB" />
-    <rect x="64" y="68" width="112" height="76" rx="14" fill="#F4F1F3" />
-    <path d="M76 132l26-27c5-5 13-5 18 0l17 18 9-10c5-5 14-5 19 0l29 30v14H76z" fill="#E9A8C0" />
+    <rect x="64" y="68" width="112" height="76" rx="14" fill="#F3F4F6" />
+    <path d="M76 132l26-27c5-5 13-5 18 0l17 18 9-10c5-5 14-5 19 0l29 30v14H76z" fill="#D1D5DB" />
     <text x="120" y="184" text-anchor="middle" fill="var(--store-text-muted)" font-family="Arial, sans-serif" font-size="15" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`

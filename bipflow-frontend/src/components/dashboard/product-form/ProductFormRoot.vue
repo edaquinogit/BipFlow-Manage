@@ -256,7 +256,7 @@ const submitLabel = computed(() => {
             type="submit"
             data-cy="btn-submit-product"
             :disabled="isBusy"
-            class="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-[#111827] px-5 text-sm font-semibold text-white shadow-xl shadow-[#111827]/20 transition-all hover:bg-[#111827]/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span v-if="isBusy" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             <CheckIcon v-else class="h-4 w-4" />

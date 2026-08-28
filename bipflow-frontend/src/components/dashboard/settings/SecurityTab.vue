@@ -202,7 +202,7 @@ onMounted(() => {
           <button
             type="button"
             :disabled="!canConfirmSetup"
-            class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            class="flex-1 rounded-lg bg-[#111827] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
             @click="confirmMfaSetup"
           >
             {{ isConfirmingSetup ? 'Confirmando...' : 'Confirmar e ativar' }}
@@ -224,20 +224,20 @@ onMounted(() => {
           MFA ativado nesta conta.
         </div>
 
-        <div v-if="isConfirmingDisable" class="mt-3 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-3">
+        <div v-if="isConfirmingDisable" class="mt-3 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-3">
           <label class="block">
-            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-[#7A143D]">
+            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-[#374151]">
               Confirme sua senha para desativar
             </span>
             <input
               v-model="disablePassword"
               type="password"
               autocomplete="current-password"
-              class="h-10 w-full rounded-lg border border-[#D81B60]/30 bg-white px-3 text-sm text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-10 w-full rounded-lg border border-[#111827]/30 bg-white px-3 text-sm text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#F3F4F6]"
             />
           </label>
           <label class="mt-3 block">
-            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-[#7A143D]">
+            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-[#374151]">
               {{ useBackupCodeForDisable ? 'Codigo de backup' : 'Codigo do app autenticador' }}
             </span>
             <input
@@ -246,12 +246,12 @@ onMounted(() => {
               inputmode="text"
               autocomplete="one-time-code"
               :placeholder="useBackupCodeForDisable ? 'AB3K-9XQ2' : '123456'"
-              class="h-10 w-full rounded-lg border border-[#D81B60]/30 bg-white px-3 text-center text-sm tracking-[0.2em] text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-10 w-full rounded-lg border border-[#111827]/30 bg-white px-3 text-center text-sm tracking-[0.2em] text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#F3F4F6]"
             />
           </label>
           <button
             type="button"
-            class="mt-1.5 text-[10px] font-bold text-[#7A143D] underline-offset-2 hover:underline"
+            class="mt-1.5 text-[10px] font-bold text-[#374151] underline-offset-2 hover:underline"
             @click="useBackupCodeForDisable = !useBackupCodeForDisable; disableCode = ''"
           >
             {{ useBackupCodeForDisable ? 'Usar codigo do app autenticador' : 'Usar codigo de backup' }}
@@ -260,7 +260,7 @@ onMounted(() => {
             <button
               type="button"
               :disabled="!canConfirmDisable"
-              class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
+              class="flex-1 rounded-lg bg-[#111827] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
               @click="confirmDisableMfa"
             >
               {{ isDisablingMfa ? 'Desativando...' : 'Desativar MFA' }}
@@ -289,7 +289,7 @@ onMounted(() => {
         v-else
         type="button"
         :disabled="isStartingSetup"
-        class="mt-4 w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
+        class="mt-4 w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
         @click="startMfaSetup"
       >
         {{ isStartingSetup ? 'Gerando...' : 'Ativar verificacao em duas etapas' }}
@@ -306,9 +306,9 @@ onMounted(() => {
 
       <div
         v-if="isConfirmingLogoutAll"
-        class="mt-4 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-3"
+        class="mt-4 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-3"
       >
-        <div class="flex gap-2 text-sm text-[#7A143D]">
+        <div class="flex gap-2 text-sm text-[#374151]">
           <ShieldExclamationIcon class="h-5 w-5 shrink-0" />
           <p>Voce sera desconectado agora, inclusive desta tela. Confirma?</p>
         </div>
@@ -316,7 +316,7 @@ onMounted(() => {
           <button
             type="button"
             :disabled="isLoggingOutAll"
-            class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            class="flex-1 rounded-lg bg-[#111827] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-300"
             @click="confirmLogoutAllDevices"
           >
             {{ isLoggingOutAll ? 'Encerrando...' : 'Sim, encerrar tudo' }}
@@ -335,7 +335,7 @@ onMounted(() => {
       <button
         v-else
         type="button"
-        class="mt-4 w-full rounded-lg border border-[#D81B60]/30 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#D81B60] transition hover:bg-[#FCE7F3]"
+        class="mt-4 w-full rounded-lg border border-[#111827]/30 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#111827] transition hover:bg-[#F3F4F6]"
         @click="isConfirmingLogoutAll = true"
       >
         Sair de todos os dispositivos

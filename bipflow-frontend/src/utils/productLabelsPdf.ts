@@ -87,7 +87,7 @@ function drawLabel(
   if (detailParts.length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(216, 27, 96); // #D81B60
+    doc.setTextColor(17, 24, 39); // #111827
     doc.text(detailParts.join(' - '), centerX, y, { align: 'center' });
     y += 4;
   }

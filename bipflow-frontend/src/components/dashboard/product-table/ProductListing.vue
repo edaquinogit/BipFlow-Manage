@@ -55,7 +55,7 @@ const { canManageCatalog } = useCurrentUser();
 <template>
   <section class="relative isolate space-y-8 overflow-visible" data-cy="product-listing-section">
 
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-[#D81B60] pl-6">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 border-l-2 border-[#111827] pl-6">
       <div>
         <h3 class="hero-display-title text-3xl font-black text-[#05050A] italic uppercase tracking-tighter leading-none">
           Produtos ativos
@@ -67,7 +67,7 @@ const { canManageCatalog } = useCurrentUser();
         <RouterLink
           data-cy="btn-stock-history"
           :to="{ name: DashboardRoutes.StockMovements }"
-          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-bip-muted shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-bip-muted shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#111827]/40 hover:bg-[#F3F4F6] hover:text-[#111827]"
         >
           <ClockIcon class="h-4 w-4" />
           Histórico de estoque
@@ -77,7 +77,7 @@ const { canManageCatalog } = useCurrentUser();
           v-if="canManageCatalog"
           data-cy="btn-add-product"
           @click="$emit('open-panel')"
-          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#D81B60] px-5 text-sm font-semibold text-white shadow-xl shadow-[#D81B60]/20 transition-all hover:bg-[#D81B60]/90 active:scale-[0.98]"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#111827] px-5 text-sm font-semibold text-white shadow-xl shadow-[#111827]/20 transition-all hover:bg-[#111827]/90 active:scale-[0.98]"
         >
           <PlusIcon class="h-4 w-4 stroke-2" />
           Novo produto
@@ -98,9 +98,9 @@ const { canManageCatalog } = useCurrentUser();
       <div v-for="i in 5" :key="i" class="h-24 bg-zinc-100 animate-pulse rounded-2xl border border-[#E5E7EB]"></div>
     </div>
 
-    <div v-else-if="error" data-cy="error-state" class="p-16 bg-[#FCE7F3] border border-[#D81B60]/20 rounded-[3rem] text-center">
-      <ExclamationTriangleIcon class="w-12 h-12 text-[#D81B60] mx-auto mb-4 opacity-70" />
-      <p class="text-[#7A143D] font-black uppercase text-[11px] tracking-[0.3em] mb-6">{{ error }}</p>
+    <div v-else-if="error" data-cy="error-state" class="p-16 bg-[#F3F4F6] border border-[#111827]/20 rounded-[3rem] text-center">
+      <ExclamationTriangleIcon class="w-12 h-12 text-[#111827] mx-auto mb-4 opacity-70" />
+      <p class="text-[#374151] font-black uppercase text-[11px] tracking-[0.3em] mb-6">{{ error }}</p>
       <button
         data-cy="btn-retry-connection"
         @click="fetchData"

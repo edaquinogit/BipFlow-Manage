@@ -49,7 +49,7 @@ const productMetaLabel = (product: Product): string => {
         <header class="border-b border-[#E5E7EB] bg-white px-6 py-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-sm font-semibold text-[#D81B60]">Estoque</p>
+              <p class="text-sm font-semibold text-[#111827]">Estoque</p>
               <h2 class="mt-2 text-2xl font-semibold text-[#05050A]">
                 {{ totalAlertCount }} produto<span v-if="totalAlertCount !== 1">s</span> em alerta
               </h2>
@@ -61,7 +61,7 @@ const productMetaLabel = (product: Product): string => {
             <button
               ref="closeButtonRef"
               type="button"
-              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] transition hover:border-[#111827] hover:text-[#111827]"
               aria-label="Fechar alertas de estoque"
               @click="emit('close')"
             >
@@ -103,7 +103,7 @@ const productMetaLabel = (product: Product): string => {
                     <p class="truncate text-sm font-semibold text-[#05050A]">{{ product.name }}</p>
                     <p class="truncate text-xs text-[#6B7280]">{{ productMetaLabel(product) }}</p>
                   </div>
-                  <span class="shrink-0 rounded-full bg-[#D81B60] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                  <span class="shrink-0 rounded-full bg-[#111827] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                     Zerado
                   </span>
                 </li>
@@ -137,7 +137,7 @@ const productMetaLabel = (product: Product): string => {
         <footer class="border-t border-[#E5E7EB] bg-white px-6 py-4">
           <RouterLink
             :to="{ name: DashboardRoutes.Products }"
-            class="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#D81B60]"
+            class="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#111827]"
             @click="emit('close')"
           >
             Ver todos os produtos

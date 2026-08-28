@@ -80,7 +80,7 @@ async function handleSave(): Promise<void> {
             data-cy="receipt-exchange-policy-input"
             rows="3"
             maxlength="280"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="Ex.: Trocas e devoluções em até 7 dias mediante apresentação deste comprovante."
           />
           <span class="mt-1 block text-[10px] text-bip-muted">
@@ -95,7 +95,7 @@ async function handleSave(): Promise<void> {
           <select
             v-model="paperFormatDraft"
             data-cy="receipt-paper-format-select"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           >
             <option v-for="option in PAPER_FORMAT_OPTIONS" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -103,7 +103,7 @@ async function handleSave(): Promise<void> {
           </select>
         </label>
 
-        <p v-if="saveError" data-cy="receipt-settings-error" class="text-xs font-semibold text-[#D81B60]">
+        <p v-if="saveError" data-cy="receipt-settings-error" class="text-xs font-semibold text-[#111827]">
           {{ saveError }}
         </p>
 
@@ -111,7 +111,7 @@ async function handleSave(): Promise<void> {
           type="submit"
           data-cy="btn-save-receipt-settings"
           :disabled="isSaving || !selectedStore"
-          class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+          class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
         >
           {{ isSaving ? 'Salvando...' : 'Salvar configurações de recibo' }}
         </button>

@@ -155,7 +155,7 @@ onMounted(async () => {
         <p class="mt-3 text-base font-semibold text-emerald-900">Você já tem um perfil nesta loja.</p>
         <button
           type="button"
-          class="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
+          class="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#111827]"
           @click="redirectAfterSuccess"
         >
           Voltar para a loja
@@ -176,7 +176,7 @@ onMounted(async () => {
         <div class="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
             type="button"
-            class="inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#D81B60]"
+            class="inline-flex h-11 items-center justify-center rounded-lg bg-[#05050A] px-5 text-sm font-semibold text-white transition hover:bg-[#111827]"
             @click="handleOpenCreateProfileForm"
           >
             Criar perfil com outro email
@@ -193,7 +193,7 @@ onMounted(async () => {
 
       <template v-else>
         <div class="mb-6 text-center">
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#D81B60]">Criar perfil</p>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#111827]">Criar perfil</p>
           <h1 class="mt-2 text-2xl font-semibold text-[#05050A]">Seus dados para comprar mais rápido</h1>
           <p class="mt-2 text-sm leading-6 text-[#6B7280]">
             Guardamos seu nome e WhatsApp. O endereço entra apenas quando você escolher entrega.
@@ -209,7 +209,7 @@ onMounted(async () => {
 
         <div
           v-if="errorMessage"
-          class="mb-5 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+          class="mb-5 rounded-xl border border-[#F3F4F6] bg-[#F3F4F6] p-3 text-sm text-[#374151]"
         >
           {{ errorMessage }}
         </div>
@@ -222,7 +222,7 @@ onMounted(async () => {
               type="text"
               autocomplete="name"
               required
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Seu nome"
             />
           </label>
@@ -236,7 +236,7 @@ onMounted(async () => {
                 inputmode="tel"
                 autocomplete="tel"
                 required
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                 placeholder="+55 71 99999-9999"
               />
             </label>
@@ -248,7 +248,7 @@ onMounted(async () => {
                 type="email"
                 autocomplete="email"
                 required
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                 placeholder="voce@email.com"
               />
             </label>
@@ -261,7 +261,7 @@ onMounted(async () => {
               type="password"
               autocomplete="new-password"
               required
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Crie uma senha segura"
             />
 
@@ -287,7 +287,7 @@ onMounted(async () => {
               type="password"
               autocomplete="new-password"
               required
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Repita a senha"
             />
           </label>
@@ -307,7 +307,7 @@ onMounted(async () => {
           <button
             type="submit"
             :disabled="isSubmitting || !isFormReady"
-            class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
+            class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#111827] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
           >
             {{ isSubmitting ? 'Criando perfil...' : 'Criar perfil' }}
           </button>

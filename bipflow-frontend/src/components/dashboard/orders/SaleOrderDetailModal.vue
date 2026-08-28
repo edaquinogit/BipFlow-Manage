@@ -160,7 +160,7 @@ function submitShipForm(): void {
             <div class="h-24 w-full animate-pulse rounded bg-zinc-100" />
           </div>
 
-          <div v-else-if="error" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]">
+          <div v-else-if="error" class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151]">
             {{ error }}
           </div>
 
@@ -226,7 +226,7 @@ function submitShipForm(): void {
                 :href="order.tracking_url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1.5 text-xs font-bold text-[#D81B60] hover:underline"
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-[#111827] hover:underline"
               >
                 <TruckIcon class="h-3.5 w-3.5" />
                 Rastrear encomenda
@@ -277,7 +277,7 @@ function submitShipForm(): void {
             </a>
 
             <section v-if="canManage && (canMarkShipped || canMarkDelivered || canCancel)" class="space-y-3 border-t border-[#E5E7EB] pt-4">
-              <p v-if="updateError" data-cy="order-detail-update-error" class="text-xs font-semibold text-[#D81B60]">
+              <p v-if="updateError" data-cy="order-detail-update-error" class="text-xs font-semibold text-[#111827]">
                 {{ updateError }}
               </p>
 
@@ -290,7 +290,7 @@ function submitShipForm(): void {
                     v-model="carrierNameDraft"
                     type="text"
                     data-cy="ship-form-carrier"
-                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                     placeholder="Correios, Jadlog, motoboy..."
                   />
                 </label>
@@ -302,11 +302,11 @@ function submitShipForm(): void {
                     v-model="trackingCodeDraft"
                     type="text"
                     data-cy="ship-form-tracking-code"
-                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                    class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                     placeholder="AB123456789BR"
                   />
                 </label>
-                <p v-if="shipFormValidationError" class="text-xs font-semibold text-[#D81B60]">
+                <p v-if="shipFormValidationError" class="text-xs font-semibold text-[#111827]">
                   {{ shipFormValidationError }}
                 </p>
                 <div class="flex gap-2">
@@ -321,7 +321,7 @@ function submitShipForm(): void {
                   <button
                     type="button"
                     data-cy="ship-form-submit"
-                    class="flex-1 rounded-lg bg-[#D81B60] px-3 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#ad1457] disabled:cursor-not-allowed disabled:opacity-60"
+                    class="flex-1 rounded-lg bg-[#111827] px-3 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[#374151] disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="isUpdating"
                     @click="submitShipForm"
                   >
@@ -335,7 +335,7 @@ function submitShipForm(): void {
                   v-if="canMarkShipped"
                   type="button"
                   data-cy="mark-shipped-button"
-                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="isUpdating"
                   @click="openShipForm"
                 >
@@ -345,7 +345,7 @@ function submitShipForm(): void {
                   v-if="canMarkDelivered"
                   type="button"
                   data-cy="mark-delivered-button"
-                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#D81B60] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-[#05050A] transition hover:border-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="isUpdating"
                   @click="emit('deliver')"
                 >
@@ -355,7 +355,7 @@ function submitShipForm(): void {
                   v-if="canCancel"
                   type="button"
                   data-cy="cancel-order-button"
-                  class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#7A143D] transition hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] px-3 py-2 text-xs font-black uppercase tracking-widest text-[#374151] transition hover:bg-[#F3F4F6]/70 disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="isUpdating"
                   @click="emit('cancel')"
                 >

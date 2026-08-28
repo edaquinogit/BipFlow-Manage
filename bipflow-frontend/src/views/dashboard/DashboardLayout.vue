@@ -52,7 +52,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A] selection:bg-[#FCE7F3] font-sans antialiased" data-cy="dashboard-view">
+  <div class="min-h-screen bg-[#FAFAFA] text-[#05050A] selection:bg-[#F3F4F6] font-sans antialiased" data-cy="dashboard-view">
     <DashboardHeader
       :user-name="currentUserName"
       :stores="stores"

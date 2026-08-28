@@ -132,10 +132,10 @@ const handleDownloadPdf = (): void => {
           </p>
 
           <div v-if="isLoading" class="flex justify-center py-10 no-print" data-cy="qr-bulk-labels-loading">
-            <span class="h-8 w-8 animate-spin rounded-full border-2 border-[#D81B60]/30 border-t-[#D81B60]" />
+            <span class="h-8 w-8 animate-spin rounded-full border-2 border-[#111827]/30 border-t-[#111827]" />
           </div>
 
-          <p v-else-if="loadError" data-cy="qr-bulk-labels-error" class="py-6 text-center text-xs font-bold text-[#D81B60] no-print">
+          <p v-else-if="loadError" data-cy="qr-bulk-labels-error" class="py-6 text-center text-xs font-bold text-[#111827] no-print">
             {{ loadError }}
           </p>
 
@@ -283,7 +283,7 @@ const handleDownloadPdf = (): void => {
 .label-price {
   font-family: monospace;
   font-weight: 900;
-  color: #d81b60;
+  color: #111827;
 }
 
 .label-size {
@@ -333,7 +333,7 @@ const handleDownloadPdf = (): void => {
   flex: 1;
   padding: 1rem 1.5rem;
   border-radius: 0.75rem;
-  background-color: #d81b60;
+  background-color: #111827;
   color: white;
   font-size: 10px;
   font-weight: 900;
@@ -343,7 +343,7 @@ const handleDownloadPdf = (): void => {
 }
 
 .confirm-button:hover:not(:disabled) {
-  background-color: #ad1457;
+  background-color: #374151;
 }
 
 .confirm-button:disabled {

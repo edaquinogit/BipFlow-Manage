@@ -39,8 +39,8 @@ useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, cancelBut
           <div class="alert-line"></div>
 
           <div class="flex flex-col items-center text-center">
-            <div class="w-16 h-16 bg-[#FCE7F3] rounded-2xl flex items-center justify-center mb-6 border border-[#D81B60]/20">
-              <ExclamationTriangleIcon class="w-8 h-8 text-[#D81B60]" />
+            <div class="w-16 h-16 bg-[#F3F4F6] rounded-2xl flex items-center justify-center mb-6 border border-[#111827]/20">
+              <ExclamationTriangleIcon class="w-8 h-8 text-[#111827]" />
             </div>
 
             <h3 class="text-xl font-black text-[#05050A] italic uppercase tracking-tighter mb-2">
@@ -110,7 +110,7 @@ useDialogA11y(toRef(props, 'show'), () => emit('close'), containerRef, cancelBut
   left: 0;
   width: 100%;
   height: 2px;
-  background: linear-gradient(to right, transparent, #d81b60, transparent);
+  background: linear-gradient(to right, transparent, #111827, transparent);
   opacity: 0.5;
 }
 

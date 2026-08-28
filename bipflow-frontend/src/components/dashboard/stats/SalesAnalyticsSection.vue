@@ -151,7 +151,7 @@ const updatedAtLabel = computed(() => {
             v-model="customStart"
             type="date"
             :max="customEnd || undefined"
-            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             @change="emitCustomRangeIfValid"
           />
         </label>
@@ -161,12 +161,12 @@ const updatedAtLabel = computed(() => {
             v-model="customEnd"
             type="date"
             :min="customStart || undefined"
-            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="h-10 rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             @change="emitCustomRangeIfValid"
           />
         </label>
       </div>
-      <p v-if="isCustomRangeInvalid" class="mt-2 text-xs font-bold text-[#D81B60]">
+      <p v-if="isCustomRangeInvalid" class="mt-2 text-xs font-bold text-[#111827]">
         A data final deve ser igual ou posterior a data inicial.
       </p>
       <p v-else-if="!customRange" class="mt-2 text-xs font-bold text-bip-muted">
@@ -177,7 +177,7 @@ const updatedAtLabel = computed(() => {
     <div
       v-if="error"
       role="alert"
-      class="mt-4 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]"
+      class="mt-4 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151]"
     >
       {{ error }}
     </div>

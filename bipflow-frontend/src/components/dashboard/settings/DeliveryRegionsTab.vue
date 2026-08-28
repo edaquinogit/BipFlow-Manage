@@ -121,7 +121,7 @@ useStoreSwitchEffect(() => {
         <input
           v-model="regionDraft.name"
           type="text"
-          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           placeholder="Centro, Zona Norte..."
         />
       </label>
@@ -132,7 +132,7 @@ useStoreSwitchEffect(() => {
           <input
             v-model="regionDraft.city"
             type="text"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="Salvador"
           />
         </label>
@@ -144,7 +144,7 @@ useStoreSwitchEffect(() => {
             type="number"
             min="0"
             step="0.01"
-            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+            class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             placeholder="12.00"
           />
         </label>
@@ -155,20 +155,20 @@ useStoreSwitchEffect(() => {
         <textarea
           v-model="regionDraft.neighborhoods"
           rows="3"
-          class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+          class="w-full resize-none rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none transition placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
           placeholder="Opcional: Centro, Barra, Ondina"
         />
       </label>
 
       <label class="flex items-center justify-between gap-3 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
         <span class="text-xs font-bold text-bip-muted">Região ativa na vitrine</span>
-        <input v-model="regionDraft.is_active" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] bg-white text-[#D81B60] focus:ring-[#FCE7F3]" />
+        <input v-model="regionDraft.is_active" type="checkbox" class="h-4 w-4 rounded border-[#D1D5DB] bg-white text-[#111827] focus:ring-[#F3F4F6]" />
       </label>
 
       <button
         type="submit"
         :disabled="isSavingDeliveryRegion"
-        class="w-full rounded-lg bg-[#D81B60] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#D81B60]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
+        class="w-full rounded-lg bg-[#111827] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-bip-muted"
       >
         {{ isSavingDeliveryRegion ? 'Salvando...' : editingRegionId ? 'Salvar região' : 'Adicionar região' }}
       </button>
@@ -180,7 +180,7 @@ useStoreSwitchEffect(() => {
         <div class="mt-3 h-3 w-56 animate-pulse rounded bg-zinc-100" />
       </div>
 
-      <div v-else-if="deliveryRegionsError" class="rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] p-4 text-sm text-[#7A143D]">
+      <div v-else-if="deliveryRegionsError" class="rounded-lg border border-[#111827]/20 bg-[#F3F4F6] p-4 text-sm text-[#374151]">
         {{ deliveryRegionsError }}
       </div>
 
@@ -197,7 +197,7 @@ useStoreSwitchEffect(() => {
               {{ region.city || 'Cidade não informada' }} - {{ region.is_active ? 'Ativa' : 'Inativa' }}
             </p>
           </div>
-          <p class="shrink-0 text-sm font-black text-[#D81B60]">{{ formatBRL(region.delivery_fee) }}</p>
+          <p class="shrink-0 text-sm font-black text-[#111827]">{{ formatBRL(region.delivery_fee) }}</p>
         </div>
 
         <p v-if="region.neighborhoods" class="mt-3 line-clamp-2 text-xs leading-5 text-bip-muted">{{ region.neighborhoods }}</p>
@@ -205,7 +205,7 @@ useStoreSwitchEffect(() => {
         <div v-if="canManageCatalog" class="mt-4 flex gap-2">
           <button
             type="button"
-            class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-[#D81B60]/40 hover:text-[#05050A]"
+            class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-bip-muted transition hover:border-[#111827]/40 hover:text-[#05050A]"
             @click="editDeliveryRegion(region)"
           >
             <PencilSquareIcon class="h-4 w-4" />
@@ -213,7 +213,7 @@ useStoreSwitchEffect(() => {
           </button>
           <button
             type="button"
-            class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#D81B60]/20 bg-[#FCE7F3] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#D81B60] transition hover:border-[#D81B60]/40 hover:bg-[#FCE7F3]/70 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#111827]/20 bg-[#F3F4F6] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#111827] transition hover:border-[#111827]/40 hover:bg-[#F3F4F6]/70 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="deletingDeliveryRegionId === region.id"
             @click="handleDeleteDeliveryRegion(region.id)"
           >

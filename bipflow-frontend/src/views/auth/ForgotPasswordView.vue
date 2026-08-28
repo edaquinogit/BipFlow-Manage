@@ -91,7 +91,7 @@ const handlePasswordResetRequest = async () => {
 
     <div
       v-if="errorMessage"
-      class="mb-6 rounded-xl border border-[#FCE7F3] bg-[#FCE7F3] p-3 text-sm text-[#7A143D]"
+      class="mb-6 rounded-xl border border-[#F3F4F6] bg-[#F3F4F6] p-3 text-sm text-[#374151]"
     >
       {{ errorMessage }}
     </div>

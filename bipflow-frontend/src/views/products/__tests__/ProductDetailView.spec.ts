@@ -144,7 +144,7 @@ describe('ProductDetailView', () => {
       whatsapp_phone: '5579999999999',
       theme: {
         primary: '#111111',
-        accent: '#D81B60',
+        accent: '#111827',
         background: '#FAFAFA',
         surface: '#FFFFFF',
         text: '#05050A',

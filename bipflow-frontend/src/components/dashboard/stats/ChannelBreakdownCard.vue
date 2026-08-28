@@ -40,7 +40,7 @@ const progressFor = (revenue: string): number => {
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-bip-muted">Por onde vendem</p>
         <h3 class="mt-2 text-lg font-black italic tracking-tighter text-[#05050A]">Canal de venda</h3>
       </div>
-      <QrCodeIcon class="h-6 w-6 text-[#D81B60]" />
+      <QrCodeIcon class="h-6 w-6 text-[#111827]" />
     </div>
 
     <div class="mt-6 space-y-4">
@@ -61,11 +61,11 @@ const progressFor = (revenue: string): number => {
         >
           <div class="flex items-baseline justify-between gap-2">
             <p class="truncate text-sm font-bold text-[#05050A]">{{ getChannelLabel(row.channel) }}</p>
-            <p class="shrink-0 text-sm font-black text-[#D81B60]">{{ formatBRL(row.revenue_total) }}</p>
+            <p class="shrink-0 text-sm font-black text-[#111827]">{{ formatBRL(row.revenue_total) }}</p>
           </div>
           <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
             <div
-              class="h-full rounded-full bg-gradient-to-r from-[#D81B60] to-[#F472B6]"
+              class="h-full rounded-full bg-gradient-to-r from-[#111827] to-[#F472B6]"
               :style="{ width: progressFor(row.revenue_total) + '%' }"
             />
           </div>

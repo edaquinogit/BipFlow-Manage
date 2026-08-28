@@ -71,7 +71,7 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
 <template>
   <section class="space-y-8 border-b border-[#E5E7EB] pb-10" @click="isCategoryMenuOpen = false">
     <header>
-      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#D81B60]">
+      <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#111827]">
         Identidade do produto
       </h3>
       <p class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
@@ -89,7 +89,7 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
     />
 
     <div class="group flex flex-col">
-      <label class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#D81B60]">
+      <label class="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#111827]">
         Categoria
       </label>
 
@@ -104,9 +104,9 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
           class="flex h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 text-left text-sm transition-all"
           :class="[
             errors.category
-              ? 'border-[#D81B60]/50 bg-[#FCE7F3] text-[#7A143D]'
-              : 'border-[#D1D5DB] bg-white text-[#05050A] hover:border-[#D81B60]/40',
-            isCategoryMenuOpen ? 'border-[#D81B60] ring-2 ring-[#FCE7F3]' : ''
+              ? 'border-[#111827]/50 bg-[#F3F4F6] text-[#374151]'
+              : 'border-[#D1D5DB] bg-white text-[#05050A] hover:border-[#111827]/40',
+            isCategoryMenuOpen ? 'border-[#111827] ring-2 ring-[#F3F4F6]' : ''
           ]"
           @click="toggleCategoryMenu"
         >
@@ -115,7 +115,7 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
           </span>
           <ChevronDownIcon
             class="h-4 w-4 shrink-0 text-bip-muted transition-transform"
-            :class="{ 'rotate-180 text-[#D81B60]': isCategoryMenuOpen }"
+            :class="{ 'rotate-180 text-[#111827]': isCategoryMenuOpen }"
           />
         </button>
 
@@ -133,11 +133,11 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
                 :aria-selected="isSelectedCategory(item.id)"
                 :data-cy="`category-option-${item.id}`"
                 class="flex h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-xs font-semibold text-bip-muted transition hover:bg-zinc-50 hover:text-[#05050A]"
-                :class="{ 'bg-[#FCE7F3] text-[#05050A]': isSelectedCategory(item.id) }"
+                :class="{ 'bg-[#F3F4F6] text-[#05050A]': isSelectedCategory(item.id) }"
                 @click="selectCategory(item.id)"
               >
                 <span class="truncate">{{ item.name }}</span>
-                <CheckIcon v-if="isSelectedCategory(item.id)" class="h-4 w-4 shrink-0 text-[#D81B60]" />
+                <CheckIcon v-if="isSelectedCategory(item.id)" class="h-4 w-4 shrink-0 text-[#111827]" />
               </button>
 
               <button
@@ -148,18 +148,18 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
                 :aria-selected="isSelectedCategory(child.id)"
                 :data-cy="`category-option-${child.id}`"
                 class="flex h-9 w-full items-center justify-between gap-3 rounded-lg px-3 pl-6 text-left text-xs font-semibold text-bip-muted transition hover:bg-zinc-50 hover:text-[#05050A]"
-                :class="{ 'bg-[#FCE7F3] text-[#05050A]': isSelectedCategory(child.id) }"
+                :class="{ 'bg-[#F3F4F6] text-[#05050A]': isSelectedCategory(child.id) }"
                 @click="selectCategory(child.id)"
               >
                 <span class="truncate">{{ child.name }}</span>
-                <CheckIcon v-if="isSelectedCategory(child.id)" class="h-4 w-4 shrink-0 text-[#D81B60]" />
+                <CheckIcon v-if="isSelectedCategory(child.id)" class="h-4 w-4 shrink-0 text-[#111827]" />
               </button>
             </template>
           </div>
         </Transition>
       </div>
 
-      <p v-if="errors.category" class="mt-2 text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
+      <p v-if="errors.category" class="mt-2 text-[9px] font-black uppercase tracking-widest text-[#111827]">
         {{ errors.category[0] }}
       </p>
     </div>
@@ -180,7 +180,7 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
           type="button"
           data-cy="btn-copy-public-code"
           title="Copiar código"
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-colors hover:border-[#D81B60]/40 hover:bg-[#FCE7F3] hover:text-[#D81B60]"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-bip-muted transition-colors hover:border-[#111827]/40 hover:bg-[#F3F4F6] hover:text-[#111827]"
           @click="copyPublicCode"
         >
           <ClipboardDocumentIcon class="h-4 w-4" />
@@ -192,7 +192,7 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
     </div>
 
     <div class="group flex flex-col gap-2">
-      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#D81B60]">
+      <label class="text-[10px] font-black uppercase tracking-[0.2em] text-bip-muted transition-colors group-focus-within:text-[#111827]">
         Descrição pública
       </label>
       <textarea
@@ -200,10 +200,10 @@ const handleCategoryFocusOut = (event: FocusEvent) => {
         name="description"
         data-cy="input-product-description"
         rows="4"
-        class="w-full resize-none rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-sm text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+        class="w-full resize-none rounded-xl border border-[#D1D5DB] bg-white px-4 py-3 text-sm text-[#05050A] outline-none transition-all placeholder:text-bip-muted/70 focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
         placeholder="Descreva o produto para a vitrine: ingredientes, materiais, diferenciais ou forma de uso."
       />
-      <p v-if="errors.description" class="text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
+      <p v-if="errors.description" class="text-[9px] font-black uppercase tracking-widest text-[#111827]">
         {{ errors.description[0] }}
       </p>
     </div>

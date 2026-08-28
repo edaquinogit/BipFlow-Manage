@@ -121,13 +121,13 @@ function buildPublicAppearance(overrides: Partial<PublicStorefrontAppearance> = 
     tagline: 'Catalogo premium',
     theme: {
       primary: '#111111',
-      accent: '#D81B60',
+      accent: '#111827',
       background: '#FAFAFA',
       surface: '#FFFFFF',
       text: '#05050A',
       muted: '#6B7280',
     },
-    secondary_color: '#E91E63',
+    secondary_color: '#374151',
     favicon_url: '',
     hero_enabled: false,
     hero_image_desktop: '',
@@ -242,7 +242,7 @@ describe('ProductsView', () => {
       whatsapp_phone: '5579999999999',
       theme: {
         primary: '#111111',
-        accent: '#D81B60',
+        accent: '#111827',
         background: '#FAFAFA',
         surface: '#FFFFFF',
         text: '#05050A',
@@ -428,7 +428,7 @@ describe('ProductsView', () => {
     expect(shell.attributes('data-font-preset')).toBe('editorial')
     expect(shell.attributes('data-motion')).toBe('off')
     expect(shell.attributes('data-decoration')).toBe('geometric')
-    expect(shell.attributes('style')).toContain('--store-secondary-base: #E91E63')
+    expect(shell.attributes('style')).toContain('--store-secondary-base: #374151')
     expect(shell.attributes('style')).toContain('--store-radius-lg: 2rem')
     expect(shell.attributes('style')).toContain('--motion-base: 0ms')
 

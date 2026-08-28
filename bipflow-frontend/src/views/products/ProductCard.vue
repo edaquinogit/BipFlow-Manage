@@ -9,7 +9,7 @@
       :aria-label="`Ver detalhes do produto ${product.name}`"
       @click="handleOpenDetails"
     >
-      <div class="relative aspect-[4/5] overflow-hidden bg-[#F4F1F3]">
+      <div class="relative aspect-[4/5] overflow-hidden bg-[#F3F4F6]">
         <div
           class="absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2"
         >
@@ -203,9 +203,9 @@ const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
     <rect width="640" height="800" fill="#FAFAFA"/>
     <rect x="96" y="128" width="448" height="544" rx="36" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
-    <path d="M222 330h196c18 0 32 14 32 32v118c0 18-14 32-32 32H222c-18 0-32-14-32-32V362c0-18 14-32 32-32z" fill="#F4F1F3"/>
-    <path d="M236 462l52-54c10-10 26-10 36 0l34 35 18-19c10-11 28-11 38 0l58 60v28H236z" fill="#E9A8C0"/>
-    <circle cx="276" cy="382" r="22" fill="#D81B60" opacity=".22"/>
+    <path d="M222 330h196c18 0 32 14 32 32v118c0 18-14 32-32 32H222c-18 0-32-14-32-32V362c0-18 14-32 32-32z" fill="#F3F4F6"/>
+    <path d="M236 462l52-54c10-10 26-10 36 0l34 35 18-19c10-11 28-11 38 0l58 60v28H236z" fill="#D1D5DB"/>
+    <circle cx="276" cy="382" r="22" fill="#111827" opacity=".16"/>
     <text x="320" y="592" text-anchor="middle" fill="#6B7280" font-family="Arial, sans-serif" font-size="26" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`

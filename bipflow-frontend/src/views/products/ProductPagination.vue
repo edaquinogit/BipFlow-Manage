@@ -12,8 +12,8 @@
         :disabled="!hasPreviousPage"
         class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors"
         :class="hasPreviousPage
-          ? 'border border-[#D1D5DB] bg-white text-[#05050A] hover:border-[#D81B60] hover:text-[#D81B60]'
-          : 'cursor-not-allowed border border-[#E5E7EB] bg-[#F4F1F3] text-[#9CA3AF]'"
+          ? 'border border-[#D1D5DB] bg-white text-[#05050A] hover:border-[var(--store-primary)] hover:text-[var(--store-primary)]'
+          : 'cursor-not-allowed border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF]'"
         aria-label="Página anterior"
       >
         Anterior
@@ -24,8 +24,8 @@
         :disabled="!hasNextPage"
         class="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors"
         :class="hasNextPage
-          ? 'border border-[#D1D5DB] bg-white text-[#05050A] hover:border-[#D81B60] hover:text-[#D81B60]'
-          : 'cursor-not-allowed border border-[#E5E7EB] bg-[#F4F1F3] text-[#9CA3AF]'"
+          ? 'border border-[#D1D5DB] bg-white text-[#05050A] hover:border-[var(--store-primary)] hover:text-[var(--store-primary)]'
+          : 'cursor-not-allowed border border-[#E5E7EB] bg-[#F3F4F6] text-[#9CA3AF]'"
         aria-label="Próxima página"
       >
         Próxima
@@ -47,7 +47,7 @@
             type="button"
             @click="previousPage"
             :disabled="!hasPreviousPage"
-            class="relative inline-flex items-center rounded-l-lg px-2 py-2 text-[#6B7280] ring-1 ring-inset ring-[#D1D5DB] transition-colors hover:bg-white hover:text-[#D81B60] focus:z-20 focus:outline-offset-0"
+            class="relative inline-flex items-center rounded-l-lg px-2 py-2 text-[#6B7280] ring-1 ring-inset ring-[#D1D5DB] transition-colors hover:bg-white hover:text-[var(--store-primary)] focus:z-20 focus:outline-offset-0"
             :class="{ 'cursor-not-allowed': !hasPreviousPage }"
             aria-label="Página anterior"
           >
@@ -74,8 +74,8 @@
               @click="goToPage(item)"
               class="relative inline-flex items-center px-4 py-2 text-sm font-semibold transition-colors"
               :class="item === currentPage
-                ? 'z-10 bg-[#05050A] text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81B60]'
-                : 'text-[#05050A] ring-1 ring-inset ring-[#D1D5DB] hover:bg-white hover:text-[#D81B60] focus:z-20 focus:outline-offset-0'"
+                ? 'z-10 bg-[#05050A] text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--store-primary)]'
+                : 'text-[#05050A] ring-1 ring-inset ring-[#D1D5DB] hover:bg-white hover:text-[var(--store-primary)] focus:z-20 focus:outline-offset-0'"
               :aria-label="`Ir para página ${item}`"
               :aria-current="item === currentPage ? 'page' : undefined"
             >
@@ -88,7 +88,7 @@
             type="button"
             @click="nextPage"
             :disabled="!hasNextPage"
-            class="relative inline-flex items-center rounded-r-lg px-2 py-2 text-[#6B7280] ring-1 ring-inset ring-[#D1D5DB] transition-colors hover:bg-white hover:text-[#D81B60] focus:z-20 focus:outline-offset-0"
+            class="relative inline-flex items-center rounded-r-lg px-2 py-2 text-[#6B7280] ring-1 ring-inset ring-[#D1D5DB] transition-colors hover:bg-white hover:text-[var(--store-primary)] focus:z-20 focus:outline-offset-0"
             :class="{ 'cursor-not-allowed': !hasNextPage }"
             aria-label="Próxima página"
           >

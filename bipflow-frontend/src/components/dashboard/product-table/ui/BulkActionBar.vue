@@ -29,7 +29,7 @@ const hasCategories = computed(() => props.categories && props.categories.length
  * 🎨 NYC STATION THEME UTILITIES
  */
 const getGlowClass = (isActive: boolean) => {
-  return isActive ? 'shadow-lg shadow-[#D81B60]/15' : '';
+  return isActive ? 'shadow-lg shadow-[#111827]/15' : '';
 };
 
 /**
@@ -71,8 +71,8 @@ const handleConfirm = () => {
 
           <!-- Selection Count -->
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-[#FCE7F3] border border-[#D81B60]/30 flex items-center justify-center">
-              <span class="text-xs font-black text-[#D81B60]">{{ selectedCount }}</span>
+            <div class="w-8 h-8 rounded-full bg-[#F3F4F6] border border-[#111827]/30 flex items-center justify-center">
+              <span class="text-xs font-black text-[#111827]">{{ selectedCount }}</span>
             </div>
             <span class="text-sm font-bold text-[#05050A] uppercase tracking-wide">
               {{ selectedCount }} produto{{ selectedCount === 1 ? '' : 's' }} selecionado{{ selectedCount === 1 ? '' : 's' }}
@@ -84,7 +84,7 @@ const handleConfirm = () => {
             type="button"
             data-cy="btn-bulk-print-labels"
             @click="emit('print-labels')"
-            class="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#FCE7F3] border border-[#E5E7EB] rounded-lg text-sm font-medium text-bip-muted hover:text-[#D81B60] transition-all"
+            class="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#F3F4F6] border border-[#E5E7EB] rounded-lg text-sm font-medium text-bip-muted hover:text-[#111827] transition-all"
           >
             <QrCodeIcon class="w-4 h-4" />
             <span class="uppercase tracking-wide">Etiquetas</span>
@@ -97,7 +97,7 @@ const handleConfirm = () => {
               v-model="selectedCategoryId"
               @change="(e) => handleCategorySelect(parseInt((e.target as HTMLSelectElement).value))"
               :disabled="isUpdating"
-              class="bg-white border border-[#D1D5DB] rounded-lg px-4 py-2 text-sm font-medium text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:border-[#D81B60] disabled:opacity-50 disabled:cursor-not-allowed"
+              class="bg-white border border-[#D1D5DB] rounded-lg px-4 py-2 text-sm font-medium text-[#05050A] focus:outline-none focus:ring-2 focus:ring-[#F3F4F6] focus:border-[#111827] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="" disabled selected>Escolher categoria</option>
               <option
@@ -115,7 +115,7 @@ const handleConfirm = () => {
             v-if="hasSelectedCategory"
             @click="handleConfirm"
             :disabled="isUpdating"
-            class="flex items-center gap-2 px-4 py-2 bg-[#D81B60] hover:bg-[#D81B60]/90 border border-[#D81B60]/50 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center gap-2 px-4 py-2 bg-[#111827] hover:bg-[#111827]/90 border border-[#111827]/50 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckIcon class="w-4 h-4" />
             <span class="uppercase tracking-wide">Confirmar</span>
@@ -123,7 +123,7 @@ const handleConfirm = () => {
 
           <!-- Loading State -->
           <div v-if="isUpdating" class="flex items-center gap-2">
-            <div class="w-4 h-4 border-2 border-[#D81B60] border-t-transparent rounded-full animate-spin"></div>
+            <div class="w-4 h-4 border-2 border-[#111827] border-t-transparent rounded-full animate-spin"></div>
             <span class="text-xs text-bip-muted font-medium uppercase tracking-wider">Atualizando...</span>
           </div>
 
@@ -154,11 +154,11 @@ select::-webkit-scrollbar-track {
 }
 
 select::-webkit-scrollbar-thumb {
-  background: rgba(216, 27, 96, 0.4);
+  background: rgba(17, 24, 39, 0.4);
   border-radius: 3px;
 }
 
 select::-webkit-scrollbar-thumb:hover {
-  background: rgba(216, 27, 96, 0.6);
+  background: rgba(17, 24, 39, 0.6);
 }
 </style>

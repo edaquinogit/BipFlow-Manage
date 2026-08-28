@@ -43,7 +43,7 @@
     <main class="mx-auto max-w-7xl px-4 py-6 pb-24 min-[390px]:py-8 sm:px-6 lg:px-8">
       <div v-if="isLoading" class="grid gap-6 min-[390px]:gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
         <div class="animate-pulse">
-          <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
+          <div class="aspect-[4/5] rounded-lg bg-[#F3F4F6]" />
         </div>
 
         <div class="animate-pulse">
@@ -89,12 +89,12 @@
       <div v-else class="grid gap-6 min-[390px]:gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
         <section class="min-w-0 space-y-3.5 min-[390px]:space-y-4">
           <div
-            class="w-full overflow-hidden rounded-[1.15rem] bg-[#F4F1F3] min-[390px]:rounded-lg"
+            class="w-full overflow-hidden rounded-[1.15rem] bg-[#F3F4F6] min-[390px]:rounded-lg"
             @mouseenter="pauseCarousel"
             @mouseleave="resumeCarousel"
           >
             <div
-              class="relative aspect-[4/5] overflow-hidden bg-[#F4F1F3] touch-pan-y"
+              class="relative aspect-[4/5] overflow-hidden bg-[#F3F4F6] touch-pan-y"
               @pointerdown="handlePointerDown"
               @pointermove="handlePointerMove"
               @pointerup="handlePointerUp"
@@ -409,9 +409,9 @@ const FALLBACK_IMAGE_URL = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800">
     <rect width="640" height="800" fill="#FAFAFA"/>
     <rect x="96" y="128" width="448" height="544" rx="36" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
-    <path d="M222 330h196c18 0 32 14 32 32v118c0 18-14 32-32 32H222c-18 0-32-14-32-32V362c0-18 14-32 32-32z" fill="#F4F1F3"/>
-    <path d="M236 462l52-54c10-10 26-10 36 0l34 35 18-19c10-11 28-11 38 0l58 60v28H236z" fill="#E9A8C0"/>
-    <circle cx="276" cy="382" r="22" fill="#D81B60" opacity=".22"/>
+    <path d="M222 330h196c18 0 32 14 32 32v118c0 18-14 32-32 32H222c-18 0-32-14-32-32V362c0-18 14-32 32-32z" fill="#F3F4F6"/>
+    <path d="M236 462l52-54c10-10 26-10 36 0l34 35 18-19c10-11 28-11 38 0l58 60v28H236z" fill="#D1D5DB"/>
+    <circle cx="276" cy="382" r="22" fill="#111827" opacity=".16"/>
     <text x="320" y="592" text-anchor="middle" fill="#6B7280" font-family="Arial, sans-serif" font-size="26" font-weight="700">Imagem em breve</text>
   </svg>
 `)}`

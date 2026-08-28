@@ -242,7 +242,7 @@ const handleSendEmail = (): void => {
                 v-model="emailDraft"
                 type="email"
                 data-cy="receipt-email-input"
-                class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="w-full rounded-lg border border-[#D1D5DB] bg-white px-3 py-2 text-sm text-[#05050A] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
                 placeholder="cliente@exemplo.com"
               />
             </label>
@@ -250,7 +250,7 @@ const handleSendEmail = (): void => {
               Ao enviar, o PDF do recibo é baixado e o Gmail abre em outra aba já preenchido --
               é só anexar o arquivo baixado e enviar.
             </p>
-            <p v-if="emailError" data-cy="receipt-email-error" class="text-xs font-semibold text-[#D81B60]">
+            <p v-if="emailError" data-cy="receipt-email-error" class="text-xs font-semibold text-[#111827]">
               {{ emailError }}
             </p>
             <div class="flex gap-3">
@@ -353,7 +353,7 @@ const handleSendEmail = (): void => {
   flex: 1;
   padding: 1rem 1.5rem;
   border-radius: 0.75rem;
-  background-color: #d81b60;
+  background-color: #111827;
   color: white;
   font-size: 10px;
   font-weight: 900;
@@ -363,7 +363,7 @@ const handleSendEmail = (): void => {
 }
 
 .confirm-button:hover {
-  background-color: #ad1457;
+  background-color: #374151;
 }
 
 .fade-enter-active,

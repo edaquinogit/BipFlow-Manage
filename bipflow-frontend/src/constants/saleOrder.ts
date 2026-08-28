@@ -27,7 +27,7 @@ const SALE_STATUS_BADGE_CLASS: Record<SaleOrderStatus, string> = {
   prepared: 'border-amber-200 bg-amber-50 text-amber-800',
   sent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   delivered: 'border-sky-200 bg-sky-50 text-sky-800',
-  cancelled: 'border-[#D81B60]/20 bg-[#FCE7F3] text-[#7A143D]',
+  cancelled: 'border-[#111827]/20 bg-[#F3F4F6] text-[#374151]',
 };
 
 export function getSaleStatusBadgeClass(status: SaleOrderStatus): string {

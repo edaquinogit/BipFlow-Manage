@@ -32,7 +32,7 @@
             <button
               type="button"
               data-cy="open-cart-button"
-              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:px-4 min-[390px]:text-xs"
+              class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:px-4 min-[390px]:text-xs"
               :class="itemCount > 0
                 ? 'storefront-primary-button shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)]'
                 : 'storefront-outline-button bg-white'"
@@ -59,7 +59,7 @@
               <input
                 :value="filters.search"
                 type="search"
-                class="h-10 w-full rounded-full border border-transparent bg-[#F4F1F3] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D81B60] focus:bg-white focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11"
+                class="h-10 w-full rounded-full border border-transparent bg-[#F3F4F6] pl-10 pr-4 text-sm text-[#05050A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[var(--store-primary)] focus:bg-white focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:h-11"
                 placeholder="Buscar produto"
                 aria-label="Buscar produtos por nome"
                 @input="handleSearchInput"
@@ -70,7 +70,7 @@
               type="button"
               :aria-expanded="isFiltersOpen"
               aria-label="Abrir filtros"
-              class="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-[#F4F1F3] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FCE7F3] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:h-11 min-[390px]:w-11"
+              class="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-[#F3F4F6] text-[#6B7280] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--store-primary-soft)] hover:text-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:h-11 min-[390px]:w-11"
               @click="toggleFilters"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@
                     </label>
                     <select
                       v-model="sortBy"
-                      class="w-full rounded-xl border border-[#D1D5DB] bg-white/50 px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                      class="w-full rounded-xl border border-[#D1D5DB] bg-white/50 px-3 py-2.5 text-sm text-[#05050A] outline-none transition focus:border-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                     >
                       <option value="featured">Mais relevantes</option>
                       <option value="price-asc">Menor preço</option>
@@ -121,7 +121,7 @@
                       <input
                         type="checkbox"
                         :checked="draftInStockOnly"
-                        class="w-4 h-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                        class="w-4 h-4 rounded border-[#D1D5DB] text-[var(--store-primary)] focus:ring-2 focus:ring-[var(--store-primary-soft)]"
                         @change="handleStockFilterToggle"
                       />
                       <span class="text-sm text-[#6B7280]">Em estoque</span>
@@ -139,8 +139,8 @@
                       type="button"
                       class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
                       :class="!draftCategoryId
-                        ? 'bg-[#D81B60] text-white shadow-md'
-                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                        ? 'bg-[var(--store-primary)] text-white shadow-md'
+                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[var(--store-primary-soft)] hover:text-[var(--store-primary)]'"
                       @click="handleQuickCategory(undefined)"
                     >
                       Todas
@@ -152,8 +152,8 @@
                       type="button"
                       class="rounded-full px-3 py-1.5 text-[11px] font-bold uppercase leading-[1.15] tracking-[0.12em] transition-all duration-200"
                       :class="draftCategoryId === category.id
-                        ? 'bg-[#D81B60] text-white shadow-md'
-                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#FCE7F3] hover:text-[#D81B60]'"
+                        ? 'bg-[var(--store-primary)] text-white shadow-md'
+                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[var(--store-primary-soft)] hover:text-[var(--store-primary)]'"
                       @click="handleQuickCategory(category.id)"
                     >
                       {{ category.name }}
@@ -165,14 +165,14 @@
                 <div class="mt-5 flex items-center justify-end gap-2.5 border-t border-white/20 pt-4 min-[390px]:mt-6 min-[390px]:gap-3">
                   <button
                     type="button"
-                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
+                    class="storefront-outline-button inline-flex h-10 items-center justify-center rounded-xl border bg-white px-4 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] transition focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:text-xs"
                     @click="handleCancelFilters"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
-                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] min-[390px]:text-xs"
+                    class="storefront-primary-button inline-flex h-10 items-center justify-center rounded-xl px-5 whitespace-nowrap text-[11px] font-bold uppercase leading-[1.15] tracking-[0.14em] text-white shadow-[0_12px_28px_-18px_rgba(5,5,10,0.8)] transition focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] min-[390px]:text-xs"
                     @click="handleSaveFilters"
                   >
                     Salvar
@@ -183,7 +183,7 @@
                 <button
                   type="button"
                   @click="isFiltersOpen = false"
-                  class="absolute top-3 right-3 text-[#9CA3AF] hover:text-[#D81B60] transition-colors"
+                  class="absolute top-3 right-3 text-[#9CA3AF] hover:text-[var(--store-primary)] transition-colors"
                   aria-label="Fechar filtros"
                 >
                   <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +298,7 @@
         <button
           v-if="filters.search || filters.categoryId"
           type="button"
-          class="font-medium text-[#05050A] underline-offset-4 hover:text-[#D81B60] hover:underline"
+          class="font-medium text-[#05050A] underline-offset-4 hover:text-[var(--store-primary)] hover:underline"
           @click="handleClearFilters"
         >
           Limpar filtros
@@ -311,7 +311,7 @@
           :key="n"
           class="animate-pulse"
         >
-          <div class="aspect-[4/5] rounded-lg bg-[#F4F1F3]" />
+          <div class="aspect-[4/5] rounded-lg bg-[#F3F4F6]" />
           <div class="space-y-3 pt-4">
             <div class="h-4 w-2/3 rounded bg-slate-200" />
             <div class="h-7 w-1/2 rounded bg-slate-200" />
@@ -339,7 +339,7 @@
         <button
           type="button"
           aria-label="Tentar novamente"
-          class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
+          class="inline-flex items-center rounded-lg bg-[#05050A] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] focus:ring-offset-2"
           @click="retryFetch"
         >
           Tentar novamente
@@ -384,7 +384,7 @@
         <button
           type="button"
           aria-label="Limpar filtros"
-          class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#05050A] transition-colors hover:border-[#D81B60] hover:text-[#D81B60] focus:outline-none focus:ring-2 focus:ring-[#FCE7F3] focus:ring-offset-2"
+          class="inline-flex items-center rounded-lg border border-[#D1D5DB] bg-white px-5 py-3 text-sm font-medium text-[#05050A] transition-colors hover:border-[var(--store-primary)] hover:text-[var(--store-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--store-primary-soft)] focus:ring-offset-2"
           @click="handleClearFilters"
         >
           Limpar filtros
@@ -431,11 +431,6 @@
       @submit-order="handleSubmitOrder"
     />
 
-    <IntroSplash
-      :visible="showIntro"
-      :is-backend-ready="isBackendReady"
-      @dismiss="dismissIntro"
-    />
   </div>
 </template>
 
@@ -446,7 +441,6 @@ import { PublicRoutes } from '@/router/public.routes'
 import CartDrawer from './CartDrawer.vue'
 import CustomerProfileMenuButton from './CustomerProfileMenuButton.vue'
 import FloatingCartButton from './FloatingCartButton.vue'
-import IntroSplash from './IntroSplash.vue'
 import ProductCard from './ProductCard.vue'
 import ProductPagination from './ProductPagination.vue'
 import {
@@ -456,7 +450,6 @@ import {
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { useCustomerProfile } from '@/composables/useCustomerProfile'
-import { useIdleIntro } from '@/composables/useIdleIntro'
 import { useProductSearch } from '@/composables/useProductSearch'
 import { usePublicStorefrontAppearance } from '@/composables/usePublicStorefrontAppearance'
 import { useStoreTheme } from '@/composables/useStoreTheme'
@@ -524,13 +517,6 @@ const { selectedStore, fetchCurrentStore } = useCurrentStore()
 const publicStoreSlug = computed(() => currentRouteStoreSlug.value || selectedStore.value?.slug || null)
 const { appearance: storefrontAppearance } = usePublicStorefrontAppearance(publicStoreSlug)
 const storeBranding = useStoreTheme(selectedStore, storefrontAppearance)
-const { showIntro, dismissIntro } = useIdleIntro({ storeKey: routeStoreSlug || 'default' })
-// Two independent fetches gate the intro's loading state: store/categories/etc
-// (awaited directly below) and the product list, which useProductSearch kicks
-// off on its own -- tracked via the isInitialLoading transition instead.
-const isCoreDataReady = ref(false)
-const isProductsReady = ref(false)
-const isBackendReady = computed(() => isCoreDataReady.value && isProductsReady.value)
 const categories = ref<Category[]>([])
 const storefrontBanners = ref<PublicStorefrontBanner[]>([])
 const deliveryRegions = ref<DeliveryRegion[]>([])
@@ -819,8 +805,6 @@ watch(
   async (storeSlug) => {
     if (typeof storeSlug === 'string' && storeSlug.trim()) {
       setSelectedStoreSlug(storeSlug)
-      isCoreDataReady.value = false
-      isProductsReady.value = false
       await Promise.allSettled([
         fetchCurrentStore(true),
         loadCategories(),
@@ -829,8 +813,6 @@ watch(
         loadStorefrontBanners(),
         fetchProducts(),
       ])
-      isCoreDataReady.value = true
-      isProductsReady.value = true
     }
   }
 )
@@ -850,12 +832,6 @@ watch(
   { immediate: true },
 )
 
-watch(isInitialLoading, (loading, wasLoading) => {
-  if (wasLoading && !loading) {
-    isProductsReady.value = true
-  }
-})
-
 onMounted(async () => {
   await Promise.allSettled([
     fetchCurrentStore(),
@@ -864,7 +840,6 @@ onMounted(async () => {
     loadStoreSettings(),
     loadStorefrontBanners(),
   ])
-  isCoreDataReady.value = true
 })
 
 function openFilters(): void {

@@ -106,7 +106,7 @@ onMounted(async () => {
 
       <template v-else>
         <div class="mt-8 mb-6">
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#D81B60]">Minha conta</p>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#111827]">Minha conta</p>
           <h1 class="mt-2 text-2xl font-semibold text-[#05050A]">{{ selectedStore?.name }}</h1>
           <p class="mt-1 text-sm text-[#6B7280]">{{ profile.email }}</p>
         </div>
@@ -117,7 +117,7 @@ onMounted(async () => {
             <input
               v-model="form.full_name"
               type="text"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             />
           </label>
 
@@ -127,7 +127,7 @@ onMounted(async () => {
               v-model="form.phone"
               type="tel"
               inputmode="tel"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             />
           </label>
 
@@ -137,7 +137,7 @@ onMounted(async () => {
               v-model="form.address"
               type="text"
               autocomplete="street-address"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
             />
           </label>
 
@@ -147,7 +147,7 @@ onMounted(async () => {
               <input
                 v-model="form.neighborhood"
                 type="text"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               />
             </label>
 
@@ -156,7 +156,7 @@ onMounted(async () => {
               <input
                 v-model="form.city"
                 type="text"
-                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+                class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               />
             </label>
           </div>
@@ -164,7 +164,7 @@ onMounted(async () => {
           <button
             type="submit"
             :disabled="isSaving"
-            class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#D81B60] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
+            class="inline-flex h-11 w-full items-center justify-center rounded-lg bg-[#05050A] text-sm font-semibold text-white transition hover:bg-[#111827] disabled:cursor-not-allowed disabled:bg-[#D1D5DB]"
           >
             {{ isSaving ? 'Salvando...' : 'Salvar' }}
           </button>
@@ -172,7 +172,7 @@ onMounted(async () => {
 
         <button
           type="button"
-          class="mt-6 w-full text-center text-sm font-semibold text-[#6B7280] transition hover:text-[#D81B60]"
+          class="mt-6 w-full text-center text-sm font-semibold text-[#6B7280] transition hover:text-[#111827]"
           @click="handleLogout"
         >
           Sair da conta

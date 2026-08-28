@@ -80,7 +80,7 @@ function addVariant(): void {
     ...variants.value,
     {
       name: '',
-      color_hex: '#D81B60',
+      color_hex: '#111827',
       stock_quantity: 0,
       image: null,
       is_active: true,
@@ -136,7 +136,7 @@ onUnmounted(() => {
   <section class="space-y-6 pb-4">
     <header class="flex items-start justify-between gap-4">
       <div>
-        <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#D81B60]">
+        <h3 class="mb-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#111827]">
           Variantes de cor
         </h3>
         <p class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
@@ -146,7 +146,7 @@ onUnmounted(() => {
 
       <button
         type="button"
-        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#05050A] transition hover:border-[#D81B60] hover:text-[#D81B60]"
+        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#05050A] transition hover:border-[#111827] hover:text-[#111827]"
         aria-label="Adicionar variante de cor"
         title="Adicionar variante"
         @click="addVariant"
@@ -207,7 +207,7 @@ onUnmounted(() => {
               :value="variant.name"
               type="text"
               maxlength="80"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Preto, azul..."
               @input="updateVariant(index, { name: ($event.target as HTMLInputElement).value })"
             />
@@ -222,7 +222,7 @@ onUnmounted(() => {
               type="number"
               min="0"
               step="1"
-              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#D81B60] focus:ring-2 focus:ring-[#FCE7F3]"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               :aria-label="`Quantidade em estoque da variante ${variant.name || index + 1}`"
               @input="updateVariant(index, { stock_quantity: normalizeVariantStock(($event.target as HTMLInputElement).value) })"
             />
@@ -233,7 +233,7 @@ onUnmounted(() => {
               Cor
             </span>
             <input
-              :value="variant.color_hex || '#D81B60'"
+              :value="variant.color_hex || '#111827'"
               type="color"
               class="h-11 w-full cursor-pointer rounded-lg border border-[#D1D5DB] bg-white p-1"
               :aria-label="`Selecionar cor da variante ${variant.name || index + 1}`"
@@ -245,7 +245,7 @@ onUnmounted(() => {
             <input
               :checked="variant.is_active"
               type="checkbox"
-              class="h-4 w-4 rounded border-[#D1D5DB] text-[#D81B60] focus:ring-[#FCE7F3]"
+              class="h-4 w-4 rounded border-[#D1D5DB] text-[#111827] focus:ring-[#F3F4F6]"
               @change="updateVariant(index, { is_active: ($event.target as HTMLInputElement).checked })"
             />
             Ativa na vitrine
@@ -267,7 +267,7 @@ onUnmounted(() => {
     <button
       v-else
       type="button"
-      class="flex min-h-20 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#D1D5DB] bg-zinc-50 px-4 text-sm font-semibold text-bip-muted transition hover:border-[#D81B60] hover:text-[#D81B60]"
+      class="flex min-h-20 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#D1D5DB] bg-zinc-50 px-4 text-sm font-semibold text-bip-muted transition hover:border-[#111827] hover:text-[#111827]"
       @click="addVariant"
     >
       <PlusIcon class="h-5 w-5" aria-hidden="true" />
@@ -275,7 +275,7 @@ onUnmounted(() => {
     </button>
 
     <Transition name="slide-up">
-      <p v-if="error || imageError" class="text-center text-[9px] font-black uppercase tracking-widest text-[#D81B60]">
+      <p v-if="error || imageError" class="text-center text-[9px] font-black uppercase tracking-widest text-[#111827]">
         {{ imageError || error }}
       </p>
     </Transition>

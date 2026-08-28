@@ -47,11 +47,11 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
         v-if="canManageCatalog"
         data-cy="row-checkbox"
         @click="emit('toggle-selection', product.id!)"
-        class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#FCE7F3]"
+        class="w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#F3F4F6]"
         :class="[
           isSelected
-            ? 'bg-[#D81B60] border-[#D81B60] shadow-lg shadow-[#D81B60]/25'
-            : 'border-[#D1D5DB] hover:border-[#D81B60]/50 bg-white'
+            ? 'bg-[#111827] border-[#111827] shadow-lg shadow-[#111827]/25'
+            : 'border-[#D1D5DB] hover:border-[#111827]/50 bg-white'
         ]"
         title="Selecionar produto"
       >
@@ -72,7 +72,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
         <ProductAvatar :image="product.image" :name="product.name" />
 
         <div class="flex flex-col">
-          <span class="text-sm font-bold text-[#05050A] uppercase tracking-tight group-hover:text-[#D81B60] transition-colors">
+          <span class="text-sm font-bold text-[#05050A] uppercase tracking-tight group-hover:text-[#111827] transition-colors">
             {{ product.name }}
           </span>
           <span class="text-[9px] text-bip-muted font-mono font-bold tracking-widest uppercase">
@@ -106,7 +106,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
           title="Nível de estoque"
         >
           <div
-            class="h-full bg-[#D81B60] transition-all duration-500"
+            class="h-full bg-[#111827] transition-all duration-500"
             :style="{ width: `${Math.min(product.stock_quantity * 10, 100)}%` }"
           />
         </div>
@@ -115,7 +115,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
 
     <td class="px-6 py-4 text-right">
       <div class="flex flex-col items-end">
-        <span class="text-sm font-black text-[#D81B60] font-mono">
+        <span class="text-sm font-black text-[#111827] font-mono">
           {{ formatBRL(product.price) }}
         </span>
         <span class="text-[8px] text-bip-muted uppercase font-bold tracking-widest">
@@ -128,7 +128,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
       <div v-if="canManageCatalog" class="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
         <button
           @click="emit('print-label', product)"
-          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
+          class="p-2.5 hover:bg-[#F3F4F6] rounded-lg text-bip-muted hover:text-[#111827] transition-colors"
           title="Imprimir etiqueta com QR Code"
         >
           <QrCodeIcon class="h-4 w-4" />
@@ -136,7 +136,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
 
         <button
           @click="emit('edit', product)"
-          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
+          class="p-2.5 hover:bg-[#F3F4F6] rounded-lg text-bip-muted hover:text-[#111827] transition-colors"
           title="Editar produto"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,7 +146,7 @@ const isLowStockRow = computed(() => props.product.stock_quantity <= getLowStock
 
         <button
           @click="emit('delete', product.id!)"
-          class="p-2.5 hover:bg-[#FCE7F3] rounded-lg text-bip-muted hover:text-[#D81B60] transition-colors"
+          class="p-2.5 hover:bg-[#F3F4F6] rounded-lg text-bip-muted hover:text-[#111827] transition-colors"
           title="Remover produto"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
