@@ -50,7 +50,8 @@ class CheckoutWhatsAppThrottlingTest(TestCase):
 
     def setUp(self) -> None:
         self.settings_override = override_settings(
-            REST_FRAMEWORK=CHECKOUT_THROTTLE_TEST_REST_FRAMEWORK
+            REST_FRAMEWORK=CHECKOUT_THROTTLE_TEST_REST_FRAMEWORK,
+            WHATSAPP_ORDER_PHONE="5571999999999",
         )
         self.settings_override.enable()
         api_settings.reload()

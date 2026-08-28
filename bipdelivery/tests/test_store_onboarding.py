@@ -221,6 +221,14 @@ class StoreSwitchSecurityTest(TestCase):
 
         self.assertEqual(response.data["slug"], self.store_a.slug)
 
+    def test_stale_token_store_claim_is_rejected(self) -> None:
+        client = APIClient()
+        client.force_authenticate(user=self.user, token={"store_id": self.store_b.id})
+
+        response = client.get("/api/v1/store/current/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_header_can_move_a_user_between_their_own_stores(self) -> None:
         StoreMembership.objects.create(
             store=self.store_b, user=self.user, role=StoreMembership.ROLE_VIEWER

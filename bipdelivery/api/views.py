@@ -1,3 +1,6 @@
+import hashlib
+import json
+import logging
 from datetime import datetime, timedelta
 from datetime import time as time_of_day
 from decimal import Decimal
@@ -8,7 +11,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import TruncDate
@@ -50,6 +53,7 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerFeedback,
     CustomerProfile,
     DeliveryRegion,
     LabelSettings,
@@ -91,6 +95,9 @@ from .serializers import (
     CheckoutRequestSerializer,
     CheckoutResponseSerializer,
     CurrentUserSerializer,
+    CustomerFeedbackCreateSerializer,
+    CustomerFeedbackSerializer,
+    CustomerFeedbackStatusUpdateSerializer,
     CustomerProfileSerializer,
     DeliveryRegionSerializer,
     LabelSettingsSerializer,
@@ -130,6 +137,7 @@ from .throttling import (
     BotMessageIpThrottle,
     CheckoutCustomerThrottle,
     CheckoutIpThrottle,
+    FeedbackIpThrottle,
     LoginIdentityThrottle,
     MfaVerifyIdentityThrottle,
     MfaVerifyIpThrottle,
@@ -142,6 +150,7 @@ from .throttling import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _store_settings_snapshot(store: Store) -> StoreSettings:
@@ -521,7 +530,11 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """
         if self.request.method in ("PUT", "PATCH"):
             kwargs["partial"] = True
-        kwargs["context"] = {"request": self.request}
+        context = kwargs.pop("context", None)
+        if context is None:
+            context = self.get_serializer_context()
+        context["request_store"] = self.get_request_store()
+        kwargs["context"] = context
         return super().get_serializer(*args, **kwargs)
 
     def perform_create(self, serializer) -> None:
@@ -1485,6 +1498,61 @@ class BotConversationViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelView
         return queryset.order_by("-updated_at", "-id")
 
 
+class CustomerFeedbackViewSet(StoreScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """Dashboard read access to storefront feedback/problem reports.
+
+    Read-only by design (mirrors BotConversationViewSet): the one mutation
+    this resource supports, changing `status`, goes through the dedicated
+    `update_status` action below, gated separately by write access -- same
+    split SaleOrderViewSet uses so a reader can never sneak a write in
+    through a generic PATCH/PUT on the detail route.
+    """
+
+    serializer_class = CustomerFeedbackSerializer
+    permission_classes = [IsAuthenticated, IsDashboardReadRole]
+    pagination_class = StandardPagination
+
+    def get_base_queryset(self):
+        queryset = CustomerFeedback.objects.select_related(
+            "product", "order", "customer_profile"
+        )
+
+        status_filter = self.request.query_params.get("status", "").strip()
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        type_filter = self.request.query_params.get("type", "").strip()
+        if type_filter:
+            queryset = queryset.filter(feedback_type=type_filter)
+
+        date_from = self.request.query_params.get("date_from", "").strip()
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+
+        date_to = self.request.query_params.get("date_to", "").strip()
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+
+        return queryset
+
+    @action(detail=True, methods=["patch"], url_path="status")
+    def update_status(self, request, pk=None):
+        """Allow dashboard writers to move a report through its status."""
+        if not has_dashboard_write_access(request.user):
+            raise PermissionDenied("Voce nao possui permissao para alterar relatos.")
+
+        feedback = self.get_object()
+        serializer = CustomerFeedbackStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        feedback.status = serializer.validated_data["status"]
+        feedback.save(update_fields=["status", "updated_at"])
+
+        return Response(
+            CustomerFeedbackSerializer(feedback).data, status=status.HTTP_200_OK
+        )
+
+
 class StoreSettingsView(APIView):
     """Read and update the resolved store's operational settings."""
 
@@ -2226,6 +2294,84 @@ class BotMessageView(APIView):
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 
+class CustomerFeedbackCreateView(APIView):
+    """Public problem-report/suggestion submission from the storefront.
+
+    Same auth story as CheckoutWhatsAppView on purpose: default
+    authentication + AllowAny, not the anonymous-only pattern of
+    PublicStorefrontAppearanceView. This works for a guest (no account) and
+    still lets an authenticated customer's report get linked to their own
+    CustomerProfile -- resolve_request_store() already threads through both
+    cases via the same X-Store-Slug header every request already carries, so
+    no store_slug is ever read from the request body.
+    """
+
+    throttle_classes = [FeedbackIpThrottle]
+
+    def post(self, request, *args, **kwargs):
+        store = resolve_request_store(request)
+
+        serializer = CustomerFeedbackCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+
+        customer_profile = None
+        if request.user is not None and request.user.is_authenticated:
+            customer_profile = CustomerProfile.objects.filter(
+                user=request.user, store=store
+            ).first()
+
+        product = None
+        product_id = validated_data.get("product_id")
+        if product_id:
+            product = Product.objects.filter(id=product_id, store=store).first()
+            if product is None:
+                raise serializers.ValidationError(
+                    {"product_id": "Produto nao encontrado nesta loja."}
+                )
+
+        order = None
+        order_id = validated_data.get("order_id")
+        if order_id:
+            order = SaleOrder.objects.filter(id=order_id, store=store).first()
+            if order is None:
+                raise serializers.ValidationError(
+                    {"order_id": "Pedido nao encontrado nesta loja."}
+                )
+
+        correlation_id = validated_data.get("correlation_id", "") or request.META.get(
+            "HTTP_X_REQUEST_ID", ""
+        )
+
+        feedback = CustomerFeedback.objects.create(
+            store=store,
+            customer_profile=customer_profile,
+            feedback_type=validated_data["feedback_type"],
+            message=validated_data["message"],
+            contact=validated_data.get("contact", ""),
+            page_path=validated_data.get("page_path", ""),
+            product=product,
+            order=order,
+            correlation_id=correlation_id[:64],
+            user_agent=request.META.get("HTTP_USER_AGENT", "")[:512],
+        )
+
+        logger.info(
+            "feedback_created",
+            extra={
+                "event": "feedback_created",
+                "store_id": store.id,
+                "feedback_id": feedback.id,
+                "type": feedback.feedback_type,
+                "correlation_id": feedback.correlation_id,
+            },
+        )
+
+        return Response(
+            {"id": feedback.id, "status": feedback.status}, status=status.HTTP_201_CREATED
+        )
+
+
 class CheckoutWhatsAppView(APIView):
     """
     Prepare a checkout note and WhatsApp redirect for the public catalog.
@@ -2431,6 +2577,166 @@ class CheckoutWhatsAppView(APIView):
 
         return item["product_name"]
 
+    @staticmethod
+    def _idempotency_customer_scope(request, profile, customer: dict) -> dict:
+        if profile is not None:
+            return {
+                "profile_id": profile.id,
+                "user_id": getattr(request.user, "id", None),
+            }
+
+        return {
+            "guest_name": customer.get("full_name", "").strip(),
+            "guest_phone": customer.get("phone", "").strip(),
+        }
+
+    def _build_idempotency_payload_hash(
+        self,
+        *,
+        store: Store,
+        validated_data: dict,
+        profile: CustomerProfile | None,
+    ) -> str:
+        customer = validated_data["customer"]
+        canonical_payload = {
+            "store_id": store.id,
+            "items": validated_data["items"],
+            "customer": customer,
+            "bot_session_id": validated_data.get("bot_session_id", "").strip(),
+            "customer_scope": self._idempotency_customer_scope(
+                self.request,
+                profile,
+                customer,
+            ),
+        }
+        encoded_payload = json.dumps(
+            canonical_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded_payload).hexdigest()
+
+    @staticmethod
+    def _order_response_payload(sale_order: SaleOrder) -> dict:
+        return {
+            "order_reference": sale_order.order_reference,
+            "items": [
+                {
+                    "product_id": item.product_id,
+                    "variant_id": item.variant_id,
+                    "product_name": item.product_name,
+                    "sku": item.sku,
+                    "variant_name": item.variant_name,
+                    "variant_color_hex": item.variant_color_hex,
+                    "variant_image_url": item.variant_image_url,
+                    "quantity": item.quantity,
+                    "unit_price": item.unit_price,
+                    "line_total": item.line_total,
+                }
+                for item in sale_order.items.order_by("id")
+            ],
+            "customer": {
+                "full_name": sale_order.customer_name,
+                "phone": sale_order.customer_phone,
+                "email": sale_order.customer_email,
+                "delivery_method": sale_order.delivery_method,
+                "payment_method": sale_order.payment_method,
+                "delivery_region_id": sale_order.delivery_region_id,
+                "delivery_region_name": sale_order.delivery_region_name,
+                "address": sale_order.address,
+                "neighborhood": sale_order.neighborhood,
+                "city": sale_order.city,
+                "notes": sale_order.notes,
+            },
+            "subtotal": sale_order.subtotal,
+            "delivery_fee": sale_order.delivery_fee,
+            "total": sale_order.total,
+            "message": sale_order.message,
+            "whatsapp_url": sale_order.whatsapp_url,
+        }
+
+    def _idempotent_order_response(self, sale_order: SaleOrder) -> Response:
+        response_payload = self._order_response_payload(sale_order)
+        output_serializer = CheckoutResponseSerializer(data=response_payload)
+        output_serializer.is_valid(raise_exception=True)
+        return Response(output_serializer.data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _checkout_log_extra(request, store: Store, **extra) -> dict:
+        return {
+            "method": getattr(request, "method", ""),
+            "path": getattr(request, "path", ""),
+            "user_id": (
+                getattr(request.user, "id", None)
+                if getattr(request, "user", None) is not None
+                and request.user.is_authenticated
+                else None
+            ),
+            "store_id": store.id,
+            "store_slug": store.slug,
+            **extra,
+        }
+
+    @staticmethod
+    def _find_idempotent_order(
+        *, store: Store, idempotency_key: str
+    ) -> SaleOrder | None:
+        if not idempotency_key:
+            return None
+
+        return (
+            SaleOrder.objects.prefetch_related("items")
+            .filter(store=store, idempotency_key=idempotency_key)
+            .first()
+        )
+
+    def _idempotent_response_or_conflict(
+        self,
+        *,
+        store: Store,
+        idempotency_key: str,
+        idempotency_payload_hash: str,
+    ) -> Response | None:
+        existing_order = self._find_idempotent_order(
+            store=store,
+            idempotency_key=idempotency_key,
+        )
+        if existing_order is None:
+            return None
+
+        if existing_order.idempotency_payload_hash != idempotency_payload_hash:
+            logger.warning(
+                "checkout.idempotency_conflict",
+                extra=self._checkout_log_extra(
+                    self.request,
+                    store,
+                    event="checkout.idempotency_conflict",
+                    code="idempotency_key_conflict",
+                    order_reference=existing_order.order_reference,
+                ),
+            )
+            return Response(
+                {
+                    "code": "idempotency_key_conflict",
+                    "detail": "Esta chave de checkout ja foi usada com outro pedido.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        logger.info(
+            "checkout.idempotency_reused",
+            extra=self._checkout_log_extra(
+                self.request,
+                store,
+                event="checkout.idempotency_reused",
+                order_reference=existing_order.order_reference,
+                items_count=existing_order.items.count(),
+                total=str(existing_order.total),
+            ),
+        )
+        return self._idempotent_order_response(existing_order)
+
     def _normalize_reserved_items(
         self,
         cart_items,
@@ -2586,6 +2892,26 @@ class CheckoutWhatsAppView(APIView):
         cart_items = validated_data["items"]
         customer = validated_data["customer"]
         is_delivery = customer["delivery_method"] == "delivery"
+        whatsapp_phone = store.get_configured_whatsapp_phone()
+        if not whatsapp_phone:
+            logger.warning(
+                "checkout.rejected",
+                extra=self._checkout_log_extra(
+                    request,
+                    store,
+                    event="checkout.rejected",
+                    code="whatsapp_not_configured",
+                    delivery_method=customer["delivery_method"],
+                    items_count=len(cart_items),
+                ),
+            )
+            return Response(
+                {
+                    "code": "whatsapp_not_configured",
+                    "detail": "WhatsApp da loja ainda nao configurado.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         if profile is not None:
             customer_name = profile.full_name.strip()
@@ -2652,178 +2978,198 @@ class CheckoutWhatsAppView(APIView):
 
         order_reference = build_sale_order_reference("BPF")
         notes = customer.get("notes", "").strip()
+        idempotency_key = validated_data.get("idempotency_key", "").strip()
+        idempotency_payload_hash = ""
 
-        with transaction.atomic():
-            normalized_items, subtotal, products_by_id = self._reserve_cart_stock(
-                cart_items, store
+        if idempotency_key:
+            idempotency_payload_hash = self._build_idempotency_payload_hash(
+                store=store,
+                validated_data=validated_data,
+                profile=profile,
             )
+            idempotent_response = self._idempotent_response_or_conflict(
+                store=store,
+                idempotency_key=idempotency_key,
+                idempotency_payload_hash=idempotency_payload_hash,
+            )
+            if idempotent_response is not None:
+                return idempotent_response
 
-            delivery_fee = Decimal("0.00")
-            if is_delivery:
-                delivery_fee = (
-                    Decimal(delivery_region.delivery_fee)
-                    if delivery_region is not None
-                    else settings.ORDER_DELIVERY_FEE
+        try:
+            with transaction.atomic():
+                normalized_items, subtotal, products_by_id = self._reserve_cart_stock(
+                    cart_items, store
                 )
-            total = subtotal + delivery_fee
 
-            if is_delivery:
-                self._sync_profile_checkout_defaults(
-                    profile,
+                delivery_fee = Decimal("0.00")
+                if is_delivery:
+                    delivery_fee = (
+                        Decimal(delivery_region.delivery_fee)
+                        if delivery_region is not None
+                        else settings.ORDER_DELIVERY_FEE
+                    )
+                total = subtotal + delivery_fee
+
+                if is_delivery:
+                    self._sync_profile_checkout_defaults(
+                        profile,
+                        address=order_address,
+                        neighborhood=order_neighborhood,
+                        city=order_city,
+                        delivery_region=delivery_region,
+                    )
+
+                message_lines = [
+                    "Pedido BipFlow",
+                    f"Referencia: {order_reference}",
+                    "",
+                    "Itens do pedido:",
+                    *[
+                        (
+                            f"{index + 1}. {self._line_item_label(item)} "
+                            f'x{item["quantity"]} - R$ {item["line_total"]:.2f}'
+                        )
+                        for index, item in enumerate(normalized_items)
+                    ],
+                    "",
+                    f"Subtotal: R$ {subtotal:.2f}",
+                    f"Entrega: R$ {delivery_fee:.2f}",
+                    f"Total: R$ {total:.2f}",
+                    "",
+                    f"Cliente: {customer_name}",
+                    f"WhatsApp: {customer_phone}",
+                    f'Email: {customer_email or "Nao informado"}',
+                    f'Entrega: {self._delivery_label(customer["delivery_method"])}',
+                    f'Pagamento: {self._payment_label(customer["payment_method"])}',
+                ]
+
+                if is_delivery:
+                    if delivery_region is not None:
+                        message_lines.append(f"Regiao: {delivery_region.name}")
+
+                    message_lines.extend(
+                        [
+                            f"Endereco: {order_address}",
+                            f"Bairro: {order_neighborhood}",
+                            f"Cidade: {order_city}",
+                        ]
+                    )
+
+                if notes:
+                    message_lines.append(f"Observacoes: {notes}")
+
+                message = "\n".join(message_lines)
+                whatsapp_url = f"https://wa.me/{whatsapp_phone}?text={quote(message)}"
+
+                sale_order = SaleOrder.objects.create(
+                    store=store,
+                    customer_profile=profile,
+                    idempotency_key=idempotency_key,
+                    idempotency_payload_hash=idempotency_payload_hash,
+                    order_reference=order_reference,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    customer_email=customer_email,
+                    delivery_method=customer["delivery_method"],
+                    payment_method=customer["payment_method"],
+                    delivery_region=delivery_region,
+                    delivery_region_name=(
+                        delivery_region.name if delivery_region is not None else ""
+                    ),
                     address=order_address,
                     neighborhood=order_neighborhood,
                     city=order_city,
-                    delivery_region=delivery_region,
+                    notes=notes,
+                    subtotal=subtotal.quantize(Decimal("0.01")),
+                    delivery_fee=delivery_fee.quantize(Decimal("0.01")),
+                    total=total.quantize(Decimal("0.01")),
+                    message=message,
+                    whatsapp_url=whatsapp_url,
                 )
-
-            message_lines = [
-                "Pedido BipFlow",
-                f"Referencia: {order_reference}",
-                "",
-                "Itens do pedido:",
-                *[
-                    (
-                        f"{index + 1}. {self._line_item_label(item)} "
-                        f'x{item["quantity"]} - R$ {item["line_total"]:.2f}'
-                    )
-                    for index, item in enumerate(normalized_items)
-                ],
-                "",
-                f"Subtotal: R$ {subtotal:.2f}",
-                f"Entrega: R$ {delivery_fee:.2f}",
-                f"Total: R$ {total:.2f}",
-                "",
-                f"Cliente: {customer_name}",
-                f"WhatsApp: {customer_phone}",
-                f'Email: {customer_email or "Nao informado"}',
-                f'Entrega: {self._delivery_label(customer["delivery_method"])}',
-                f'Pagamento: {self._payment_label(customer["payment_method"])}',
-            ]
-
-            if is_delivery:
-                if delivery_region is not None:
-                    message_lines.append(f"Regiao: {delivery_region.name}")
-
-                message_lines.extend(
+                SaleOrderItem.objects.bulk_create(
                     [
-                        f"Endereco: {order_address}",
-                        f"Bairro: {order_neighborhood}",
-                        f"Cidade: {order_city}",
+                        SaleOrderItem(
+                            order=sale_order,
+                            product=products_by_id.get(item["product_id"]),
+                            variant_id=item["variant_id"],
+                            product_name=item["product_name"],
+                            sku=item["sku"],
+                            variant_name=item["variant_name"],
+                            variant_color_hex=item["variant_color_hex"],
+                            variant_image_url=item["variant_image_url"],
+                            quantity=item["quantity"],
+                            unit_price=item["unit_price"],
+                            line_total=item["line_total"],
+                        )
+                        for item in normalized_items
                     ]
                 )
 
-            if notes:
-                message_lines.append(f"Observacoes: {notes}")
+                # The decrement itself already happened above in
+                # _reserve_cart_stock (one bulk_update, inside the same lock) --
+                # this just persists the audit trail for it. Built straight from
+                # data already in memory (no extra SELECT/lock per product):
+                # products_by_id[...].stock_quantity is the post-decrement value,
+                # so previous_stock is reconstructed by adding the quantity back.
+                StockMovement.objects.bulk_create(
+                    [
+                        StockMovement(
+                            store=store,
+                            product=products_by_id[item["product_id"]],
+                            variant_id=item["variant_id"],
+                            movement_type=StockMovement.TYPE_SAIDA,
+                            quantity=item["quantity"],
+                            previous_stock=item["previous_stock"],
+                            new_stock=item["new_stock"],
+                            reason=StockMovement.REASON_VENDA,
+                            source=StockMovement.SOURCE_VENDA,
+                            sale_order=sale_order,
+                        )
+                        for item in normalized_items
+                    ]
+                )
 
-            message = "\n".join(message_lines)
-            whatsapp_phone = store.get_configured_whatsapp_phone()
-            whatsapp_url = (
-                f"https://wa.me/{whatsapp_phone}?text={quote(message)}"
-                if whatsapp_phone
-                else ""
-            )
-
-            sale_order = SaleOrder.objects.create(
-                store=store,
-                customer_profile=profile,
-                order_reference=order_reference,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                customer_email=customer_email,
-                delivery_method=customer["delivery_method"],
-                payment_method=customer["payment_method"],
-                delivery_region=delivery_region,
-                delivery_region_name=(
-                    delivery_region.name if delivery_region is not None else ""
-                ),
-                address=order_address,
-                neighborhood=order_neighborhood,
-                city=order_city,
-                notes=notes,
-                subtotal=subtotal.quantize(Decimal("0.01")),
-                delivery_fee=delivery_fee.quantize(Decimal("0.01")),
-                total=total.quantize(Decimal("0.01")),
-                message=message,
-                whatsapp_url=whatsapp_url,
-            )
-            SaleOrderItem.objects.bulk_create(
-                [
-                    SaleOrderItem(
-                        order=sale_order,
-                        product=products_by_id.get(item["product_id"]),
-                        variant_id=item["variant_id"],
-                        product_name=item["product_name"],
-                        sku=item["sku"],
-                        variant_name=item["variant_name"],
-                        variant_color_hex=item["variant_color_hex"],
-                        variant_image_url=item["variant_image_url"],
-                        quantity=item["quantity"],
-                        unit_price=item["unit_price"],
-                        line_total=item["line_total"],
-                    )
-                    for item in normalized_items
-                ]
-            )
-
-            # The decrement itself already happened above in
-            # _reserve_cart_stock (one bulk_update, inside the same lock) --
-            # this just persists the audit trail for it. Built straight from
-            # data already in memory (no extra SELECT/lock per product):
-            # products_by_id[...].stock_quantity is the post-decrement value,
-            # so previous_stock is reconstructed by adding the quantity back.
-            StockMovement.objects.bulk_create(
-                [
-                    StockMovement(
+                bot_session_id = validated_data.get("bot_session_id", "").strip()
+                if bot_session_id:
+                    BotConversation.objects.filter(
+                        session_id=bot_session_id,
                         store=store,
-                        product=products_by_id[item["product_id"]],
-                        variant_id=item["variant_id"],
-                        movement_type=StockMovement.TYPE_SAIDA,
-                        quantity=item["quantity"],
-                        previous_stock=item["previous_stock"],
-                        new_stock=item["new_stock"],
-                        reason=StockMovement.REASON_VENDA,
-                        source=StockMovement.SOURCE_VENDA,
-                        sale_order=sale_order,
-                    )
-                    for item in normalized_items
-                ]
-            )
+                        sale_order__isnull=True,
+                    ).update(sale_order=sale_order)
 
-            bot_session_id = validated_data.get("bot_session_id", "").strip()
-            if bot_session_id:
-                BotConversation.objects.filter(
-                    session_id=bot_session_id, store=store, sale_order__isnull=True
-                ).update(sale_order=sale_order)
-
-            response_payload = {
-                "order_reference": order_reference,
-                "items": normalized_items,
-                "customer": {
-                    "full_name": customer_name,
-                    "phone": customer_phone,
-                    "email": customer_email,
-                    "delivery_method": customer["delivery_method"],
-                    "payment_method": customer["payment_method"],
-                    "delivery_region_id": (
-                        delivery_region.id if delivery_region is not None else None
+                logger.info(
+                    "checkout.created",
+                    extra=self._checkout_log_extra(
+                        request,
+                        store,
+                        event="checkout.created",
+                        order_reference=sale_order.order_reference,
+                        items_count=len(normalized_items),
+                        delivery_method=sale_order.delivery_method,
+                        payment_method=sale_order.payment_method,
+                        has_delivery_region=delivery_region is not None,
+                        has_customer_profile=profile is not None,
+                        has_idempotency_key=bool(idempotency_key),
+                        subtotal=str(sale_order.subtotal),
+                        delivery_fee=str(sale_order.delivery_fee),
+                        total=str(sale_order.total),
                     ),
-                    "delivery_region_name": (
-                        delivery_region.name if delivery_region is not None else ""
-                    ),
-                    "address": order_address,
-                    "neighborhood": order_neighborhood,
-                    "city": order_city,
-                    "notes": notes,
-                },
-                "subtotal": subtotal.quantize(Decimal("0.01")),
-                "delivery_fee": delivery_fee.quantize(Decimal("0.01")),
-                "total": total.quantize(Decimal("0.01")),
-                "message": message,
-                "whatsapp_url": whatsapp_url,
-            }
+                )
 
-            output_serializer = CheckoutResponseSerializer(data=response_payload)
-            output_serializer.is_valid(raise_exception=True)
+                output_serializer = CheckoutResponseSerializer(
+                    data=self._order_response_payload(sale_order)
+                )
+                output_serializer.is_valid(raise_exception=True)
+        except (IntegrityError, serializers.ValidationError):
+            if idempotency_key:
+                idempotent_response = self._idempotent_response_or_conflict(
+                    store=store,
+                    idempotency_key=idempotency_key,
+                    idempotency_payload_hash=idempotency_payload_hash,
+                )
+                if idempotent_response is not None:
+                    return idempotent_response
+            raise
 
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 

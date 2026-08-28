@@ -3,6 +3,7 @@ Tests for standardized error handling middleware and utilities.
 """
 
 import json
+from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -121,6 +122,36 @@ class GlobalExceptionMiddlewareTests(TestCase):
 
         self.assertEqual(data["error"], "THROTTLED")  # Based on default_code mapping
         self.assertEqual(data["message"], "Custom API error")
+
+    def test_known_exception_log_includes_request_context_without_stacktrace(self):
+        """Handled 4xx logs should be searchable without noisy exception traces."""
+        user = type("MockUser", (), {"id": 42, "is_authenticated": True})()
+        request = type(
+            "MockRequest",
+            (),
+            {
+                "META": {},
+                "path": "/api/v1/products/",
+                "method": "GET",
+                "headers": {"X-Store-Slug": "loja-a"},
+                "auth": {"store_id": 7},
+                "user": user,
+            },
+        )()
+
+        with patch("bipdelivery.core.middleware.logger.warning") as warning_log:
+            self.middleware._handle_known_exception(
+                PermissionDenied("sem acesso"),
+                request,
+                "test-request-id",
+            )
+
+        log_kwargs = warning_log.call_args.kwargs
+        self.assertFalse(log_kwargs["exc_info"])
+        self.assertEqual(log_kwargs["extra"]["method"], "GET")
+        self.assertEqual(log_kwargs["extra"]["user_id"], 42)
+        self.assertEqual(log_kwargs["extra"]["store_id"], 7)
+        self.assertEqual(log_kwargs["extra"]["store_slug"], "loja-a")
 
     def test_server_error_handling(self):
         """Test server error handling."""

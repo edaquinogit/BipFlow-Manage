@@ -82,6 +82,42 @@ class GlobalExceptionMiddleware:
         request.META["HTTP_X_REQUEST_ID"] = new_request_id
         return new_request_id
 
+    @staticmethod
+    def _token_claim(request: HttpRequest, key: str):
+        token = getattr(request, "auth", None)
+        if token is None:
+            return None
+        try:
+            return token[key]
+        except (KeyError, TypeError):
+            return None
+
+    def _build_log_extra(
+        self,
+        request: HttpRequest,
+        request_id: str,
+        **extra,
+    ) -> dict:
+        user = getattr(request, "user", None)
+        user_id = (
+            getattr(user, "id", None)
+            if user is not None and getattr(user, "is_authenticated", False)
+            else None
+        )
+        headers = getattr(request, "headers", {})
+        store_slug = headers.get("X-Store-Slug") if hasattr(headers, "get") else None
+
+        log_extra = {
+            "request_id": request_id,
+            "method": getattr(request, "method", ""),
+            "path": getattr(request, "path", ""),
+            "user_id": user_id,
+            "store_id": self._token_claim(request, "store_id"),
+            "store_slug": store_slug,
+        }
+        log_extra.update(extra)
+        return log_extra
+
     def _handle_known_exception(
         self, exception: Exception, request: HttpRequest, request_id: str
     ) -> JsonResponse:
@@ -118,13 +154,13 @@ class GlobalExceptionMiddleware:
 
         logger.warning(
             "Handled exception in GlobalExceptionMiddleware",
-            extra={
-                "request_id": request_id,
-                "status_code": status_code,
-                "error_type": error_type,
-                "path": request.path,
-            },
-            exc_info=isinstance(exception, Exception),
+            extra=self._build_log_extra(
+                request,
+                request_id,
+                status_code=status_code,
+                error_type=error_type,
+            ),
+            exc_info=status_code >= 500,
         )
 
         response_data = {
@@ -186,10 +222,7 @@ class GlobalExceptionMiddleware:
     ) -> JsonResponse:
         logger.error(
             "Unhandled server exception",
-            extra={
-                "request_id": request_id,
-                "path": request.path,
-            },
+            extra=self._build_log_extra(request, request_id),
             exc_info=True,
         )
 

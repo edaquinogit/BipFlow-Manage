@@ -64,10 +64,25 @@ class Command(BaseCommand):
             self._check_postgres_database(),
             self._check_redis_cache(),
             self._check_dashboard_operator(),
+            self._check_active_stores(),
             self._check_store_whatsapp(),
             self._check_catalog(),
             self._check_delivery_regions(),
         ]
+
+    @staticmethod
+    def _active_stores() -> list[Store]:
+        return list(
+            Store.objects.filter(is_active=True)
+            .only("id", "name", "slug", "whatsapp_phone")
+            .order_by("name")
+        )
+
+    @staticmethod
+    def _store_labels(stores: list[Store]) -> str:
+        labels = [f"{store.name} ({store.slug})" for store in stores[:5]]
+        suffix = "" if len(stores) <= 5 else f" and {len(stores) - 5} more"
+        return ", ".join(labels) + suffix
 
     def _check_debug_disabled(self) -> ReadinessCheck:
         if not settings.DEBUG:
@@ -162,46 +177,142 @@ class Command(BaseCommand):
 
         return ReadinessCheck("dashboard_operator", True, "Dashboard operator exists.")
 
-    def _check_store_whatsapp(self) -> ReadinessCheck:
-        has_store_phone = any(
-            store.get_configured_whatsapp_phone()
-            for store in Store.objects.filter(is_active=True).only("whatsapp_phone")
+    def _check_active_stores(self) -> ReadinessCheck:
+        active_stores = self._active_stores()
+
+        if not active_stores:
+            return ReadinessCheck(
+                "active_stores",
+                False,
+                "At least one active store is required before accepting orders.",
+            )
+
+        return ReadinessCheck(
+            "active_stores",
+            True,
+            f"{len(active_stores)} active store(s) configured.",
         )
 
-        if has_store_phone or StoreSettings.get_configured_whatsapp_phone():
-            return ReadinessCheck("store_whatsapp", True, "Store WhatsApp is configured.")
+    def _check_store_whatsapp(self) -> ReadinessCheck:
+        active_stores = self._active_stores()
+        global_phone = StoreSettings.get_configured_whatsapp_phone()
+
+        if not active_stores:
+            return ReadinessCheck(
+                "store_whatsapp",
+                False,
+                "No active store is available to receive WhatsApp orders.",
+            )
+
+        if global_phone:
+            return ReadinessCheck(
+                "store_whatsapp",
+                True,
+                "Global WhatsApp fallback is configured for active stores.",
+            )
+
+        missing_phone = [
+            store for store in active_stores if not store.whatsapp_phone_digits
+        ]
+        if not missing_phone:
+            return ReadinessCheck(
+                "store_whatsapp",
+                True,
+                "Each active store has WhatsApp configured.",
+            )
 
         return ReadinessCheck(
             "store_whatsapp",
             False,
-            "Configure store WhatsApp in the dashboard or WHATSAPP_ORDER_PHONE.",
+            "Configure WhatsApp for active stores: "
+            f"{self._store_labels(missing_phone)}.",
         )
 
     def _check_catalog(self) -> ReadinessCheck:
-        has_category = Category.objects.exists()
-        has_available_product = Product.objects.filter(
-            is_available=True,
-            stock_quantity__gt=0,
-        ).exists()
+        active_stores = self._active_stores()
+        active_store_ids = [store.id for store in active_stores]
 
-        if not has_category:
-            return ReadinessCheck("catalog", False, "Create at least one category.")
-
-        if not has_available_product:
+        if not active_stores:
             return ReadinessCheck(
                 "catalog",
                 False,
-                "Create at least one available product with stock.",
+                "No active store is available for catalog checks.",
             )
 
-        return ReadinessCheck("catalog", True, "Catalog has sellable products.")
+        stores_with_category = set(
+            Category.objects.filter(store_id__in=active_store_ids).values_list(
+                "store_id", flat=True
+            )
+        )
+        stores_with_available_product = set(
+            Product.objects.filter(
+                store_id__in=active_store_ids,
+                is_available=True,
+                stock_quantity__gt=0,
+            ).values_list("store_id", flat=True)
+        )
+        missing_category = [
+            store for store in active_stores if store.id not in stores_with_category
+        ]
+        missing_product = [
+            store
+            for store in active_stores
+            if store.id not in stores_with_available_product
+        ]
+
+        if missing_category:
+            return ReadinessCheck(
+                "catalog",
+                False,
+                "Create at least one category for active stores: "
+                f"{self._store_labels(missing_category)}.",
+            )
+
+        if missing_product:
+            return ReadinessCheck(
+                "catalog",
+                False,
+                "Create at least one available product with stock for active stores: "
+                f"{self._store_labels(missing_product)}.",
+            )
+
+        return ReadinessCheck(
+            "catalog",
+            True,
+            "Each active store has categories and sellable products.",
+        )
 
     def _check_delivery_regions(self) -> ReadinessCheck:
-        if DeliveryRegion.objects.filter(is_active=True).exists():
-            return ReadinessCheck("delivery", True, "At least one active delivery region exists.")
+        active_stores = self._active_stores()
+        active_store_ids = [store.id for store in active_stores]
+
+        if not active_stores:
+            return ReadinessCheck(
+                "delivery",
+                False,
+                "No active store is available for delivery checks.",
+            )
+
+        stores_with_region = set(
+            DeliveryRegion.objects.filter(
+                store_id__in=active_store_ids,
+                is_active=True,
+            ).values_list("store_id", flat=True)
+        )
+        missing_region = [
+            store for store in active_stores if store.id not in stores_with_region
+        ]
+
+        if not missing_region:
+            return ReadinessCheck(
+                "delivery",
+                True,
+                "Each active store has at least one active delivery region.",
+            )
 
         return ReadinessCheck(
             "delivery",
             False,
-            "Create at least one active delivery region for checkout delivery.",
+            "Create at least one active delivery region for active stores: "
+            f"{self._store_labels(missing_region)}.",
         )

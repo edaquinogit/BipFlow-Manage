@@ -15,7 +15,7 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -24,6 +24,7 @@ from bipdelivery.api.models import Category, CustomerProfile, Product, SaleOrder
 User = get_user_model()
 
 
+@override_settings(WHATSAPP_ORDER_PHONE="5571999999999")
 class CheckoutGuestAndProfileTest(TestCase):
     def setUp(self) -> None:
         # LocMemCache persists across test methods within the same run (it
@@ -125,7 +126,7 @@ class CheckoutGuestAndProfileTest(TestCase):
 
     def test_authenticated_user_without_a_profile_checks_out_as_guest(self) -> None:
         client = APIClient()
-        client.force_authenticate(user=self.user, token={"store_id": self.store.id})
+        client.force_authenticate(user=self.user)
 
         response = client.post(
             "/api/v1/checkout/whatsapp/",

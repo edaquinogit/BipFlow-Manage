@@ -1235,6 +1235,8 @@ class SaleOrder(models.Model):
             "sales, which have no customer account involved."
         ),
     )
+    idempotency_key = models.CharField(max_length=128, blank=True, default="")
+    idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     customer_name = models.CharField(max_length=255)
     customer_phone = models.CharField(max_length=32)
     customer_email = models.EmailField(blank=True)
@@ -1278,6 +1280,13 @@ class SaleOrder(models.Model):
         indexes = [
             models.Index(fields=["store", "created_at"]),
             models.Index(fields=["store", "status", "created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="unique_sale_order_idempotency_per_store",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -1618,3 +1627,105 @@ class StockMovement(models.Model):
         """Return a compact movement summary."""
         variant_suffix = f" / {self.variant.name}" if self.variant_id else ""
         return f"{self.get_movement_type_display()} {self.quantity} - {self.product.name}{variant_suffix}"
+
+
+class CustomerFeedback(models.Model):
+    """Problem report / suggestion submitted from the public storefront.
+
+    Deliberately minimal: no PII beyond an optional free-text contact, no
+    sensitive request internals (headers, tokens, cookies). `correlation_id`
+    is the same `X-Request-ID` GlobalExceptionMiddleware already stamps on
+    every response -- the connective tissue between a human's "não consegui
+    calcular o frete" and the matching server log line, without building a
+    second tracing mechanism.
+    """
+
+    TYPE_PROBLEM = "problem"
+    TYPE_PURCHASE_DIFFICULTY = "purchase_difficulty"
+    TYPE_SHIPPING = "shipping"
+    TYPE_CHECKOUT = "checkout"
+    TYPE_PRODUCT = "product"
+    TYPE_SUGGESTION = "suggestion"
+    TYPE_OTHER = "other"
+    TYPE_CHOICES = [
+        (TYPE_PROBLEM, "Problema"),
+        (TYPE_PURCHASE_DIFFICULTY, "Dificuldade na compra"),
+        (TYPE_SHIPPING, "Entrega/Frete"),
+        (TYPE_CHECKOUT, "Checkout"),
+        (TYPE_PRODUCT, "Produto"),
+        (TYPE_SUGGESTION, "Sugestao"),
+        (TYPE_OTHER, "Outro"),
+    ]
+
+    STATUS_NEW = "new"
+    STATUS_REVIEWING = "reviewing"
+    STATUS_RESOLVED = "resolved"
+    STATUS_IGNORED = "ignored"
+    STATUS_CHOICES = [
+        (STATUS_NEW, "Novo"),
+        (STATUS_REVIEWING, "Em analise"),
+        (STATUS_RESOLVED, "Resolvido"),
+        (STATUS_IGNORED, "Ignorado"),
+    ]
+
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.CASCADE,
+        related_name="customer_feedback",
+        default=get_default_store_id,
+        help_text="Tenant this feedback was submitted to.",
+    )
+    customer_profile = models.ForeignKey(
+        CustomerProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feedback",
+        help_text="Resolved automatically from the authenticated session, when there is one.",
+    )
+    feedback_type = models.CharField(max_length=24, choices=TYPE_CHOICES)
+    message = models.TextField(max_length=2000)
+    contact = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="Optional WhatsApp/e-mail the customer left for a reply.",
+    )
+    page_path = models.CharField(
+        max_length=512,
+        blank=True,
+        help_text="Storefront route the report was opened from, not a full URL.",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feedback",
+    )
+    order = models.ForeignKey(
+        SaleOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feedback",
+    )
+    correlation_id = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="X-Request-ID of the failed request this feedback is about, when known.",
+    )
+    user_agent = models.CharField(max_length=512, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_NEW)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["store", "status", "created_at"]),
+            models.Index(fields=["store", "feedback_type", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        """Return a compact feedback identifier for admin/debug purposes."""
+        return f"{self.get_feedback_type_display()} @ {self.store_id} ({self.status})"

@@ -5,9 +5,12 @@ requests resolve by the `X-Store-Slug` header; authenticated requests trust
 the JWT's `store_id` claim by default but may switch to a different store
 via the same header (Etapa 4's store switcher) -- only ever to a store the
 user actually belongs to, or to any store at all for staff/superusers.
-Every path falls back to the single default store, so today's behaviour --
-and every public link issued before this landed -- keeps working unchanged.
+Public requests and authenticated requests with no store claim still fall
+back to the single default store; an authenticated request carrying a stale
+or unauthorized claim fails closed instead of drifting into another tenant.
 """
+from rest_framework.exceptions import PermissionDenied
+
 from .models import CustomerProfile, Store, StoreMembership
 
 
@@ -73,6 +76,8 @@ def resolve_request_store(request) -> Store:
         if store_id:
             store = Store.objects.filter(id=store_id, is_active=True).first()
             if store is not None:
+                if not _user_belongs_to(user, store):
+                    raise PermissionDenied("Voce nao possui acesso a esta loja.")
                 return store
         return Store.get_default()
 

@@ -58,19 +58,19 @@ class CustomerProfileEndpointTest(TestCase):
     def test_get_returns_404_when_user_has_no_profile_for_the_resolved_store(self) -> None:
         other_user = User.objects.create_user(username="sem_perfil@example.com", password="testpass123")
         client = APIClient()
-        client.force_authenticate(user=other_user, token={"store_id": self.store.id})
+        client.force_authenticate(user=other_user)
 
         response = client.get("/api/v1/customers/me/")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_a_customer_of_store_a_has_no_profile_visible_at_store_b(self) -> None:
+    def test_a_customer_of_store_a_cannot_use_a_store_b_token_claim(self) -> None:
         client = APIClient()
         client.force_authenticate(user=self.user, token={"store_id": self.other_store.id})
 
         response = client.get("/api/v1/customers/me/")
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_patch_updates_editable_fields_without_touching_the_rest(self) -> None:
         response = self.client.patch(

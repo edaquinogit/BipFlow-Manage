@@ -209,6 +209,49 @@ class DashboardCreateAssignsAuthenticatedStoreTest(TwoStoreFixtureMixin, TestCas
         created = Category.objects.get(id=response.data["id"])
         self.assertEqual(created.store_id, self.store_b.id)
 
+    def test_creating_a_product_assigns_the_authenticated_users_store(self) -> None:
+        response = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto Novo B",
+                "price": "19.90",
+                "stock_quantity": 3,
+                "category": self.category_b.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        created = Product.objects.get(id=response.data["id"])
+        self.assertEqual(created.store_id, self.store_b.id)
+        self.assertEqual(created.category_id, self.category_b.id)
+
+    def test_creating_a_product_rejects_category_from_another_store(self) -> None:
+        response = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto Clandestino",
+                "price": "19.90",
+                "stock_quantity": 3,
+                "category": self.category_a.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.objects.filter(name="Produto Clandestino").exists())
+
+    def test_updating_a_product_rejects_category_from_another_store(self) -> None:
+        response = self.client.patch(
+            f"/api/v1/products/{self.product_b.id}/",
+            {"category": self.category_a.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product_b.refresh_from_db()
+        self.assertEqual(self.product_b.category_id, self.category_b.id)
+
     def test_creating_a_delivery_region_assigns_the_authenticated_users_store(self) -> None:
         response = self.client.post(
             "/api/v1/delivery-regions/", {"name": "Nova Regiao", "delivery_fee": "5.00"}, format="json"
@@ -252,6 +295,8 @@ class CheckoutIsolationTest(TwoStoreFixtureMixin, TestCase):
         # store_scope._user_belongs_to), so this still genuinely exercises
         # cross-tenant product isolation instead of just failing on auth.
         customer = User.objects.create_user(username="cliente_loja_b", password="testpass123")
+        self.store_b.whatsapp_phone = "5571999999999"
+        self.store_b.save(update_fields=["whatsapp_phone"])
         CustomerProfile.objects.create(
             user=customer, store=self.store_b, full_name="Cliente Teste", phone="71999999999"
         )

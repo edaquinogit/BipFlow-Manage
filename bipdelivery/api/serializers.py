@@ -1,4 +1,5 @@
 import re
+import logging
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -22,6 +23,7 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    CustomerFeedback,
     CustomerProfile,
     DeliveryRegion,
     LabelSettings,
@@ -47,10 +49,65 @@ from .permissions import (
 from .stock import sync_product_stock_from_variants
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 STOREFRONT_MEDIA_PATH_RE = re.compile(
     r"(?:^|/)stores/(?P<store_id>\d+)/storefront(?:/|$)"
 )
+SAFE_IMAGE_UPLOAD_TYPES = {
+    "image/jpeg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
+    "image/jpg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
+    "image/png": {"extensions": {"png"}, "format": "PNG"},
+    "image/webp": {"extensions": {"webp"}, "format": "WEBP"},
+}
+PRODUCT_IMAGE_MAX_BYTES = 2 * 1024 * 1024
+
+
+def detect_image_upload_format(uploaded_file) -> str:
+    try:
+        uploaded_file.seek(0)
+        with Image.open(uploaded_file) as image:
+            detected_format = image.format or ""
+            image.verify()
+        return detected_format
+    except (UnidentifiedImageError, OSError) as error:
+        raise serializers.ValidationError(
+            {"file": "Arquivo de imagem invalido."}
+        ) from error
+    finally:
+        uploaded_file.seek(0)
+
+
+def validate_safe_image_upload(uploaded_file, *, max_bytes: int) -> tuple[str, str]:
+    content_type = str(getattr(uploaded_file, "content_type", "") or "").lower()
+    content_type = content_type.split(";", 1)[0].strip()
+
+    if content_type not in SAFE_IMAGE_UPLOAD_TYPES:
+        raise serializers.ValidationError(
+            {"file": "Envie uma imagem PNG, JPG, JPEG ou WEBP."}
+        )
+
+    extension = Path(uploaded_file.name or "").suffix.lower().lstrip(".")
+    expected_extensions = SAFE_IMAGE_UPLOAD_TYPES[content_type]["extensions"]
+    if extension not in expected_extensions:
+        raise serializers.ValidationError(
+            {"file": "A extensao do arquivo nao corresponde ao tipo da imagem."}
+        )
+
+    if uploaded_file.size > max_bytes:
+        max_mb = max_bytes // (1024 * 1024)
+        raise serializers.ValidationError(
+            {"file": f"A imagem deve ter no maximo {max_mb} MB."}
+        )
+
+    detected_format = detect_image_upload_format(uploaded_file)
+    expected_format = SAFE_IMAGE_UPLOAD_TYPES[content_type]["format"]
+    if detected_format != expected_format:
+        raise serializers.ValidationError(
+            {"file": "O conteudo do arquivo nao corresponde ao tipo informado."}
+        )
+
+    return content_type, "jpg" if extension == "jpeg" else extension
 
 
 def validate_storefront_media_url_ownership(
@@ -360,6 +417,7 @@ class ProductSerializer(serializers.ModelSerializer):
     Includes read-only computed fields for category relationships.
     """
 
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.none())
     category_name = serializers.ReadOnlyField(source="category.name")
     category_parent = serializers.SerializerMethodField()
     category_parent_name = serializers.SerializerMethodField()
@@ -415,6 +473,73 @@ class ProductSerializer(serializers.ModelSerializer):
             "category_parent_name",
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request_store = self._get_request_store()
+        if request_store is not None:
+            self.fields["category"].queryset = Category.objects.filter(
+                store=request_store
+            )
+
+    def _get_request_store(self) -> Store | None:
+        context_store = self.context.get("store") or self.context.get(
+            "request_store"
+        )
+        if isinstance(context_store, Store):
+            return context_store
+
+        view = self.context.get("view")
+        if view is not None and hasattr(view, "get_request_store"):
+            return view.get_request_store()
+
+        if isinstance(self.instance, Product) and self.instance.store_id:
+            return self.instance.store
+
+        return None
+
+    def validate_category(self, category: Category) -> Category:
+        request_store = self._get_request_store()
+        if request_store is not None and category.store_id != request_store.id:
+            raise serializers.ValidationError(
+                "Categoria nao pertence a loja atual."
+            )
+        return category
+
+    def _validate_product_image_upload(self, uploaded_file, *, field_name: str) -> None:
+        if not hasattr(uploaded_file, "content_type"):
+            return
+
+        try:
+            validate_safe_image_upload(
+                uploaded_file,
+                max_bytes=PRODUCT_IMAGE_MAX_BYTES,
+            )
+        except serializers.ValidationError as error:
+            detail = error.detail
+            request_store = self._get_request_store()
+            logger.warning(
+                "product_upload.rejected",
+                extra={
+                    "event": "product_upload.rejected",
+                    "store_id": request_store.id if request_store else None,
+                    "store_slug": request_store.slug if request_store else None,
+                    "field_name": field_name,
+                    "upload_filename": Path(
+                        getattr(uploaded_file, "name", "") or ""
+                    ).name,
+                    "content_type": getattr(uploaded_file, "content_type", ""),
+                    "size": getattr(uploaded_file, "size", None),
+                    "reason": str(detail.get("file", detail))
+                    if isinstance(detail, dict)
+                    else str(detail),
+                },
+            )
+            if isinstance(detail, dict) and "file" in detail:
+                raise serializers.ValidationError(
+                    {field_name: detail["file"]}
+                ) from error
+            raise
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
 
@@ -422,6 +547,11 @@ class ProductSerializer(serializers.ModelSerializer):
 
         if request_images is not None:
             total_images = len(request_images)
+            for image_file in request_images:
+                self._validate_product_image_upload(
+                    image_file,
+                    field_name="uploaded_images",
+                )
         else:
             uploaded_images = attrs.get("uploaded_images", [])
             existing_images = attrs.get("existing_images", [])
@@ -429,6 +559,16 @@ class ProductSerializer(serializers.ModelSerializer):
             total_images = (
                 len(uploaded_images) + len(existing_images) + (1 if direct_image else 0)
             )
+            if direct_image:
+                self._validate_product_image_upload(
+                    direct_image,
+                    field_name="image",
+                )
+            for image_file in uploaded_images:
+                self._validate_product_image_upload(
+                    image_file,
+                    field_name="uploaded_images",
+                )
 
         if total_images > 3:
             raise serializers.ValidationError(
@@ -544,6 +684,12 @@ class ProductSerializer(serializers.ModelSerializer):
                 except (TypeError, ValueError):
                     raise serializers.ValidationError(
                         {"variants_payload": "Indice de imagem de variante invalido."}
+                    )
+                uploaded_variant_image = self._get_variant_upload(image_upload_index)
+                if uploaded_variant_image is not None:
+                    self._validate_product_image_upload(
+                        uploaded_variant_image,
+                        field_name=f"variant_images[{image_upload_index}]",
                     )
 
             raw_is_active = raw_variant.get("is_active", True)
@@ -746,7 +892,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
             resolved_images.append(entry)
 
-        return resolved_images[:3]
+        return resolved_images
 
     def _resolve_variant_image(self, variant: ProductVariant | None, image_url: str):
         if not variant or not image_url or not variant.image:
@@ -835,22 +981,29 @@ class ProductSerializer(serializers.ModelSerializer):
         if variants_payload is None:
             return
 
-        existing_by_id = {variant.id: variant for variant in product.variants.all()}
         submitted_ids = {
             variant_data["id"]
             for variant_data in variants_payload
             if variant_data["id"] is not None
         }
-        invalid_ids = submitted_ids - set(existing_by_id)
-        if invalid_ids:
-            raise serializers.ValidationError(
-                {
-                    "variants_payload": "Uma ou mais variantes nao pertencem a este produto."
-                }
-            )
 
         with transaction.atomic():
-            product.variants.exclude(id__in=submitted_ids).delete()
+            locked_product = Product.objects.select_for_update().get(id=product.id)
+            existing_by_id = {
+                variant.id: variant
+                for variant in locked_product.variants.select_for_update().order_by(
+                    "id"
+                )
+            }
+            invalid_ids = submitted_ids - set(existing_by_id)
+            if invalid_ids:
+                raise serializers.ValidationError(
+                    {
+                        "variants_payload": "Uma ou mais variantes nao pertencem a este produto."
+                    }
+                )
+
+            locked_product.variants.exclude(id__in=submitted_ids).delete()
 
             for index, variant_id in enumerate(sorted(submitted_ids)):
                 variant = existing_by_id[variant_id]
@@ -865,11 +1018,11 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant = (
                     existing_by_id.get(variant_id)
                     if variant_id is not None
-                    else ProductVariant(product=product)
+                    else ProductVariant(product=locked_product)
                 )
                 previous_stock = variant.stock_quantity if variant_id is not None else 0
 
-                variant.product = product
+                variant.product = locked_product
                 variant.name = variant_data["name"]
                 variant.color_hex = variant_data["color_hex"]
                 if variant_data["stock_quantity"] is not None:
@@ -898,7 +1051,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
                 if audit_stock_changes:
                     self._record_variant_stock_movement(
-                        product=product,
+                        product=locked_product,
                         variant=variant,
                         previous_stock=previous_stock,
                         new_stock=variant.stock_quantity,
@@ -906,7 +1059,11 @@ class ProductSerializer(serializers.ModelSerializer):
                         notes=stock_movement_notes,
                     )
 
-            sync_product_stock_from_variants(product)
+            sync_product_stock_from_variants(locked_product)
+
+            product.stock_quantity = locked_product.stock_quantity
+            product.is_available = locked_product.is_available
+            product.updated_at = locked_product.updated_at
 
             if hasattr(product, "_prefetched_objects_cache"):
                 product._prefetched_objects_cache.pop("variants", None)
@@ -1091,6 +1248,101 @@ class DeliveryRegionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+FEEDBACK_HONEYPOT_FIELDS = ("website", "company")
+
+
+class CustomerFeedbackCreateSerializer(serializers.Serializer):
+    """Public, unauthenticated-friendly feedback submission.
+
+    Shape validation only -- store/customer/product/order resolution against
+    the request's actual tenant happens in the view (same split as
+    CheckoutRequestSerializer / CheckoutWhatsAppView), since this serializer
+    has no access to the resolved store.
+    """
+
+    type = serializers.ChoiceField(choices=CustomerFeedback.TYPE_CHOICES, source="feedback_type")
+    message = serializers.CharField(
+        max_length=2000, trim_whitespace=True, allow_blank=False
+    )
+    contact = serializers.CharField(
+        max_length=160, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    page_path = serializers.CharField(
+        max_length=512, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+    product_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    order_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    correlation_id = serializers.CharField(
+        max_length=64, required=False, allow_blank=True, trim_whitespace=True, default=""
+    )
+
+    def validate_message(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Conte o que aconteceu para enviarmos seu relato.")
+        return value.strip()
+
+    def validate_page_path(self, value: str) -> str:
+        """Keep only a same-origin route, never an absolute URL with query/hash secrets."""
+        if not value:
+            return ""
+        parsed = urlparse(value)
+        return parsed.path[:512] if parsed.path else ""
+
+    def validate(self, attrs):
+        """Reject autofilled honeypot fields without changing the public contract."""
+        initial_data = self.initial_data if hasattr(self, "initial_data") else {}
+        if not hasattr(initial_data, "get"):
+            return attrs
+
+        for field_name in FEEDBACK_HONEYPOT_FIELDS:
+            value = initial_data.get(field_name)
+            if value and str(value).strip():
+                raise serializers.ValidationError("Invalid feedback request")
+        return attrs
+
+
+class CustomerFeedbackSerializer(serializers.ModelSerializer):
+    """Dashboard read view of one feedback report."""
+
+    product_name = serializers.CharField(source="product.name", read_only=True, default=None)
+    order_reference = serializers.CharField(
+        source="order.order_reference", read_only=True, default=None
+    )
+    customer_name = serializers.CharField(
+        source="customer_profile.full_name", read_only=True, default=""
+    )
+    customer_phone = serializers.CharField(
+        source="customer_profile.phone", read_only=True, default=""
+    )
+
+    class Meta:
+        model = CustomerFeedback
+        fields = [
+            "id",
+            "feedback_type",
+            "message",
+            "contact",
+            "page_path",
+            "product",
+            "product_name",
+            "order",
+            "order_reference",
+            "customer_name",
+            "customer_phone",
+            "correlation_id",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class CustomerFeedbackStatusUpdateSerializer(serializers.Serializer):
+    """Dashboard status transition for one feedback report."""
+
+    status = serializers.ChoiceField(choices=CustomerFeedback.STATUS_CHOICES)
 
 
 PUBLIC_STORE_SETTINGS_FIELDS = ("whatsapp_phone_digits", "is_whatsapp_configured")
@@ -1384,12 +1636,7 @@ class StorefrontMediaUploadSerializer(serializers.Serializer):
         (KIND_PROMOTION, "Promocao"),
     )
 
-    ALLOWED_IMAGE_TYPES = {
-        "image/jpeg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
-        "image/jpg": {"extensions": {"jpg", "jpeg"}, "format": "JPEG"},
-        "image/png": {"extensions": {"png"}, "format": "PNG"},
-        "image/webp": {"extensions": {"webp"}, "format": "WEBP"},
-    }
+    ALLOWED_IMAGE_TYPES = SAFE_IMAGE_UPLOAD_TYPES
     MAX_BYTES_BY_KIND = {
         KIND_LOGO: 2 * 1024 * 1024,
         KIND_BANNER: 5 * 1024 * 1024,
@@ -1410,53 +1657,14 @@ class StorefrontMediaUploadSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         kind = attrs["kind"]
         uploaded_file = attrs["file"]
-        content_type = str(getattr(uploaded_file, "content_type", "") or "").lower()
-        content_type = content_type.split(";", 1)[0].strip()
-
-        if content_type not in self.ALLOWED_IMAGE_TYPES:
-            raise serializers.ValidationError(
-                {"file": "Envie uma imagem PNG, JPG, JPEG ou WEBP."}
-            )
-
-        extension = Path(uploaded_file.name or "").suffix.lower().lstrip(".")
-        expected_extensions = self.ALLOWED_IMAGE_TYPES[content_type]["extensions"]
-        if extension not in expected_extensions:
-            raise serializers.ValidationError(
-                {"file": "A extensao do arquivo nao corresponde ao tipo da imagem."}
-            )
-
-        max_bytes = self.MAX_BYTES_BY_KIND[kind]
-        if uploaded_file.size > max_bytes:
-            max_mb = max_bytes // (1024 * 1024)
-            raise serializers.ValidationError(
-                {"file": f"A imagem deve ter no maximo {max_mb} MB."}
-            )
-
-        detected_format = self._detect_image_format(uploaded_file)
-        expected_format = self.ALLOWED_IMAGE_TYPES[content_type]["format"]
-        if detected_format != expected_format:
-            raise serializers.ValidationError(
-                {"file": "O conteudo do arquivo nao corresponde ao tipo informado."}
-            )
+        content_type, extension = validate_safe_image_upload(
+            uploaded_file,
+            max_bytes=self.MAX_BYTES_BY_KIND[kind],
+        )
 
         attrs["_content_type"] = content_type
-        attrs["_extension"] = "jpg" if extension == "jpeg" else extension
+        attrs["_extension"] = extension
         return attrs
-
-    @staticmethod
-    def _detect_image_format(uploaded_file) -> str:
-        try:
-            uploaded_file.seek(0)
-            with Image.open(uploaded_file) as image:
-                detected_format = image.format or ""
-                image.verify()
-            return detected_format
-        except (UnidentifiedImageError, OSError) as error:
-            raise serializers.ValidationError(
-                {"file": "Arquivo de imagem invalido."}
-            ) from error
-        finally:
-            uploaded_file.seek(0)
 
     def save(self, **kwargs):
         store: Store = self.context["store"]
@@ -1974,6 +2182,13 @@ class CheckoutRequestSerializer(serializers.Serializer):
     items = CheckoutItemInputSerializer(many=True)
     customer = CheckoutCustomerInputSerializer()
     bot_session_id = serializers.CharField(required=False, allow_blank=True, default="")
+    idempotency_key = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        max_length=128,
+        trim_whitespace=True,
+    )
 
     @staticmethod
     def _submitted_text(data, field_name: str) -> str:
@@ -1990,6 +2205,17 @@ class CheckoutRequestSerializer(serializers.Serializer):
         """Ensure the cart has at least one item."""
         if not value:
             raise serializers.ValidationError("items must contain at least one product")
+        return value
+
+    def validate_idempotency_key(self, value: str) -> str:
+        if not value:
+            return ""
+
+        if not re.fullmatch(r"[A-Za-z0-9:_-]{8,128}", value):
+            raise serializers.ValidationError(
+                "A chave de idempotencia deve ter 8 a 128 caracteres seguros."
+            )
+
         return value
 
     def validate(self, attrs):

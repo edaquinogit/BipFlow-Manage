@@ -27,6 +27,7 @@ from uuid import uuid4
 
 import django
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -73,6 +74,19 @@ def build_test_image(filename: str) -> SimpleUploadedFile:
     return SimpleUploadedFile(
         filename,
         image_buffer.read(),
+        content_type="image/png",
+    )
+
+
+def build_oversized_test_image(filename: str) -> SimpleUploadedFile:
+    """Create a valid PNG payload whose real upload size exceeds product limits."""
+    image_buffer = BytesIO()
+    Image.new("RGB", (2, 2), color=(240, 120, 160)).save(image_buffer, format="PNG")
+    oversized_content = image_buffer.getvalue() + (b"0" * ((2 * 1024 * 1024) + 1))
+
+    return SimpleUploadedFile(
+        filename,
+        oversized_content,
         content_type="image/png",
     )
 
@@ -518,6 +532,89 @@ class ProductAPIHealthTest(TestCase):
         self.assertIn("cover", response.data["images"][0])
         self.assertIn("gallery-1", response.data["images"][1])
         self.assertIn("gallery-2", response.data["images"][2])
+
+    @override_settings(MEDIA_ROOT=build_test_media_root())
+    def test_product_create_rejects_more_than_three_indexed_images(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "name": "Burger Quatro Imagens",
+            "sku": "BRG-004",
+            "price": "29.90",
+            "stock_quantity": 9,
+            "category": self.category.id,  # type: ignore[arg-type]
+            "image": build_test_image("cover.png"),
+            "uploaded_images[1]": build_test_image("gallery-1.png"),
+            "uploaded_images[2]": build_test_image("gallery-2.png"),
+            "uploaded_images[3]": build_test_image("gallery-3.png"),
+        }
+
+        response: Any = self.client.post(
+            "/api/v1/products/", payload, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.objects.filter(sku="BRG-004").exists())
+
+    @override_settings(MEDIA_ROOT=build_test_media_root())
+    def test_product_create_rejects_oversized_cover_image(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "name": "Burger Imagem Pesada",
+            "sku": "BRG-005",
+            "price": "29.90",
+            "stock_quantity": 9,
+            "category": self.category.id,  # type: ignore[arg-type]
+            "image": build_oversized_test_image("cover.png"),
+        }
+
+        with patch("bipdelivery.api.serializers.logger") as logger_mock:
+            response: Any = self.client.post(
+                "/api/v1/products/", payload, format="multipart"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.objects.filter(sku="BRG-005").exists())
+        logger_mock.warning.assert_called_once()
+        log_call = logger_mock.warning.call_args
+        self.assertEqual(log_call.args[0], "product_upload.rejected")
+        self.assertEqual(log_call.kwargs["extra"]["event"], "product_upload.rejected")
+        self.assertEqual(log_call.kwargs["extra"]["store_id"], Store.get_default().id)
+        self.assertIn(
+            log_call.kwargs["extra"]["field_name"],
+            {"image", "uploaded_images"},
+        )
+        self.assertEqual(log_call.kwargs["extra"]["upload_filename"], "cover.png")
+        self.assertGreater(log_call.kwargs["extra"]["size"], 2 * 1024 * 1024)
+
+    @override_settings(MEDIA_ROOT=build_test_media_root())
+    def test_product_create_rejects_oversized_variant_image(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "name": "Camiseta Variante Pesada",
+            "sku": "CAM-901",
+            "price": "89.90",
+            "category": self.category.id,  # type: ignore[arg-type]
+            "variants_payload": json.dumps(
+                [
+                    {
+                        "name": "Preto",
+                        "color_hex": "#000000",
+                        "stock_quantity": 3,
+                        "position": 0,
+                        "is_active": True,
+                        "image_upload_index": 0,
+                    }
+                ]
+            ),
+            "variant_images[0]": build_oversized_test_image("camiseta-preta.png"),
+        }
+
+        response: Any = self.client.post(
+            "/api/v1/products/", payload, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Product.objects.filter(sku="CAM-901").exists())
 
     @override_settings(MEDIA_ROOT=build_test_media_root())
     def test_product_create_syncs_color_variants_from_multipart_payload(self) -> None:
@@ -1124,6 +1221,7 @@ class GoLiveReadinessCommandTest(TestCase):
         "CSRF_TRUSTED_ORIGINS": ["https://shop.example.com"],
         "CORS_ALLOWED_ORIGINS": ["https://shop.example.com"],
         "IS_PRODUCTION": False,
+        "WHATSAPP_ORDER_PHONE": "",
     }
 
     @override_settings(**go_live_settings)
@@ -1190,6 +1288,90 @@ class GoLiveReadinessCommandTest(TestCase):
         self.assertIn("Go-live readiness checks passed.", output.getvalue())
 
     @override_settings(**go_live_settings)
+    def test_go_live_readiness_fails_when_active_store_has_no_whatsapp(
+        self,
+    ) -> None:
+        """Every active tenant needs an effective checkout phone before go-live."""
+        User.objects.create_user(
+            username="operator@example.com",
+            email="operator@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        default_store = Store.get_default()
+        default_store.whatsapp_phone = "5571999999999"
+        default_store.save(update_fields=["whatsapp_phone"])
+        category = Category.objects.create(
+            name="Prontos", slug="prontos", store=default_store
+        )
+        Product.objects.create(
+            name="Produto pronto",
+            sku="READY-001",
+            price=Decimal("19.90"),
+            stock_quantity=5,
+            category=category,
+            store=default_store,
+        )
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("12.00"),
+            store=default_store,
+        )
+        Store.objects.create(name="Loja sem WhatsApp", slug="loja-sem-whatsapp")
+        output = StringIO()
+
+        with self.assertRaises(CommandError):
+            call_command("check_go_live_readiness", stdout=output)
+
+        self.assertIn("store_whatsapp", output.getvalue())
+        self.assertIn("loja-sem-whatsapp", output.getvalue())
+
+    @override_settings(**go_live_settings)
+    def test_go_live_readiness_fails_when_active_store_has_no_sellable_catalog(
+        self,
+    ) -> None:
+        """Catalog readiness must be checked per active tenant, not globally."""
+        User.objects.create_user(
+            username="operator@example.com",
+            email="operator@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        default_store = Store.get_default()
+        default_store.whatsapp_phone = "5571999999999"
+        default_store.save(update_fields=["whatsapp_phone"])
+        category = Category.objects.create(
+            name="Prontos", slug="prontos", store=default_store
+        )
+        Product.objects.create(
+            name="Produto pronto",
+            sku="READY-001",
+            price=Decimal("19.90"),
+            stock_quantity=5,
+            category=category,
+            store=default_store,
+        )
+        DeliveryRegion.objects.create(
+            name="Centro",
+            city="Salvador",
+            delivery_fee=Decimal("12.00"),
+            store=default_store,
+        )
+        Store.objects.create(
+            name="Loja sem Catalogo",
+            slug="loja-sem-catalogo",
+            whatsapp_phone="5572888888888",
+        )
+        output = StringIO()
+
+        with self.assertRaises(CommandError):
+            call_command("check_go_live_readiness", stdout=output)
+
+        self.assertIn("catalog", output.getvalue())
+        self.assertIn("loja-sem-catalogo", output.getvalue())
+
+    @override_settings(**go_live_settings)
     def test_go_live_readiness_fails_without_catalog_and_operator(self) -> None:
         """Readiness command should fail closed when operational data is missing."""
         output = StringIO()
@@ -1201,6 +1383,7 @@ class GoLiveReadinessCommandTest(TestCase):
         self.assertIn("catalog", output.getvalue())
 
 
+@override_settings(WHATSAPP_ORDER_PHONE="5571999999999")
 class CheckoutWhatsAppAPITest(TestCase):
     """Test the public checkout preparation endpoint."""
 
@@ -1264,6 +1447,34 @@ class CheckoutWhatsAppAPITest(TestCase):
             },
         }
 
+    @override_settings(WHATSAPP_ORDER_PHONE="")
+    def test_checkout_without_whatsapp_configuration_rejects_without_side_effects(
+        self,
+    ) -> None:
+        client = self._checkout_client()
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 2}]
+        )
+
+        with patch("bipdelivery.api.views.logger") as logger_mock:
+            response: Any = client.post(
+                "/api/v1/checkout/whatsapp/", payload, format="json"
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data["code"], "whatsapp_not_configured")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 8)
+        self.assertFalse(SaleOrder.objects.exists())
+        self.assertFalse(StockMovement.objects.filter(product=self.product).exists())
+        logger_mock.warning.assert_called_once()
+        log_call = logger_mock.warning.call_args
+        self.assertEqual(log_call.args[0], "checkout.rejected")
+        self.assertEqual(log_call.kwargs["extra"]["event"], "checkout.rejected")
+        self.assertEqual(log_call.kwargs["extra"]["code"], "whatsapp_not_configured")
+        self.assertEqual(log_call.kwargs["extra"]["store_id"], Store.get_default().id)
+        self.assertEqual(log_call.kwargs["extra"]["items_count"], 1)
+
     def test_checkout_builds_whatsapp_payload(self) -> None:
         """Checkout should return totals, note text and WhatsApp URL."""
         client = self._checkout_client(
@@ -1287,9 +1498,10 @@ class CheckoutWhatsAppAPITest(TestCase):
                     "notes": "Sem cebola",
                 },
             }
-            response: Any = client.post(
-                "/api/v1/checkout/whatsapp/", payload, format="json"
-            )
+            with patch("bipdelivery.api.views.logger") as logger_mock:
+                response: Any = client.post(
+                    "/api/v1/checkout/whatsapp/", payload, format="json"
+                )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["subtotal"], "85.00")
@@ -1310,6 +1522,19 @@ class CheckoutWhatsAppAPITest(TestCase):
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 6)
         self.assertTrue(self.product.is_available)
+        logger_mock.info.assert_called_once()
+        log_call = logger_mock.info.call_args
+        log_extra = log_call.kwargs["extra"]
+        self.assertEqual(log_call.args[0], "checkout.created")
+        self.assertEqual(log_extra["event"], "checkout.created")
+        self.assertEqual(log_extra["store_id"], Store.get_default().id)
+        self.assertEqual(log_extra["items_count"], 1)
+        self.assertEqual(log_extra["delivery_method"], "delivery")
+        self.assertEqual(log_extra["payment_method"], "pix")
+        self.assertEqual(log_extra["subtotal"], "85.00")
+        self.assertEqual(log_extra["total"], "97.00")
+        self.assertNotIn("customer_name", log_extra)
+        self.assertNotIn("customer_phone", log_extra)
 
     def test_checkout_creates_a_stock_movement_per_product(self) -> None:
         """Checkout should leave an auditable saida movement behind the decrement."""
@@ -1340,6 +1565,60 @@ class CheckoutWhatsAppAPITest(TestCase):
             movement.previous_stock - movement.quantity, movement.new_stock
         )
         self.assertEqual(movement.new_stock, 6)
+
+    def test_checkout_idempotency_returns_existing_order_without_double_stock(
+        self,
+    ) -> None:
+        client = self._checkout_client()
+        payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 2}]
+        )
+        payload["idempotency_key"] = "checkout-retry-1"
+
+        first_response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+        second_response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            second_response.data["order_reference"],
+            first_response.data["order_reference"],
+        )
+        self.assertEqual(SaleOrder.objects.count(), 1)
+        self.assertEqual(StockMovement.objects.filter(product=self.product).count(), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 6)
+
+    def test_checkout_idempotency_rejects_same_key_with_different_payload(
+        self,
+    ) -> None:
+        client = self._checkout_client()
+        first_payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 1}]
+        )
+        first_payload["idempotency_key"] = "checkout-conflict-1"
+        second_payload = self._build_pickup_payload(
+            [{"product_id": self.product.id, "quantity": 2}]
+        )
+        second_payload["idempotency_key"] = "checkout-conflict-1"
+
+        first_response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", first_payload, format="json"
+        )
+        second_response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", second_payload, format="json"
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(second_response.data["code"], "idempotency_key_conflict")
+        self.assertEqual(SaleOrder.objects.count(), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 7)
 
     def test_checkout_links_a_bot_conversation_to_the_resulting_order(self) -> None:
         """A bot_session_id on checkout should mark that conversation as converted."""
@@ -1758,6 +2037,47 @@ class CheckoutWhatsAppAPITest(TestCase):
             response.data["customer"]["delivery_region_name"], "Centro expandido"
         )
         self.assertIn("Regiao: Centro expandido", response.data["message"])
+
+    def test_checkout_falls_back_to_default_delivery_fee_without_a_region(
+        self,
+    ) -> None:
+        """Delivery checkout with no resolvable delivery region must still
+        charge the configured ORDER_DELIVERY_FEE default, not R$0.00.
+
+        Regression test: a prior refactor of the delivery-fee branch dropped
+        the `else settings.ORDER_DELIVERY_FEE` fallback, so any delivery
+        checkout without a matching active DeliveryRegion silently charged
+        zero delivery fee.
+        """
+        client = self._checkout_client(
+            address="Rua A, 123", neighborhood="Centro", city="Salvador"
+        )
+        payload = {
+            "items": [
+                {
+                    "product_id": self.product.id,  # type: ignore[arg-type]
+                    "quantity": 1,
+                }
+            ],
+            "customer": {
+                "delivery_method": "delivery",
+                "payment_method": "pix",
+                "notes": "",
+            },
+        }
+
+        response: Any = client.post(
+            "/api/v1/checkout/whatsapp/", payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["delivery_fee"], f"{settings.ORDER_DELIVERY_FEE:.2f}"
+        )
+        self.assertEqual(
+            response.data["total"],
+            f"{self.product.price + settings.ORDER_DELIVERY_FEE:.2f}",
+        )
 
     def test_public_delivery_regions_returns_only_active_regions(self) -> None:
         """Public active regions endpoint should hide inactive options."""
