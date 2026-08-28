@@ -1,7 +1,7 @@
 import re
 import logging
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 
@@ -384,6 +384,10 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     """Read-only product color variant payload."""
 
     image = serializers.SerializerMethodField()
+    # `price` is the raw override ("69.90" or null); `effective_price` is the
+    # value a checkout line would actually charge, with the Product.price
+    # fallback already applied -- so the frontend never re-derives the rule.
+    effective_price = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariant
@@ -391,11 +395,16 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "color_hex",
+            "price",
+            "effective_price",
             "stock_quantity",
             "image",
             "is_active",
             "position",
         ]
+
+    def get_effective_price(self, instance: ProductVariant) -> str:
+        return f"{Decimal(instance.product.get_effective_price(instance)):.2f}"
 
     def get_image(self, instance: ProductVariant) -> str | None:
         if not instance.image:
@@ -647,6 +656,10 @@ class ProductSerializer(serializers.ModelSerializer):
                     }
                 )
 
+            price = self._normalize_variant_price(
+                raw_variant.get("price", serializers.empty)
+            )
+
             normalized_name = name.casefold()
             if normalized_name in seen_names:
                 raise serializers.ValidationError(
@@ -711,6 +724,7 @@ class ProductSerializer(serializers.ModelSerializer):
                     "id": variant_id,
                     "name": name,
                     "color_hex": color_hex,
+                    "price": price,
                     "stock_quantity": stock_quantity,
                     "image": raw_variant.get("image", serializers.empty),
                     "image_upload_index": image_upload_index,
@@ -720,6 +734,34 @@ class ProductSerializer(serializers.ModelSerializer):
             )
 
         return normalized_variants
+
+    @staticmethod
+    def _normalize_variant_price(raw_price) -> Decimal | None:
+        """Parse a variant price override. Blank/missing means "inherit the
+        base price" -- see docs/architecture/product-variant-pricing.md."""
+        if raw_price in (serializers.empty, None, ""):
+            return None
+
+        try:
+            price = Decimal(str(raw_price))
+        except (InvalidOperation, TypeError, ValueError):
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante deve ser um numero valido."}
+            )
+
+        if not price.is_finite() or price < 0:
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante nao pode ser negativo."}
+            )
+
+        if price.as_tuple().exponent < -2:
+            raise serializers.ValidationError(
+                {
+                    "variants_payload": "O preco da variante deve ter no maximo 2 casas decimais."
+                }
+            )
+
+        return price.quantize(Decimal("0.01"))
 
     def get_images(self, instance):
         request = self.context.get("request")
@@ -1025,6 +1067,9 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.product = locked_product
                 variant.name = variant_data["name"]
                 variant.color_hex = variant_data["color_hex"]
+                # Unaudited, unlike stock_quantity: a blank price field is an
+                # explicit "inherit the base price" (None), so set it directly.
+                variant.price = variant_data["price"]
                 if variant_data["stock_quantity"] is not None:
                     variant.stock_quantity = variant_data["stock_quantity"]
                 elif variant_id is None:
