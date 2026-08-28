@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
@@ -383,6 +384,20 @@ class Product(models.Model):
         """Return product SKU and name as string representation."""
         return f"{self.sku} - {self.name}"
 
+    def get_effective_price(self, variant: "ProductVariant | None" = None) -> Decimal:
+        """Return the price a checkout/PDV line should charge for this product.
+
+        A variant with its own `price` overrides the base price; a variant
+        with `price=None` (the default) inherits `Product.price`. This is the
+        single source of truth for that fallback -- callers must never
+        re-implement ``variant.price or product.price`` themselves (0.00 is a
+        real price, only ``None`` means "inherit"). See
+        docs/architecture/product-variant-pricing.md.
+        """
+        if variant is not None and variant.price is not None:
+            return variant.price
+        return self.price
+
     @property
     def public_image_urls(self) -> list[str]:
         """Return all public-facing product image paths preserving display order."""
@@ -436,6 +451,19 @@ class ProductVariant(models.Model):
     name = models.CharField(max_length=80)
     color_hex = models.CharField(max_length=7, validators=[COLOR_HEX_VALIDATOR])
     stock_quantity = models.PositiveIntegerField(default=0)
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text=(
+            "Optional per-variant price override. NULL (the default) means "
+            "this variant inherits Product.price -- semantically different "
+            "from 0.00. Resolve the effective price via "
+            "Product.get_effective_price(variant), never variant.price directly."
+        ),
+    )
     image = models.ImageField(
         upload_to=product_variant_image_upload_to, null=True, blank=True
     )
