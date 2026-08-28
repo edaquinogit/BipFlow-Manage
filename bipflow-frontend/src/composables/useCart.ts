@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import type { CartCustomer, CartItem, Product, ProductVariant } from '@/types/product'
 import { getSelectedStoreSlug, subscribeStoreScopeChange } from '@/services/store-scope'
+import { effectiveUnitPrice } from '@/utils/pricing'
 
 // Etapa 3 of the multi-tenant evolution: the cart key is scoped per store so
 // a delivery region or item picked while browsing one storefront never
@@ -298,7 +299,8 @@ export function useCart() {
 
   const subtotal = computed(() =>
     items.value.reduce(
-      (total, item) => total + parsePrice(item.product.price) * item.quantity,
+      (total, item) =>
+        total + parsePrice(effectiveUnitPrice(item.product, item.variant)) * item.quantity,
       0
     )
   )

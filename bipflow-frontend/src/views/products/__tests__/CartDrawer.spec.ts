@@ -219,6 +219,8 @@ describe('CartDrawer', () => {
         id: 9,
         name: 'Azul',
         color_hex: '#3366FF',
+        price: null,
+        effective_price: '42.50',
         stock_quantity: 4,
         image: 'https://example.com/azul.jpg',
         is_active: true,
@@ -237,6 +239,28 @@ describe('CartDrawer', () => {
     expect(wrapper.emitted('removeItem')?.[0]).toEqual([1, 9])
   })
 
+  it('shows the variant effective price per unit and in the line total', () => {
+    const item = {
+      ...buildItem(),
+      quantity: 2,
+      variant: {
+        id: 9,
+        name: 'Premium',
+        color_hex: '#3366FF',
+        price: '59.90',
+        effective_price: '59.90',
+        stock_quantity: 4,
+        image: null,
+        is_active: true,
+        position: 0,
+      },
+    }
+    const wrapper = mountDrawer({ items: [item], subtotal: 119.8 })
+
+    expect(wrapper.text()).toContain('59,90 / unidade')
+    expect(wrapper.text()).toContain('119,80')
+  })
+
   it('blocks checkout when a variant line exceeds that color stock', () => {
     const item = {
       ...buildItem(),
@@ -245,6 +269,8 @@ describe('CartDrawer', () => {
         id: 9,
         name: 'Azul',
         color_hex: '#3366FF',
+        price: null,
+        effective_price: '42.50',
         stock_quantity: 2,
         image: 'https://example.com/azul.jpg',
         is_active: true,

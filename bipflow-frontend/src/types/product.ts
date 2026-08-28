@@ -25,6 +25,11 @@ export interface ProductVariant {
   id: number
   name: string
   color_hex: string
+  // Optional per-variant price override ("69.90"); null means "inherit the
+  // product's base price". `effective_price` is that fallback already
+  // resolved server-side -- see docs/architecture/product-variant-pricing.md.
+  price: string | null
+  effective_price: string
   stock_quantity: number
   image: string | null
   is_active: boolean
@@ -200,6 +205,17 @@ export const ProductVariantSchema = z.object({
   id: z.number(),
   name: z.string(),
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  price: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .optional()
+    .transform((value) => (value === null || value === undefined ? null : String(value))),
+  // Empty string when an older backend omits it; callers fall back to the
+  // product's base price in that case.
+  effective_price: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((value) => (value === undefined ? '' : String(value))),
   stock_quantity: z.number().int().nonnegative().default(0),
   image: z.string().url().nullable().optional().default(null),
   is_active: z.boolean(),
