@@ -100,6 +100,10 @@ const normalizeInitialFormData = (
         id: variant.id,
         name: variant.name ?? '',
         color_hex: variant.color_hex ?? '#000000',
+        price:
+          variant.price === null || variant.price === undefined
+            ? null
+            : toNumberOrZero(variant.price),
         stock_quantity: Math.trunc(toNumberOrZero(variant.stock_quantity)),
         image: variant.image ?? null,
         is_active: variant.is_active ?? true,
@@ -246,6 +250,7 @@ const submitLabel = computed(() => {
 
           <ProductVariantsSection
             v-model:variants="form.variants"
+            :base-price="form.price"
             :error="errors.variants?.[0]"
           />
         </form>

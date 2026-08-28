@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import type { Product, ProductVariant } from "../schemas/product.schema";
 import type { PdvSaleItemPayload } from "../types/pdvSale";
+import { effectiveUnitPrice } from "../utils/pricing";
 
 /**
  * Local running cart for the PDV screen (Etapa 3 of the QR-code stock-exit
@@ -138,7 +139,9 @@ export function usePdvCart() {
         variantName: selectedVariant?.name ?? "",
         variantColorHex: selectedVariant?.color_hex ?? "",
         name: product.name,
-        unitPrice: Number(product.price),
+        // Display only -- the backend recomputes the sale total from the
+        // scanned code + variant. Mirrors Product.get_effective_price.
+        unitPrice: Number(effectiveUnitPrice(product, selectedVariant)),
         quantity: quantityToAdd,
         availableStock,
         lowStockThreshold: product.low_stock_threshold ?? null,
