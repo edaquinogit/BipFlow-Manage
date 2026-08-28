@@ -88,7 +88,7 @@ class CategoryAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
-    fields = ("name", "color_hex", "stock_quantity", "image", "is_active", "position")
+    fields = ("name", "color_hex", "price", "stock_quantity", "image", "is_active", "position")
 
 
 @admin.register(Product)
