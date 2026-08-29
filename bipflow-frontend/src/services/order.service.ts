@@ -9,6 +9,7 @@ import type {
 } from '@/types/product'
 import { isAxiosError } from '@/types/errors'
 import { formatBRL } from '@/utils/formatters'
+import { effectiveUnitPrice } from '@/utils/pricing'
 
 const CHECKOUT_IDEMPOTENCY_STORAGE_PREFIX = 'bipflow_checkout_idempotency'
 
@@ -162,7 +163,7 @@ function clearCheckoutIdempotencyKey(payload: CheckoutPayload): void {
 
 function buildWhatsAppHandoffMessage(items: CartItem[], subtotal: number): string {
   const itemLines = items.map((item, index) => {
-    const lineTotal = Number(item.product.price) * item.quantity
+    const lineTotal = Number(effectiveUnitPrice(item.product, item.variant)) * item.quantity
     const sku = item.product.sku ? ` (${item.product.sku})` : ''
     const variant = item.variant?.name ? ` - ${item.variant.name}` : ''
 
