@@ -140,8 +140,19 @@ function stubStorefrontApis(checkoutRequests: CheckoutRequestBody[]): void {
     }
     checkoutRequests.push(body)
 
+    // First attempt: a deterministic transient backend failure. Deliberately
+    // NOT { forceNetworkError: true } -- in Electron/Chromium a connection
+    // destroyed with zero bytes received is transparently retried by the
+    // browser's net stack, so the stub answers that retry with the success
+    // branch below and the order completes before the test runs its own
+    // explicit retry (the drawer unmounts on the premature success, so
+    // [data-cy="checkout-submit-button"] is "never found"). A 503 exercises
+    // the identical frontend path: api.ts's >= 500 branch falls through to
+    // Promise.reject, handleSubmitOrder's catch shows the error toast,
+    // `finally` clears isSubmittingOrder, and the idempotency key is kept
+    // (clearCheckoutIdempotencyKey only runs after a resolved POST).
     if (checkoutRequests.length === 1) {
-      req.reply({ forceNetworkError: true })
+      req.reply({ statusCode: 503, body: {} })
       return
     }
 
@@ -189,7 +200,7 @@ function stubWindowOpenBeforeLoad(): void {
 }
 
 describe('production mobile checkout retry', () => {
-  it('keeps the same idempotency key after a mobile network failure', () => {
+  it('keeps the same idempotency key after a transient checkout failure', () => {
     const checkoutRequests: CheckoutRequestBody[] = []
     stubStorefrontApis(checkoutRequests)
     stubWindowOpenBeforeLoad()
@@ -211,6 +222,9 @@ describe('production mobile checkout retry', () => {
     cy.get('[data-cy="checkout-submit-button"]').should('be.enabled').click()
     cy.wait('@checkout')
 
+    // First attempt failed: the cart drawer stays open in a recoverable
+    // state -- error toast shown, loading finished, submit usable again.
+    cy.get('[data-cy="toast-error"]').should('be.visible')
     cy.get('[data-cy="checkout-submit-button"]', { timeout: 10000 })
       .should('be.enabled')
     cy.get('[data-cy="checkout-submit-button"]').click()
