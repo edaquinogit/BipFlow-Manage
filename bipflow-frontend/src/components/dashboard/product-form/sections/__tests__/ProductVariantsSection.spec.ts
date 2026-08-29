@@ -55,9 +55,17 @@ describe('ProductVariantsSection', () => {
     expect(emitted[0]?.price).toBeNull()
   })
 
-  it('coerces a negative price back to inherit', async () => {
+  it('keeps a negative value so form validation can reject it', async () => {
     const wrapper = mountSection(null)
     await wrapper.find('input[type="number"][step="0.01"]').setValue('-5')
+
+    const emitted = wrapper.emitted('update:variants')?.at(-1)?.[0] as Array<{ price: unknown }>
+    expect(emitted[0]?.price).toBe(-5)
+  })
+
+  it('resolves a non-numeric value to inherit', async () => {
+    const wrapper = mountSection(69.9)
+    await wrapper.find('input[type="number"][step="0.01"]').setValue('abc')
 
     const emitted = wrapper.emitted('update:variants')?.at(-1)?.[0] as Array<{ price: unknown }>
     expect(emitted[0]?.price).toBeNull()

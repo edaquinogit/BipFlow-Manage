@@ -28,16 +28,20 @@ export function effectiveUnitPrice(
 }
 
 /**
- * The price to advertise on a card / detail header for a product, taking its
- * active variants into account. `from` is true when active variants disagree
- * on price (render as "A partir de …").
+ * The price to advertise on a card / detail header for a product. Considers
+ * the variants a shopper could actually buy (active AND in stock); if none are
+ * in stock, falls back to every active variant so the card still shows a
+ * number. `from` is true when those variants disagree on price ("A partir de …").
  */
 export function displayPrice(
   product: Pick<Product, 'price' | 'variants'>,
 ): { amount: string; from: boolean } {
   const active = (product.variants ?? []).filter((variant) => variant.is_active)
-  const rawPrices = active.length
-    ? active.map((variant) => Number.parseFloat(effectiveUnitPrice(product, variant)))
+  const inStock = active.filter((variant) => Number(variant.stock_quantity) > 0)
+  const relevant = inStock.length ? inStock : active
+
+  const rawPrices = relevant.length
+    ? relevant.map((variant) => Number.parseFloat(effectiveUnitPrice(product, variant)))
     : [Number.parseFloat(product.price)]
   const prices = rawPrices.filter((value) => Number.isFinite(value))
 
