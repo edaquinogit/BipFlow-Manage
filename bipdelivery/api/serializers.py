@@ -404,7 +404,16 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         ]
 
     def get_effective_price(self, instance: ProductVariant) -> str:
-        return f"{Decimal(instance.product.get_effective_price(instance)):.2f}"
+        if instance.price is not None:
+            return f"{Decimal(instance.price):.2f}"
+        # ProductSerializer.to_representation puts the parent product's base
+        # price here, so a variant that inherits it needs no per-row query.
+        # `instance.product` is only touched on the (rare) path where this
+        # serializer runs without that parent -- kept as a correctness net.
+        base_price = self.context.get("variant_base_price")
+        if base_price is None:
+            base_price = instance.product.price
+        return f"{Decimal(base_price):.2f}"
 
     def get_image(self, instance: ProductVariant) -> str | None:
         if not instance.image:
@@ -761,7 +770,20 @@ class ProductSerializer(serializers.ModelSerializer):
                 }
             )
 
-        return price.quantize(Decimal("0.01"))
+        # ProductVariant.price is DecimalField(max_digits=10, decimal_places=2)
+        # -- reject an out-of-range value here with a 400 instead of letting it
+        # blow up at quantize() or at INSERT with a numeric-overflow 500.
+        if price >= Decimal("1E8"):
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante e alto demais."}
+            )
+
+        try:
+            return price.quantize(Decimal("0.01"))
+        except InvalidOperation:
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante e alto demais."}
+            )
 
     def get_images(self, instance):
         request = self.context.get("request")
@@ -1186,7 +1208,11 @@ class ProductSerializer(serializers.ModelSerializer):
         Override to_representation to return absolute URL for image field.
 
         Converts the relative image path to an absolute URL for API responses.
+        Also hands the base price down through context so the nested
+        ProductVariantSerializer resolves an inherited effective_price without
+        a query per variant on responses that skipped the list prefetch.
         """
+        self.context["variant_base_price"] = instance.price
         data = super().to_representation(instance)
         request = self.context.get("request")
 
