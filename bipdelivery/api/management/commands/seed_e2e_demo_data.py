@@ -6,7 +6,13 @@ from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
-from bipdelivery.api.models import Category, DeliveryRegion, Product, Store
+from bipdelivery.api.models import (
+    Category,
+    DeliveryRegion,
+    Product,
+    ProductVariant,
+    Store,
+)
 
 # 1x1 transparent PNG -- product_sync.cy.ts's "absolute URLs for product
 # images" check needs a real <img> to exist somewhere in the table, and
@@ -60,6 +66,41 @@ class Command(BaseCommand):
                 "is_available": True,
                 "size": "M",
                 "image": ContentFile(_ONE_PIXEL_PNG, name="produto-demo-e2e.png"),
+            },
+        )
+
+        # A second product WITH colour variants, one inheriting the base price
+        # and one with its own -- exercises the variant-pricing flow end to end
+        # (product-variant-pricing.md). The variant-less product above is left
+        # untouched so the existing critical-purchase smoke stays valid.
+        variable_product, _ = Product.objects.get_or_create(
+            store=store,
+            name="Produto Variavel E2E",
+            defaults={
+                "category": category,
+                "price": Decimal("50.00"),
+                "stock_quantity": 40,
+                "is_available": True,
+            },
+        )
+        ProductVariant.objects.get_or_create(
+            product=variable_product,
+            name="P",
+            defaults={
+                "color_hex": "#111827",
+                "price": None,
+                "stock_quantity": 20,
+                "position": 0,
+            },
+        )
+        ProductVariant.objects.get_or_create(
+            product=variable_product,
+            name="GG",
+            defaults={
+                "color_hex": "#B91C1C",
+                "price": Decimal("70.00"),
+                "stock_quantity": 20,
+                "position": 1,
             },
         )
 
