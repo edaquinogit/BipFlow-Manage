@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -239,12 +239,7 @@ class ProductViewSet(StoreScopedViewSetMixin, viewsets.ModelViewSet):
         """
         queryset = Product.objects.select_related(
             "category", "category__parent"
-        ).prefetch_related(
-            "gallery_images",
-            # select_related("product") so ProductVariantSerializer.effective_price
-            # can fall back to the base price without an extra query per variant.
-            Prefetch("variants", ProductVariant.objects.select_related("product")),
-        )
+        ).prefetch_related("gallery_images", "variants")
 
         # 🔍 TEXT SEARCH: Search in name, SKU, and description
         search_term = self.request.query_params.get("search", "").strip()

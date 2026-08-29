@@ -825,6 +825,75 @@ class ProductAPIHealthTest(TestCase):
             ],
         )
 
+    def test_product_create_persists_and_serializes_a_variant_price(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Camiseta Precificada",
+                "sku": "CAM-PR1",
+                "price": "50.00",
+                "category": self.category.id,
+                "variants_payload": [
+                    {"name": "P", "color_hex": "#111111", "stock_quantity": 3, "position": 0, "is_active": True},
+                    {"name": "GG", "color_hex": "#222222", "price": "70.00", "stock_quantity": 3, "position": 1, "is_active": True},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        by_name = {v["name"]: v for v in response.data["variants"]}
+        self.assertIsNone(by_name["P"]["price"])
+        self.assertEqual(by_name["P"]["effective_price"], "50.00")
+        self.assertEqual(by_name["GG"]["price"], "70.00")
+        self.assertEqual(by_name["GG"]["effective_price"], "70.00")
+
+    def test_product_create_rejects_an_out_of_range_variant_price(self) -> None:
+        """An oversized price must 400 through the variants_payload parser, not
+        500 at quantize()/INSERT (DecimalField is max_digits=10)."""
+        self.client.force_authenticate(user=self.user)
+
+        for bad_price in ("1e27", "99999999999.99"):
+            response: Any = self.client.post(
+                "/api/v1/products/",
+                {
+                    "name": f"Produto {bad_price}",
+                    "sku": f"SKU-{bad_price[:4]}",
+                    "price": "50.00",
+                    "category": self.category.id,
+                    "variants_payload": [
+                        {"name": "X", "color_hex": "#111111", "price": bad_price, "stock_quantity": 1, "position": 0, "is_active": True},
+                    ],
+                },
+                format="json",
+            )
+            self.assertEqual(
+                response.status_code, status.HTTP_400_BAD_REQUEST, msg=(bad_price, response.data)
+            )
+
+        self.assertFalse(Product.objects.filter(name__startswith="Produto 1e27").exists())
+
+    def test_product_create_rejects_a_negative_variant_price(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto Negativo",
+                "sku": "SKU-NEG",
+                "price": "50.00",
+                "category": self.category.id,
+                "variants_payload": [
+                    {"name": "X", "color_hex": "#111111", "price": "-1.00", "stock_quantity": 1, "position": 0, "is_active": True},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, msg=response.data)
+
     def test_product_update_variant_stock_creates_adjustment_movement(self) -> None:
         self.client.force_authenticate(user=self.user)
         variant = ProductVariant.objects.create(
