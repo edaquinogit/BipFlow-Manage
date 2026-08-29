@@ -98,6 +98,10 @@ jobs:
       BASE_URL: http://localhost:8000
       BIPFLOW_THROTTLE_AUTH_IP: 1000/minute
       BIPFLOW_THROTTLE_AUTH_LOGIN_IDENTITY: 1000/minute
+      # checkout-flow.cy.ts and variant-pricing-smoke.cy.ts each finalize a
+      # real checkout from the same runner IP; the 5/minute default would
+      # throttle whichever runs last.
+      BIPFLOW_THROTTLE_CHECKOUT_IP: 1000/minute
       CORS_ALLOWED_ORIGINS: http://localhost:5173
       CSRF_TRUSTED_ORIGINS: http://localhost:5173
       CYPRESS_adminPassword: ci-e2e-throwaway-pw-2026
