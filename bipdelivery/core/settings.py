@@ -20,6 +20,18 @@ PROJECT_ROOT = BASE_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env")
 load_dotenv(BASE_DIR / ".env")
 
+# Opt-in only: DJANGO_ENV_FILE points at a named profile (e.g. .env.e2e, the
+# local Cypress throttle profile mirroring .github/workflows/ci.yml's
+# frontend-e2e job) instead of editing the developer's own .env by hand.
+# override=True since this is a deliberate, explicit request -- it should
+# win over whatever the regular .env already set, not be silently shadowed
+# by it. Never set in production (Render injects real env vars directly;
+# see render.yaml), so this block is inert there.
+_env_profile = os.environ.get("DJANGO_ENV_FILE")
+if _env_profile:
+    load_dotenv(PROJECT_ROOT / _env_profile, override=True)
+    load_dotenv(BASE_DIR / _env_profile, override=True)
+
 # ------------------------------------------------------------------------------
 # ðŸ”‘ SECURITY & ENVIRONMENT
 # ------------------------------------------------------------------------------
