@@ -91,4 +91,26 @@ describe('displayPrice', () => {
     })
     expect(displayPrice(p)).toEqual({ amount: '59.90', from: false })
   })
+
+  it('advertises only the price of variants that are actually in stock', () => {
+    const p = product({
+      price: '50.00',
+      variants: [
+        variant({ id: 1, effective_price: '50.00', stock_quantity: 0 }),
+        variant({ id: 2, price: '70.00', effective_price: '70.00', stock_quantity: 5 }),
+      ],
+    })
+    expect(displayPrice(p)).toEqual({ amount: '70.00', from: false })
+  })
+
+  it('falls back to all active variants when none are in stock', () => {
+    const p = product({
+      price: '50.00',
+      variants: [
+        variant({ id: 1, effective_price: '50.00', stock_quantity: 0 }),
+        variant({ id: 2, price: '70.00', effective_price: '70.00', stock_quantity: 0 }),
+      ],
+    })
+    expect(displayPrice(p)).toEqual({ amount: '50.00', from: true })
+  })
 })

@@ -24,8 +24,15 @@ function normalizeVariantPrice(value: unknown): number | null {
   }
 
   const numericValue = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  if (!Number.isFinite(numericValue) || numericValue < 0) {
+  if (!Number.isFinite(numericValue)) {
     return null;
+  }
+
+  // A negative value is kept as-is so ProductFormSchema's `.min(0)` rejects it
+  // on submit and the merchant sees why -- silently blanking it would look
+  // like "inherit the base price", which is not what they typed.
+  if (numericValue < 0) {
+    return numericValue;
   }
 
   return Math.round(numericValue * 100) / 100;
@@ -279,7 +286,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-3">
+          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-4">
             <input
               :checked="variant.is_active"
               type="checkbox"
