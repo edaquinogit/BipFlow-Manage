@@ -1,7 +1,7 @@
 import re
 import logging
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 
@@ -384,6 +384,10 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     """Read-only product color variant payload."""
 
     image = serializers.SerializerMethodField()
+    # `price` is the raw override ("69.90" or null); `effective_price` is the
+    # value a checkout line would actually charge, with the Product.price
+    # fallback already applied -- so the frontend never re-derives the rule.
+    effective_price = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariant
@@ -391,11 +395,25 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "color_hex",
+            "price",
+            "effective_price",
             "stock_quantity",
             "image",
             "is_active",
             "position",
         ]
+
+    def get_effective_price(self, instance: ProductVariant) -> str:
+        if instance.price is not None:
+            return f"{Decimal(instance.price):.2f}"
+        # ProductSerializer.to_representation puts the parent product's base
+        # price here, so a variant that inherits it needs no per-row query.
+        # `instance.product` is only touched on the (rare) path where this
+        # serializer runs without that parent -- kept as a correctness net.
+        base_price = self.context.get("variant_base_price")
+        if base_price is None:
+            base_price = instance.product.price
+        return f"{Decimal(base_price):.2f}"
 
     def get_image(self, instance: ProductVariant) -> str | None:
         if not instance.image:
@@ -647,6 +665,15 @@ class ProductSerializer(serializers.ModelSerializer):
                     }
                 )
 
+            # A missing "price" key means "don't touch the stored override"
+            # (legacy clients never send it); an explicit null/"" clears it.
+            # Kept distinct via the serializers.empty sentinel, mirroring how
+            # "image" and "stock_quantity" already tolerate omission below.
+            if "price" in raw_variant:
+                price = self._normalize_variant_price(raw_variant["price"])
+            else:
+                price = serializers.empty
+
             normalized_name = name.casefold()
             if normalized_name in seen_names:
                 raise serializers.ValidationError(
@@ -711,6 +738,7 @@ class ProductSerializer(serializers.ModelSerializer):
                     "id": variant_id,
                     "name": name,
                     "color_hex": color_hex,
+                    "price": price,
                     "stock_quantity": stock_quantity,
                     "image": raw_variant.get("image", serializers.empty),
                     "image_upload_index": image_upload_index,
@@ -720,6 +748,51 @@ class ProductSerializer(serializers.ModelSerializer):
             )
 
         return normalized_variants
+
+    @staticmethod
+    def _normalize_variant_price(raw_price) -> Decimal | None:
+        """Parse an *explicitly sent* variant price override. ``None`` or ``""``
+        means "clear the override and inherit Product.price". A missing ``price``
+        key never reaches here -- ``_validate_variants_payload`` keeps it as
+        ``serializers.empty`` so ``_sync_variants`` can leave the stored value
+        untouched (same legacy tolerance ``stock_quantity`` already has). See
+        docs/architecture/product-variant-pricing.md."""
+        if raw_price in (None, ""):
+            return None
+
+        try:
+            price = Decimal(str(raw_price))
+        except (InvalidOperation, TypeError, ValueError):
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante deve ser um numero valido."}
+            )
+
+        if not price.is_finite() or price < 0:
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante nao pode ser negativo."}
+            )
+
+        if price.as_tuple().exponent < -2:
+            raise serializers.ValidationError(
+                {
+                    "variants_payload": "O preco da variante deve ter no maximo 2 casas decimais."
+                }
+            )
+
+        # ProductVariant.price is DecimalField(max_digits=10, decimal_places=2)
+        # -- reject an out-of-range value here with a 400 instead of letting it
+        # blow up at quantize() or at INSERT with a numeric-overflow 500.
+        if price >= Decimal("1E8"):
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante e alto demais."}
+            )
+
+        try:
+            return price.quantize(Decimal("0.01"))
+        except InvalidOperation:
+            raise serializers.ValidationError(
+                {"variants_payload": "O preco da variante e alto demais."}
+            )
 
     def get_images(self, instance):
         request = self.context.get("request")
@@ -1025,6 +1098,13 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.product = locked_product
                 variant.name = variant_data["name"]
                 variant.color_hex = variant_data["color_hex"]
+                # Unaudited, unlike stock_quantity. An explicit null/"" (None)
+                # clears the override; a *missing* key (serializers.empty) is a
+                # legacy/stale client and must leave the stored value alone. A
+                # brand-new variant starts at price=None, so skipping the
+                # assignment there naturally yields NULL.
+                if variant_data["price"] is not serializers.empty:
+                    variant.price = variant_data["price"]
                 if variant_data["stock_quantity"] is not None:
                     variant.stock_quantity = variant_data["stock_quantity"]
                 elif variant_id is None:
@@ -1141,7 +1221,11 @@ class ProductSerializer(serializers.ModelSerializer):
         Override to_representation to return absolute URL for image field.
 
         Converts the relative image path to an absolute URL for API responses.
+        Also hands the base price down through context so the nested
+        ProductVariantSerializer resolves an inherited effective_price without
+        a query per variant on responses that skipped the list prefetch.
         """
+        self.context["variant_base_price"] = instance.price
         data = super().to_representation(instance)
         request = self.context.get("request")
 

@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { PhotoIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 import type { ProductFormData } from '@/schemas/product.schema';
 import { compressImageFile } from '@/utils/image';
+import { formatBRL } from '@/utils/formatters';
 
 type ProductVariantForm = ProductFormData['variants'][number];
 
@@ -10,9 +11,32 @@ const variants = defineModel<ProductFormData['variants']>('variants', { default:
 
 interface Props {
   error?: string;
+  basePrice?: number | string;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const basePriceLabel = computed(() => formatBRL(Number(props.basePrice) || 0));
+
+function normalizeVariantPrice(value: unknown): number | null {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  // A negative value is kept as-is so ProductFormSchema's `.min(0)` rejects it
+  // on submit and the merchant sees why -- silently blanking it would look
+  // like "inherit the base price", which is not what they typed.
+  if (numericValue < 0) {
+    return numericValue;
+  }
+
+  return Math.round(numericValue * 100) / 100;
+}
 
 const previewUrls = new Set<string>();
 const previews = ref<string[]>([]);
@@ -81,6 +105,7 @@ function addVariant(): void {
     {
       name: '',
       color_hex: '#111827',
+      price: null,
       stock_quantity: 0,
       image: null,
       is_active: true,
@@ -140,7 +165,10 @@ onUnmounted(() => {
           Variantes de cor
         </h3>
         <p class="text-[9px] font-bold uppercase tracking-widest text-bip-muted">
-          Nome, cor e imagem propria por opcao
+          Nome, cor, preco e imagem propria por opcao
+        </p>
+        <p v-if="hasVariants" class="mt-1 text-[10px] font-semibold normal-case tracking-normal text-bip-muted">
+          Preco base do produto: {{ basePriceLabel }}
         </p>
       </div>
 
@@ -198,7 +226,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_6rem] sm:items-end">
+        <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_4.5rem] sm:items-end">
           <label class="block min-w-0">
             <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
               Nome da cor
@@ -210,6 +238,23 @@ onUnmounted(() => {
               class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
               placeholder="Preto, azul..."
               @input="updateVariant(index, { name: ($event.target as HTMLInputElement).value })"
+            />
+          </label>
+
+          <label class="block">
+            <span class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-bip-muted">
+              Preco (R$)
+            </span>
+            <input
+              :value="variant.price ?? ''"
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              class="h-11 w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm text-[#05050A] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#F3F4F6]"
+              :placeholder="basePriceLabel"
+              :aria-label="`Preco da variante ${variant.name || index + 1}. Em branco usa o preco base.`"
+              @input="updateVariant(index, { price: normalizeVariantPrice(($event.target as HTMLInputElement).value) })"
             />
           </label>
 
@@ -241,7 +286,7 @@ onUnmounted(() => {
             />
           </label>
 
-          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-3">
+          <label class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4B5563] sm:col-span-4">
             <input
               :checked="variant.is_active"
               type="checkbox"

@@ -37,6 +37,38 @@ describe('ProductCard', () => {
     expect(wrapper.text()).toContain('2')
   })
 
+  it('shows a single price when active variants agree, "A partir de" when they differ', () => {
+    const agree = mount(ProductCard, {
+      props: {
+        product: {
+          ...mockProduct,
+          price: '99.90',
+          variants: [
+            { id: 1, name: 'A', color_hex: '#111827', price: null, effective_price: '99.90', stock_quantity: 3, image: null, is_active: true, position: 0 },
+            { id: 2, name: 'B', color_hex: '#222222', price: null, effective_price: '99.90', stock_quantity: 3, image: null, is_active: true, position: 1 },
+          ],
+        },
+      },
+    })
+    expect(agree.text()).not.toContain('A partir de')
+    expect(agree.text()).toContain('99,90')
+
+    const differ = mount(ProductCard, {
+      props: {
+        product: {
+          ...mockProduct,
+          price: '99.90',
+          variants: [
+            { id: 1, name: 'A', color_hex: '#111827', price: null, effective_price: '99.90', stock_quantity: 3, image: null, is_active: true, position: 0 },
+            { id: 2, name: 'B', color_hex: '#222222', price: '129.90', effective_price: '129.90', stock_quantity: 3, image: null, is_active: true, position: 1 },
+          ],
+        },
+      },
+    })
+    expect(differ.text()).toContain('A partir de')
+    expect(differ.text()).toContain('99,90')
+  })
+
   it('emits openDetails when the detail trigger is clicked', async () => {
     const detailButton = wrapper.findAll('button').find((button) => button.text().includes('Detalhe'))
 

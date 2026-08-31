@@ -70,7 +70,7 @@
           <span
             class="block text-[1.12rem] font-semibold tracking-[-0.015em] text-[var(--store-text)] min-[390px]:text-[1.22rem] sm:text-[1.36rem] lg:text-[1.28rem] xl:text-[1.34rem]"
           >
-            {{ formatBRL(product.price) }}
+            <span v-if="displayedPrice.from" class="text-[0.62em] font-medium text-[var(--store-text-muted)]">A partir de </span>{{ formatBRL(displayedPrice.amount) }}
           </span>
           <p class="mt-1 text-[12px] text-slate-500 min-[390px]:text-sm">
             {{ stockStatusLabel }}
@@ -182,6 +182,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { Product, ProductVariant } from '@/types/product'
 import { formatBRL } from '@/utils/formatters'
+import { displayPrice } from '@/utils/pricing'
 import { isLowStock } from '@/utils/stockAlerts'
 
 const props = withDefaults(
@@ -224,6 +225,10 @@ const activeVariants = computed(() =>
     .filter((variant) => variant.is_active)
     .sort((left, right) => left.position - right.position || left.id - right.id)
 )
+
+// "A partir de R$ X" when active variants disagree on price; a single number
+// otherwise. Backend recomputes the real price at checkout.
+const displayedPrice = computed(() => displayPrice(props.product))
 
 const hasActiveVariants = computed(() => activeVariants.value.length > 0)
 

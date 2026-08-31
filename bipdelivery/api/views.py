@@ -2803,7 +2803,9 @@ class CheckoutWhatsAppView(APIView):
                     }
                 )
 
-            unit_price = Decimal(product.price).quantize(Decimal("0.01"))
+            unit_price = Decimal(
+                product.get_effective_price(variant)
+            ).quantize(Decimal("0.01"))
             line_total = (unit_price * quantity).quantize(Decimal("0.01"))
             subtotal += line_total
             previous_stock = (

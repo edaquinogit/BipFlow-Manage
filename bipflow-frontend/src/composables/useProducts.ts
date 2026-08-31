@@ -118,9 +118,19 @@ export function useProducts() {
           const payloadIndex = variantsPayload.length;
           const position = Number(variant.position);
           const stockQuantity = Number(variant.stock_quantity);
+          // null / empty -> the backend treats it as "inherit the base price".
+          const rawPrice = variant.price;
+          const numericPrice =
+            rawPrice === null || rawPrice === undefined || rawPrice === ""
+              ? null
+              : Number(rawPrice);
           const payload: Record<string, unknown> = {
             name,
             color_hex: String(variant.color_hex || "#000000").toUpperCase(),
+            price:
+              numericPrice !== null && Number.isFinite(numericPrice) && numericPrice >= 0
+                ? numericPrice
+                : null,
             stock_quantity: Number.isFinite(stockQuantity)
               ? Math.max(0, Math.trunc(stockQuantity))
               : 0,

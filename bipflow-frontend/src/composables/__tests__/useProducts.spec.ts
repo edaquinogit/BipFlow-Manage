@@ -148,6 +148,7 @@ describe("useProducts Composable", () => {
         {
           name: "Preto",
           color_hex: "#000000",
+          price: null,
           stock_quantity: 2,
           is_active: true,
           position: 0,
@@ -155,6 +156,29 @@ describe("useProducts Composable", () => {
         },
       ]);
       expect(sentPayload.get("variant_images[0]")).toBeInstanceOf(File);
+    });
+
+    it("sends a per-variant price when set and null when left blank", async () => {
+      const { createProduct } = createComposable();
+      const serviceSpy = vi
+        .spyOn(ProductService, "create")
+        .mockResolvedValue({ id: 103, name: "Camiseta", image: null } as any);
+
+      await createProduct({
+        name: "Camiseta",
+        price: 59.9,
+        stock_quantity: 10,
+        category: 2,
+        variants: [
+          { name: "M", color_hex: "#000000", price: null, stock_quantity: 5, is_active: true, position: 0 },
+          { name: "GG", color_hex: "#111111", price: 69.9, stock_quantity: 5, is_active: true, position: 1 },
+          { name: "XG", color_hex: "#222222", price: -3, stock_quantity: 5, is_active: true, position: 2 },
+        ],
+      } as any);
+
+      const sentPayload = serviceSpy.mock.calls[0]?.[0] as FormData;
+      const variantsPayload = JSON.parse(String(sentPayload.get("variants_payload")));
+      expect(variantsPayload.map((v: { price: unknown }) => v.price)).toEqual([null, 69.9, null]);
     });
 
     /**
