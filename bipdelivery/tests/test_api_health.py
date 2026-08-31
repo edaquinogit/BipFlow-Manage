@@ -895,6 +895,171 @@ class ProductAPIHealthTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, msg=response.data)
 
+    # --- variants_payload backward compatibility for the `price` override ---
+    #
+    # variants_payload is full-replace. A legacy/stale dashboard bundle (the
+    # one live on origin/main before this feature) sends every variant field
+    # EXCEPT `price`. The `price` key must then behave exactly like
+    # `stock_quantity` already does when omitted: leave the stored value
+    # alone. An explicit null/"" still clears the override; 0 is still a real
+    # price. See docs/architecture/product-variant-pricing.md.
+
+    def _variants_with_overrides(self) -> tuple[ProductVariant, ProductVariant]:
+        first = ProductVariant.objects.create(
+            product=self.product, name="P", color_hex="#111111",
+            stock_quantity=5, position=0, price=Decimal("59.90"),
+        )
+        second = ProductVariant.objects.create(
+            product=self.product, name="M", color_hex="#222222",
+            stock_quantity=5, position=1, price=Decimal("69.90"),
+        )
+        return first, second
+
+    @staticmethod
+    def _legacy_variant_entry(variant: ProductVariant) -> dict:
+        """Exact shape origin/main's frontend `_preparePayload` builds -- no
+        `price` key at all."""
+        return {
+            "id": variant.id,
+            "name": variant.name,
+            "color_hex": variant.color_hex,
+            "stock_quantity": variant.stock_quantity,
+            "position": variant.position,
+            "is_active": variant.is_active,
+        }
+
+    def test_variant_update_without_price_key_preserves_existing_overrides(self) -> None:
+        """BLOCKING regression: a legacy payload that omits `price` must NOT
+        wipe per-variant overrides."""
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {
+                "variants_payload": [
+                    self._legacy_variant_entry(first),
+                    self._legacy_variant_entry(second),
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.price, Decimal("59.90"))
+        self.assertEqual(second.price, Decimal("69.90"))
+
+    def test_variant_update_explicit_null_price_clears_the_override(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+        entry = self._legacy_variant_entry(first)
+        entry["price"] = None
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"variants_payload": [entry, self._legacy_variant_entry(second)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertIsNone(first.price)
+        self.assertEqual(second.price, Decimal("69.90"))
+
+    def test_variant_update_empty_string_price_clears_the_override(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+        entry = self._legacy_variant_entry(first)
+        entry["price"] = ""
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"variants_payload": [entry, self._legacy_variant_entry(second)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        first.refresh_from_db()
+        self.assertIsNone(first.price)
+
+    def test_variant_update_zero_price_persists_a_real_zero(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+        first_entry = self._legacy_variant_entry(first)
+        first_entry["price"] = 0
+        second_entry = self._legacy_variant_entry(second)
+        second_entry["price"] = "0.00"
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"variants_payload": [first_entry, second_entry]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.price, Decimal("0.00"))
+        self.assertEqual(second.price, Decimal("0.00"))
+
+    def test_variant_update_valid_price_override_is_persisted(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+        entry = self._legacy_variant_entry(first)
+        entry["price"] = "79.90"
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"variants_payload": [entry, self._legacy_variant_entry(second)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        first.refresh_from_db()
+        self.assertEqual(first.price, Decimal("79.90"))
+
+    def test_variant_update_negative_price_is_rejected_and_leaves_the_override(self) -> None:
+        self.client.force_authenticate(user=self.user)
+        first, second = self._variants_with_overrides()
+        entry = self._legacy_variant_entry(first)
+        entry["price"] = "-5.00"
+
+        response: Any = self.client.patch(
+            f"/api/v1/products/{self.product.id}/",
+            {"variants_payload": [entry, self._legacy_variant_entry(second)]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, msg=response.data)
+        first.refresh_from_db()
+        self.assertEqual(first.price, Decimal("59.90"))
+
+    def test_variant_create_without_price_key_yields_null(self) -> None:
+        """A brand-new variant with no `price` key must land as NULL (inherit),
+        not error -- the sentinel only means 'preserve' for an existing row."""
+        self.client.force_authenticate(user=self.user)
+
+        response: Any = self.client.post(
+            "/api/v1/products/",
+            {
+                "name": "Produto Sem Preco De Variante",
+                "sku": "SKU-NOVP",
+                "price": "50.00",
+                "category": self.category.id,
+                "variants_payload": [
+                    {"name": "U", "color_hex": "#111111", "stock_quantity": 2, "position": 0, "is_active": True},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, msg=response.data)
+        created = Product.objects.get(sku="SKU-NOVP")
+        self.assertIsNone(created.variants.get().price)
+
     def test_product_update_variant_stock_creates_adjustment_movement(self) -> None:
         self.client.force_authenticate(user=self.user)
         variant = ProductVariant.objects.create(

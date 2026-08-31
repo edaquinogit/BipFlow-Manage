@@ -665,9 +665,14 @@ class ProductSerializer(serializers.ModelSerializer):
                     }
                 )
 
-            price = self._normalize_variant_price(
-                raw_variant.get("price", serializers.empty)
-            )
+            # A missing "price" key means "don't touch the stored override"
+            # (legacy clients never send it); an explicit null/"" clears it.
+            # Kept distinct via the serializers.empty sentinel, mirroring how
+            # "image" and "stock_quantity" already tolerate omission below.
+            if "price" in raw_variant:
+                price = self._normalize_variant_price(raw_variant["price"])
+            else:
+                price = serializers.empty
 
             normalized_name = name.casefold()
             if normalized_name in seen_names:
@@ -746,9 +751,13 @@ class ProductSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _normalize_variant_price(raw_price) -> Decimal | None:
-        """Parse a variant price override. Blank/missing means "inherit the
-        base price" -- see docs/architecture/product-variant-pricing.md."""
-        if raw_price in (serializers.empty, None, ""):
+        """Parse an *explicitly sent* variant price override. ``None`` or ``""``
+        means "clear the override and inherit Product.price". A missing ``price``
+        key never reaches here -- ``_validate_variants_payload`` keeps it as
+        ``serializers.empty`` so ``_sync_variants`` can leave the stored value
+        untouched (same legacy tolerance ``stock_quantity`` already has). See
+        docs/architecture/product-variant-pricing.md."""
+        if raw_price in (None, ""):
             return None
 
         try:
@@ -1089,9 +1098,13 @@ class ProductSerializer(serializers.ModelSerializer):
                 variant.product = locked_product
                 variant.name = variant_data["name"]
                 variant.color_hex = variant_data["color_hex"]
-                # Unaudited, unlike stock_quantity: a blank price field is an
-                # explicit "inherit the base price" (None), so set it directly.
-                variant.price = variant_data["price"]
+                # Unaudited, unlike stock_quantity. An explicit null/"" (None)
+                # clears the override; a *missing* key (serializers.empty) is a
+                # legacy/stale client and must leave the stored value alone. A
+                # brand-new variant starts at price=None, so skipping the
+                # assignment there naturally yields NULL.
+                if variant_data["price"] is not serializers.empty:
+                    variant.price = variant_data["price"]
                 if variant_data["stock_quantity"] is not None:
                     variant.stock_quantity = variant_data["stock_quantity"]
                 elif variant_id is None:
