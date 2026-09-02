@@ -205,6 +205,14 @@ def build_database_config() -> dict:
     if not database_name:
         raise ImproperlyConfigured("DATABASE_URL must include a database name.")
 
+    # libpq reads a connect_timeout of 0 or a negative number as "wait
+    # indefinitely", which would silently undo the bound we want here, so
+    # reject it explicitly rather than relying on the generic int parser
+    # (get_int_env is shared with settings that legitimately allow 0).
+    database_connect_timeout = get_int_env("DATABASE_CONNECT_TIMEOUT", 10)
+    if database_connect_timeout <= 0:
+        raise ImproperlyConfigured("DATABASE_CONNECT_TIMEOUT must be greater than 0.")
+
     return {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -214,6 +222,21 @@ def build_database_config() -> dict:
             "HOST": parsed_url.hostname or "localhost",
             "PORT": str(parsed_url.port or 5432),
             "CONN_MAX_AGE": get_int_env("DATABASE_CONN_MAX_AGE", 60),
+            # Persistent connections (CONN_MAX_AGE > 0) can go stale while the
+            # managed Postgres (Neon free tier) auto-suspends or a NAT/pooler
+            # drops an idle socket -- the next request that reuses one then
+            # fails. CONN_HEALTH_CHECKS makes Django ping the connection once
+            # per request when reusing it and reconnect transparently if it's
+            # dead. The ping only runs while a real request is being served,
+            # so it adds no background traffic and never keeps Postgres awake.
+            "CONN_HEALTH_CHECKS": True,
+            # Without an explicit timeout libpq blocks until the OS TCP
+            # timeout (minutes) when the DB host is unreachable, which hangs
+            # the container boot (migrate runs before gunicorn). Bound it so
+            # an unreachable DB fails fast and the platform can retry.
+            "OPTIONS": {
+                "connect_timeout": database_connect_timeout,
+            },
         }
     }
 
