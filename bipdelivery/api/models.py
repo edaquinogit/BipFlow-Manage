@@ -5,7 +5,12 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import (
+    MaxValueValidator,
+    MinValueValidator,
+    RegexValidator,
+    URLValidator,
+)
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1083,6 +1088,180 @@ class StoreSettings(models.Model):
             return dashboard_phone
 
         return cls.normalize_phone(getattr(settings, "WHATSAPP_ORDER_PHONE", ""))
+
+
+# Only http/https links may be stored for merchant-provided URLs. Django's
+# default URLField also allows ftp/ftps; javascript:/data:/file: are already
+# rejected by URLValidator, but pinning the scheme list here is defense in
+# depth for anything that writes the field outside the DRF serializer (Django
+# admin, data migrations, shell).
+merchant_url_validator = URLValidator(schemes=["http", "https"])
+
+# Brazilian federative units. MerchantProfile.state is a closed set, never
+# free text -- keeps the address usable for display and, later, for fiscal.
+BRAZILIAN_UF_CODES = (
+    "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI "
+    "RJ RN RS RO RR SC SP SE TO"
+).split()
+
+
+class MerchantProfile(models.Model):
+    """Commercial identity, contact, address and social links for one Store.
+
+    COMMERCE P1 (see docs/architecture/commerce-merchant-profile.md). A
+    per-store settings cluster following the same OneToOne + get_for_store()
+    pattern as LabelSettings / StorefrontAppearance -- deliberately not extra
+    columns on Store, which is already the multi-tenant root and only carries
+    what the storefront theme engine needs.
+
+    Every field is optional. A Store created before this model existed keeps
+    working with an all-blank profile (get_for_store() creates it lazily),
+    and onboarding is never blocked on it -- `is_complete` is a computed hint,
+    not a gate.
+
+    Nothing fiscal lives here (tax_regime, inscricao estadual, provider,
+    environment, certificate) -- that is Commerce P4's StoreFiscalProfile.
+    `tax_id` is a plain cadastral field, stored digits-only, with a
+    length/checksum sanity check, not full fiscal validation.
+
+    WhatsApp is intentionally absent: the checkout handoff reads
+    Store.whatsapp_phone via Store.get_configured_whatsapp_phone() and that
+    stays the single source of truth, edited on the existing "WhatsApp"
+    settings tab. Duplicating it here would re-fragment a field the
+    multi-tenant evolution already consolidated onto Store.
+    """
+
+    UF_CHOICES = [(code, code) for code in BRAZILIAN_UF_CODES]
+
+    # Fields safe to echo on the public storefront (see
+    # PublicStorefrontAppearanceSerializer). Everything else -- legal_name,
+    # tax_id, contact_email, contact_phone, street/number/complement/
+    # district/postal_code -- is dashboard-only.
+    PUBLIC_FIELDS = (
+        "trade_name",
+        "city",
+        "state",
+        "website_url",
+        "instagram_url",
+        "facebook_url",
+        "tiktok_url",
+        "youtube_url",
+    )
+
+    SOCIAL_URL_FIELDS = (
+        "website_url",
+        "instagram_url",
+        "facebook_url",
+        "tiktok_url",
+        "youtube_url",
+    )
+
+    store = models.OneToOneField(
+        Store,
+        on_delete=models.CASCADE,
+        related_name="merchant_profile",
+    )
+
+    # --- Commercial identity ---
+    legal_name = models.CharField(
+        max_length=160, blank=True, help_text="Razao social"
+    )
+    trade_name = models.CharField(
+        max_length=160, blank=True, help_text="Nome fantasia"
+    )
+    tax_id = models.CharField(
+        max_length=14,
+        blank=True,
+        help_text="CPF (11 digitos) ou CNPJ (14). Armazenado somente com digitos.",
+    )
+
+    # --- Contact ---
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(
+        max_length=13,
+        blank=True,
+        help_text="Telefone comercial, somente digitos (DDI+DDD+numero).",
+    )
+
+    # --- Address ---
+    postal_code = models.CharField(
+        max_length=8, blank=True, help_text="CEP, somente digitos"
+    )
+    street = models.CharField(max_length=160, blank=True)
+    number = models.CharField(max_length=20, blank=True)
+    complement = models.CharField(max_length=80, blank=True)
+    district = models.CharField(max_length=80, blank=True, help_text="Bairro")
+    city = models.CharField(max_length=80, blank=True)
+    state = models.CharField(
+        max_length=2, blank=True, choices=UF_CHOICES, help_text="UF"
+    )
+    country = models.CharField(max_length=2, default="BR")
+
+    # --- Links / social ---
+    website_url = models.URLField(
+        max_length=300, blank=True, validators=[merchant_url_validator]
+    )
+    instagram_url = models.URLField(
+        max_length=300, blank=True, validators=[merchant_url_validator]
+    )
+    facebook_url = models.URLField(
+        max_length=300, blank=True, validators=[merchant_url_validator]
+    )
+    tiktok_url = models.URLField(
+        max_length=300, blank=True, validators=[merchant_url_validator]
+    )
+    youtube_url = models.URLField(
+        max_length=300, blank=True, validators=[merchant_url_validator]
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Merchant profile"
+        verbose_name_plural = "Merchant profiles"
+
+    def __str__(self) -> str:
+        """Return a compact identifier for admin/debug purposes."""
+        return f"Merchant profile for {self.store_id}"
+
+    @staticmethod
+    def normalize_digits(value: str | None) -> str:
+        """Return only the decimal digits of `value` (CEP/CPF/CNPJ/phone)."""
+        return "".join(character for character in str(value or "") if character.isdigit())
+
+    @classmethod
+    def get_for_store(cls, store: "Store") -> "MerchantProfile":
+        """Return this store's profile, creating an empty one on first access."""
+        profile, _created = cls.objects.get_or_create(store=store)
+        return profile
+
+    @property
+    def has_complete_address(self) -> bool:
+        """Whether every field a shipping label / fiscal address needs is filled."""
+        return all(
+            [
+                self.postal_code,
+                self.street,
+                self.number,
+                self.district,
+                self.city,
+                self.state,
+            ]
+        )
+
+    @property
+    def is_complete(self) -> bool:
+        """Computed onboarding hint -- never persisted, never a hard gate."""
+        return all(
+            [
+                self.legal_name or self.trade_name,
+                self.tax_id,
+                self.contact_email,
+                self.contact_phone,
+                self.has_complete_address,
+            ]
+        )
 
 
 class BotConversation(models.Model):

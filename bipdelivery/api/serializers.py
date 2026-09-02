@@ -27,6 +27,8 @@ from .models import (
     CustomerProfile,
     DeliveryRegion,
     LabelSettings,
+    MerchantProfile,
+    merchant_url_validator,
     Product,
     ProductGalleryImage,
     ProductVariant,
@@ -1914,6 +1916,7 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
     logo_url = serializers.CharField(source="store.logo_url", read_only=True)
     tagline = serializers.CharField(source="store.tagline", read_only=True)
     theme = serializers.SerializerMethodField()
+    merchant = serializers.SerializerMethodField()
 
     class Meta:
         model = StorefrontAppearance
@@ -1923,6 +1926,7 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
             "logo_url",
             "tagline",
             "theme",
+            "merchant",
             "secondary_color",
             "favicon_url",
             "hero_enabled",
@@ -1951,6 +1955,13 @@ class PublicStorefrontAppearanceSerializer(serializers.ModelSerializer):
 
     def get_store_name(self, appearance: StorefrontAppearance) -> str:
         return appearance.store.display_name.strip() or appearance.store.name
+
+    def get_merchant(self, appearance: StorefrontAppearance) -> dict:
+        """Storefront-safe merchant fields only (PUBLIC_FIELDS). A read never
+        creates the row -- an unsaved instance keeps the payload shape stable
+        for a store that has not filled its profile yet."""
+        profile = MerchantProfile.objects.filter(store=appearance.store).first()
+        return dict(PublicMerchantProfileSerializer(profile or MerchantProfile()).data)
 
 
 class StoreRenameSerializer(serializers.Serializer):
@@ -2038,6 +2049,217 @@ class StoreSettingsSerializer(PublicStoreSettingsSerializer):
             )
 
         return phone_digits
+
+
+def _is_valid_cpf(digits: str) -> bool:
+    """Standard mod-11 CPF check-digit validation."""
+    if len(digits) != 11 or digits == digits[0] * 11:
+        return False
+
+    for length in (9, 10):
+        total = sum(
+            int(digits[index]) * ((length + 1) - index) for index in range(length)
+        )
+        check = (total * 10) % 11 % 10
+        if check != int(digits[length]):
+            return False
+    return True
+
+
+_CNPJ_WEIGHTS_FIRST = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+_CNPJ_WEIGHTS_SECOND = [6, *_CNPJ_WEIGHTS_FIRST]
+
+
+def _is_valid_cnpj(digits: str) -> bool:
+    """Standard mod-11 CNPJ check-digit validation."""
+    if len(digits) != 14 or digits == digits[0] * 14:
+        return False
+
+    for weights, length in ((_CNPJ_WEIGHTS_FIRST, 12), (_CNPJ_WEIGHTS_SECOND, 13)):
+        total = sum(int(digits[index]) * weights[index] for index in range(length))
+        remainder = total % 11
+        check = 0 if remainder < 2 else 11 - remainder
+        if check != int(digits[length]):
+            return False
+    return True
+
+
+# Host fragments a merchant-provided social link is expected to point at. A
+# link whose host clearly belongs to a different network is almost always a
+# paste error (or worse) -- rejected with a clear message rather than shown
+# as that network's icon on the storefront. website_url is intentionally
+# unconstrained (any http/https host).
+_SOCIAL_URL_HOST_HINTS = {
+    "instagram_url": ("instagram.com", "instagr.am"),
+    "facebook_url": ("facebook.com", "fb.com", "fb.me"),
+    "tiktok_url": ("tiktok.com",),
+    "youtube_url": ("youtube.com", "youtu.be"),
+}
+
+
+class MerchantProfileSerializer(serializers.ModelSerializer):
+    """Read/write the resolved store's commercial identity, contact, address
+    and social links (COMMERCE P1).
+
+    Explicit field list (never ``__all__``): ``store``/``id`` are deliberately
+    not exposed, so a client can neither read the tenant linkage nor attempt
+    to reassign it -- the view owns the instance, resolved from the
+    authenticated store context. PATCH is partial: an omitted field keeps its
+    stored value; an empty string is an explicit "clear this field".
+    """
+
+    is_complete = serializers.BooleanField(read_only=True)
+    has_complete_address = serializers.BooleanField(read_only=True)
+    # choices already reject unknown UFs; allow_blank keeps "" (not set) valid.
+    state = serializers.ChoiceField(
+        choices=MerchantProfile.UF_CHOICES,
+        required=False,
+        allow_blank=True,
+    )
+    # Accept masked input ("11.222.333/0001-81", "40010-000", "(71) 3333-4444")
+    # and normalize to digits in validate_*; the wider max_length here keeps
+    # the model column's tighter limit from rejecting the mask before the
+    # field-level validator can strip it.
+    tax_id = serializers.CharField(
+        required=False, allow_blank=True, max_length=32, trim_whitespace=True
+    )
+    contact_phone = serializers.CharField(
+        required=False, allow_blank=True, max_length=32, trim_whitespace=True
+    )
+    postal_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=16, trim_whitespace=True
+    )
+
+    class Meta:
+        model = MerchantProfile
+        fields = [
+            "legal_name",
+            "trade_name",
+            "tax_id",
+            "contact_email",
+            "contact_phone",
+            "postal_code",
+            "street",
+            "number",
+            "complement",
+            "district",
+            "city",
+            "state",
+            "country",
+            "website_url",
+            "instagram_url",
+            "facebook_url",
+            "tiktok_url",
+            "youtube_url",
+            "is_complete",
+            "has_complete_address",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "is_complete",
+            "has_complete_address",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_tax_id(self, value: str) -> str:
+        digits = MerchantProfile.normalize_digits(value)
+        if not digits:
+            return ""
+
+        if len(digits) == 11:
+            if not _is_valid_cpf(digits):
+                raise serializers.ValidationError("CPF invalido.")
+        elif len(digits) == 14:
+            if not _is_valid_cnpj(digits):
+                raise serializers.ValidationError("CNPJ invalido.")
+        else:
+            raise serializers.ValidationError(
+                "Informe um CPF (11 digitos) ou CNPJ (14 digitos)."
+            )
+        return digits
+
+    def validate_contact_phone(self, value: str) -> str:
+        digits = MerchantProfile.normalize_digits(value)
+        if not digits:
+            return ""
+        if len(digits) < 10 or len(digits) > 13:
+            raise serializers.ValidationError(
+                "Informe o telefone com DDD. Ex.: 71 3333-4444."
+            )
+        return digits
+
+    def validate_postal_code(self, value: str) -> str:
+        digits = MerchantProfile.normalize_digits(value)
+        if not digits:
+            return ""
+        if len(digits) != 8:
+            raise serializers.ValidationError("O CEP deve ter 8 digitos.")
+        return digits
+
+    def validate_country(self, value: str) -> str:
+        normalized = (value or "").strip().upper()
+        if not normalized:
+            return "BR"
+        if len(normalized) != 2 or not normalized.isalpha():
+            raise serializers.ValidationError(
+                "Use o codigo de pais com 2 letras. Ex.: BR."
+            )
+        return normalized
+
+    def _validate_public_url(self, field_name: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            return ""
+
+        try:
+            merchant_url_validator(normalized)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(
+                "Informe um link valido comecando com https://."
+            ) from error
+
+        host = urlparse(normalized).netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        expected_hosts = _SOCIAL_URL_HOST_HINTS.get(field_name)
+        if expected_hosts and not any(
+            host == candidate or host.endswith(f".{candidate}")
+            for candidate in expected_hosts
+        ):
+            raise serializers.ValidationError(
+                f"Este link nao parece ser do {expected_hosts[0]}."
+            )
+        return normalized
+
+    def validate_website_url(self, value: str) -> str:
+        return self._validate_public_url("website_url", value)
+
+    def validate_instagram_url(self, value: str) -> str:
+        return self._validate_public_url("instagram_url", value)
+
+    def validate_facebook_url(self, value: str) -> str:
+        return self._validate_public_url("facebook_url", value)
+
+    def validate_tiktok_url(self, value: str) -> str:
+        return self._validate_public_url("tiktok_url", value)
+
+    def validate_youtube_url(self, value: str) -> str:
+        return self._validate_public_url("youtube_url", value)
+
+
+class PublicMerchantProfileSerializer(serializers.ModelSerializer):
+    """Storefront-safe subset of the merchant profile.
+
+    Only MerchantProfile.PUBLIC_FIELDS -- never legal_name, tax_id, contact
+    e-mail/phone, or the street-level address. Read-only.
+    """
+
+    class Meta:
+        model = MerchantProfile
+        fields = list(MerchantProfile.PUBLIC_FIELDS)
+        read_only_fields = fields
 
 
 class BotMessageRequestSerializer(serializers.Serializer):

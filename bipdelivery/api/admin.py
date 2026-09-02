@@ -10,6 +10,7 @@ from .models import (
     DeliveryRegion,
     LabelSettings,
     LoginAttempt,
+    MerchantProfile,
     MFABackupCode,
     Product,
     ProductVariant,
@@ -138,6 +139,14 @@ class LabelSettingsAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("page_format", "store")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(MerchantProfile)
+class MerchantProfileAdmin(StoreScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "store", "trade_name", "city", "state", "updated_at")
+    list_filter = ("state", "country")
+    search_fields = ("store__name", "legal_name", "trade_name", "tax_id")
     readonly_fields = ("created_at", "updated_at")
 
 
