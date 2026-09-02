@@ -42,8 +42,12 @@ services:
         sync: false
       - key: FRONTEND_BASE_URL
         sync: false
-      # Neon connection string (postgresql://...); Neon's free tier includes
-      # `?sslmode=require` in the URL it gives you -- keep it, psycopg honors it.
+      # Neon connection string (postgresql://...). build_database_config() in
+      # bipdelivery/core/settings.py parses an allowlisted subset of the query
+      # string: sslmode and channel_binding are forwarded to psycopg, any other
+      # parameter is ignored with a warning, and connect_timeout stays owned by
+      # DATABASE_CONNECT_TIMEOUT. Keep the `?sslmode=require&channel_binding=require`
+      # Neon hands you -- both are honored.
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_CONN_MAX_AGE
