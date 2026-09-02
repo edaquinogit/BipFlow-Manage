@@ -1,9 +1,10 @@
-﻿import os
+﻿import logging
+import os
 import sys
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qsl, unquote, urlparse
 
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
@@ -183,6 +184,63 @@ TEMPLATES = [
 # ðŸ“Š DATABASE & AUTHENTICATION
 # ------------------------------------------------------------------------------
 
+logger = logging.getLogger(__name__)
+
+# DATABASE_URL query parameters are parsed against this strict allowlist -- only
+# these two are forwarded to psycopg. Everything else (connect_timeout,
+# application_name, options, sslrootcert, ...) is ignored with a warning so a
+# provider that later appends a parameter to the URL it hands out cannot crash
+# the container. connect_timeout in particular stays owned by
+# DATABASE_CONNECT_TIMEOUT (see below) and is never taken from the URL.
+_ALLOWED_DB_URL_QUERY_PARAMS = frozenset({"sslmode", "channel_binding"})
+
+# libpq's documented value sets. We validate but never rewrite the operator's
+# choice (no silent prefer -> require or require -> verify-full promotion).
+_VALID_SSLMODES = frozenset(
+    {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
+)
+_VALID_CHANNEL_BINDING = frozenset({"disable", "prefer", "require"})
+
+
+def build_db_url_query_options(query: str) -> dict:
+    """Extract the allowlisted psycopg OPTIONS from a DATABASE_URL query string.
+
+    parse_qsl (not parse_qs) so duplicate keys stay visible as separate pairs
+    and can be rejected. keep_blank_values=False so ``?sslmode=`` is dropped
+    rather than forwarded as an empty string.
+    """
+    options: dict[str, str] = {}
+
+    for key, value in parse_qsl(query, keep_blank_values=False):
+        if key not in _ALLOWED_DB_URL_QUERY_PARAMS:
+            # Never log the value -- only the parameter name is guaranteed
+            # non-sensitive.
+            logger.warning(
+                "Ignoring unsupported DATABASE_URL query parameter %r", key
+            )
+            continue
+        if key in options:
+            raise ImproperlyConfigured(
+                f"DATABASE_URL query parameter {key!r} is set more than once."
+            )
+        options[key] = value
+
+    sslmode = options.get("sslmode")
+    if sslmode is not None and sslmode not in _VALID_SSLMODES:
+        raise ImproperlyConfigured(
+            f"DATABASE_URL sslmode {sslmode!r} is not one of "
+            f"{sorted(_VALID_SSLMODES)}."
+        )
+
+    channel_binding = options.get("channel_binding")
+    if channel_binding is not None and channel_binding not in _VALID_CHANNEL_BINDING:
+        raise ImproperlyConfigured(
+            f"DATABASE_URL channel_binding {channel_binding!r} is not one of "
+            f"{sorted(_VALID_CHANNEL_BINDING)}."
+        )
+
+    return options
+
 
 def build_database_config() -> dict:
     database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -213,6 +271,15 @@ def build_database_config() -> dict:
     if database_connect_timeout <= 0:
         raise ImproperlyConfigured("DATABASE_CONNECT_TIMEOUT must be greater than 0.")
 
+    # The allowlist in build_db_url_query_options() only ever yields sslmode /
+    # channel_binding, so a URL-supplied connect_timeout is dropped there and
+    # DATABASE_CONNECT_TIMEOUT stays the single authority for it. Merging URL
+    # options last is belt-and-braces on top of that.
+    options = {
+        "connect_timeout": database_connect_timeout,
+        **build_db_url_query_options(parsed_url.query),
+    }
+
     return {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -230,13 +297,13 @@ def build_database_config() -> dict:
             # dead. The ping only runs while a real request is being served,
             # so it adds no background traffic and never keeps Postgres awake.
             "CONN_HEALTH_CHECKS": True,
-            # Without an explicit timeout libpq blocks until the OS TCP
-            # timeout (minutes) when the DB host is unreachable, which hangs
-            # the container boot (migrate runs before gunicorn). Bound it so
-            # an unreachable DB fails fast and the platform can retry.
-            "OPTIONS": {
-                "connect_timeout": database_connect_timeout,
-            },
+            # OPTIONS is passed straight through to psycopg. connect_timeout
+            # (from DATABASE_CONNECT_TIMEOUT) bounds the boot-time wait when the
+            # DB host is unreachable -- without it libpq blocks for the OS TCP
+            # timeout (minutes) and hangs the container (migrate runs before
+            # gunicorn). sslmode / channel_binding, when present in
+            # DATABASE_URL, are forwarded here after allowlist validation.
+            "OPTIONS": options,
         }
     }
 
