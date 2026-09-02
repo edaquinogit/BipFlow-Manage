@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useAsyncResource } from '@/composables/useAsyncResource';
+import { useCurrentStore } from '@/composables/useCurrentStore';
 import { useStoreSwitchEffect } from '@/composables/useStoreSwitchEffect';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useToast } from '@/composables/useToast';
@@ -53,19 +54,48 @@ function emptyDraft(): Record<EditableField, string> {
 }
 
 const { canManageCatalog } = useCurrentUser();
+const { selectedStore } = useCurrentStore();
 const { success, error: toastError } = useToast();
 
+// `run()` is not used: it writes the shared refs unconditionally, so a stale
+// GET/PATCH from a store the user already switched away from could still
+// land on the form (real MEDIUM finding). We keep its refs but drive them
+// through guarded handlers below. Same idea as
+// usePublicStorefrontAppearance.ts's loadRequestId -- kept local to this
+// tab, no change to the shared composable.
 const {
   data: profile,
   isLoading,
   error: loadError,
-  run: runFetch,
 } = useAsyncResource<MerchantProfile>();
 
 const draft = reactive<Record<EditableField, string>>(emptyDraft());
 const fieldErrors = reactive<Partial<Record<EditableField, string>>>({});
 const formError = ref<string | null>(null);
 const isSaving = ref(false);
+
+// Monotonic tokens: every fetch / save / store-switch bumps the matching
+// counter, so a response that resolves after a newer one (or after a store
+// switch) is detected as stale and its effects are dropped.
+let loadRequestId = 0;
+let saveRequestId = 0;
+
+function currentStoreKey(): number | string | null {
+  return selectedStore.value?.id ?? selectedStore.value?.slug ?? null;
+}
+
+function isStaleResponse(
+  requestId: number,
+  latestId: number,
+  storeKeyAtStart: number | string | null,
+): boolean {
+  if (requestId !== latestId) {
+    return true;
+  }
+  // Only enforce store identity when we actually knew the store at start
+  // (the very first load can begin before DashboardLayout resolves it).
+  return storeKeyAtStart !== null && currentStoreKey() !== storeKeyAtStart;
+}
 
 const canEdit = computed(() => canManageCatalog.value);
 
@@ -89,11 +119,37 @@ function clearErrors(): void {
 }
 
 async function fetchProfile(): Promise<void> {
-  await runFetch(
-    () => storeService.getMerchantProfile(),
-    'Não foi possível carregar o perfil da loja agora.',
-  );
-  hydrateDraft(profile.value);
+  const requestId = ++loadRequestId;
+  const storeKeyAtStart = currentStoreKey();
+
+  isLoading.value = true;
+  loadError.value = null;
+
+  let loaded: MerchantProfile | null = null;
+  let failed = false;
+  try {
+    loaded = await storeService.getMerchantProfile();
+  } catch (caught: unknown) {
+    failed = true;
+    Logger.warn('Merchant profile load failed', buildErrorContext(caught as ApplicationError));
+  }
+
+  // A newer fetch or a store switch happened while this request was in
+  // flight: drop everything -- data, draft, error and loading are owned by
+  // whatever request is current now.
+  if (isStaleResponse(requestId, loadRequestId, storeKeyAtStart)) {
+    return;
+  }
+
+  isLoading.value = false;
+  if (failed) {
+    profile.value = null;
+    loadError.value = 'Não foi possível carregar o perfil da loja agora.';
+    return;
+  }
+
+  profile.value = loaded;
+  hydrateDraft(loaded);
 }
 
 const isDirty = computed(() => {
@@ -184,15 +240,24 @@ async function handleSubmit(): Promise<void> {
     return;
   }
 
+  const requestId = ++saveRequestId;
+  const storeKeyAtStart = currentStoreKey();
   isSaving.value = true;
   clearErrors();
 
   try {
-    profile.value = await storeService.updateMerchantProfile(payload);
-    hydrateDraft(profile.value);
+    const updated = await storeService.updateMerchantProfile(payload);
+    if (isStaleResponse(requestId, saveRequestId, storeKeyAtStart)) {
+      return;
+    }
+    profile.value = updated;
+    hydrateDraft(updated);
     success('Perfil da loja atualizado.');
   } catch (caught: unknown) {
     Logger.error('Merchant profile save failed', buildErrorContext(caught as ApplicationError));
+    if (isStaleResponse(requestId, saveRequestId, storeKeyAtStart)) {
+      return;
+    }
     const handledFieldErrors =
       isAxiosError(caught) && caught.response?.status === 400
         ? applyServerErrors(caught.response?.data)
@@ -202,7 +267,11 @@ async function handleSubmit(): Promise<void> {
       : 'Não foi possível salvar o perfil da loja. Tente novamente.';
     toastError('Não foi possível salvar o perfil da loja.');
   } finally {
-    isSaving.value = false;
+    // Only the current save clears the flag; a superseded save leaves the
+    // store-switch handler's reset (below) untouched.
+    if (requestId === saveRequestId) {
+      isSaving.value = false;
+    }
   }
 }
 
@@ -211,6 +280,12 @@ onMounted(() => {
 });
 
 useStoreSwitchEffect(() => {
+  // Invalidate any GET/PATCH still in flight for the previous store before
+  // loading the new one, and drop a pending save's disabled state so the
+  // new store's form is immediately usable.
+  loadRequestId += 1;
+  saveRequestId += 1;
+  isSaving.value = false;
   void fetchProfile();
 });
 </script>
