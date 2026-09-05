@@ -14,12 +14,16 @@ rest of the suite uses.
 from decimal import Decimal
 from typing import Any
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.core.exceptions import PermissionDenied
+from django.test import RequestFactory, TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from bipdelivery.api.admin import MerchantProfileAdminForm
 from bipdelivery.api.models import (
     Category,
     MerchantProfile,
@@ -46,6 +50,41 @@ def make_member(store: Store, *, role: str, username: str) -> Any:
 
 def auth(client: APIClient, user: Any, store: Store) -> None:
     client.force_authenticate(user=user, token={"store_id": store.id})
+
+
+def grant_admin_permissions(user: Any, *codenames: str) -> None:
+    permissions = Permission.objects.filter(
+        codename__in=codenames,
+        content_type__app_label="api",
+    )
+    user.user_permissions.add(*permissions)
+
+
+def merchant_profile_admin_payload(store: Store, **overrides: str) -> dict[str, str]:
+    payload = {
+        "store": str(store.id),
+        "legal_name": "",
+        "trade_name": "Loja Admin",
+        "tax_id": "",
+        "contact_email": "",
+        "contact_phone": "",
+        "postal_code": "",
+        "street": "",
+        "number": "",
+        "complement": "",
+        "district": "",
+        "city": "",
+        "state": "",
+        "country": "BR",
+        "website_url": "",
+        "instagram_url": "",
+        "facebook_url": "",
+        "tiktok_url": "",
+        "youtube_url": "",
+        "_save": "Save",
+    }
+    payload.update(overrides)
+    return payload
 
 
 class MerchantProfileModelTest(TestCase):
@@ -88,6 +127,296 @@ class MerchantProfileModelTest(TestCase):
         store.delete()
 
         self.assertFalse(MerchantProfile.objects.filter(store_id=store.id).exists())
+
+
+class MerchantProfileAdminTenantScopingTest(TestCase):
+    """Django admin must enforce the same tenant boundary as the dashboard API."""
+
+    def setUp(self) -> None:
+        self.store_a = Store.get_default()
+        self.store_b = Store.objects.create(name="Loja B", slug="loja-b")
+        self.store_c = Store.objects.create(name="Loja C", slug="loja-c")
+        self.staff_a = User.objects.create_user(
+            username="admin-staff-a", password="pw-12345678", is_staff=True
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.staff_a, role=StoreMembership.ROLE_OWNER
+        )
+        self.staff_ab = User.objects.create_user(
+            username="admin-staff-ab", password="pw-12345678", is_staff=True
+        )
+        StoreMembership.objects.create(
+            store=self.store_a, user=self.staff_ab, role=StoreMembership.ROLE_OWNER
+        )
+        StoreMembership.objects.create(
+            store=self.store_b, user=self.staff_ab, role=StoreMembership.ROLE_MANAGER
+        )
+        self.superuser = User.objects.create_superuser(
+            username="admin-root",
+            password="pw-12345678",
+            email="root@example.com",
+        )
+        for user in (self.staff_a, self.staff_ab):
+            grant_admin_permissions(
+                user,
+                "add_merchantprofile",
+                "change_merchantprofile",
+                "view_merchantprofile",
+            )
+        self.model_admin = admin.site._registry[MerchantProfile]
+        self.factory = RequestFactory()
+
+    def _admin_request(self, user: Any):
+        request = self.factory.post("/admin/api/merchantprofile/add/")
+        request.user = user
+        return request
+
+    def _store_field_ids_for(self, user: Any) -> list[int]:
+        self.client.force_login(user)
+        response = self.client.get("/admin/api/merchantprofile/add/")
+        form = response.context["adminform"].form
+        return list(form.fields["store"].queryset.order_by("id").values_list("id", flat=True))
+
+    def test_staff_sees_only_membership_stores_in_store_field(self) -> None:
+        self.assertEqual(self._store_field_ids_for(self.staff_a), [self.store_a.id])
+
+    def test_staff_creates_profile_in_own_store(self) -> None:
+        self.client.force_login(self.staff_a)
+
+        response = self.client.post(
+            "/admin/api/merchantprofile/add/",
+            merchant_profile_admin_payload(self.store_a, trade_name="Admin A"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            MerchantProfile.objects.filter(
+                store=self.store_a, trade_name="Admin A"
+            ).exists()
+        )
+
+    def test_staff_cannot_create_profile_in_foreign_store_by_forged_post(self) -> None:
+        self.client.force_login(self.staff_a)
+
+        response = self.client.post(
+            "/admin/api/merchantprofile/add/",
+            merchant_profile_admin_payload(self.store_b, trade_name="Forged B"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            MerchantProfile.objects.filter(
+                store=self.store_b, trade_name="Forged B"
+            ).exists()
+        )
+
+    def test_save_model_rejects_foreign_store_even_if_form_is_bypassed(self) -> None:
+        obj = MerchantProfile(store=self.store_b, trade_name="Bypass B")
+
+        with self.assertRaises(PermissionDenied):
+            self.model_admin.save_model(
+                self._admin_request(self.staff_a), obj, form=None, change=False
+            )
+
+        self.assertFalse(
+            MerchantProfile.objects.filter(
+                store=self.store_b, trade_name="Bypass B"
+            ).exists()
+        )
+
+    def test_save_model_rejects_foreign_existing_object_even_if_target_is_owned(
+        self,
+    ) -> None:
+        profile = MerchantProfile.objects.create(
+            store=self.store_b, trade_name="Foreign B"
+        )
+        profile.store = self.store_a
+
+        with self.assertRaises(PermissionDenied):
+            self.model_admin.save_model(
+                self._admin_request(self.staff_a), profile, form=None, change=True
+            )
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.store_id, self.store_b.id)
+        self.assertEqual(profile.trade_name, "Foreign B")
+
+    def test_staff_cannot_move_existing_profile_to_foreign_store(self) -> None:
+        profile = MerchantProfile.objects.create(
+            store=self.store_a, trade_name="Original A"
+        )
+        self.client.force_login(self.staff_a)
+
+        response = self.client.post(
+            f"/admin/api/merchantprofile/{profile.id}/change/",
+            merchant_profile_admin_payload(self.store_b, trade_name="Moved B"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        profile.refresh_from_db()
+        self.assertEqual(profile.store_id, self.store_a.id)
+        self.assertEqual(profile.trade_name, "Original A")
+
+    def test_member_of_two_stores_can_select_and_create_for_both(self) -> None:
+        self.assertEqual(
+            self._store_field_ids_for(self.staff_ab),
+            [self.store_a.id, self.store_b.id],
+        )
+        self.client.force_login(self.staff_ab)
+
+        response = self.client.post(
+            "/admin/api/merchantprofile/add/",
+            merchant_profile_admin_payload(self.store_b, trade_name="Admin B"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            MerchantProfile.objects.filter(
+                store=self.store_b, trade_name="Admin B"
+            ).exists()
+        )
+
+    def test_superuser_keeps_full_store_access(self) -> None:
+        self.assertEqual(
+            self._store_field_ids_for(self.superuser),
+            [self.store_a.id, self.store_b.id, self.store_c.id],
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.post(
+            "/admin/api/merchantprofile/add/",
+            merchant_profile_admin_payload(self.store_c, trade_name="Root C"),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            MerchantProfile.objects.filter(
+                store=self.store_c, trade_name="Root C"
+            ).exists()
+        )
+
+    def test_foreign_record_is_absent_from_staff_queryset(self) -> None:
+        own = MerchantProfile.objects.create(store=self.store_a, trade_name="Own A")
+        foreign = MerchantProfile.objects.create(
+            store=self.store_b, trade_name="Foreign B"
+        )
+        request = self.factory.get("/admin/api/merchantprofile/")
+        request.user = self.staff_a
+
+        queryset = self.model_admin.get_queryset(request)
+
+        self.assertIn(own, queryset)
+        self.assertNotIn(foreign, queryset)
+
+
+class MerchantProfileAdminInvariantTest(TestCase):
+    """Admin ModelForm and API share MerchantProfile normalization/validation."""
+
+    def setUp(self) -> None:
+        self.store = Store.get_default()
+
+    def _form(self, **overrides: str) -> MerchantProfileAdminForm:
+        return MerchantProfileAdminForm(
+            data=merchant_profile_admin_payload(self.store, **overrides)
+        )
+
+    def test_admin_rejects_invalid_cpf_cnpj(self) -> None:
+        form = self._form(tax_id="11111111111")
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("tax_id", form.errors)
+
+    def test_admin_normalizes_masked_document(self) -> None:
+        form = self._form(tax_id="11.222.333/0001-81")
+
+        self.assertTrue(form.is_valid(), form.errors)
+        profile = form.save()
+        self.assertEqual(profile.tax_id, VALID_CNPJ)
+
+    def test_admin_normalizes_or_rejects_contact_phone(self) -> None:
+        ok = self._form(contact_phone="(71) 3333-4444")
+        self.assertTrue(ok.is_valid(), ok.errors)
+        profile = ok.save()
+        self.assertEqual(profile.contact_phone, "7133334444")
+
+        bad_store = Store.objects.create(name="Telefone ruim", slug="telefone-ruim")
+        bad = MerchantProfileAdminForm(
+            data=merchant_profile_admin_payload(bad_store, contact_phone="3333")
+        )
+        self.assertFalse(bad.is_valid())
+        self.assertIn("contact_phone", bad.errors)
+
+    def test_admin_normalizes_or_rejects_postal_code(self) -> None:
+        ok = self._form(postal_code="40010-000")
+        self.assertTrue(ok.is_valid(), ok.errors)
+        profile = ok.save()
+        self.assertEqual(profile.postal_code, "40010000")
+
+        bad_store = Store.objects.create(name="CEP ruim", slug="cep-ruim")
+        bad = MerchantProfileAdminForm(
+            data=merchant_profile_admin_payload(bad_store, postal_code="123")
+        )
+        self.assertFalse(bad.is_valid())
+        self.assertIn("postal_code", bad.errors)
+
+    def test_admin_rejects_incompatible_social_hosts(self) -> None:
+        cases = {
+            "instagram_url": "https://example.com/loja",
+            "facebook_url": "https://instagram.com/loja",
+            "tiktok_url": "https://youtube.com/@loja",
+            "youtube_url": "https://tiktok.com/@loja",
+        }
+
+        for field, url in cases.items():
+            with self.subTest(field=field):
+                store = Store.objects.create(
+                    name=f"Host ruim {field}",
+                    slug=f"host-ruim-{field.replace('_', '-')}",
+                )
+                form = MerchantProfileAdminForm(
+                    data=merchant_profile_admin_payload(store, **{field: url})
+                )
+                self.assertFalse(form.is_valid())
+                self.assertIn(field, form.errors)
+
+    def test_admin_accepts_empty_optional_fields(self) -> None:
+        form = self._form(
+            trade_name="",
+            tax_id="",
+            contact_email="",
+            contact_phone="",
+            postal_code="",
+            website_url="",
+            instagram_url="",
+            facebook_url="",
+            tiktok_url="",
+            youtube_url="",
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_valid_admin_profile_is_saved_with_normalized_fields(self) -> None:
+        form = self._form(
+            legal_name="ACME LTDA",
+            trade_name="ACME",
+            tax_id="11.222.333/0001-81",
+            contact_email="loja@example.com",
+            contact_phone="(71) 3333-4444",
+            postal_code="40010-000",
+            city="Salvador",
+            state="BA",
+            website_url="https://minhaloja.com.br",
+            instagram_url="https://instagram.com/minhaloja",
+            facebook_url="https://facebook.com/minhaloja",
+            tiktok_url="https://tiktok.com/@minhaloja",
+            youtube_url="https://youtube.com/@minhaloja",
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        profile = form.save()
+        self.assertEqual(profile.tax_id, VALID_CNPJ)
+        self.assertEqual(profile.contact_phone, "7133334444")
+        self.assertEqual(profile.postal_code, "40010000")
 
 
 class MerchantProfileReadTest(TestCase):
@@ -334,6 +663,19 @@ class MerchantProfileValidationTest(TestCase):
         response = self._patch({"instagram_url": "https://example.com/minhaloja"})
         self.assertEqual(response.status_code, 400)
         self.assertIn("instagram_url", response.data)
+
+    def test_all_network_specific_social_hosts_are_checked(self) -> None:
+        cases = {
+            "facebook_url": "https://instagram.com/minhaloja",
+            "tiktok_url": "https://youtube.com/@minhaloja",
+            "youtube_url": "https://tiktok.com/@minhaloja",
+        }
+
+        for field, url in cases.items():
+            with self.subTest(field=field):
+                response = self._patch({field: url})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
 
     def test_tax_id_cnpj_normalized_to_digits(self) -> None:
         response = self._patch({"tax_id": "11.222.333/0001-81"})

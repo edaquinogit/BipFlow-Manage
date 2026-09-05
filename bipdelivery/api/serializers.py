@@ -23,12 +23,16 @@ from .models import (
     BotConversation,
     BotMessage,
     Category,
+    clean_merchant_contact_phone,
+    clean_merchant_country,
+    clean_merchant_postal_code,
+    clean_merchant_public_url,
+    clean_merchant_tax_id,
     CustomerFeedback,
     CustomerProfile,
     DeliveryRegion,
     LabelSettings,
     MerchantProfile,
-    merchant_url_validator,
     Product,
     ProductGalleryImage,
     ProductVariant,
@@ -2051,50 +2055,11 @@ class StoreSettingsSerializer(PublicStoreSettingsSerializer):
         return phone_digits
 
 
-def _is_valid_cpf(digits: str) -> bool:
-    """Standard mod-11 CPF check-digit validation."""
-    if len(digits) != 11 or digits == digits[0] * 11:
-        return False
-
-    for length in (9, 10):
-        total = sum(
-            int(digits[index]) * ((length + 1) - index) for index in range(length)
-        )
-        check = (total * 10) % 11 % 10
-        if check != int(digits[length]):
-            return False
-    return True
-
-
-_CNPJ_WEIGHTS_FIRST = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-_CNPJ_WEIGHTS_SECOND = [6, *_CNPJ_WEIGHTS_FIRST]
-
-
-def _is_valid_cnpj(digits: str) -> bool:
-    """Standard mod-11 CNPJ check-digit validation."""
-    if len(digits) != 14 or digits == digits[0] * 14:
-        return False
-
-    for weights, length in ((_CNPJ_WEIGHTS_FIRST, 12), (_CNPJ_WEIGHTS_SECOND, 13)):
-        total = sum(int(digits[index]) * weights[index] for index in range(length))
-        remainder = total % 11
-        check = 0 if remainder < 2 else 11 - remainder
-        if check != int(digits[length]):
-            return False
-    return True
-
-
-# Host fragments a merchant-provided social link is expected to point at. A
-# link whose host clearly belongs to a different network is almost always a
-# paste error (or worse) -- rejected with a clear message rather than shown
-# as that network's icon on the storefront. website_url is intentionally
-# unconstrained (any http/https host).
-_SOCIAL_URL_HOST_HINTS = {
-    "instagram_url": ("instagram.com", "instagr.am"),
-    "facebook_url": ("facebook.com", "fb.com", "fb.me"),
-    "tiktok_url": ("tiktok.com",),
-    "youtube_url": ("youtube.com", "youtu.be"),
-}
+def _as_serializer_validation_error(error: DjangoValidationError) -> None:
+    messages = getattr(error, "messages", None)
+    if messages and len(messages) == 1:
+        raise serializers.ValidationError(messages[0]) from error
+    raise serializers.ValidationError(messages or str(error)) from error
 
 
 class MerchantProfileSerializer(serializers.ModelSerializer):
@@ -2164,74 +2129,34 @@ class MerchantProfileSerializer(serializers.ModelSerializer):
         ]
 
     def validate_tax_id(self, value: str) -> str:
-        digits = MerchantProfile.normalize_digits(value)
-        if not digits:
-            return ""
-
-        if len(digits) == 11:
-            if not _is_valid_cpf(digits):
-                raise serializers.ValidationError("CPF invalido.")
-        elif len(digits) == 14:
-            if not _is_valid_cnpj(digits):
-                raise serializers.ValidationError("CNPJ invalido.")
-        else:
-            raise serializers.ValidationError(
-                "Informe um CPF (11 digitos) ou CNPJ (14 digitos)."
-            )
-        return digits
+        try:
+            return clean_merchant_tax_id(value)
+        except DjangoValidationError as error:
+            _as_serializer_validation_error(error)
 
     def validate_contact_phone(self, value: str) -> str:
-        digits = MerchantProfile.normalize_digits(value)
-        if not digits:
-            return ""
-        if len(digits) < 10 or len(digits) > 13:
-            raise serializers.ValidationError(
-                "Informe o telefone com DDD. Ex.: 71 3333-4444."
-            )
-        return digits
+        try:
+            return clean_merchant_contact_phone(value)
+        except DjangoValidationError as error:
+            _as_serializer_validation_error(error)
 
     def validate_postal_code(self, value: str) -> str:
-        digits = MerchantProfile.normalize_digits(value)
-        if not digits:
-            return ""
-        if len(digits) != 8:
-            raise serializers.ValidationError("O CEP deve ter 8 digitos.")
-        return digits
+        try:
+            return clean_merchant_postal_code(value)
+        except DjangoValidationError as error:
+            _as_serializer_validation_error(error)
 
     def validate_country(self, value: str) -> str:
-        normalized = (value or "").strip().upper()
-        if not normalized:
-            return "BR"
-        if len(normalized) != 2 or not normalized.isalpha():
-            raise serializers.ValidationError(
-                "Use o codigo de pais com 2 letras. Ex.: BR."
-            )
-        return normalized
+        try:
+            return clean_merchant_country(value)
+        except DjangoValidationError as error:
+            _as_serializer_validation_error(error)
 
     def _validate_public_url(self, field_name: str, value: str) -> str:
-        normalized = (value or "").strip()
-        if not normalized:
-            return ""
-
         try:
-            merchant_url_validator(normalized)
+            return clean_merchant_public_url(field_name, value)
         except DjangoValidationError as error:
-            raise serializers.ValidationError(
-                "Informe um link valido comecando com https://."
-            ) from error
-
-        host = urlparse(normalized).netloc.lower()
-        if host.startswith("www."):
-            host = host[4:]
-        expected_hosts = _SOCIAL_URL_HOST_HINTS.get(field_name)
-        if expected_hosts and not any(
-            host == candidate or host.endswith(f".{candidate}")
-            for candidate in expected_hosts
-        ):
-            raise serializers.ValidationError(
-                f"Este link nao parece ser do {expected_hosts[0]}."
-            )
-        return normalized
+            _as_serializer_validation_error(error)
 
     def validate_website_url(self, value: str) -> str:
         return self._validate_public_url("website_url", value)

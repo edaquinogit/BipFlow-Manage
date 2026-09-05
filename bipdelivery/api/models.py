@@ -1,6 +1,7 @@
 import secrets
 import uuid
 from decimal import Decimal
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
@@ -1105,6 +1106,147 @@ BRAZILIAN_UF_CODES = (
 ).split()
 
 
+def normalize_merchant_digits(value: str | None) -> str:
+    """Return only the decimal digits of a merchant-provided identifier."""
+    return "".join(character for character in str(value or "") if character.isdigit())
+
+
+def _is_valid_merchant_cpf(digits: str) -> bool:
+    """Standard mod-11 CPF check-digit validation."""
+    if len(digits) != 11 or digits == digits[0] * 11:
+        return False
+
+    for length in (9, 10):
+        total = sum(
+            int(digits[index]) * ((length + 1) - index) for index in range(length)
+        )
+        check = (total * 10) % 11 % 10
+        if check != int(digits[length]):
+            return False
+    return True
+
+
+_MERCHANT_CNPJ_WEIGHTS_FIRST = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+_MERCHANT_CNPJ_WEIGHTS_SECOND = [6, *_MERCHANT_CNPJ_WEIGHTS_FIRST]
+
+
+def _is_valid_merchant_cnpj(digits: str) -> bool:
+    """Standard mod-11 CNPJ check-digit validation."""
+    if len(digits) != 14 or digits == digits[0] * 14:
+        return False
+
+    for weights, length in (
+        (_MERCHANT_CNPJ_WEIGHTS_FIRST, 12),
+        (_MERCHANT_CNPJ_WEIGHTS_SECOND, 13),
+    ):
+        total = sum(int(digits[index]) * weights[index] for index in range(length))
+        remainder = total % 11
+        check = 0 if remainder < 2 else 11 - remainder
+        if check != int(digits[length]):
+            return False
+    return True
+
+
+def clean_merchant_tax_id(value: str | None) -> str:
+    """Normalize and validate a Brazilian CPF/CNPJ for MerchantProfile."""
+    digits = normalize_merchant_digits(value)
+    if not digits:
+        return ""
+
+    if len(digits) == 11:
+        if not _is_valid_merchant_cpf(digits):
+            raise ValidationError("CPF invalido.")
+    elif len(digits) == 14:
+        if not _is_valid_merchant_cnpj(digits):
+            raise ValidationError("CNPJ invalido.")
+    else:
+        raise ValidationError("Informe um CPF (11 digitos) ou CNPJ (14 digitos).")
+    return digits
+
+
+def clean_merchant_contact_phone(value: str | None) -> str:
+    """Normalize and validate the merchant commercial phone number."""
+    digits = normalize_merchant_digits(value)
+    if not digits:
+        return ""
+    if len(digits) < 10 or len(digits) > 13:
+        raise ValidationError("Informe o telefone com DDD. Ex.: 71 3333-4444.")
+    return digits
+
+
+def clean_merchant_postal_code(value: str | None) -> str:
+    """Normalize and validate a Brazilian CEP for MerchantProfile."""
+    digits = normalize_merchant_digits(value)
+    if not digits:
+        return ""
+    if len(digits) != 8:
+        raise ValidationError("O CEP deve ter 8 digitos.")
+    return digits
+
+
+def clean_merchant_country(value: str | None) -> str:
+    """Normalize and validate the two-letter country code."""
+    normalized = (value or "").strip().upper()
+    if not normalized:
+        return "BR"
+    if len(normalized) != 2 or not normalized.isalpha():
+        raise ValidationError("Use o codigo de pais com 2 letras. Ex.: BR.")
+    return normalized
+
+
+# Host fragments a merchant-provided social link is expected to point at. A
+# link whose host clearly belongs to a different network is almost always a
+# paste error (or worse) -- rejected with a clear message rather than shown
+# as that network's icon on the storefront. website_url is intentionally
+# unconstrained (any http/https host).
+MERCHANT_SOCIAL_URL_HOST_HINTS = {
+    "instagram_url": ("instagram.com", "instagr.am"),
+    "facebook_url": ("facebook.com", "fb.com", "fb.me"),
+    "tiktok_url": ("tiktok.com",),
+    "youtube_url": ("youtube.com", "youtu.be"),
+}
+
+
+def normalize_merchant_public_url(value: str | None) -> str:
+    """Trim optional public URL fields without changing their content."""
+    return (value or "").strip()
+
+
+def validate_merchant_social_url_host(field_name: str, value: str | None) -> None:
+    """Validate social URL host compatibility for network-specific fields."""
+    normalized = normalize_merchant_public_url(value)
+    if not normalized:
+        return
+
+    expected_hosts = MERCHANT_SOCIAL_URL_HOST_HINTS.get(field_name)
+    if not expected_hosts:
+        return
+
+    host = urlparse(normalized).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not any(
+        host == candidate or host.endswith(f".{candidate}")
+        for candidate in expected_hosts
+    ):
+        raise ValidationError(f"Este link nao parece ser do {expected_hosts[0]}.")
+
+
+def clean_merchant_public_url(field_name: str, value: str | None) -> str:
+    """Normalize and validate an optional public MerchantProfile URL."""
+    normalized = normalize_merchant_public_url(value)
+    if not normalized:
+        return ""
+
+    try:
+        merchant_url_validator(normalized)
+    except ValidationError as error:
+        raise ValidationError("Informe um link valido comecando com https://.") from error
+
+    validate_merchant_social_url_host(field_name, normalized)
+    return normalized
+
+
 class MerchantProfile(models.Model):
     """Commercial identity, contact, address and social links for one Store.
 
@@ -1228,7 +1370,61 @@ class MerchantProfile(models.Model):
     @staticmethod
     def normalize_digits(value: str | None) -> str:
         """Return only the decimal digits of `value` (CEP/CPF/CNPJ/phone)."""
-        return "".join(character for character in str(value or "") if character.isdigit())
+        return normalize_merchant_digits(value)
+
+    def _normalize_cleanable_fields(self, exclude: set[str] | None = None) -> None:
+        excluded = exclude or set()
+        if "tax_id" not in excluded:
+            self.tax_id = normalize_merchant_digits(self.tax_id)
+        if "contact_phone" not in excluded:
+            self.contact_phone = normalize_merchant_digits(self.contact_phone)
+        if "postal_code" not in excluded:
+            self.postal_code = normalize_merchant_digits(self.postal_code)
+        if "country" not in excluded:
+            self.country = (self.country or "").strip().upper() or "BR"
+        for field_name in self.SOCIAL_URL_FIELDS:
+            if field_name not in excluded:
+                setattr(
+                    self,
+                    field_name,
+                    normalize_merchant_public_url(getattr(self, field_name)),
+                )
+
+    def clean_fields(self, exclude=None) -> None:
+        """Normalize masks before model field validators check max_length."""
+        self._normalize_cleanable_fields(set(exclude or []))
+        super().clean_fields(exclude=exclude)
+
+    def clean(self) -> None:
+        """Apply MerchantProfile invariants for ModelForm/admin validation."""
+        super().clean()
+        self._normalize_cleanable_fields()
+
+        errors = {}
+        field_cleaners = {
+            "tax_id": clean_merchant_tax_id,
+            "contact_phone": clean_merchant_contact_phone,
+            "postal_code": clean_merchant_postal_code,
+            "country": clean_merchant_country,
+        }
+        for field_name, cleaner in field_cleaners.items():
+            try:
+                setattr(self, field_name, cleaner(getattr(self, field_name)))
+            except ValidationError as error:
+                errors[field_name] = error.messages
+
+        for field_name in self.SOCIAL_URL_FIELDS:
+            try:
+                setattr(
+                    self,
+                    field_name,
+                    clean_merchant_public_url(field_name, getattr(self, field_name)),
+                )
+            except ValidationError as error:
+                errors[field_name] = error.messages
+
+        if errors:
+            raise ValidationError(errors)
 
     @classmethod
     def get_for_store(cls, store: "Store") -> "MerchantProfile":
