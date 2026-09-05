@@ -187,4 +187,31 @@ describe('buildStorefrontColorTokens', () => {
     const tokens = buildStorefrontColorTokens({ muted: '#777777', surface: '#FFFFFF' })
     expect(contrastRatio(tokens.textMuted, tokens.surface)).toBeGreaterThanOrEqual(AA_LARGE_CONTRAST)
   })
+
+  // brandOnLightContrast is the foreground for text/icons drawn *on top of*
+  // brandOnLight itself (e.g. the selected chip), not on top of the raw
+  // brand -- brandContrast is picked against `brand` and is not guaranteed
+  // to still pass once brandOnLight has darkened a pale/vivid brand for its
+  // own AA pass against `surface`.
+  describe('brandOnLightContrast', () => {
+    it.each([
+      ['a pale/vivid yellow', '#FFE600'],
+      ['a dark colour', '#111827'],
+      ['a light saturated colour', SATURATED_LIGHT],
+      ['an intermediate grey', '#767676'],
+    ])('passes AA against brandOnLight for %s', (_label, brand) => {
+      const tokens = buildStorefrontColorTokens({ brand })
+      expect(contrastRatio(tokens.brandOnLightContrast, tokens.brandOnLight)).toBeGreaterThanOrEqual(
+        AA_CONTRAST,
+      )
+    })
+
+    it('differs from brandContrast when brandOnLight had to darken a pale brand', () => {
+      const tokens = buildStorefrontColorTokens({ brand: '#FFE600' })
+      // brandOnLight is darkened well past the point where the foreground
+      // picked for the original #FFE600 (near-black) still passes AA on it.
+      expect(contrastRatio(tokens.brandContrast, tokens.brandOnLight)).toBeLessThan(AA_CONTRAST)
+      expect(tokens.brandOnLightContrast).not.toBe(tokens.brandContrast)
+    })
+  })
 })

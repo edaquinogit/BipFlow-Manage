@@ -45,6 +45,7 @@ describe('buildStoreBranding', () => {
       '--store-brand-strong',
       '--store-brand-soft',
       '--store-brand-on-light',
+      '--store-brand-on-light-contrast',
       '--store-focus',
     ]) {
       expect(vars[token]).toMatch(/^#[0-9A-F]{6}$/)
@@ -63,6 +64,11 @@ describe('buildStoreBranding', () => {
     // white text is hardcoded next to several `bg-[var(--store-primary)]`
     // chips -- that pairing must also pass.
     expect(contrastRatio('#FFFFFF', vars['--store-primary']!)).toBeGreaterThanOrEqual(4.5)
+    // Selected chip: background is --store-brand-on-light, so its text must
+    // be picked against that colour, not against the original --store-brand.
+    expect(
+      contrastRatio(vars['--store-brand-on-light-contrast']!, vars['--store-brand-on-light']!),
+    ).toBeGreaterThanOrEqual(4.5)
   })
 
   it('gives a dark brand a light CTA foreground', () => {

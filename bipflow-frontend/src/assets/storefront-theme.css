@@ -21,6 +21,7 @@
   --store-brand-soft: color-mix(in srgb, var(--store-primary) 12%, white);
   --store-brand-strong: var(--store-primary-hover, var(--store-primary));
   --store-brand-on-light: var(--store-primary);
+  --store-brand-on-light-contrast: #ffffff;
   --store-focus: var(--store-primary);
   --store-card-shadow: 0 18px 40px -30px rgba(5, 5, 10, 0.6);
 
@@ -201,7 +202,10 @@
 .storefront-chip--on {
   border-color: var(--store-brand-on-light);
   background: var(--store-brand-on-light);
-  color: var(--store-brand-contrast);
+  /* Not --store-brand-contrast: that foreground is picked against the raw
+     --store-brand, not against the darkened --store-brand-on-light fill
+     this chip actually uses as its background. */
+  color: var(--store-brand-on-light-contrast);
 }
 
 /* Sheet transition (bottom sheet on mobile, centred on >=sm). */

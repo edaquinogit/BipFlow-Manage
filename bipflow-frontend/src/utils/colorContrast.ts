@@ -200,6 +200,15 @@ export interface StorefrontColorTokens {
   brandSoft: string
   brandInk: string
   brandOnLight: string
+  /**
+   * Foreground for text/icons placed *on top of* a `brandOnLight` fill
+   * (e.g. a selected chip). `brandOnLight` is brand darkened to pass AA
+   * against `surface` -- a different colour from `brand` itself -- so
+   * `brandContrast` (picked against the original `brand`) is not
+   * guaranteed to still pass against it. This token is picked against
+   * `brandOnLight` directly.
+   */
+  brandOnLightContrast: string
   focus: string
 }
 
@@ -233,6 +242,7 @@ export function buildStorefrontColorTokens(raw: RawStoreColors): StorefrontColor
   const brand = normalizeHex(raw.brand) ?? SAFE_BRAND
   const brandContrast = pickForeground(brand)
   const brandOnLight = deriveReadableBrandOnLight(brand, surface)
+  const brandOnLightContrast = pickForeground(brandOnLight)
   const border = mix(surface, text, 0.14)
   const focus = deriveReadableBrandOnLight(brand, surface, AA_LARGE_CONTRAST)
 
@@ -248,6 +258,7 @@ export function buildStorefrontColorTokens(raw: RawStoreColors): StorefrontColor
     brandSoft: deriveBrandSoft(brand, surface),
     brandInk: brandOnLight,
     brandOnLight,
+    brandOnLightContrast,
     focus,
   }
 }

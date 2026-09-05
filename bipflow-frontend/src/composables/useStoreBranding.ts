@@ -85,6 +85,7 @@ export function buildStoreBranding(store: Store | null | undefined): StoreBrandi
       '--store-brand-soft': safe.brandSoft,
       '--store-brand-ink': safe.brandInk,
       '--store-brand-on-light': safe.brandOnLight,
+      '--store-brand-on-light-contrast': safe.brandOnLightContrast,
       '--store-focus': safe.focus,
       // Backwards-compatible aliases so existing storefront components
       // (ProductCard, CartDrawer, ...) inherit the safe palette unchanged.

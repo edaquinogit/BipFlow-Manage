@@ -565,19 +565,24 @@ useStorefrontOverlay(toRef(props, 'isOpen'))
 type CheckoutStep = 'review' | 'details'
 const step = ref<CheckoutStep>('review')
 
-function moveFocus(target: HTMLElement | null): void {
-  void nextTick(() => target?.focus())
+// Takes a getter, not a resolved element: the destination step's heading
+// isn't in the DOM yet at the call site below (it only renders once Vue
+// processes the `step` change), so its ref is still null until then --
+// reading `.value` has to happen inside the nextTick callback, after the
+// patch, not before it.
+function moveFocus(getTarget: () => HTMLElement | null): void {
+  void nextTick(() => getTarget()?.focus())
 }
 
 function goToDetails(): void {
   if (!canContinue.value) return
   step.value = 'details'
-  moveFocus(detailsHeadingRef.value)
+  moveFocus(() => detailsHeadingRef.value)
 }
 
 function goToReview(): void {
   step.value = 'review'
-  moveFocus(reviewHeadingRef.value)
+  moveFocus(() => reviewHeadingRef.value)
 }
 
 // Reset to 'review' whenever the drawer (re)opens or the cart empties -- but

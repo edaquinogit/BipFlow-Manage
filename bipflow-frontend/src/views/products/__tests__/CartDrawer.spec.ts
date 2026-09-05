@@ -116,6 +116,25 @@ describe('CartDrawer', () => {
       expect(wrapper.find('[data-cy="checkout-submit-button"]').exists()).toBe(false)
     })
 
+    it('moves focus to the details heading after advancing to the details step', async () => {
+      const wrapper = mountDrawer()
+      await goToDetails(wrapper)
+
+      const detailsHeading = wrapper.get('h3')
+      expect(detailsHeading.text()).toContain('Finalizar pedido')
+      expect(document.activeElement).toBe(detailsHeading.element)
+    })
+
+    it('moves focus to the review heading after going back to "Voltar ao pedido"', async () => {
+      const wrapper = mountDrawer()
+      await goToDetails(wrapper)
+      await wrapper.get('[aria-label="Voltar ao pedido"]').trigger('click')
+
+      const reviewHeading = wrapper.get('h2')
+      expect(reviewHeading.text()).toContain('Pedido')
+      expect(document.activeElement).toBe(reviewHeading.element)
+    })
+
     it('preserves typed customer data across a back-and-forth', async () => {
       const wrapper = mountDrawer()
       await goToDetails(wrapper)
